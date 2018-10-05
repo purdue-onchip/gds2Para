@@ -1,0 +1,422 @@
+#!/usr/bin/perl
+use strict;
+#REV='@(#)$Id: gdsinfo 18 2007-05-19 02:07:28Z schumack $ $Revision: 18 $ $Date: 2007-05-18 21:07:28 -0500 (Fri, 18 May 2007) $ subversion icrepo';
+require 5.008;
+use warnings;
+our $VERSION = sprintf("%s", q$Revision: 18 $ =~ /(\d[\.\d]*)/); ##subversion compatible
+BEGIN
+{
+    use constant TRUE   => 1;
+    use constant FALSE  => 0;
+    use constant DEBUG   => 'DEBUG:   ';
+    use constant ERROR   => 'ERROR:   ';
+    use constant WARNING => 'WARNING: ';
+    use constant INFO    => 'INFO:    ';
+    use constant NOTE    => 'NOTE:    ';
+}
+use Getopt::Long qw(GetOptions);
+use Term::ANSIColor;
+use FileHandle;
+use IPC::Open3;
+use Pod::Usage;
+use File::Basename;
+
+# declare subroutines
+sub printTree($$);
+sub printUsage;
+sub printUsageInXterm;
+sub printVersion;
+sub which($;$);
+
+$|=1;    ## serve stdout hot
+$\="\n"; ## default print() ending
+
+my $super3 = '³'; ##a superscript 3 - not visible unless your font set has it
+my $REVERSE_YELLOW  = '';
+my $REVERSE_RED     = '';
+my $REVERSE_BLUE    = '';
+my $REVERSE_GREEN   = '';
+my $REVERSE_CYAN    = '';
+my $REVERSE_MAGENTA = '';
+my $REVERSE         = '';
+my $COLOR_RESET     = '';
+
+my $G_color         = FALSE;
+my $debug           = FALSE;
+my $depth           = 0;
+my $doLayerSummary  = TRUE;
+my $inputFile       = '';
+my $listCellDefines = FALSE;
+my $outputFile      = '';
+my $printLevelNum   = FALSE;
+my $textDumpCells   = $super3; # this means "no cells"
+my $topCellNames    = '';
+my $treeView        = FALSE;
+GetOptions(
+        'celldefines!'     => \$listCellDefines,
+        'color!'           => \$G_color,
+        'debug!'           => \$debug,
+        'depth:i'          => \$depth,
+        'help'             => \&printUsage,
+        'inputfile:s'      => \$inputFile,
+        'outputfile:s'     => \$outputFile,
+        'printlevelnum!'   => \$printLevelNum,
+        'summarizelayers!' => \$doLayerSummary,
+        'textdumpcells:s'  => \$textDumpCells,
+        'topcellnames:s'   => \$topCellNames,
+        'treeview!'        => \$treeView,
+        'version'          => \&printVersion,
+        'xhelp|xtermhelp'  => \&printUsageInXterm,        
+    ) || printUsage();
+
+$textDumpCells =~ s/,/ /g;
+$textDumpCells =~ s/\s+/ /g;
+$topCellNames =~ s/,/ /g;
+$topCellNames =~ s/\s+/ /g;
+
+# help find gds2gdt
+my $uname_s = `/bin/uname -s`; # OS name
+chomp $uname_s;
+$ENV{'PATH'} = "/bin:/usr/bin:/user/ic/gnu/$uname_s/bin:".$ENV{'PATH'};
+my $gds2gdt = which("gds2gdt");
+unless ($gds2gdt)
+{
+    die $REVERSE_RED.ERROR."$COLOR_RESET unable to find gds2gdt in \$PATH";
+}
+if ($G_color)
+{
+    $REVERSE         = color('bold reverse');
+    $REVERSE_RED     = color('bold reverse red on_black');
+    $REVERSE_YELLOW  = color('bold reverse yellow on_black');
+    $REVERSE_GREEN   = color('bold reverse green on_black');
+    $REVERSE_CYAN    = color('bold reverse cyan on_black');
+    $REVERSE_MAGENTA = color('bold reverse magenta on_black');
+    $REVERSE_BLUE    = color('bold reverse blue on_white');
+    $COLOR_RESET     = color('reset');
+}
+my @G_colors = (
+    $REVERSE,
+    $REVERSE_RED,
+    $REVERSE_YELLOW,
+    $REVERSE_GREEN,
+    $REVERSE_CYAN,
+    $REVERSE_MAGENTA,
+    $REVERSE_BLUE,
+);
+my $G_maxColors = $#G_colors + 1 ;
+
+my %polygonLayers = (); #polygon layers
+my %textLayers    = (); #text layers
+
+if (! -e $gds2gdt)
+{
+    print $REVERSE_RED,ERROR,"$COLOR_RESET unable to find gds2gdt $!";
+    exit 3;
+}
+
+## get input file name
+$inputFile = shift if ($#ARGV >= 0);
+if ($inputFile eq '') 
+{
+    
+    printf "Input file: ";
+    $inputFile = <STDIN>;
+}
+$inputFile =~ s/\s+//g;
+if (($inputFile eq '') || (! -r $inputFile))
+{
+    print $REVERSE_RED,ERROR,"$COLOR_RESET unable to read input file $inputFile $!";
+}
+
+## get output file name
+my $fhOut;
+if ($outputFile ne '')
+{
+    open($fhOut,">$outputFile") or die $REVERSE_RED.ERROR."$COLOR_RESET unable to create output file $outputFile $!";
+}
+else
+{
+    $fhOut = *STDOUT;
+}
+
+## open3 gives us more control than a plain open - perldoc IPC::Open3 - for more information
+my $fhGdt = new FileHandle;
+my $fhJunk = new FileHandle; # not using write
+my $cellName = '';
+my %cellCallNum = ();
+my %G_cellHasRefs = ();
+my %G_cellRefs = ();
+open3($fhJunk,$fhGdt,$fhGdt,$gds2gdt,$inputFile,'-out','-') or die $REVERSE_RED.ERROR."$COLOR_RESET unable to run gds2gdt on file $inputFile $!";
+while (<$fhGdt>)
+{
+    chomp;
+    s/^\s+//;
+    s/^#.*//;
+    if (m/^[bp]{(\d+)/) # boundary or path polygon
+    {
+        #p{100 dt2 w1.5 xy(2.61 0 2.61 11.5)}
+        #b{69 dt44 xy(-0.14 -0.14 0.14 -0.14 0.14 0.14 -0.14 0.14)}
+        my $layer = $1;
+        $polygonLayers{$layer}++;
+        #my $dt = 0; #init data type
+        #if (m/ dt(\d+)/)
+        #{
+        #    $dt = $1;
+        #}
+    }
+    elsif (m/^t{(\d+)/) # text
+    {
+        #t{69 tt5 mc m0.15 a90 xy(3.255 8.24) 'out_b'}
+        my $layer = $1;
+        $textLayers{$layer}++;
+        my $tt = 0; #init text type
+        if (m/ tt(\d+)/)
+        {
+            $tt = $1;
+        }
+        if (($textDumpCells eq '') || ($textDumpCells =~ m/\b$cellName\b/i))
+        {
+            if (m/^t{(\d+)\s.*xy\(([^\)]+)\)\s+'([^']+)'/)
+            { #t{69 tt5 m0.3 a270 xy(506.52 1669.61) 'ABC[0]'}
+                print "$cellName: $3 $1:$tt ($2)";
+            }
+        }
+    }
+    elsif (m/^[as]{'([^']+)'/) # aref or sref
+    { # s{'via2' xy(0 1.8)}
+        my $cellRefName = $1;
+        $cellCallNum{$cellRefName} += 1;
+        $G_cellHasRefs{$cellName} = TRUE;
+        push @{$G_cellRefs{$cellName}},$cellRefName unless(" @{$G_cellRefs{$cellName}} " =~ m/ $cellRefName /);
+    }
+    elsif (m/^cell.*'([^']+)'/)
+    { # cell{c=1979-12-31 18:00:00 m=2005-06-02 14:03:46 'abcd'
+        $cellName = $1;
+        $cellCallNum{$cellName} += 0;
+        @{$G_cellRefs{$cellName}} = ();
+        $G_cellHasRefs{$cellName} = FALSE; #init
+        print "$cellName" if ($listCellDefines);
+    }
+}
+$fhGdt -> close;
+
+if ($doLayerSummary)
+{
+    printf "\n";
+    printf "Polygon layers:";
+    foreach my $layer (sort {$a <=> $b} keys %polygonLayers)
+    {
+        printf " $layer";
+    }
+    printf "\n";
+
+    printf "Text layers:";
+    foreach my $layer (sort {$a <=> $b} keys %textLayers)
+    {
+        printf " $layer";
+    }
+    printf "\n";
+}
+
+if ($treeView)
+{
+    printf "\n";
+    foreach my $cellName (sort keys %cellCallNum)
+    {
+        if ($topCellNames)
+        {
+            if (" $topCellNames " =~ m/ $cellName /)
+            {
+                printTree($cellName,"");
+            }
+        }
+        elsif ($cellCallNum{$cellName} == 0) # then top cell
+        {
+            printTree($cellName,"");
+        }
+    }
+}
+################################################################################
+################################################################################
+
+#######
+sub printTree($$)
+{
+    my $name = shift;
+    my $indent = shift;
+    my $color2use = '';
+    my $levelNum = sprintf("%02d",(length($indent)/2));
+    return if ($depth && ($levelNum > $depth));
+    if ($G_color)
+    {
+        my $colorIndex = $levelNum % $G_maxColors;
+        $color2use= $G_colors[$colorIndex];
+    }
+    $levelNum = '' unless($printLevelNum);
+    print "$color2use$levelNum$indent$COLOR_RESET$name";
+    return unless($G_cellHasRefs{$name});
+    $indent .= ". ";
+    foreach my $refName (sort @{$G_cellRefs{$name}})
+    {
+        printTree($refName, $indent);
+    }
+}
+################################################################################
+
+#######
+sub printUsage
+{
+    my $extraMessage = shift;
+    if (defined($extraMessage))
+    {
+        print "$extraMessage\n";
+        pod2usage(-message => "$extraMessage\n", -exitval => 0,-verbose => 2);
+    }
+    else
+    {
+        pod2usage(-exitval => 0,-verbose => 2);
+    }
+}
+################################################################################
+
+#######
+sub printVersion()
+{
+    my(%arg) = @_;
+    my $exit = $arg{'-exit'};
+    $exit = TRUE unless(defined($exit));
+
+    my $versionInfo = basename($0).": $VERSION";
+    print $versionInfo;
+    CORE::exit(0) if($exit);
+    $versionInfo;
+}
+################################################################################
+
+#######
+sub printUsageInXterm
+{
+    system("xterm -e '$0 -help' &");
+    exit 0;
+}
+################################################################################
+
+# like unix which command
+#######
+sub which($;$)
+{
+    my $fileName = shift;
+    chomp $fileName;
+    my $all = shift;
+    $all = '' if (! defined $all);
+    my $separator = ':';
+    $separator = ';' if ($^O =~ /(Win32|dos|os2)/i);
+    my $path = $ENV{'PATH'};
+    my @dirs = split(/$separator/,$path);
+    my $result = '';
+    my $foundIt = 0;
+    foreach my $dir (@dirs)
+    {
+        $dir =~ s|(\w)/$|$1|; # remove trailing '/'
+        next if (-d "$dir/$fileName/."); ## it's a directory...
+        if (-d $dir)
+        {
+            my @matches = ();
+            opendir(DIR, $dir) || next;
+            my @dirFiles = readdir DIR;
+            closedir DIR;
+            @matches = grep(/^$fileName$/,@dirFiles);
+            foreach my $match (@matches)
+            {
+                next if (-d "$dir/$match/."); ## it's a directory...
+                if (-x "$dir/$match")
+                {
+                    $result .= "$dir/$match ";
+                    $foundIt = 1;
+                    last if ($all eq '');
+                }
+            }
+        }
+        last if ($foundIt && ($all eq ''));
+    }
+    $result =~ s/ $//;
+    $result;
+}
+################################################################################
+
+__END__
+
+=pod
+=head1 NAME 
+
+gdsinfo - Provide information about the contents of a GDS2 stream file.
+
+=head1 SYNOPSIS
+
+gdsinfo [options] [gds2file]
+
+=head1 EXAMPLE
+
+  gdsinfo -tree -nosum chip.gds
+
+=head1 OPTIONS
+
+ Note: options are case-insensitive and can be shortened as long they remain unique.
+
+  -cellDefines  or  -noCellDefines
+    default is -nocelldefines
+    List names of cells defined in the GDS2 file
+
+  -color  or  -noColor
+    default is -noColor
+    whether to use color highlights on output
+ 
+  -debug
+    programmer option
+
+  -depth <integer>
+    use with -treeView to specify hierarcy depth to display
+    default is all levels
+
+  -help
+    print this and exit
+
+  -inputFile <filePath>
+    default is first filename on command line
+
+  -outputFile <filePath>
+    default is to print to screen
+    
+  -printLevelNum  or  -noPrintLevelNum
+    default is -noPrintLevelNum
+    use with -treeView to print hierarcy depth of cell
+
+  -summarizeLayers  or  -noSummarizeLayers
+    default is -summarizeLayers
+    Output polygon and text layer summary
+
+  -textDumpCells [cellName(s)]
+    Dump text locations for specified cell names.
+    If no cell names are given for option, then dump all cells.
+    I.e. -textDump cella,cellb,cellc
+    Format is: 
+    name: text layer:textType (x y)
+    CHIP: VDDA 53:0 (0.3 7.905)
+
+  -topCellName <cellName(s)]
+    default is all top cells
+    start -tree listing at cell name
+    I.e. -topcell via,contact
+
+  -treeView  or  -noTreeView
+    default is -noTreeView
+    list cell name contents indenting hierarchy
+
+  -version
+    print version and exit
+
+  -xhelp  or  -xtermHelp
+    open help in temporary xterm window
+
+=cut
+

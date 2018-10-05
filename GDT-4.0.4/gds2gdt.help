@@ -1,0 +1,30 @@
+
+NAME
+       gds2gdt - tool to convert binary gds2 to textual gdt format
+
+SYNOPSIS
+       gds2gdt [options] [inputFile] [outputFile]
+
+OPTIONS
+       Note: options are case-insensitive and can be shortened as long they
+       remain unique.
+
+         -help
+           print this and exit
+
+         -inFilename <fileName>
+           default is STDIN
+           also filename of '-' means STDIN
+
+         -outFilename <fileName>
+           default is STDOUT
+           also filename of '-' means STDOUT
+
+         -version
+           print version of program and quit
+
+EXAMPLES
+       gds2gdt test.gds test.gdt
+
+       zcat test.gds.gz | gds2gdt | grep ^cell
+

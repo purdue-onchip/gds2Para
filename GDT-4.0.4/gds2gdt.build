@@ -1,0 +1,54 @@
+#!/bin/tcsh -f
+set path=($path /bin /usr/bin) ## for getconf uname rm echo gcc
+set OS=`uname -s`
+rm gds2gdt.$OS >& /dev/null
+#-----------------------------------------------------------------
+#set CCFLAGS="-D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64"
+set CCFLAGS=`getconf LFS_CFLAGS` #Large File Support
+
+set EXTRA_LIBS="-L. -L/usr/lib -lm"
+#set EXTRA_LIBS="-L. -L/usr/lib64 -lm" #for x86_64
+
+#set CC="gcc -m32" ## some solaris machines need this
+set CC="gcc"
+
+set EXTRA_INCLUDES="-I."
+
+set LIBDIR="/usr/lib"
+#set LIBDIR="/usr/lib64" #for x86_64
+
+#-----------------------------------------------------------------
+
+rm *.o >& /dev/null
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES sRemoveTrailingZeros ====
+$CC $CCFLAGS $EXTRA_INCLUDES sRemoveTrailingZeros.C -c -O -o sRemoveTrailingZeros.o  
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES get_field =======
+$CC $CCFLAGS $EXTRA_INCLUDES get_field.c -c -O -o get_field.o  
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES stoupper =======
+$CC $CCFLAGS $EXTRA_INCLUDES stoupper.c -c -O -o stoupper.o  
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES sfind =======
+$CC $CCFLAGS $EXTRA_INCLUDES sfind.C -c -O -o sfind.o  
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES match_string =======
+$CC $CCFLAGS $EXTRA_INCLUDES match_string.C -c -O -o match_string.o 
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES sRemoveSpaces =======
+$CC $CCFLAGS $EXTRA_INCLUDES sRemoveSpaces.C -c -O -o sRemoveSpaces.o  
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES sRemoveWhiteSpace ====
+$CC $CCFLAGS $EXTRA_INCLUDES sRemoveWhiteSpace.C -c -O -o sRemoveWhiteSpace.o  
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES gdsStream =======
+$CC $CCFLAGS $EXTRA_INCLUDES gdsStream.C -c -O -o gdsStream.o -Wno-deprecated
+
+echo $CC $CCFLAGS $EXTRA_INCLUDES $EXTRA_LIBS gds2gdt ======= 
+$CC gds2gdt.C -O -o gds2gdt.$OS $EXTRA_INCLUDES $EXTRA_LIBS -lstdc++ *.o -Wimplicit -Wreturn-type -Wswitch -Wcomment -Wformat -Wchar-subscripts -Wparentheses -Wpointer-arith -Wcast-qual -Woverloaded-virtual $LIBDIR/libm.a -static -Wno-deprecated
+
+strip gds2gdt.$OS
+rm *.o >& /dev/null
+echo created gds2gdt.$OS
+

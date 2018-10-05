@@ -1,0 +1,56 @@
+#!/bin/tcsh -f
+set path=($path /bin /usr/bin) ## for getconf uname rm echo gcc
+set OS=`uname -s`
+rm gdt2gds.$OS >& /dev/null
+#---------------------------------------------------------------
+#set CCFLAGS="-D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64"
+set CCFLAGS=`getconf LFS_CFLAGS` #Large File Support
+
+set EXTRA_LIBS="-L. -L/usr/lib -lm"
+#set EXTRA_LIBS="-L. -L/usr/lib64 -lm" #for x86_64
+
+#set CC="gcc -m32" #some solaris and others not 64 bit ready
+set CC="gcc"
+
+#set CCFLAGS="-D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64"
+set EXTRA_INCLUDES="-I." 
+
+set LIBDIR="/usr/lib"
+#set LIBDIR="/usr/lib64" #for x86_64
+
+set OPT='-O' ##'-g -pg'
+#---------------------------------------------------------------
+
+rm *.o >& /dev/null
+
+echo $CC $CCFLAGS sRemoveWhiteSpace ====
+$CC $CCFLAGS $EXTRA_INCLUDES sRemoveWhiteSpace.C -c $OPT -o sRemoveWhiteSpace.o
+
+echo $CC $CCFLAGS sRemoveTrailingZeros ====
+$CC $CCFLAGS $EXTRA_INCLUDES sRemoveTrailingZeros.C -c $OPT -o sRemoveTrailingZeros.o 
+
+echo $CC $CCFLAGS get_field =======
+$CC $CCFLAGS $EXTRA_INCLUDES get_field.c -c $OPT -o get_field.o 
+
+echo $CC $CCFLAGS stoupper =======
+$CC $CCFLAGS $EXTRA_INCLUDES stoupper.c -c $OPT -o stoupper.o  
+
+echo $CC $CCFLAGS sfind =======
+$CC $CCFLAGS $EXTRA_INCLUDES sfind.C -c $OPT -o sfind.o 
+
+echo $CC $CCFLAGS match_string =======
+$CC $CCFLAGS $EXTRA_INCLUDES match_string.C -c $OPT -o match_string.o 
+
+echo $CC $CCFLAGS sRemoveSpaces =======
+$CC $CCFLAGS $EXTRA_INCLUDES sRemoveSpaces.C -c $OPT -o sRemoveSpaces.o  
+
+echo $CC $CCFLAGS gdsStream =======
+$CC $CCFLAGS $EXTRA_INCLUDES gdsStream.C -c $OPT -Wno-deprecated
+
+echo $CC $CCFLAGS gdt2gds ======= 
+$CC $CCFLAGS $EXTRA_INCLUDES $EXTRA_LIBS gdt2gds.C $OPT -o gdt2gds.$OS *.o -lstdc++ $LIBDIR/libm.a -static -Wimplicit -Wreturn-type -Wswitch -Wcomment -Wformat -Wchar-subscripts -Wparentheses -Wpointer-arith -Wcast-qual -Woverloaded-virtual -Wno-deprecated
+
+strip gdt2gds.$OS
+rm *.o >& /dev/null
+echo "created gdt2gds.$OS"
+

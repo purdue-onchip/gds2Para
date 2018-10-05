@@ -1,0 +1,364 @@
+#!/usr/bin/perl -w
+#REV='@(#)$Id: scalegds 88 2013-05-22 20:44:55Z schumack $ $Revision: 88 $ $Date: 2013-05-22 15:44:55 -0500 (Wed, 22 May 2013) $ subversion icrepo'
+use strict;
+require 5.008;
+use warnings;
+our $VERSION = "0.1";
+our $REVISION = sprintf("%s", q$Revision: 88 $ =~ m/(\d[\.\d]*)/); ##subversion compatible
+# © copyright 2007 Ken Schumack
+BEGIN
+{
+    use constant TRUE    => 1;
+    use constant FALSE   => 0;
+    use constant DEBUG   => 'DEBUG:   ';
+    use constant ERROR   => 'ERROR:   ';
+    use constant WARNING => 'WARNING: ';
+    use constant INFO    => 'INFO:    ';
+    use constant NOTE    => 'NOTE:    ';
+    use constant TABOVER => '         ';
+}
+use File::Basename;
+use FileHandle;
+use IPC::Open3;
+use Getopt::Long qw(GetOptions);
+use Pod::Usage;
+use Term::ANSIColor;
+use Cwd;
+
+# declare subroutines
+sub printUsage;
+sub printUsageInXterm;
+sub printVersion;
+sub which($;$);
+
+$|=1;    ## serve stdout hot
+$\="\n"; ## default print() ending
+
+my $color = TRUE;
+$color = FALSE if ((! defined($ENV{'TERM'})) || ($ENV{'TERM'} eq 'hpterm'));
+$color = FALSE if (! -t 0); # not running interactive
+
+my $REVERSE_YELLOW  = color('bold reverse yellow on_black');
+my $REVERSE_RED     = color('bold reverse red on_black');
+my $REVERSE_CYAN    = color('bold reverse cyan on_black');
+my $REVERSE_GREEN   = color('bold reverse green on_black');
+my $REVERSE_MAGENTA = color('bold reverse magenta on_black');
+my $REVERSE_BLUE    = color('bold reverse blue on_white');
+my $REVERSE         = color('bold reverse');
+my $COLOR_RESET     = color('reset');
+
+my $debug                      = FALSE;
+my $factor                     = "";
+my $inputFile                  = "";
+my $outputFile                 = "";
+my $verbose                    = TRUE;
+GetOptions(
+    'debug!'                   => \$debug,
+    'factor:s'                 => \$factor,
+    'help'                     => \&printUsage,
+    'inputfile:s'              => \$inputFile,
+    'outputfile:s'             => \$outputFile,
+    'verbose!'                 => \$verbose,
+    'version'                  => \&printVersion,
+    'xhelp|xtermhelp'          => \&printUsageInXterm,
+) || printUsage();
+
+
+$verbose = TRUE if ($debug);
+unless ($color)
+{
+    $REVERSE_YELLOW = $REVERSE_RED = $REVERSE_CYAN = $REVERSE_GREEN = $REVERSE_MAGENTA = $REVERSE_BLUE = $REVERSE = $COLOR_RESET = '';
+}
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+$mon++; $year += 1900;
+# help find gds2gdt
+my $uname_s = `/bin/uname -s`; # OS name
+chomp $uname_s;
+$ENV{'PATH'} = "/bin:/usr/bin:/user/ic/gnu/$uname_s/bin:".$ENV{'PATH'};
+
+my $gds2gdt = which("gds2gdt");
+unless ($gds2gdt)
+{
+    die $REVERSE_RED.ERROR."$COLOR_RESET unable to find gds2gdt in \$PATH";
+}
+
+my $gdt2gds = which("gdt2gds");
+unless ($gdt2gds)
+{
+    die $REVERSE_RED.ERROR."$COLOR_RESET unable to find gdt2gds in \$PATH";
+}
+
+unless($factor)
+{
+    print STDERR $REVERSE_RED.ERROR."$COLOR_RESET missing -factor";
+    exit 6;
+}
+$factor = eval $factor;
+print STDERR $REVERSE_BLUE.DEBUG.__FILE__.":".__LINE__."$COLOR_RESET factor:$factor" if ($debug); 
+
+# get input file name
+$inputFile = shift if ($#ARGV >= 0);
+if ($inputFile eq '') 
+{
+    
+    printf "Input file: ";
+    $inputFile = <STDIN>;
+}
+$inputFile =~ s/\s+//g;
+if (($inputFile eq '') || (! -r $inputFile))
+{
+    print $REVERSE_RED,ERROR,"$COLOR_RESET unable to read input file $inputFile $!";
+    exit 2;
+}
+
+# get output file name
+$outputFile = shift if ($#ARGV >= 0);
+if ($outputFile eq '') 
+{
+    
+    printf "output file: ";
+    $outputFile = <STDIN>;
+}
+$outputFile =~ s/\s+//g;
+if ($outputFile eq '')
+{
+    print $REVERSE_RED,ERROR,"$COLOR_RESET must give output file";
+    exit 3;
+}
+my $scaledGDTInputFile = basename($inputFile)."_scaled_tmp.gdt";
+my $fhGdtNew = new FileHandle;
+open($fhGdtNew,">$scaledGDTInputFile") or die "Unable to create tmp file $scaledGDTInputFile because $!";
+
+my $fhGdt = new FileHandle;
+my $fhJunk = new FileHandle; # not using write
+
+if ($inputFile =~ m/\.(gz|Z)$/)
+{
+    my $zcat = which("zcat");
+    unless ($zcat)
+    {
+        die $REVERSE_RED.ERROR."$COLOR_RESET unable to find zcat in \$PATH";
+    }
+    print STDERR $REVERSE_BLUE.DEBUG.__FILE__.":".__LINE__."$COLOR_RESET $zcat --stdout $inputFile | gds2gdt -out -" if ($debug); 
+    open3($fhJunk,$fhGdt,$fhGdt,"$zcat --stdout $inputFile | gds2gdt -out -") or die $REVERSE_RED.ERROR."$COLOR_RESET unable to run gds2gdt on zcat'ed file $inputFile $!";
+}
+elsif ($inputFile =~ m/\.bz2$/)
+{
+    my $bzcat = which("bzcat");
+    unless ($bzcat)
+    {
+        die $REVERSE_RED.ERROR."$COLOR_RESET unable to find bzcat in \$PATH";
+    }
+    print STDERR $REVERSE_BLUE.DEBUG.__FILE__.":".__LINE__."$COLOR_RESET $bzcat --stdout $inputFile | gds2gdt -out -" if ($debug); 
+    open3($fhJunk,$fhGdt,$fhGdt,"$bzcat --stdout $inputFile | gds2gdt -out -") or die $REVERSE_RED.ERROR."$COLOR_RESET unable to run gds2gdt on bzcat'ed file $inputFile $!";
+}
+else
+{
+    open3($fhJunk,$fhGdt,$fhGdt,$gds2gdt,$inputFile,'-out','-') or die $REVERSE_RED.ERROR."$COLOR_RESET unable to run gds2gdt on file $inputFile $!";
+}
+print STDERR $REVERSE_CYAN.INFO."$COLOR_RESET calling gds2gdt" if ($verbose);
+my $debugLine = "";
+my $roundOut = 0; # set by lib line
+while (<$fhGdt>)
+{
+    my $line = $_;
+    chomp $line;
+    $line =~ s/^\s+//;
+    $line =~ s/^#.*//;
+    next unless ($line);
+    $debugLine = "";
+    if ($line =~ m/^([bpsa].*) xy\(([^\)]+)/)
+    {
+        my $front = $1;
+        my $nums = $2;
+        $debugLine = $line if ($debug);
+        $line = "$front xy(";
+        foreach my $num (split(" ",$nums))
+        {
+            $num = sprintf("%0.${roundOut}f",($num * $factor));
+            $num =~ s/0+$/0/;
+            $num =~ s/0$// unless($num =~ m/\.0$/);
+            $line .= "$num ";
+        }
+        $line =~ s/ $/)}/;
+    }
+    elsif ($line =~ m/^(t.*) xy\(([^\)]+)(.*)/)
+    {
+        my $front = $1;
+        my $nums = $2;
+        my $end = $3;
+        $debugLine = $line if ($debug);
+        $line = "$front xy(";
+        foreach my $num (split(" ",$nums))
+        {
+            $num = sprintf("%0.${roundOut}f",($num * $factor));
+            $num =~ s/0+$/0/;
+            $num =~ s/0$// unless($num =~ m/\.0$/);
+            $line .= "$num ";
+        }
+        $line =~ s/ $/$end/;
+    }
+    elsif ($line =~ m/^(lib .*) (\S+) (\S+)/)
+    {
+        my $lib = $1;
+        my $userUnits = $2;
+        my $dataUnits = $3;
+        $debugLine = $line if ($debug);
+        my $tmpString = sprintf("%0.8f",$userUnits);
+        $tmpString =~ s/0+$//;
+        $roundOut = length( $tmpString) - 2; # 0.00875 -> 5  # 0.001 -> 3
+        $userUnits = sprintf("%0.${roundOut}e",($userUnits * $factor));
+        $dataUnits = sprintf("%0.${roundOut}e",($dataUnits * $factor));
+        $userUnits =~ s/0+e/0e/;
+        $dataUnits =~ s/0+e/0e/;
+        $line = "$lib $userUnits $dataUnits"
+    }
+    elsif ($line =~ m/^m=/)
+    {
+        $debugLine = $line if ($debug);
+        $line = sprintf("m=%s-%02d-%02d %02d:%02d:%02d a=%s-%02d-%02d %02d:%02d:%02d",$year,$mon,$mday,$hour,$min,$sec,$year,$mon,$mday,$hour,$min,$sec);
+    }
+    print $fhGdtNew $line;
+    print $fhGdtNew "#old: $debugLine" if ($debug && $debugLine);
+}
+$fhGdt  -> close;
+$fhGdtNew  -> close;
+print STDERR $REVERSE_CYAN.INFO."$COLOR_RESET calling gdt2gds $scaledGDTInputFile $outputFile" if ($verbose);
+`$gdt2gds $scaledGDTInputFile $outputFile`;
+`rm -f $scaledGDTInputFile` unless ($debug);
+print STDERR $REVERSE_CYAN.INFO."$COLOR_RESET created $outputFile" if ($verbose);
+################################################################################
+################################################################################
+
+#######
+sub printUsage
+{
+    my $extraMessage = shift;
+    if (defined($extraMessage))
+    {
+        print "$extraMessage\n";
+        pod2usage(-message => "$extraMessage\n", -exitval => 0,-verbose => 2);
+    }
+    else
+    {
+        pod2usage(-exitval => 0,-verbose => 2);
+    }
+}
+################################################################################
+
+#######
+sub printVersion()
+{
+    my(%arg) = @_;
+    my $exit = $arg{'-exit'};
+    $exit = TRUE unless(defined($exit));
+
+    my $versionInfo = "$VERSION.$REVISION";
+    print $versionInfo;
+    CORE::exit(0) if($exit);
+    $versionInfo;
+}
+################################################################################
+
+#######
+sub printUsageInXterm
+{
+    system("xterm -e '$0 -help' &");
+    exit 0;
+}
+################################################################################
+
+# like unix which command
+#######
+sub which($;$)
+{
+    my $fileName = shift;
+    chomp $fileName;
+    my $all = shift;
+    $all = '' if (! defined $all);
+    my $separator = ':';
+    $separator = ';' if ($^O =~ /(Win32|dos|os2)/i);
+    my $path = $ENV{'PATH'};
+    my @dirs = split(/$separator/,$path);
+    my $result = '';
+    my $foundIt = 0;
+    foreach my $dir (@dirs)
+    {
+        $dir =~ s|(\w)/$|$1|; # remove trailing '/'
+        next if (-d "$dir/$fileName/."); ## it's a directory...
+        if (-d $dir)
+        {
+            my @matches = ();
+            opendir(DIR, $dir) || next;
+            my @dirFiles = readdir DIR;
+            closedir DIR;
+            @matches = grep(/^$fileName$/,@dirFiles);
+            foreach my $match (@matches)
+            {
+                next if (-d "$dir/$match/."); ## it's a directory...
+                if (-x "$dir/$match")
+                {
+                    $result .= "$dir/$match ";
+                    $foundIt = 1;
+                    last if ($all eq '');
+                }
+            }
+        }
+        last if ($foundIt && ($all eq ''));
+    }
+    $result =~ s/ $//;
+    $result;
+}
+################################################################################
+
+__END__
+
+=pod
+
+=head1 NAME
+
+scalegds - scales a GDS2 stream file
+
+=head1 SYNOPSIS
+
+scalegds -factor <numberString> [options] <inputFile> <outputFile>
+
+Program calls 
+
+=head1 OPTIONS
+
+ Note: Options are case-insensitive and can be shortened as long they remain unique.
+
+  -debug 
+    Programmer option
+
+  -factor <value>
+    Number to multiply with
+     Examples:
+      -factor 1/0.175 
+      -factor 2.5
+      -factor 40/7 
+
+  -help
+    Print this and exit
+
+  -inputFile <filePath>
+    Default is first filename on command line
+    Note: Can handle *.Z, *.gz, and *.bz2 compressed files
+
+  -outputFile <filePath>
+    Default is second filename on command line
+
+  -verbose  or  -noVerbose
+    Default is -verbose
+    Be chatty while running
+
+  -version
+    Print version and exit
+
+  -xhelp  or  -xtermHelp
+    Open help in temporary xterm window
+
+=cut
+

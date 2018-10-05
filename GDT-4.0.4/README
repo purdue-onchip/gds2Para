@@ -1,0 +1,14 @@
+Use the BUILD.csh file to compile the code.
+You may have to tweak the CCFLAGS and CC settings
+
+Use perldoc, pos2man, and pod2html to create
+various help formats from gds2gdt.C and gdt2gds.C
+
+See Examples directory for how to call
+from Perl.
+
+See gds2gdt and gdt2gds wrapper scripts for one way
+to support cross-platform use
+
+Starting in GDT-4.0 you can read and write properties.
+

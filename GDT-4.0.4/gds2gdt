@@ -1,0 +1,7 @@
+#!/bin/tcsh -f
+## simple example of wrapper script so multiple OS versions can be made
+##  and called with the same name
+## @(#) $Id: gds2gdt 86 2010-09-24 20:45:37Z schumack $ 
+set parentDir = "" # set yourself - end with /
+exec ${parentDir}gds2gdt.`uname -s` $*
+
