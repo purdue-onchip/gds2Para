@@ -27,7 +27,7 @@ Please direct all questions, bug reports, and issues relating to this repository
 
 Many thanks are owed to the project sponsors:
 
-|  ![<img src="image/purdue.png" width="100px">][Purdue University] | ![<img src="image/darpa.png" width="100px">][DARPA ERI] |
+| <img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/purdue.png" width=100 alt="Purdue University"> | <img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/DARPA.png" width=100 alt="DARPA ERI"> |
 | :---: | :---: |
 
 ## Installation and Usage
