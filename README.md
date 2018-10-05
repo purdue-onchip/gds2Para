@@ -26,7 +26,8 @@ Please direct all questions, bug reports, and issues relating to this repository
 * [Michael Hayashi](mailto:mhayashi@purdue.edu?subject=Inquiry%20for%20gdsii-interface), Graduate Research Assistant, School of ECE, Purdue University
 
 Many thanks are owed to the project sponsors:
-|  [<img src="image/purdue.png" width="100px">][Purdue University] | [<img src="image/darpa.png" width="100px">][DARPA ERI] |
+|  ![<img src="image/purdue.png" width="100px">][Purdue University] | ![<img src="image/darpa.png" width="100px">][DARPA ERI] |
+| :---: | :---: |
 
 ## Installation and Usage
 1. Clone this respository into your working location
