@@ -10,14 +10,14 @@ Please direct all questions, bug reports, and issues relating to installing or r
   * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of this repository followed by "Download ZIP"
   * Move the zip archive to the working location
   * Unzip the archive with `unzip gdsii-interface-master.zip`
-2. Clone the [Limbo repository]{https://github.com/limbo018/Limbo} into your working location with `git clone https://github.com/limbo018/Limbo.git`
+2. Clone the [Limbo repository](https://github.com/limbo018/Limbo) into your working location with `git clone https://github.com/limbo018/Limbo.git`
   * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the Limbo repository followed by "Download ZIP"
   * Move the zip archive to the working location
   * Unzip the archive with `unzip Limbo-master.zip`
 3. Ensure that you are the owner of the files that were downloaded with full read/write/execute permissions
   * Change ownership with `chown -R <username>:<username> <directory>`, where \<username> is your Purdue username and \<directory> is either "gdsii-interface/" (cloned), "gdsii-interface-master/" (downloaded), "Limbo/" (cloned), or "Limbo-master/" (downloaded)
   * Change permissions with `chmod -R 744 <directory>`, where \<directory> is either "gdsii-interface/" (cloned), "gdsii-interface-master/" (downloaded), "Limbo/" (cloned), or "Limbo-master/" (downloaded)
-4. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison
+4. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
 5. Modify run commands files depending on the shell indicated by `echo $SHELL`
   * For "bash", edit the file ".bashrc" in your home directory by appending the following:
 ```bash
@@ -42,6 +42,6 @@ setenv FLEX_DIR /usr/bin/flex
 setenv LIMBO_DIR <absolute path to Limbo directory>
 ```
 6. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory in working location
-7. (Optional) Add GDSII file to working location
+7. (Optional) Add GDSII file besides "nand2.gds" to working location
 8. Run `make explicit` in shell to compile executable **Test\_explicit**
-9. Run `./Test\_explicit` in shell to produce terminal output describing the GDSII file
+9. Run `./Test_explicit nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with your own GDSII file if provided earlier)
