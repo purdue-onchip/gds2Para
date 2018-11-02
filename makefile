@@ -1,7 +1,7 @@
 # Custom makefile for LimboInterface
 # Directories and Names
 LIB_PREFIX = gds
-LIMBO_ROOT_DIR = $(realpath ../../Limbo/)
+LIMBO_ROOT_DIR = $(realpath ../Limbo/)
 OBJDIR = $(realpath ./)/obj
 LIBDIR = $(LIMBO_ROOT_DIR)/lib
 MKDIR = if [ ! -d $(@D) ]; then mkdir -p $(@D); fi
@@ -54,7 +54,7 @@ LimboInterface: $(OBJS) $(LIBDIR)/lib$(LIB_PREFIX)parser.a
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LIB) -l$(LIB_PREFIX)parser $(INCLUDE)
 
 explicit: TestLimboInterface.cpp
-	g++ -std=c++17 -g -o Test_$@ TestLimboInterface.cpp limboint.h ../../Limbo/limbo/parsers/gdsii/stream/GdsReader.h -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/
+	g++ -std=c++17 -g -o Test_$@ TestLimboInterface.cpp limboint.h ../Limbo/limbo/parsers/gdsii/stream/GdsReader.h -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/
 			
 .PHONY: clean
 clean: cleandep
