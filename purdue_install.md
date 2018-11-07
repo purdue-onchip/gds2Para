@@ -18,7 +18,7 @@ Please direct all questions, bug reports, and issues relating to installing or r
   * Change ownership with `chown -R <username>:<username> <directory>`, where \<username> is your Purdue username and \<directory> is either "gdsii-interface/" (cloned), "gdsii-interface-master/" (downloaded), "Limbo/" (cloned), or "Limbo-master/" (downloaded)
   * Change permissions with `chmod -R 744 <directory>`, where \<directory> is either "gdsii-interface/" (cloned), "gdsii-interface-master/" (downloaded), "Limbo/" (cloned), or "Limbo-master/" (downloaded)
 4. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
-5. Modify run commands files depending on the shell indicated by `echo $SHELL`
+5. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
   * For "bash", edit the file ".bashrc" in your home directory by appending the following:
 ```bash
 # Improve gcc Version
@@ -30,7 +30,7 @@ export BOOST_DIR="/opt/boost/1.57.0"
 export FLEX_DIR="/usr/bin/flex"
 export LIMBO_DIR="<absolute path to Limbo directory>"
 ```
-  * For "tcsh", edit the file ".cshrc" in your home directory`by appending the following:
+  * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
 ```tcsh
 # Improve gcc Version
 setenv PATH /opt/gcc/7.1.0/bin:${PATH}
@@ -41,7 +41,11 @@ setenv BOOST_DIR /opt/boost/1.57.0
 setenv FLEX_DIR /usr/bin/flex
 setenv LIMBO_DIR <absolute path to Limbo directory>
 ```
-6. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory in working location
-7. (Optional) Add GDSII file besides "nand2.gds" to working location
-8. Run `make explicit` in shell to compile executable **Test\_explicit**
-9. Run `./Test_explicit nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with your own GDSII file if provided earlier)
+6. Exit the shell and terminate the connection before logging back in
+7. Enter "Limbo/limbo/parsers/gdsii/stream" (cloned) or "Limbo-master/limbo/parsers/gdsii/stream" (downloaded) directory in working location
+8. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
+9. Return to working directory and ensure that a new library file named "libgdsparser.a" exists by running `ls -lh Limbo/lib`
+10. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory from working location
+11. (Optional) Add GDSII file besides "nand2.gds" to working location
+12. Run `make explicit` in shell to compile executable **Test\_explicit**
+13. Run `./Test_explicit nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with your own GDSII file if provided earlier)
