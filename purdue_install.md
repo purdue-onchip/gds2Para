@@ -22,7 +22,7 @@ Please direct all questions, bug reports, and issues relating to installing or r
   * For "bash", edit the file ".bashrc" in your home directory by appending the following:
 ```bash
 # Improve gcc Version
-export PATH=/opt/gcc/7.1.0/bing:$PATH
+export PATH=/opt/gcc/7.1.0/bin:$PATH
 export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
 
 # Environment Variables for GDSII File Handling
