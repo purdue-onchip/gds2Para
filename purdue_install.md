@@ -42,10 +42,14 @@ setenv FLEX_DIR /usr/bin/flex
 setenv LIMBO_DIR <absolute path to Limbo directory>
 ```
 6. Exit the shell and terminate the connection before logging back in
-7. Enter "Limbo/limbo/parsers/gdsii/stream" (cloned) or "Limbo-master/limbo/parsers/gdsii/stream" (downloaded) directory in working location
-8. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
-9. Return to working directory and ensure that a new library file named "libgdsparser.a" exists by running `ls -lh Limbo/lib`
-10. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory from working location
-11. (Optional) Add GDSII file besides "nand2.gds" to working location
-12. Run `make explicit` in shell to compile executable **Test\_explicit**
-13. Run `./Test_explicit nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with your own GDSII file if provided earlier)
+7. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`
+  * If nothing shows up for "bash" users, run `cp .bashrc .bash_profile` in the home directory, exit the shell, log back in, and try again
+  * If nothing shows up for "tcsh" users, run `cp .cshrc .tcshrc` in the home directory, exit the shell, log back in, and try again
+  * For all other errors, contact the primary maintainer
+8. Enter "Limbo/limbo/parsers/gdsii/stream" (cloned) or "Limbo-master/limbo/parsers/gdsii/stream" (downloaded) directory in working location
+9. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
+10. Return to working directory and ensure that a new library file named "libgdsparser.a" exists by running `ls -lh Limbo/lib`
+11. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory from working location
+12. (Optional) Add GDSII file besides "nand2.gds" to working location
+13. Run `make explicit` in shell to compile executable **Test\_explicit**
+14. Run `./Test_explicit nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with your own GDSII file if provided earlier)
