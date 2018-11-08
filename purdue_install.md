@@ -1,5 +1,5 @@
 # Instructions Specific to Purdue ECN Machines
-Please follow these instructions for a more complete deployment on Red Hat Enterprise Linux (RHEL) machines at Purdue University maintained by the Engineering Computer Network (ECN). These instructions do **not** apply to any users outside Purdue University.
+Please follow these instructions for a more complete deployment on Red Hat Enterprise Linux (RHEL) machines at Purdue University maintained by the Engineering Computer Network (ECN). There are a number of nonuniformities that cause subtle, pernicious failures when attempting to deploy this code for yourself, but this guide attempts to address them as they are discovered. These instructions do **not** apply to any users outside Purdue University.
 
 ## Developers
 Please direct all questions, bug reports, and issues relating to installing or running this software at Purdue University  to the primary maintainer:
@@ -7,7 +7,17 @@ Please direct all questions, bug reports, and issues relating to installing or r
 
 ## Installation and Usage
 1. Clone this respository into your working location with `git clone git@github.com:purdue-onchip/gdsii-interface.git`
-  * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of this repository followed by "Download ZIP"
+  * If cloning fails, the usual reason is that a secure connection to the server could not be made. It is important to clone to be able to use `git` to receive updates. These steps will help get your going using `git`:
+    1. Check if you have any public keys such as **id_rsa.pub** by running `ls -lh .ssh` in your home directory
+    2. If no public keys appear, then generate one by running `ssh-keygen -t rsa -C <Purdue email>` in your home directory, where \<Purdue email> is your Purdue email address ending in "@purdue.edu"
+    3. The key generation command will require you to click "Enter" to place the public key in the default location, and then click "Enter" twice more to forgo additional password protection
+    4. Open the public key **id_rsa.pub** in a text editor; for example, run `vim ~/.ssh/id_rsa.pub`
+    5. In your GitHub account, go to [your SSH and GPG keys under your account settings](https://github.com/settings/keys) and click the green "New SSH key" button
+    6. Give this SSH public key title such as "Purdue ECN"
+    7. Copy and paste the contents of **id_rsa.pub** open in the text editor verbatim into the key field
+    8. Click the green "Add SSH key" button
+    9. Navigate back to your working location and attempt to clone the repository again
+  * If cloning and SSH key generation fail, try to download the files by clicking the green "Clone or download" button on the Code tab of this repository followed by "Download ZIP"
   * Move the zip archive to the working location
   * Unzip the archive with `unzip gdsii-interface-master.zip`
 2. Clone the [Limbo repository](https://github.com/limbo018/Limbo) into your working location with `git clone https://github.com/limbo018/Limbo.git`
@@ -48,7 +58,7 @@ setenv LIMBO_DIR <absolute path to Limbo directory>
   * For all other errors, contact the primary maintainer
 8. Enter "Limbo/limbo/parsers/gdsii/stream" (cloned) or "Limbo-master/limbo/parsers/gdsii/stream" (downloaded) directory in working location
 9. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
-10. Return to working directory and ensure that a new library file named "libgdsparser.a" exists by running `ls -lh Limbo/lib`
+10. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
 11. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory from working location
 12. (Optional) Add GDSII file besides "nand2.gds" to working location
 13. Run `make explicit` in shell to compile executable **Test\_explicit**
