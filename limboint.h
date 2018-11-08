@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <cstring>
 #include <string>
 #include <algorithm>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
@@ -63,11 +64,11 @@ public:
 	~boundary()
 	{
 		//this->bounds = NULL;
-		delete bounds;
+		//delete bounds;
 		//(this->bounds).clear();
 		this->layer = 0;
 		//this->props = NULL;
-		delete props;
+		//delete props;
 	}
 };
 
@@ -144,9 +145,9 @@ public:
 	~path()
 	{
 		//this->paths = NULL;
-		delete paths;
+		//delete paths;
 		this->layer = 0;
-		delete props;
+		//delete props;
 		this->type = 2;
 		this->width = 0.;
 	}
@@ -206,9 +207,9 @@ public:
 	~node()
 	{
 		//this->nodes = NULL;
-		delete nodes;
+		//delete nodes;
 		this->layer = 0;
-		delete props;
+		//delete props;
 		this->type = 0;
 	}
 };
@@ -267,9 +268,9 @@ public:
 	~box()
 	{
 		//this->boxes = NULL;
-		delete boxes;
+		//delete boxes;
 		this->layer = 0;
-		delete props;
+		//delete props;
 		this->type = 0;
 	}
 };
@@ -372,7 +373,7 @@ public:
 		vector<int> justs = { 0, 0 };
 		this->texts = texts;
 		this->layer = 0;
-		delete props;
+		//delete props;
 		this->type = 2;
 		this->fontID = 0;
 		this->justs = justs;
@@ -428,7 +429,7 @@ public:
 	{
 		vector<double> srefs = { 0., 0. };
 		this->srefs = srefs;
-		delete props;
+		//delete props;
 		this->srefName = "";
 	}
 };
@@ -746,7 +747,7 @@ public:
 		this->dbUnits = databaseUnits;
 		this->numCell = numCell;
 		this->element = element;
-		this->numProp = 0;
+		this->numProp = numProp;
 		this->cells = cells;
 	}
 
@@ -1012,7 +1013,7 @@ public:
 		<< "data size: " << data.size() << endl;
 		}*/
 
-		// Data handling
+	// Data handling
 		if (ascii_record_type == "HEADER")
 		{
 			this->version = std::to_string(data[0]);
@@ -1026,14 +1027,14 @@ public:
 		{
 			// Fix and print library name
 			char label[64];
-			for (size_t indj = 0; indj < data.size(); indj++) // Only store printable characters
+			for (size_t indj = 0; indj < data.size() + 1; indj++) // Only store printable characters
 			{
 				if (((int)data[indj] < 32) || ((int)data[indj] > 128))
 				{
 					label[indj] = '\0';
 					break; // Break if unprintable character
 				}
-				label[indj] = data[indj];
+				label[indj] = (char)data[indj];
 			}
 			//cout << "Name of this library: " << label << endl;
 
@@ -1055,16 +1056,16 @@ public:
 		{
 			// Print and store name
 			char label[64];
-			for (size_t indj = 0; indj < data.size(); indj++) // Only store printable characters
+			for (size_t indj = 0; indj < data.size() + 1; indj++) // Only store printable characters
 			{
 				if (((int)data[indj] < 32) || ((int)data[indj] > 128))
 				{
 					label[indj] = '\0';
 					break; // Break if unprintable character
 				}
-				label[indj] = data[indj];
-			}
-			//cout << "Geometric cell name: " << label << endl;
+				label[indj] = (char)data[indj];
+                        }
+                        //cout << "Geometric cell name: " << label << endl;
 			((this->cells)[this->numCell]).cellName = label; // Save cell name
 		}
 		else if (ascii_record_type == "BOUNDARY")
@@ -1101,7 +1102,7 @@ public:
 		{
 			if (this->getElement() == 'b')
 			{
-				boundary modBound = getCell(this->numCell).boundaries.back(); // Get copy of boundary
+				boundary modBound = ((getCell(this->numCell)).boundaries).back(); // Get copy of boundary
 				((this->cells)[this->numCell]).boundaries.pop_back(); // Remove last boundary vector entry
 				((this->cells)[this->numCell]).boundaries.emplace_back(boundary(modBound.getBounds(), data[0], modBound.getProps())); // Put boundary back with layer update
 			}
@@ -1190,7 +1191,7 @@ public:
 			}
 
 			// Delete coordinates variable
-			delete coord;
+			//delete coord;
 		}
 		else if (ascii_record_type == "DATATYPE") // Unimplemented in the GDSII standard
 		{
@@ -1288,14 +1289,14 @@ public:
 		{
 			// Print and store text box string
 			char label[64];
-			for (size_t indj = 0; indj < data.size(); indj++) // Only store printable characters
+			for (size_t indj = 0; indj < data.size() + 1; indj++) // Only store printable characters
 			{
 				if (((int)data[indj] < 32) || ((int)data[indj] > 128))
 				{
 					label[indj] = '\0';
 					break; // Break if unprintable character
 				}
-				label[indj] = data[indj];
+				label[indj] = (char)data[indj];
 			}
 			//cout << "Text box string: " << label << endl;
 			if (this->getElement() == 't')
@@ -1309,14 +1310,14 @@ public:
 		{
 			// Print and store name
 			char label[64];
-			for (size_t indj = 0; indj < data.size(); indj++) // Only store printable characters
+			for (size_t indj = 0; indj < data.size() + 1; indj++) // Only store printable characters
 			{
 				if (((int)data[indj] < 32) || ((int)data[indj] > 128))
 				{
 					label[indj] = '\0';
 					break; // Break if unprintable character
 				}
-				label[indj] = data[indj];
+				label[indj] = (char)data[indj];
 			}
 			//cout << "Structure reference name: " << label << endl;
 			if (this->getElement() == 's')
@@ -1334,14 +1335,14 @@ public:
 		{
 			// Fix and print property
 			char label[64];
-			for (size_t indj = 0; indj < data.size(); indj++) // Only store printable characters
+			for (size_t indj = 0; indj < data.size() + 1; indj++) // Only store printable characters
 			{
 				if (((int)data[indj] < 32) || ((int)data[indj] > 128))
 				{
 					label[indj] = '\0';
 					break; // Break if unprintable character
 				}
-				label[indj] = data[indj];
+				label[indj] = (char)data[indj];
 			}
 			//cout << "Element property value: " << label << endl;
 
@@ -1362,7 +1363,7 @@ public:
 				(*modProps)[this->numProp - 1] = label; // Put new property value in place
 				((this->cells)[this->numCell]).boundaries.pop_back(); // Remove last boundary vector entry
 				((this->cells)[this->numCell]).boundaries.emplace_back(boundary(modBound.getBounds(), modBound.getLayer(), modProps)); // Put boundary back with properties update
-				delete modProps; // Free pointer to vector
+				//delete modProps; // Free pointer to vector
 			}
 			else if (this->getElement() == 'p')
 			{
@@ -1380,7 +1381,7 @@ public:
 				(*modProps)[this->numProp - 1] = label;
 				((this->cells)[this->numCell]).paths.pop_back();
 				((this->cells)[this->numCell]).paths.emplace_back(path(modPath.getPaths(), modPath.getLayer(), modProps, modPath.getType(), modPath.getWidth()));
-				delete modProps; // Free pointer to vector
+				//delete modProps; // Free pointer to vector
 			}
 			else if (this->getElement() == 'n')
 			{
@@ -1398,7 +1399,7 @@ public:
 				(*modProps)[this->numProp - 1] = label;
 				((this->cells)[this->numCell]).nodes.pop_back();
 				((this->cells)[this->numCell]).nodes.emplace_back(node(modNode.getNodes(), modNode.getLayer(), modProps, modNode.getType()));
-				delete modProps; // Free pointer to vector
+				//delete modProps; // Free pointer to vector
 			}
 			else if (this->getElement() == 'x')
 			{
@@ -1416,7 +1417,7 @@ public:
 				(*modProps)[this->numProp - 1] = label;
 				((this->cells)[this->numCell]).boxes.pop_back();
 				((this->cells)[this->numCell]).boxes.emplace_back(box(modBox.getBoxes(), modBox.getLayer(), modProps, modBox.getType()));
-				delete modProps; // Free pointer to vector
+				//delete modProps; // Free pointer to vector
 			}
 			else if (this->getElement() == 't')
 			{
@@ -1434,7 +1435,7 @@ public:
 				(*modProps)[this->numProp - 1] = label;
 				((this->cells)[this->numCell]).textboxes.pop_back();
 				((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modProps, modText.getType(), modText.getFontID(), modText.getJusts(), modText.getWidth(), modText.getTextStr()));
-				delete modProps; // Free pointer to vector
+				//delete modProps; // Free pointer to vector
 			}
 			else if (this->getElement() == 's')
 			{
@@ -1452,7 +1453,7 @@ public:
 				(*modProps)[this->numProp - 1] = label;
 				((this->cells)[this->numCell]).sreferences.pop_back();
 				((this->cells)[this->numCell]).sreferences.emplace_back(sref(modSRef.getSRefs(), modProps, modSRef.getSRefName()));
-				delete modProps; // Free pointer to vector
+				//delete modProps; // Free pointer to vector
 			}
 		}
 		else if (ascii_record_type == "ENDEL")
