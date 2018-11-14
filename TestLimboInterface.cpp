@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 		std::ifstream inFile(fName.c_str());
 		GdsParser::GdsReader adbReader(adb);
 		bool adbIsGood = adbReader(inFile);
-		vector<size_t> indCellPrint = {0, 3};
+		vector<size_t> indCellPrint = {adb.getNumCell() - 1};
 		adb.print(indCellPrint);
 
         /*EnumDataBase edb;
