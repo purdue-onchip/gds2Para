@@ -2,6 +2,7 @@
 # Directories and Names
 LIB_PREFIX = gds
 LIMBO_ROOT_DIR = $(realpath ../Limbo/)
+PARSER_SPEF_ROOT_DIR = $(realpath ../Parser-SPEF/)
 OBJDIR = $(realpath ./)/obj
 LIBDIR = $(LIMBO_ROOT_DIR)/lib
 MKDIR = if [ ! -d $(@D) ]; then mkdir -p $(@D); fi
@@ -13,7 +14,7 @@ DBG = 0 # Off by default
 ifeq ($(DBG), 1)
 	CXXFLAGS = $(CXXFLAGS_DEBUG) -DDEBUG_GDSREADER -DDEBUG_GDSWRITER
 else
-	CXXFLAGS = $(CXXFLAGS_RELEASE) -std=C++17
+	CXXFLAGS = $(CXXFLAGS_RELEASE) -std=C++17 -g -lstdc++fs
 endif
 
 ifdef ZLIB_DIR # Compression support
@@ -23,7 +24,7 @@ endif
 endif
 
 # Special Libraries to Include
-INCLUDE = -I $(LIMBO_ROOT_DIR)
+INCLUDE = -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR)
 
 ifdef ZLIB_DIR
 ifdef BOOST_DIR
@@ -54,7 +55,7 @@ LimboInterface: $(OBJS) $(LIBDIR)/lib$(LIB_PREFIX)parser.a
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LIB) -l$(LIB_PREFIX)parser $(INCLUDE)
 
 explicit: TestLimboInterface.cpp
-	g++ -std=c++17 -g -o Test_$@ TestLimboInterface.cpp limboint.h ../Limbo/limbo/parsers/gdsii/stream/GdsReader.h -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/
+	g++ -std=c++17 -g -lstdc++fs -o Test_$@ TestLimboInterface.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR)
 			
 .PHONY: clean
 clean: cleandep
