@@ -541,8 +541,6 @@ public:
             adbIMAP.setFileName(gdsiiFileName);
             adbIMAP.setDateMod(time);
             adbIMAP.setDateAccess(time);
-            adbIMAP.setdbUserUnits(1.);
-            adbIMAP.setdbUnits(1.);
 
             // File is readable line-by-line
             std::string fileLine;
@@ -559,33 +557,36 @@ public:
             while (!imapFile.eof())
             {
                 // Handle units
-                double multSI = 1.0;
                 double stripLength = 2000; // Hard-coded (for now)
                 if (fileLine.compare(0, 12, "LINEARUNITS ") == 0)
                 {
-                    std::string units = fileLine.substr(12, fileLine.length() - 12);
+                    // Extract unit text
+                    std::string units = fileLine.substr(12, fileLine.length() - 13);
 
                     // Find SI multiplier for given units
-                    if (units.compare("ym") == 0) { multSI = 1e-24; }
-                    else if (units.compare("zm") == 0) { multSI = 1e-21; }
-                    else if (units.compare("am") == 0) { multSI = 1e-18; }
-                    else if (units.compare("fm") == 0) { multSI = 1e-15; }
-                    else if (units.compare("pm") == 0) { multSI = 1e-12; }
-                    else if (units.compare("nm") == 0) { multSI = 1e-09; }
-                    else if (units.compare("um") == 0) { multSI = 1e-06; }
-                    else if (units.compare("mm") == 0) { multSI = 1e-03; }
-                    else if (units.compare("cm") == 0) { multSI = 1e-02; }
-                    else if (units.compare("dm") == 0) { multSI = 1e-01; }
+                    double multSI = 1.0;
+                    if (units.compare("ym") == 0) { multSI = 1.e-24; }
+                    else if (units.compare("zm") == 0) { multSI = 1.e-21; }
+                    else if (units.compare("am") == 0) { multSI = 1.e-18; }
+                    else if (units.compare("fm") == 0) { multSI = 1.e-15; }
+                    else if (units.compare("pm") == 0) { multSI = 1.e-12; }
+                    else if (units.compare("nm") == 0) { multSI = 1.e-09; }
+                    else if (units.compare("um") == 0) { multSI = 1.e-06; }
+                    else if (units.compare("mm") == 0) { multSI = 1.e-03; }
+                    else if (units.compare("cm") == 0) { multSI = 1.e-02; }
+                    else if (units.compare("dm") == 0) { multSI = 1.e-01; }
 
-                    stripLength *= multSI; // Hard-coded rescaling of length (for now)
+                    // Propagate units information to ASCII database now
+                    adbIMAP.setdbUserUnits(1.);
+                    adbIMAP.setdbUnits(multSI);
                 }
                 // Handle design name
                 else if (fileLine.compare(0, 5, "NAME ") == 0)
                 {
-                    this->designName = fileLine.substr(5, fileLine.length() - 5);
+                    this->designName = fileLine.substr(5, fileLine.length() - 6);
                 }
                 // Handle layer stack
-                else if (fileLine.compare(0, 5, "STACK") == 0)
+                if (fileLine.compare(0, 5, "STACK") == 0)
                 {
                     // Move down one line
                     getline(imapFile, fileLine);
@@ -615,9 +616,9 @@ public:
                             double zStart = 0.;
                             if (indZStart != string::npos)
                             {
-                                zStart = stod(fileLine.substr(indZStart + 2, indHeight - indZStart - 3));
+                                zStart = stod(fileLine.substr(indZStart + 2, indHeight - indZStart - 3)) * adbIMAP.getdbUnits();
                             }
-                            double zHeight = stod(fileLine.substr(indHeight + 2, fileLine.find(" ", indHeight) - indHeight - 2));
+                            double zHeight = stod(fileLine.substr(indHeight + 2, fileLine.find(" ", indHeight) - indHeight - 2)) * adbIMAP.getdbUnits();
                             double epsilon_r = 1.;
                             if (indPermit != string::npos)
                             {
@@ -642,10 +643,11 @@ public:
                     }
                 }
                 // Handle conductors
-                else if (fileLine.compare(0, 10, "CONDUCTORS") == 0)
+                if (fileLine.compare(0, 10, "CONDUCTORS") == 0)
                 {
                     // Move down one line
                     getline(imapFile, fileLine);
+                    stripLength *= adbIMAP.getdbUnits(); // Hard-coded rescaling of length (for now)
 
                     // Keep reading until end of conductor list
                     while ((fileLine.compare(0, 8, "BOUNDARY") != 0) && (fileLine.compare(0, 9, "PORTTABLE") != 0))
@@ -669,10 +671,10 @@ public:
                             // Save conductor information to variables
                             std::string category = fileLine.substr(0, indCategory);
                             std::string condName = fileLine.substr(indCategory + 1, indCondName - indCategory - 1);
-                            double x1 = stod(fileLine.substr(indX1 + 3, indY1 - indX1 - 4)) * multSI; // Length is index difference minus space
-                            double y1 = stod(fileLine.substr(indY1 + 3, indZ1 - indY1 - 4)) * multSI;
-                            double x2 = stod(fileLine.substr(indX2 + 3, indY2 - indX2 - 4)) * multSI;
-                            double y2 = stod(fileLine.substr(indY2 + 3, indZ2 - indY2 - 4)) * multSI;
+                            double x1 = stod(fileLine.substr(indX1 + 3, indY1 - indX1 - 4)) * adbIMAP.getdbUnits(); // Length is index difference minus space
+                            double y1 = stod(fileLine.substr(indY1 + 3, indZ1 - indY1 - 4)) * adbIMAP.getdbUnits();
+                            double x2 = stod(fileLine.substr(indX2 + 3, indY2 - indX2 - 4)) * adbIMAP.getdbUnits();
+                            double y2 = stod(fileLine.substr(indY2 + 3, indZ2 - indY2 - 4)) * adbIMAP.getdbUnits();
                             std::string sigma = fileLine.substr(indSigma, indLayer - indSigma - 1);
                             std::string group;
                             if (indGroup != string::npos)
@@ -704,10 +706,17 @@ public:
             // Close file
             imapFile.close();
 
-            // Update ASCII Database
+            // Update ASCII database
             adbIMAP.setLibName(this->designName);
             adbIMAP.appendCell(cellIMAP);
-            return true;
+            adbIMAP.setdbUnits(adbIMAP.getdbUnits() * 1.e-3); // Rescale IMAP 0.001x to allow integer representation in GDSII
+
+            // Print the ASCII database
+            adbIMAP.print({ 0 });
+
+            // Write GDSII file to hard drive
+            bool dumpPassed = adbIMAP.dump();
+            return dumpPassed;
         }
         else
         {

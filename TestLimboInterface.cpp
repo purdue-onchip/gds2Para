@@ -47,10 +47,11 @@ int main(int argc, char** argv)
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
             cout << "  -r, --read            Read given GDSII file into memory." << endl;
+            cout << "  -p, --parrot          Immediately output given GDSII file after reading." << endl;
             cout << "  -w, --write           Write database in memory to given file." << endl;
             cout << "  -i, --imap            Read given IMAP 3D file and write GDSII file with name also given." << endl;
             cout << endl << "Comments:" << endl;
-            cout << "The file passed after -r or --read must be Calma GDSII stream file." << endl;
+            cout << "The file passed after -r, --read, -p, or --parrot must be Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imap must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
             cout << endl << "Bug reporting:" << endl;
@@ -83,6 +84,21 @@ int main(int argc, char** argv)
             bool edbIsGood = edbReader(inFile);
             cout << "Test Enum API: " << edbIsGood << endl;
             //cout << "Test Enum API: " << GdsParser::read(edb, argv[1]) << endl;*/
+        }
+        else if ((strcmp(argv[1], "-p") == 0) || (strcmp(argv[1], "--parrot") == 0))
+        {
+            // Read and print existing file
+            AsciiDataBase adb;
+            string fName = argv[2];
+            size_t indExtension = fName.find(".", 1);
+            adb.setFileName(fName.substr(0, indExtension) + "_parrot" + fName.substr(indExtension, string::npos));
+            GdsParser::GdsReader adbReader(adb);
+            bool adbIsGood = adbReader(fName.c_str());
+            adb.print({ adb.getNumCell() - 1 });
+
+            // Dump to parroted file immediately
+            adb.dump();
+            cout << "Dumped parroted file" << endl;
         }
         else if ((strcmp(argv[1], "-w") == 0) || (strcmp(argv[1], "--write") == 0))
         {

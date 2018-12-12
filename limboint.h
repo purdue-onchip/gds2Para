@@ -16,6 +16,7 @@
 #include <string>
 #include <algorithm>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
+#include <limbo/parsers/gdsii/stream/GdsWriter.h>
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -249,7 +250,7 @@ public:
         this->nodes = nodes;
         this->layer = layer;
         this->props = props;
-        this->type = 0;
+        this->type = type;
     }
 
     // Get node vertices in cell coordinates
@@ -369,7 +370,7 @@ public:
         this->boxes = boxes;
         this->layer = layer;
         this->props = props;
-        this->type = 0;
+        this->type = type;
     }
 
     // Get box outline vertices in cell coordinates
@@ -1235,6 +1236,147 @@ public:
         cout << "------" << endl;
     }
 
+    // Dump ASCII database back into a GDSII file
+    bool dump()
+    {
+        // Attempt to create GdsWriter variable
+        GdsParser::GdsWriter gw((this->fileName).c_str());
+
+        // Create library
+        gw.create_lib(this->getLibName().c_str(), this->getdbUserUnits(), this->getdbUnits());
+
+        // Create each cell
+        size_t numCell = this->getNumCell();
+        for (size_t indCell = 0; indCell < numCell; indCell++)
+        {
+            // Cell header
+            gw.gds_write_bgnstr();
+            gw.gds_write_strname(((this->cells)[indCell]).getCellName().c_str());
+
+            // Create each boundary within the cell
+            size_t numBound = ((this->cells)[indCell]).getNumBound();
+            for (size_t indBound = 0; indBound < numBound; indBound++)
+            {
+                size_t numPt = (((this->cells)[indCell]).boundaries)[indBound].getNBoundPt();
+                vector<double> bounds = (((this->cells)[indCell]).boundaries)[indBound].getBounds();
+                bool has_last = true; // Boundaries always stored with first point repeated
+                int xcoord[numPt];
+                int ycoord[numPt];
+
+                // Save boundary points to integer vectors (might not work)
+                for (size_t indPt = 0; indPt < numPt; indPt++)
+                {
+                    xcoord[indPt] = (int)(bounds[2 * indPt + 0] / this->getdbUnits());
+                    ycoord[indPt] = (int)(bounds[2 * indPt + 1] / this->getdbUnits());
+                }
+
+                // Write the boundary to file
+                gw.gds_write_boundary();
+                gw.gds_write_layer((((this->cells)[indCell]).boundaries)[indBound].getLayer());
+                gw.gds_write_datatype(0);
+                gw.gds_write_xy(xcoord, ycoord, numPt, has_last);
+                gw.gds_write_endel();
+            }
+
+            // Create each path within the cell
+            size_t numPath = ((this->cells)[indCell]).getNumPath();
+            for (size_t indPath = 0; indPath < numPath; indPath++)
+            {
+                size_t numPt = (((this->cells)[indCell]).paths)[indPath].getNPathPt();
+                vector<double> paths = (((this->cells)[indCell]).paths)[indPath].getPaths();
+                int width = (int)((((this->cells)[indCell]).paths)[indPath].getWidth() / this->getdbUnits());
+                int xcoord[numPt];
+                int ycoord[numPt];
+
+                // Save path points to integer vectors (might not work)
+                for (size_t indPt = 0; indPt < numPt; indPt++)
+                {
+                    xcoord[indPt] = (int)(paths[2 * indPt + 0] / this->getdbUnits());
+                    ycoord[indPt] = (int)(paths[2 * indPt + 1] / this->getdbUnits());
+                }
+
+                // Write the path to file
+                gw.gds_write_path();
+                gw.gds_write_layer((((this->cells)[indCell]).paths)[indPath].getLayer());
+                gw.gds_write_datatype(0);
+                gw.gds_write_pathtype((((this->cells)[indCell]).paths)[indPath].getType());
+                gw.gds_write_width(width);
+                gw.gds_write_xy(xcoord, ycoord, numPt);
+                gw.gds_write_endel();
+            }
+
+            // Create each node within the cell (unfortunately unimplemented in GdsWriter.h)
+
+            // Create each box outline within the cell
+            size_t numBox = ((this->cells)[indCell]).getNumBox();
+            for (size_t indBox = 0; indBox < numBox; indBox++)
+            {
+                size_t numPt = (((this->cells)[indCell]).boxes)[indBox].getNBoxPt();
+                vector<double> boxes = (((this->cells)[indCell]).boxes)[indBox].getBoxes();
+                bool has_last = true; // Box outlines always stored with first point repeated
+                int xcoord[numPt];
+                int ycoord[numPt];
+
+                // Save box outline points to integer vectors (might not work)
+                for (size_t indPt = 0; indPt < numPt; indPt++)
+                {
+                    xcoord[indPt] = (int)(boxes[2 * indPt + 0] / this->getdbUnits());
+                    ycoord[indPt] = (int)(boxes[2 * indPt + 1] / this->getdbUnits());
+                }
+
+                // Write the box outline to file
+                gw.gds_write_box();
+                gw.gds_write_layer((((this->cells)[indCell]).boxes)[indBox].getLayer());
+                gw.gds_write_boxtype((((this->cells)[indCell]).boxes)[indBox].getType());
+                gw.gds_write_xy(xcoord, ycoord, numPt, has_last);
+                gw.gds_write_endel();
+            }
+
+            // Create each textbox within the cell
+            size_t numText = ((this->cells)[indCell]).getNumText();
+            for (size_t indText = 0; indText < numText; indText++)
+            {
+                int xcoord[1] = { (int)(((((this->cells)[indCell]).textboxes)[indText].getTexts()[0]) / this->getdbUnits()) };
+                int ycoord[1] = { (int)(((((this->cells)[indCell]).textboxes)[indText].getTexts()[1]) / this->getdbUnits()) };
+                int width = (int)((((this->cells)[indCell]).textboxes)[indText].getWidth() / this->getdbUnits());
+
+                // Write the textbox to file
+                gw.gds_write_text();
+                gw.gds_write_layer((((this->cells)[indCell]).textboxes)[indText].getLayer());
+                gw.gds_write_texttype((((this->cells)[indCell]).textboxes)[indText].getType());
+                gw.gds_write_presentation((((this->cells)[indCell]).textboxes)[indText].getFontID(), (((this->cells)[indCell]).textboxes)[indText].getJusts()[0], (((this->cells)[indCell]).textboxes)[indText].getJusts()[1]);
+                gw.gds_write_width(width);
+                gw.gds_write_strans(0, 0, 0); // Strans unimplemented until needed (reflect, mag, angle)
+                gw.gds_write_xy(xcoord, ycoord, 1);
+                gw.gds_write_string((((this->cells)[indCell]).textboxes)[indText].getTextStr().c_str());
+                gw.gds_write_endel();
+            }
+
+            // Create each structure reference within the cell
+            size_t numSRef = ((this->cells)[indCell]).getNumSRef();
+            for (size_t indSRef = 0; indSRef < numSRef; indSRef++)
+            {
+                int xcoord[1] = { (int)(((((this->cells)[indCell]).sreferences)[indSRef].getSRefs()[0]) / this->getdbUnits()) };
+                int ycoord[1] = { (int)(((((this->cells)[indCell]).sreferences)[indSRef].getSRefs()[1]) / this->getdbUnits()) };
+
+                // Write the structure reference to file
+                gw.gds_write_sref();
+                gw.gds_write_sname((((this->cells)[indCell]).sreferences)[indSRef].getSRefName().c_str());
+                //gw.gds_write_mag(1.0); // MAG unimplemented until needed
+                //gw.gds_write_angle(0.0); // ANGLE unimplemented until needed
+                gw.gds_write_xy(xcoord, ycoord, 1);
+                gw.gds_write_endel();
+            }
+
+            // Cell closer
+            gw.gds_write_endstr();
+        }
+
+        // Close library
+        gw.gds_write_endlib();
+        return true;
+    }
+
     ///////////////////// required callbacks /////////////////////
     /// @brief bit array callback 
     /// @param ascii_record_type record 
@@ -1543,6 +1685,12 @@ public:
                 path modPath = getCell(this->numCell).paths.back();
                 ((this->cells)[this->numCell]).paths.pop_back();
                 ((this->cells)[this->numCell]).paths.emplace_back(path(modPath.getPaths(), modPath.getLayer(), modPath.getProps(), modPath.getType(), unitFactor * data[0]));
+            }
+            else if (this->getElement() == 't')
+            {
+                textbox modText = getCell(this->numCell).textboxes.back();
+                ((this->cells)[this->numCell]).textboxes.pop_back();
+                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modText.getProps(), modText.getType(), modText.getFontID(), modText.getJusts(), unitFactor * data[0], modText.getTextStr()));
             }
         }
         else if (ascii_record_type == "PRESENTATION")
