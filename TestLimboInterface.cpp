@@ -42,15 +42,17 @@ int main(int argc, char** argv)
         if (strcmp(argv[1], "--help") == 0)
         {
             cout << "Help for Test Limbo Interface binary" << endl;
-            cout << "Usage: Test_$@ [options] file" << endl;
+            cout << "Usage: Test_$@ [options] file1 [file2]" << endl;
             cout << "Options:" << endl;
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
             cout << "  -r, --read            Read given GDSII file into memory." << endl;
             cout << "  -w, --write           Write database in memory to given file." << endl;
+            cout << "  -i, --imap            Read given IMAP 3D file and write GDSII file with name also given." << endl;
             cout << endl << "Comments:" << endl;
             cout << "The file passed after -r or --read must be Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
+            cout << " The first file passed after -i or --imap must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
         }
@@ -112,16 +114,32 @@ int main(int argc, char** argv)
             std::ifstream inFile(fName.c_str());
             //GdsParser::GdsReader adbReader(sdb);
             //bool sdbIsGood = adbReader(inFile);
-            sdb.printDump();
+            bool couldDump = sdb.printDump();
         }
         else
         {
             cerr << "Must pass a file after \"-r\" or \"-w\" flags, rerun with \"--help\" flag for details" << endl;
         }
     }
+    else if (argc == 4)
+    {
+        if ((strcmp(argv[1], "-i") == 0) || (strcmp(argv[1], "--imap") == 0))
+        {
+            // Read IMAP 3D description file and write to GDSII file
+            SolverDataBase sdb;
+            string inIMAPFile = argv[2];
+            string outGDSIIFile = argv[3];
+            bool sdbIsGood = sdb.readIMAPwriteGDSII(inIMAPFile, outGDSIIFile);
+            cout << "File ready at " << outGDSIIFile << endl;
+        }
+        else
+        {
+            cerr << "Must pass a IMAP file to read and blank GDSII file to write after \"-i\" flags, rerun with \"--help\" flag for details" << endl;
+        }
+    }
     else
     {
-        cerr << "Either 1 or 2 arguments are required, use \"--help\" flag for details" << endl;
+        cerr << "Either 1, 2, or 3 arguments are required, use \"--help\" flag for details" << endl;
     }
 
     return 0;

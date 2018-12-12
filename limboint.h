@@ -1082,6 +1082,36 @@ public:
         this->fileName = fileName;
     }
 
+    // Set date of last modification
+    void setDateMod(std::string dateMod)
+    {
+        this->dateMod = dateMod;
+    }
+
+    // Set date of last access
+    void setDateAccess(std::string dateAccess)
+    {
+        this->dateAccess = dateAccess;
+    }
+
+    // Set library name
+    void setLibName(std::string libName)
+    {
+        this->libName = libName;
+    }
+
+    // Set database user units
+    void setdbUserUnits(double dbUserUnits)
+    {
+        this->dbUserUnits = dbUserUnits;
+    }
+
+    // Set database units in SI
+    void setdbUnits(double dbUnits)
+    {
+        this->dbUnits = dbUnits;
+    }
+
     // Find index of cell by name
     // Returns index past number of cells if not found
     size_t locateCell(std::string name) const
@@ -1113,6 +1143,13 @@ public:
             names.push_back(cell.getCellName());
         }
         return names;
+    }
+
+    // Append a cell
+    void appendCell(GeoCell extraCell)
+    {
+        (this->cells).push_back(extraCell);
+        (this->numCell)++;
     }
 
     // Return all included layers in order

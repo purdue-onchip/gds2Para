@@ -18,7 +18,111 @@
 #include <ctime>
 //#include <algorithm>
 #include <parser-spef/parser-spef.hpp>
+#include "limboint.h"
 using namespace std;
+
+class Layer
+{
+private:
+    std::string layerName;        // Name of layer in physical stack-up
+    int gdsiiNum;                 // Layer number in GDSII file
+    double zStart;                // Z-coordinate of bottom of layer (m)
+    double zHeight;               // Height of layer in z-direction (m)
+    double epsilon_r;             // Relative permittivity of material
+    double lossTan;               // Loss tangent of material
+    double sigma;                 // (Real) Conductivity of material (S/m)
+public:
+    // Default constructor
+    Layer()
+    {
+        this->layerName = "";
+        this->gdsiiNum = -1;
+        this->zStart = 0.;
+        this->zHeight = 0.;
+        this->epsilon_r = 1.;
+        this->lossTan = 0.;
+        this->sigma = 0.;
+    }
+
+    // Parametrized constructor
+    Layer(std::string layerName, int gdsiiNum, double zStart, double zHeight, double epsilon_r, double lossTan, double sigma)
+    {
+        this->layerName = layerName;
+        this->gdsiiNum = gdsiiNum;
+        this->zStart = zStart;
+        this->zHeight = zHeight;
+        this->epsilon_r = epsilon_r;
+        this->lossTan = lossTan;
+        this->sigma = sigma;
+    }
+
+    // Get layer name
+    std::string getLayerName() const
+    {
+        return this->layerName;
+    }
+
+    // Get GDSII file layer number
+    // Metallic layers are nonnegative, and -1 is used for dielectric, substrates, and undescribed planes
+    int getGDSIINum() const
+    {
+        return this->gdsiiNum;
+    }
+
+    // Get layer bottom z-coordinate
+    double getZStart() const
+    {
+        return this->zStart;
+    }
+
+    // Get layer height
+    double getZHeight() const
+    {
+        return this->zHeight;
+    }
+
+    // Get layer relative permittivity
+    double getEpsilonR() const
+    {
+        return this->epsilon_r;
+    }
+
+    // Get layer loss tangent
+    double getLossTan() const
+    {
+        return this->lossTan;
+    }
+
+    // Get layer conductivity
+    double getSigma() const
+    {
+        return this->sigma;
+    }
+
+    // Print the layer information
+    void print() const
+    {
+        cout << " ------" << endl;
+        cout << " Layer Details:" << endl;
+        cout << "  Name: " << this->layerName << endl;
+        if (this->gdsiiNum != -1)
+        {
+            cout << "  GDSII layer number: " << this->gdsiiNum << endl;
+        }
+        cout << "  Bottom z-coordinate: " << this->zStart << " m" << endl;
+        cout << "  Layer height: " << this->zHeight << " m" << endl;
+        cout << "  Relative permittivity: " << this->epsilon_r << endl;
+        cout << "  Loss tangent: " << this->lossTan << endl;
+        cout << "  Conductivity: " << this->sigma << " S/m" << endl;
+        cout << " ------" << endl;
+    }
+
+    // Destructor
+    ~Layer()
+    {
+        // Nothing
+    }
+};
 
 class Waveforms
 {
@@ -316,6 +420,7 @@ struct SolverDataBase
 {
 private:
     std::string designName; // Name of design
+    vector<Layer> layers;   // Layer stack-up information
     Waveforms wf;           // Waveforms
     Parasitics para;        // Parasitics
     std::string outSPEF;    // SPEF output file name
@@ -323,9 +428,11 @@ public:
     // Default constructor
     SolverDataBase()
     {
+        vector<Layer> layers;
         Waveforms wf;
         Parasitics para;
-        this->designName;
+        this->designName = "";
+        this->layers = layers;
         this->wf = wf;
         this->para = para;
         this->outSPEF = "";
@@ -334,7 +441,9 @@ public:
     // Parametrized constructor
     SolverDataBase(std::string designName, Waveforms wf, Parasitics para)
     {
+        vector<Layer> layers;
         this->designName = designName;
+        this->layers = layers;
         this->wf = wf;
         this->para = para;
         this->outSPEF = "";
@@ -364,20 +473,251 @@ public:
         return this->outSPEF;
     }
 
+    // Set layer stackup
+    void setLayers(vector<Layer> layers)
+    {
+        this->layers = layers;
+    }
+
     // Set SPEF output file name
     void setOutSPEF(std::string fileName)
     {
         this->outSPEF = fileName;
     }
 
-    // Read IMAP 3D file data into the solver database
-    bool readIMAPwriteGDSII()
+    // Find index of layer by name
+    // Returns index past number of layers if not found
+    size_t locateLayer(std::string name) const
     {
-        return true;
+        size_t indLayer;
+        for (indLayer = 0; indLayer < (this->layers).size(); indLayer++)
+        {
+            if (name.compare((this->layers[indLayer]).getLayerName()) == 0)
+            {
+                return indLayer;
+            }
+        }
+        return indLayer;
+    }
+
+    // Return a layer
+    Layer getLayer(size_t indLayer) const
+    {
+        return (this->layers)[indLayer];
+    }
+
+    // Return all layer names
+    vector<string> findLayerNames() const
+    {
+        vector<string> names;
+        for (size_t indi = 0; indi < (this->layers).size(); indi++)
+        {
+            names.push_back(((this->layers)[indi]).getLayerName());
+        }
+        return names;
+    }
+
+    // Read IMAP 3D file data into the solver database
+    bool readIMAPwriteGDSII(std::string imapFileName, std::string gdsiiFileName)
+    {
+        // Attempt to open IMAP 3D file
+        ifstream imapFile(imapFileName.c_str());
+        if (imapFile.is_open())
+        {
+            // Time manipulations
+            char timeStr[80]; // Character array to hold formatted time
+            time_t rawtime; // Timer variable
+            strftime(timeStr, sizeof(timeStr), "%d-%m-%Y %H:%M:%S", localtime(&rawtime)); // Use local timezone to format string
+            std::string time(timeStr); // Formatted time to string parametrized constructor
+
+            // Build single geometric cell from limboint.h to store information
+            GeoCell cellIMAP;
+            cellIMAP.cellName = imapFileName.substr(0, imapFileName.find(".", 1));
+            cellIMAP.dateCreate = time;
+            cellIMAP.dateMod = time;
+
+            // Build ASCII database from limboint.h
+            AsciiDataBase adbIMAP;
+            adbIMAP.setFileName(gdsiiFileName);
+            adbIMAP.setDateMod(time);
+            adbIMAP.setDateAccess(time);
+            adbIMAP.setdbUserUnits(1.);
+            adbIMAP.setdbUnits(1.);
+
+            // File is readable line-by-line
+            std::string fileLine;
+            getline(imapFile, fileLine);
+
+            // Save opening lines as metadata (mostly ignored)
+            if (fileLine.compare(0, 7, "IMAP3D ") == 0)
+            {
+                // Save IMAP 3D version number
+                std::string version = fileLine.substr(7, fileLine.length() - 7); // 7 characters in header syntax
+            }
+
+            // Read rest of file line-by-line
+            while (!imapFile.eof())
+            {
+                // Handle units
+                double multSI = 1.0;
+                double stripLength = 2000; // Hard-coded (for now)
+                if (fileLine.compare(0, 12, "LINEARUNITS ") == 0)
+                {
+                    std::string units = fileLine.substr(12, fileLine.length() - 12);
+
+                    // Find SI multiplier for given units
+                    if (units.compare("ym") == 0) { multSI = 1e-24; }
+                    else if (units.compare("zm") == 0) { multSI = 1e-21; }
+                    else if (units.compare("am") == 0) { multSI = 1e-18; }
+                    else if (units.compare("fm") == 0) { multSI = 1e-15; }
+                    else if (units.compare("pm") == 0) { multSI = 1e-12; }
+                    else if (units.compare("nm") == 0) { multSI = 1e-09; }
+                    else if (units.compare("um") == 0) { multSI = 1e-06; }
+                    else if (units.compare("mm") == 0) { multSI = 1e-03; }
+                    else if (units.compare("cm") == 0) { multSI = 1e-02; }
+                    else if (units.compare("dm") == 0) { multSI = 1e-01; }
+
+                    stripLength *= multSI; // Hard-coded rescaling of length (for now)
+                }
+                // Handle design name
+                else if (fileLine.compare(0, 5, "NAME ") == 0)
+                {
+                    this->designName = fileLine.substr(5, fileLine.length() - 5);
+                }
+                // Handle layer stack
+                else if (fileLine.compare(0, 5, "STACK") == 0)
+                {
+                    // Move down one line
+                    getline(imapFile, fileLine);
+
+                    // Keep reading until end of layer stack
+                    while ((fileLine.compare(0, 10, "CONDUCTORS") != 0) && (fileLine.compare(0, 8, "BOUNDARY") != 0))
+                    {
+                        // Record each layer
+                        if (fileLine.length() >= 3)
+                        {
+                            // Find layer property delimiters
+                            size_t indLayNam = fileLine.find(" ");
+                            size_t indZStart = fileLine.find("z=");
+                            size_t indHeight = fileLine.find("h=");
+                            size_t indPermit = fileLine.find("e=");
+                            size_t indLosTan = fileLine.find("TanD=");
+                            size_t indConduc = fileLine.find("sigma=");
+
+                            // Save layer information to variables
+                            std::string layerName = fileLine.substr(0, indLayNam);
+                            int gdsiiNum = -1;
+                            if (layerName.find('M') != string::npos)
+                            {
+                                size_t indNumber = layerName.find("M");
+                                gdsiiNum = stoi(layerName.substr(indNumber + 1, layerName.length() - indNumber - 1));
+                            }
+                            double zStart = 0.;
+                            if (indZStart != string::npos)
+                            {
+                                zStart = stod(fileLine.substr(indZStart + 2, indHeight - indZStart - 3));
+                            }
+                            double zHeight = stod(fileLine.substr(indHeight + 2, fileLine.find(" ", indHeight) - indHeight - 2));
+                            double epsilon_r = 1.;
+                            if (indPermit != string::npos)
+                            {
+                                epsilon_r = stod(fileLine.substr(indPermit + 2, fileLine.find(" ", indPermit) - indPermit - 2));
+                            }
+                            double lossTan = 0.;
+                            if (indLosTan != string::npos) // See if it handles being at the end of line
+                            {
+                                lossTan = stod(fileLine.substr(indLosTan + 5, fileLine.find(" ", indLosTan) - indLosTan - 5));
+                            }
+                            double sigma = 0.;
+                            if (indConduc != string::npos) // See if it handles being at the end of line
+                            {
+                                sigma = stod(fileLine.substr(indConduc + 6, fileLine.find(" ", indConduc) - indConduc - 6));
+                            }
+
+                            // Push new layer to class vector
+                            (this->layers).emplace_back(Layer(layerName, gdsiiNum, zStart, zHeight, epsilon_r, lossTan, sigma));
+                        }
+                        // Keep moving down the layer stack
+                        getline(imapFile, fileLine);
+                    }
+                }
+                // Handle conductors
+                else if (fileLine.compare(0, 10, "CONDUCTORS") == 0)
+                {
+                    // Move down one line
+                    getline(imapFile, fileLine);
+
+                    // Keep reading until end of conductor list
+                    while ((fileLine.compare(0, 8, "BOUNDARY") != 0) && (fileLine.compare(0, 9, "PORTTABLE") != 0))
+                    {
+                        // Record each conductor as a box
+                        if (fileLine.length() >= 3)
+                        {
+                            // Find conductor property delimiters
+                            size_t indCategory = fileLine.find(" ", 0);
+                            size_t indCondName = fileLine.find(" ", indCategory);
+                            size_t indX1 = fileLine.find("x1=", indCondName);
+                            size_t indY1 = fileLine.find("y1=", indCondName);
+                            size_t indZ1 = fileLine.find("z1=", indCondName);
+                            size_t indX2 = fileLine.find("x2=", indCondName);
+                            size_t indY2 = fileLine.find("y2=", indCondName);
+                            size_t indZ2 = fileLine.find("z2=", indCondName);
+                            size_t indSigma = fileLine.find("sigma=", indCondName);
+                            size_t indLayer = fileLine.find("layer=", indCondName);
+                            size_t indGroup = fileLine.find("group=", indCondName);
+
+                            // Save conductor information to variables
+                            std::string category = fileLine.substr(0, indCategory);
+                            std::string condName = fileLine.substr(indCategory + 1, indCondName - indCategory - 1);
+                            double x1 = stod(fileLine.substr(indX1 + 3, indY1 - indX1 - 4)) * multSI; // Length is index difference minus space
+                            double y1 = stod(fileLine.substr(indY1 + 3, indZ1 - indY1 - 4)) * multSI;
+                            double x2 = stod(fileLine.substr(indX2 + 3, indY2 - indX2 - 4)) * multSI;
+                            double y2 = stod(fileLine.substr(indY2 + 3, indZ2 - indY2 - 4)) * multSI;
+                            std::string sigma = fileLine.substr(indSigma, indLayer - indSigma - 1);
+                            std::string group;
+                            if (indGroup != string::npos)
+                            {
+                                group = fileLine.substr(indGroup + 6);
+                            }
+
+                            // Assign layer number based on layer stack-up
+                            int gdsiiNum = 1;
+                            size_t indThisLayer = this->locateLayer(fileLine.substr(indLayer + 6, fileLine.find(" ", indLayer)));
+                            if (indThisLayer < (this->layers).size())
+                            {
+                                // Layer name for conductor matched name in layer stack-up
+                                gdsiiNum = ((this->layers)[indThisLayer]).getGDSIINum();
+                            }
+
+                            // Push new box to the geometric cell
+                            cellIMAP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, {sigma, condName, category, group}, 0));
+                        }
+                        // Keep moving down the conductor list
+                        getline(imapFile, fileLine);
+                    }
+                }
+
+                // Keep reading new lines in file
+                getline(imapFile, fileLine);
+            }
+
+            // Close file
+            imapFile.close();
+
+            // Update ASCII Database
+            adbIMAP.setLibName(this->designName);
+            adbIMAP.appendCell(cellIMAP);
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
     }
 
     // Print the solver database and dump to SPEF file
-    void printDump()
+    bool printDump()
     {
         // Print
         cout << "Solver Database of IC Design, " << this->designName << ":" << endl;
@@ -393,8 +733,18 @@ public:
         // Dump
         if (spefFile.is_open())
         {
+            // Write to file
             spef::Spef designPara = (this->para).toSPEF(this->designName, 1.0e-5);
             designPara.dump(spefFile);
+
+            // Close file
+            spefFile.close();
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
         }
     }
 
