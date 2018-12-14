@@ -3,6 +3,7 @@
 LIB_PREFIX = gds
 LIMBO_ROOT_DIR = $(realpath ../Limbo/)
 PARSER_SPEF_ROOT_DIR = $(realpath ../Parser-SPEF/)
+EIGEN_ROOT_DIR = $(realpath ../eigen-git-mirror/)
 OBJDIR = $(realpath ./)/obj
 LIBDIR = $(LIMBO_ROOT_DIR)/lib
 MKDIR = if [ ! -d $(@D) ]; then mkdir -p $(@D); fi
@@ -24,7 +25,7 @@ endif
 endif
 
 # Special Libraries to Include
-INCLUDE = -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR)
+INCLUDE = -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR)
 
 ifdef ZLIB_DIR
 ifdef BOOST_DIR
@@ -55,7 +56,7 @@ LimboInterface: $(OBJS) $(LIBDIR)/lib$(LIB_PREFIX)parser.a
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LIB) -l$(LIB_PREFIX)parser $(INCLUDE)
 
 explicit: TestLimboInterface.cpp
-	g++ -std=c++17 -g -lstdc++fs -o Test_$@ TestLimboInterface.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR)
+	g++ -std=c++17 -g -lstdc++fs -o Test_$@ TestLimboInterface.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR)
 			
 .PHONY: clean
 clean: cleandep

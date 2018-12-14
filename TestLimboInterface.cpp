@@ -11,25 +11,12 @@
 #include <string>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <parser-spef/parser-spef.hpp>
+#include <Eigen/Sparse>
 #include "limboint.h"
 #include "spefwrite.h"
 using std::cerr;
 using std::cout;
 using std::endl;
-
-/* ===========================================
-example to read .gds.gz 
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/device/file.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
-
-EnumDataBase edb; 
-boost::iostreams::filtering_istream in; 
-in.push(boost::iostreams::gzip_decompressor());
-in.push(boost::iostreams::file_source(argv[1]));
-
-cout << "test enum api\n" << GdsParser::read(edb, in) << endl;
-=========================================== */
 
 /// @brief main function 
 /// @param argc number of arguments 
@@ -108,19 +95,64 @@ int main(int argc, char** argv)
             size_t numPorts = 13;
             vector<std::string> ports = { "inp1", "u1:a", "inp2", "u1:b", "out", "u3:o", "u1:o", "u4:a", "u4:o", "f1:d", "f1:a", "u2:a", "u4:b" };
             vector<char> portDir = { 'I', 'I', 'I', 'I', 'O', 'O', 'O', 'I', 'O', 'I', 'O', 'I', 'I' };
-            vector<vector<double>> matG = { { 1. / (10.5e3), -1. / (10.5e3), 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0. },{ -1. / (10.5e3), 1. / (10.5e3), 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0. },
-            { 0., 0., 1. / (4.5e3), -1. / (4.5e3), 0., 0., 0., 0., 0., 0., 0., 0., 0. },{ 0., 0., -1. / (4.5e3), 1. / (4.5e3), 0., 0., 0., 0., 0., 0., 0., 0., 0. },
-            { 0., 0., 0., 0., 1. / (1.4e3), -1. / (1.4e3), 0., 0., 0., 0., 0., 0., 0. },{ 0., 0., 0., 0., -1. / (1.4e3), 1. / (1.4e3), 0., 0., 0., 0., 0., 0., 0. },
-            { 0., 0., 0., 0., 0., 0., 1. / (2.1e3), -1. / (2.1e3), 0., 0., 0., 0., 0. },{ 0., 0., 0., 0., 0., 0., -1. / (2.1e3), 1. / (2.1e3), 0., 0., 0., 0., 0. },
-            { 0., 0., 0., 0., 0., 0., 0., 0., 1. / (2.1e3), -1. / (2.1e3), 0., 0., 0. },{ 0., 0., 0., 0., 0., 0., 0., 0., -1. / (2.1e3), 1. / (2.1e3), 0., 0., 0. },
-            { 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1. / (1.2e3 + 2.3e3 + 3.4e3) + 1. / (1.2e3 + 7.8e3 + 5.6e3), -1. / (1.2e3 + 2.3e3 + 3.4e3), -1. / (1.2e3 + 7.8e3 + 5.6e3) },
-            { 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., -1. / (3.4e3 + 2.3e3 + 1.2e3), 1. / (3.4e3 + 2.3e3 + 1.2e3) + 1. / (3.4e3 + 2.3e3 + 7.8e3 + 5.6e3), -1. / (3.4e3 + 2.3e3 + 7.8e3 + 5.6e3) },
-            { 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., -1. / (5.6e3 + 7.8e3 + 1.2e3), -1. / (5.6e3 + 7.8e3 + 2.3e3 + 3.4e3), 1. / (5.6e3 + 7.8e3 + 1.2e3) + 1. / (5.6e3 + 7.8e3 + 2.3e3 + 3.4e3) } };
-            vector<vector<double>> matC = { { 2.5e-15, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0. },{ 0., 2.9e-5, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0. },
-            { 0., 0., 0.7e-15, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0. },{ 0., 0., 0., 1.3e-15, 0., 0., 0., 0., 0., 0., 0., 0., 0. },{ 0., 0., 0., 0., 0.5e-15, 0., 0., 0., 0., 0., 0., 0., 0. },
-            { 0., 0., 0., 0., 0., 0.2e-15, 0., 0., 0., 0., 0., 0., 0. },{ 0., 0., 0., 0., 0., 0., 0.35e-15, 0., 0., 0., 0., 0., 0. },{ 0., 0., 0., 0., 0., 0., 0., 0.65e-15, 0., 0., 0., 0., 0. },
-            { 0., 0., 0., 0., 0., 0., 0., 0., 0.7e-15, 0., 0., 0., 0. },{ 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.5e-15, 0., 0., 0. },{ 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 8.9e-15, 0., 0. },
-            { 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 6.7e-15, 0. },{ 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 7.8e-15 } };
+
+            // Setup the Eigen sparse conductance matrix
+            spMat matG(13, 13); // Initialize sparse conductance matrix (S)
+            vector<dTriplet> listG; // Initialize triplet list for conductance matrix
+            listG.reserve(3); // Reserve room for 3 nonzero entries in each row
+            listG.push_back(dTriplet(0, 0, 1. / (10.5e3)));
+            listG.push_back(dTriplet(0, 1, -1. / (10.5e3)));
+            listG.push_back(dTriplet(1, 0, -1. / (10.5e3)));
+            listG.push_back(dTriplet(1, 1, 1. / (10.5e3)));
+            listG.push_back(dTriplet(2, 2, 1. / (4.5e3)));
+            listG.push_back(dTriplet(2, 3, -1. / (4.5e3)));
+            listG.push_back(dTriplet(3, 2, -1. / (4.5e3)));
+            listG.push_back(dTriplet(3, 3, 1. / (4.5e3)));
+            listG.push_back(dTriplet(4, 4, 1. / (1.4e3)));
+            listG.push_back(dTriplet(4, 5, -1. / (1.4e3)));
+            listG.push_back(dTriplet(5, 4, -1. / (1.4e3)));
+            listG.push_back(dTriplet(5, 5, 1. / (1.4e3)));
+            listG.push_back(dTriplet(6, 6, 1. / (2.1e3)));
+            listG.push_back(dTriplet(6, 7, -1. / (2.1e3)));
+            listG.push_back(dTriplet(7, 6, -1. / (2.1e3)));
+            listG.push_back(dTriplet(7, 7, 1. / (2.1e3)));
+            listG.push_back(dTriplet(8, 8, 1. / (2.1e3)));
+            listG.push_back(dTriplet(8, 9, -1. / (2.1e3)));
+            listG.push_back(dTriplet(9, 8, -1. / (2.1e3)));
+            listG.push_back(dTriplet(9, 9, 1. / (2.1e3)));
+            listG.push_back(dTriplet(10, 10, 1. / (1.2e3 + 2.3e3 + 3.4e3) + 1. / (1.2e3 + 7.8e3 + 5.6e3)));
+            listG.push_back(dTriplet(10, 11, -1. / (1.2e3 + 2.3e3 + 3.4e3)));
+            listG.push_back(dTriplet(10, 12, -1. / (1.2e3 + 7.8e3 + 5.6e3)));
+            listG.push_back(dTriplet(11, 10, -1. / (3.4e3 + 2.3e3 + 1.2e3)));
+            listG.push_back(dTriplet(11, 11, 1. / (3.4e3 + 2.3e3 + 1.2e3) + 1. / (3.4e3 + 2.3e3 + 7.8e3 + 5.6e3)));
+            listG.push_back(dTriplet(11, 12, -1. / (3.4e3 + 2.3e3 + 7.8e3 + 5.6e3)));
+            listG.push_back(dTriplet(12, 10, -1. / (5.6e3 + 7.8e3 + 1.2e3)));
+            listG.push_back(dTriplet(12, 11, -1. / (5.6e3 + 7.8e3 + 2.3e3 + 3.4e3)));
+            listG.push_back(dTriplet(12, 12, 1. / (5.6e3 + 7.8e3 + 1.2e3) + 1. / (5.6e3 + 7.8e3 + 2.3e3 + 3.4e3)));
+            matG.setFromTriplets(listG.begin(), listG.end()); // Assign nonzero entries to sparse conductance matrix
+            matG.makeCompressed(); // Conductance matrix in compressed sparse row (CSR) format
+
+            // Setup the Eigen sparse capacitance matrix
+            spMat matC(13, 13); // Initialize sparse capacitance matrix (F)
+            vector<dTriplet> listC; // Initialize triplet list for capacitance matrix
+            listC.reserve(1); // Reserve room for 1 nonzero entry in each row
+            listC.push_back(dTriplet(0, 0, 2.5e-15));
+            listC.push_back(dTriplet(1, 1, 2.9e-15));
+            listC.push_back(dTriplet(2, 2, 0.7e-15));
+            listC.push_back(dTriplet(3, 3, 1.3e-15));
+            listC.push_back(dTriplet(4, 4, 0.5e-15));
+            listC.push_back(dTriplet(5, 5, 0.2e-15));
+            listC.push_back(dTriplet(6, 6, 0.35e-15));
+            listC.push_back(dTriplet(7, 7, 0.65e-15));
+            listC.push_back(dTriplet(8, 8, 0.7e-15));
+            listC.push_back(dTriplet(9, 9, 0.5e-15));
+            listC.push_back(dTriplet(10, 10, 8.9e-15));
+            listC.push_back(dTriplet(11, 11, 6.7e-15));
+            listC.push_back(dTriplet(12, 12, 7.8e-15));
+            matC.setFromTriplets(listC.begin(), listC.end()); // Assign nonzero entries to sparse capacitance matrix
+            matC.makeCompressed(); // Capactiance matrix in compressed sparse row (CSR) format
+
+            // Create variables of custom classes
             Parasitics sample(numPorts, ports, portDir, matG, matC);
             SolverDataBase sdb(design, blank, sample);
 
@@ -128,13 +160,11 @@ int main(int argc, char** argv)
             string fName = argv[2];
             sdb.setOutSPEF(fName);
             std::ifstream inFile(fName.c_str());
-            //GdsParser::GdsReader adbReader(sdb);
-            //bool sdbIsGood = adbReader(inFile);
             bool couldDump = sdb.printDump();
         }
         else
         {
-            cerr << "Must pass a file after \"-r\" or \"-w\" flags, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a file after \"-r\", \"-p\", or \"-w\" flags, rerun with \"--help\" flag for details" << endl;
         }
     }
     else if (argc == 4)

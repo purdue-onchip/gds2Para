@@ -16,11 +16,39 @@
 #include <unordered_map>
 #include <cmath>
 #include <ctime>
-//#include <algorithm>
 #include <parser-spef/parser-spef.hpp>
+#include <Eigen/Sparse>
 #include "limboint.h"
 using namespace std;
 
+// Define types for Eigen
+typedef Eigen::Triplet<double, int> dTriplet;
+typedef Eigen::SparseMatrix<double, Eigen::RowMajor> spMat;
+struct myPruneFunctor
+{
+private:
+    double reference;
+public:
+    // Default constructor
+    myPruneFunctor()
+    {
+        this->reference = 0.;
+    }
+
+    // Parametrizer constructor
+    myPruneFunctor(double ref)
+    {
+        this->reference = ref;
+    }
+
+    // Functor magic overloading parentheses
+    inline bool operator() (const int& row, const int& col, const double& value) const
+    {
+        return (abs(value) > this->reference);
+    }
+};
+
+// Custom classes for SPEF writer
 class Layer
 {
 private:
@@ -159,18 +187,18 @@ public:
 class Parasitics
 {
 private:
-    size_t nPorts;                // Number of ports
-    vector<std::string> ports;    // Name of each port
-    vector<char> portDir;         // Direction of each port
-    vector<vector<double>> matG;  // Conductance matrix (S)
-    vector<vector<double>> matC;  // Capacitance matrix (F)
+    size_t nPorts;                             // Number of ports
+    vector<std::string> ports;                 // Name of each port
+    vector<char> portDir;                      // Direction of each port
+    spMat matG;                                // Condctance matrix (S)
+    spMat matC;                                // Capacitance matrix (F)
 public:
     // Default constructor
     Parasitics()
     {
         vector<std::string> ports = {};
         vector<char> portDir = {};
-        vector<vector<double>> emptMat = { {} };
+        spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
         this->portDir = portDir;
@@ -179,7 +207,7 @@ public:
     }
 
     // Parametrized constructor
-    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, vector<vector<double>> matG, vector<vector<double>> matC)
+    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, spMat matG, spMat matC)
     {
         this->nPorts = nPorts;
         this->ports = ports;
@@ -208,13 +236,13 @@ public:
     }
 
     // Get conductance matrix
-    vector<vector<double>> getGMatrix() const
+    spMat getGMatrix() const
     {
         return this->matG;
     }
 
     // Get capacitance matrix
-    vector<vector<double>> getCMatrix() const
+    spMat getCMatrix() const
     {
         return this->matC;
     }
@@ -222,57 +250,27 @@ public:
     // Return node-to-ground conductance
     double getGNodeGround(size_t indNode) const
     {
-        double condNG = 0.0;
-        for (size_t indi = 0; indi < this->getNPort(); indi++)
-        {
-            // Calculate by summing along given row
-            condNG += ((this->matG)[indi])[0];
-        }
-        return condNG;
+        // Calculate by summing along given row
+        return (this->matG).innerVector(indNode).sum();
     }
 
-    // Return total conductance represented in matrix
+    // Return total conductance represented in matrix (sum of diagonal entries)
     double getGTotal() const
     {
-        size_t nPort = this->getNPort();
-        double condTot = 0.0;
-        for (size_t indi = 0; indi < nPort; indi++)
-        {
-            condTot += getGNodeGround(indi); // Include node-to-ground conductances
-            for (size_t indj = indi + 1; indj < nPort; indj++)
-            {
-                condTot -= (this->matG)[indi][indj]; // Include negated node-node conductance entries
-            }
-        }
-        return condTot;
+        return (this->matG).diagonal().sum();
     }
 
     // Return node-to-ground capacitance
     double getCNodeGround(size_t indNode) const
     {
-        double capNG = 0.0;
-        for (size_t indi = 0; indi < this->getNPort(); indi++)
-        {
-            // Calculate by summing along given row
-            capNG += ((this->matC)[indi])[0];
-        }
-        return capNG;
+        // Calculate by summing along given row
+        return (this->matC).innerVector(indNode).sum();
     }
 
-    // Return total capacitance represented in matrix
+    // Return total capacitance represented in matrix (sum of diagonal entries)
     double getCTotal() const
     {
-        size_t nPort = this->getNPort();
-        double capTot = 0.0;
-        for (size_t indi = 0; indi < nPort; indi++)
-        {
-            capTot += getCNodeGround(indi); // Include node-to-ground capacitances
-            for (size_t indj = indi + 1; indj < nPort; indj++)
-            {
-                capTot -= (this->matC)[indi][indj]; // Include negated node-node capacitance entries
-            }
-        }
-        return capTot;
+        return (this->matC).diagonal().sum();
     }
 
     // Print the parasitics information
@@ -287,30 +285,20 @@ public:
             cout << "   #" << indi + 1 << ": " << (this->ports)[indi] << endl;
         }
         cout << "  Conductance Matrix (S):" << endl;
-        for (size_t indi = 0; indi < numPort; indi++)
+        for (size_t indi = 0; indi < (this->matG).outerSize(); indi++)
         {
-            cout << "   |"; // Indent the matrix rows
-            for (size_t indj = 0; indj < numPort; indj++)
+            for (spMat::InnerIterator it(this->matG, indi); it; ++it)
             {
-                char value[12];
-                sprintf(value, "%-+10.2g", (this->matG)[indi][indj]);
-                cout << value;
-                //delete[] value; // Free array pointer
+                cout << "   row " << setw(4) << it.row() << ", column " << setw(4) << it.col() << ", value " << it.value() << endl;
             }
-            cout << "|" << endl; // End the matrix row
         }
         cout << "  Capacitance Matrix (F):" << endl;
-        for (size_t indi = 0; indi < numPort; indi++)
+        for (size_t indi = 0; indi < (this->matC).outerSize(); indi++)
         {
-            cout << "   |"; // Indent the matrix rows
-            for (size_t indj = 0; indj < numPort; indj++)
+            for (spMat::InnerIterator it(this->matC, indi); it; ++it)
             {
-                char value[12];
-                sprintf(value, "%-+10.2g", (this->matC)[indi][indj]);
-                cout << value;
-                //delete[] value; // Free array pointer
+                cout << "   row " << setw(4) << it.row() << ", column " << setw(4) << it.col() << ", value " << it.value() << endl;
             }
-            cout << "|" << endl; // End the matrix row
         }
         cout << " ------" << endl;
     }
@@ -346,7 +334,6 @@ public:
         for (size_t indi = 0; indi < numPort; indi++)
         {
             para.name_map.emplace(indi + 1, (this->ports)[indi]); // Create name map for each port
-            //para.ports.emplace_back((this->ports)[indi]); // Instantiate and push new port entry by name
             para.ports.emplace_back("*" + to_string(indi + 1)); // Instantiate and push new port entry by name map
             switch ((this->portDir)[indi]) // Assign port direction
             {
@@ -364,6 +351,8 @@ public:
         // Populate Spef struct nets vector (single net)
         double capTot = this->getCTotal();
         double condTot = this->getGTotal();
+        (this->matC).prune(myPruneFunctor(saveThresh * capTot)); // Prune away nonzeros sufficiently smaller than threshold
+        (this->matG).prune(myPruneFunctor(saveThresh * condTot));
         para.nets.emplace_back(spef::Net());
         para.nets.back().name = "all";
         para.nets.back().lcap = capTot;
@@ -373,27 +362,26 @@ public:
             para.nets.back().connections.back().name = (this->ports)[indi];
             para.nets.back().connections.back().type = spef::ConnectionType::EXTERNAL; // All ports are external connections, not internal to cells
             para.nets.back().connections.back().direction = (para.ports[indi]).direction; // Same as port direction
-            for (size_t indj = 0; indj < numPort; indj++)
+            for (spMat::InnerIterator it(this->matC, indi); it; ++it)
             {
-                if (indi == indj) // Diagonal element, so admittance to ground
+                if ((it.row() == it.col()) && (abs(this->getCNodeGround(indi)) >= saveThresh * capTot)) // Diagonal element, so sufficient admittance to ground
                 {
-                    if (abs(this->getCNodeGround(indi) / capTot) >= saveThresh) // Only place sufficiently nonzero entries
-                    {
-                        para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, "", this->getCNodeGround(indi)));
-                    }
-                    if (abs(this->getGNodeGround(indi) / condTot) >= saveThresh)
-                    {
-                        para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, "", 1.0 / this->getGNodeGround(indi)));
-                    }
+                    para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, "", this->getCNodeGround(indi)));
                 }
-                else if (indj > indi) // Upper triangular element, so negate node-to-node admittance
+                else if (it.col() > it.row()) // Upper triangular element, so negate node-to-node admittance
                 {
-                    if (abs((this->matC)[indi][indj] / capTot) >= saveThresh) // Only place sufficiently nonzero entries
-                    {
-                        para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[indj].name, -(this->matC)[indi][indj]));
-                    }
-                    if (abs((this->matG)[indi][indj] / condTot) >= saveThresh)
-                    para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[indj].name, -1.0 / ((this->matG)[indi][indj])));
+                    para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, -it.value()));
+                } // Skip lower triangular element, which is repeated
+            }
+            for (spMat::InnerIterator it(this->matG, indi); it; ++it)
+            {
+                if ((it.row() == it.col()) && (abs(this->getGNodeGround(indi)) >= saveThresh * condTot)) // Diagonal element, so sufficient admittance to ground
+                {
+                    para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, "", 1.0 / this->getGNodeGround(indi)));
+                }
+                else if (it.col() > it.row()) // Upper triangular element, so negate node-to-node admittance
+                {
+                    para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, -1.0 / it.value()));
                 } // Skip lower triangular element, which is repeated
             }
         }
@@ -407,7 +395,8 @@ public:
     {
         vector<std::string> ports = {};
         vector<char> portDir = {};
-        vector<vector<double>> emptMat = { {} };
+        /*vector<vector<double>> emptMat = { {} };*/
+        spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
         this->portDir = portDir;
