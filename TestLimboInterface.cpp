@@ -95,6 +95,8 @@ int main(int argc, char** argv)
             size_t numPorts = 13;
             vector<std::string> ports = { "inp1", "u1:a", "inp2", "u1:b", "out", "u3:o", "u1:o", "u4:a", "u4:o", "f1:d", "f1:a", "u2:a", "u4:b" };
             vector<char> portDir = { 'I', 'I', 'I', 'I', 'O', 'O', 'O', 'I', 'O', 'I', 'O', 'I', 'I' };
+            vector<double> Z_port_source;
+            Z_port_source.assign(numPorts, 50.);
 
             // Setup the Eigen sparse conductance matrix
             spMat matG(13, 13); // Initialize sparse conductance matrix (S)
@@ -153,7 +155,7 @@ int main(int argc, char** argv)
             matC.makeCompressed(); // Capactiance matrix in compressed sparse row (CSR) format
 
             // Create variables of custom classes
-            Parasitics sample(numPorts, ports, portDir, matG, matC);
+            Parasitics sample(numPorts, ports, portDir, Z_port_source, matG, matC);
             SolverDataBase sdb(design, blank, sample);
 
             // Prepare to write to file

@@ -49,6 +49,104 @@ public:
 };
 
 // Custom classes for SPEF writer
+class SimSettings
+{
+private:
+    double lengthUnit;     // Units for lengths (m)
+    vector<double> limits; // xmin, xmax, ymin, ymax, zmin, zmax (m)
+    double freqUnit;       // Units for frequency (Hz)
+    size_t nFreq;          // Number of frequencies in simulation
+    double freqScale;      // Frequency scaling?
+    vector<double> freqs;  // List of logarithmically spaced frequencies
+public:
+    // Default constructor
+    SimSettings()
+    {
+        this->lengthUnit = 1.;
+        this->limits = {0., 0., 0., 0., 0., 0.};
+        this->freqUnit = 1.;
+        this->nFreq = 0;
+        this->freqScale = 0.;
+        this->freqs = {};
+    }
+
+    // Parametrized constructor
+    SimSettings(double lengthUnit, vector<double> limits, double freqUnit, size_t nFreq, double freqScale, vector<double> freqs)
+    {
+        this->lengthUnit = lengthUnit;
+        this->limits = limits;
+        this->freqUnit = freqUnit;
+        this->nFreq = nFreq;
+        this->freqScale = freqScale;
+        this->freqs = freqs;
+    }
+
+    // Get length unit (m)
+    double getLengthUnit() const
+    {
+        return this->lengthUnit;
+    }
+
+    // Get limits (minimum extent, maximum extent) for x-dir, y-dir, and z-dir
+    vector<double> getLimits() const
+    {
+        return this->limits;
+    }
+
+    // Get frequency unit (Hz)
+    double getFreqUnit() const
+    {
+        return this->freqUnit;
+    }
+
+    // Get number of frequencies in simulatoin
+    size_t getNFreq() const
+    {
+        return this->nFreq;
+    }
+
+    // Get frequency scaling
+    double getFreqScale() const
+    {
+        return this->freqScale;
+    }
+
+    // Get list of frequencies (logarithmic spacing)
+    vector<double> getFreqs() const
+    {
+        return this->freqs;
+    }
+
+    // Print the simulation settings
+    void print() const
+    {
+        size_t numFreq = this->getNFreq();
+        cout << " ------" << endl;
+        cout << " Simulation Settings:" << endl;
+        cout << "  Limits in x-direction: " << (this->limits)[0] << " m to " << (this->limits)[1] << "m" << endl;
+        cout << "  Limits in y-direction: " << (this->limits)[2] << " m to " << (this->limits)[3] << "m" << endl;
+        cout << "  Limits in z-direction: " << (this->limits)[4] << " m to " << (this->limits)[5] << "m" << endl;
+        cout << "  List of " << numFreq << " frequencies to simulate with " << this->freqScale << " scaling:" << endl;
+        for (size_t indi = 0; indi < numFreq; indi++)
+        {
+            if (numFreq - indi == 1) // Single frequency left to print
+            {
+                cout << "   #" << indi + 1 << " is " << (this->freqs)[indi] << " Hz" << endl;
+            }
+            else // Two frequencies per line
+            {
+                cout << "   #" << indi + 1 << " is " << (this->freqs)[indi++] << " Hz, and #" << indi + 2 << " is " << (this->freqs)[indi + 1] << " Hz" << endl;
+            }
+        }
+    }
+
+    // Destructor
+    ~SimSettings()
+    {
+        // Nothing
+    }
+};
+
 class Layer
 {
 private:
@@ -131,8 +229,7 @@ public:
     void print() const
     {
         cout << " ------" << endl;
-        cout << " Layer Details:" << endl;
-        cout << "  Name: " << this->layerName << endl;
+        cout << " Details for layer " << this->layerName << ":" << endl;
         if (this->gdsiiNum != -1)
         {
             cout << "  GDSII layer number: " << this->gdsiiNum << endl;
@@ -190,7 +287,8 @@ private:
     size_t nPorts;                             // Number of ports
     vector<std::string> ports;                 // Name of each port
     vector<char> portDir;                      // Direction of each port
-    spMat matG;                                // Condctance matrix (S)
+    vector<double> Z_port_source;              // Impedance of source attached to port (ohm)
+    spMat matG;                                // Conductance matrix (S)
     spMat matC;                                // Capacitance matrix (F)
 public:
     // Default constructor
@@ -198,6 +296,7 @@ public:
     {
         vector<std::string> ports = {};
         vector<char> portDir = {};
+        vector<double> Z_port_source = {};
         spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
@@ -207,11 +306,12 @@ public:
     }
 
     // Parametrized constructor
-    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, spMat matG, spMat matC)
+    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, vector<double> Z_port_source, spMat matG, spMat matC)
     {
         this->nPorts = nPorts;
         this->ports = ports;
         this->portDir = portDir;
+        this->Z_port_source = Z_port_source;
         this->matG = matG;
         this->matC = matC;
     }
@@ -233,6 +333,12 @@ public:
     vector<char> getPortDir() const
     {
         return this->portDir;
+    }
+
+    // Get impedance of source attached to port (ohm)
+    vector<double> getZPortSource() const
+    {
+        return this->Z_port_source;
     }
 
     // Get conductance matrix
@@ -282,7 +388,7 @@ public:
         cout << "  Port Names:" << endl;
         for (size_t indi = 0; indi < numPort; indi++) // Handle each port name
         {
-            cout << "   #" << indi + 1 << ": " << (this->ports)[indi] << endl;
+            cout << "   #" << indi + 1 << ": " << (this->ports)[indi] << ", direction " << (this->portDir)[indi] << endl;
         }
         cout << "  Conductance Matrix (S):" << endl;
         for (size_t indi = 0; indi < (this->matG).outerSize(); indi++)
@@ -339,10 +445,13 @@ public:
             {
             case 'O':
                 para.ports.back().direction = spef::ConnectionDirection::OUTPUT;
+                break;
             case 'I':
                 para.ports.back().direction = spef::ConnectionDirection::INPUT;
+                break;
             case 'B':
                 para.ports.back().direction = spef::ConnectionDirection::INOUT;
+                break;
             default:
                 para.ports.back().direction = spef::ConnectionDirection::INOUT; // Treat as bidirectional if direction unclear
             }
@@ -409,6 +518,7 @@ struct SolverDataBase
 {
 private:
     std::string designName; // Name of design
+    SimSettings settings;   // Simulation settings
     vector<Layer> layers;   // Layer stack-up information
     Waveforms wf;           // Waveforms
     Parasitics para;        // Parasitics
@@ -417,10 +527,12 @@ public:
     // Default constructor
     SolverDataBase()
     {
+        SimSettings settings;
         vector<Layer> layers;
         Waveforms wf;
         Parasitics para;
         this->designName = "";
+        this->settings = settings;
         this->layers = layers;
         this->wf = wf;
         this->para = para;
@@ -430,8 +542,10 @@ public:
     // Parametrized constructor
     SolverDataBase(std::string designName, Waveforms wf, Parasitics para)
     {
+        SimSettings settings;
         vector<Layer> layers;
         this->designName = designName;
+        this->settings = settings;
         this->layers = layers;
         this->wf = wf;
         this->para = para;
@@ -442,6 +556,18 @@ public:
     std::string getDesignName() const
     {
         return this->designName;
+    }
+
+    // Get simulation settings
+    SimSettings getSimSettings() const
+    {
+        return this->settings;
+    }
+
+    // Get number of layers
+    size_t getNumLayer() const
+    {
+        return (this->layers).size();
     }
 
     // Get waveforms
@@ -460,6 +586,12 @@ public:
     std::string getOutSPEF() const
     {
         return this->outSPEF;
+    }
+
+    // Set simulation settings
+    void setSimSettings(SimSettings newSettings)
+    {
+        this->settings = newSettings;
     }
 
     // Set layer stackup
@@ -687,6 +819,91 @@ public:
                         getline(imapFile, fileLine);
                     }
                 }
+                // Handle port table
+                if (fileLine.compare(0, 9, "PORTTABLE") == 0)
+                {
+                    // Move down one line
+                    getline(imapFile, fileLine);
+
+                    // Keep reading until end of port table
+                    vector<std::string> ports;
+                    vector<char> portDir;
+                    vector<double> Z_source;
+                    while (fileLine.compare(0, 8, "ANALYSIS") != 0)
+                    {
+                        if (fileLine.length() >= 3)
+                        {
+                            // Find port table delimiters
+                            size_t indNameStart = fileLine.find("group=", 0) + 6;
+                            size_t indNameEnd = fileLine.find(" ", indNameStart);
+                            size_t indZNearStart = fileLine.find("znear=", indNameEnd) + 6;
+                            size_t indZNearEnd = fileLine.find(" ", indZNearStart);
+                            size_t indZFar = fileLine.find("zfar=", indNameEnd) + 5;
+
+                            // Save port table information to variables
+                            std::string groupName = fileLine.substr(indNameStart, indNameEnd - indNameStart);
+                            double Z_near = stod(fileLine.substr(indZNearStart, indZNearStart - indZNearEnd));
+                            double Z_far = stod(fileLine.substr(indZFar));
+
+                            // Register a new port in vectors
+                            ports.push_back(groupName);
+                            portDir.push_back('B');
+                            Z_source.push_back(Z_near);
+                        }
+                        // Keep moving down the port table
+                        getline(imapFile, fileLine);
+                    }
+
+                    // Propagate port information to Solver Database now
+                    this->para = Parasitics(ports.size(), ports, portDir, Z_source, spMat(), spMat());
+                }
+                // Handle analysis parameters
+                if (fileLine.compare(0, 8, "ANALYSIS") == 0)
+                {
+                    // Move down one line
+                    getline(imapFile, fileLine);
+                }
+                // Handle frequency information
+                if (fileLine.compare(0, 9, "Frequency") == 0)
+                {
+                    // Find frequency sweep delimiters
+                    size_t indBegin = fileLine.find("begin=");
+                    size_t indEnd = fileLine.find("end=");
+                    size_t indNoP = fileLine.find("numberofpoints=");
+
+                    // Save frequency sweep information to variables
+                    double freqBegin = stod(fileLine.substr(indBegin + 6, indEnd - indBegin - 7)); // Length is index difference minus space
+                    double freqEnd = stod(fileLine.substr(indEnd + 4, indNoP - indEnd - 5));
+                    int numFreqPts = stoi(fileLine.substr(indNoP + 15));
+                    vector<double> freqList;
+                    if (numFreqPts == 1)
+                    {
+                        freqList.push_back(freqBegin);
+                    }
+                    else if (numFreqPts == 2)
+                    {
+                        freqList.push_back(freqBegin);
+                        freqList.push_back(freqEnd);
+                    }
+                    else
+                    {
+                        double exp10Step = log10(freqEnd / freqBegin) / (numFreqPts - 1);
+                        freqList.push_back(freqBegin);
+                        for (size_t indi = 1; indi < numFreqPts - 1; indi++)
+                        {
+                            freqList.push_back(freqList.back() * pow(10, exp10Step));
+                        }
+                        freqList.push_back(freqEnd); // Ensure last frequency is exact
+                    }
+
+                    // Save simulation settings (hard-coded limits for now)
+                    this->settings = SimSettings(adbIMAP.getdbUnits(), {0.0, 3.000e-4, 0.0, 2.00005e-3, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight()}, 1.0, (size_t) numFreqPts, 0.0, freqList);
+                }
+                // Handle length in this weird spot
+                if (fileLine.compare(0, 6, "Length") == 0)
+                {
+                    //double stripLength = stod(fileLine.substr(7));
+                }
 
                 // Keep reading new lines in file
                 getline(imapFile, fileLine);
@@ -718,7 +935,15 @@ public:
     bool printDump()
     {
         // Print
+        int numLayer = this->getNumLayer();
         cout << "Solver Database of IC Design, " << this->designName << ":" << endl;
+        cout << " Settings for the simulation:" << endl;
+        (this->settings).print(); // Print the simulation settings
+        cout << " Layers:" << endl;
+        for (size_t indi = 0; indi < numLayer; indi++)
+        {
+            (this->layers)[indi].print();
+        }
         cout << " Waveforms:" << endl;
         (this->wf).print(); // Print the waveforms
         cout << " Parasitics in file " << this->outSPEF << ":" << endl;
