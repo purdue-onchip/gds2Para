@@ -24,16 +24,29 @@ Please direct all questions, bug reports, and issues relating to installing or r
   * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the Limbo repository followed by "Download ZIP"
   * Move the zip archive to the working location
   * Unzip the archive with `unzip Limbo-master.zip`
-3. Ensure that you are the owner of the files that were downloaded with full read/write/execute permissions
-  * Change ownership with `chown -R <username>:<username> <directory>`, where \<username> is your Purdue username and \<directory> is either "gdsii-interface/" (cloned), "gdsii-interface-master/" (downloaded), "Limbo/" (cloned), or "Limbo-master/" (downloaded)
-  * Change permissions with `chmod -R 744 <directory>`, where \<directory> is either "gdsii-interface/" (cloned), "gdsii-interface-master/" (downloaded), "Limbo/" (cloned), or "Limbo-master/" (downloaded)
-4. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
-5. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
+3. Clone the [Parser-SPEF repository](https://github.com/OpenTimer/Parser-SPEF) into your working location with `git clone https://github.com/OpenTimer/Parser-SPEF.git`
+  * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the Parser-SPEF repository followed by "Download ZIP"
+  * Move the zip archive to the working location
+  * Unzip the archive with `unzip Parser-SPEF-master.zip`
+4. Clone the [eigen-git-mirror repository](https://github.com/eigenteam/eigen-git-mirror) into your working location with `git clone https://github.com/eigenteam/eigen-git-mirror.git`
+  * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the eigen-git-mirror repository followed by "Download ZIP"
+  * Move the zip archive to the working location
+  * Unzip the archive with `unzip eigen-git-mirror-master.zip`
+5. Ensure that you are the owner of the files that were downloaded with full read/write/execute permissions
+  * Change ownership with `chown -R <username>:<username> <directory>`, where \<username> is your Purdue username and \<directory> is either "gdsii-interface/" (cloned) or "gdsii-interface-master/" (downloaded), "Limbo/" (cloned) or "Limbo-master/" (downloaded), "Parser-SPEF/" (cloned) or "Parser-SPEF-master/" (downloaded), or "eigen-git-mirror/" (cloned) or "eigen-git-mirror-master/" (downloaded)
+  * Change permissions with `chmod -R 744 <directory>`, where \<directory> is either "gdsii-interface/" (cloned) or "gdsii-interface-master/" (downloaded), "Limbo/" (cloned) or "Limbo-master/" (downloaded), "Parser-SPEF/" (cloned) or "Parser-SPEF-master/" (downloaded), or "eigen-git-mirror/" (cloned) or "eigen-git-mirror-master/" (downloaded)
+6. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
+7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
   * For "bash", edit the file ".bashrc" in your home directory by appending the following:
 ```bash
 # Improve gcc Version
+alias cc="gcc"
 export PATH=/opt/gcc/7.1.0/bin:$PATH
 export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
+
+# Improve git Version
+export PATH=/opt/git/2.18.0/bin:$PATH
+export LD_LIBRARY_PATH=/opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:$LD_LIBRARY_PATH
 
 # Environment Variables for GDSII File Handling
 export BOOST_DIR="/opt/boost/1.57.0"
@@ -43,23 +56,29 @@ export LIMBO_DIR="<absolute path to Limbo directory>"
   * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
 ```tcsh
 # Improve gcc Version
+alias cc 'gcc'
 setenv PATH /opt/gcc/7.1.0/bin:${PATH}
 setenv LD_LIBRARY_PATH /opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:${LD_LIBRARY_PATH}
+
+# Improve git Version                                                                                 
+setenv PATH /opt/git/2.18.0/bin:${PATH}                                                               
+setenv LD_LIBRARY_PATH /opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:${LD_LIBRARY_PATH}
 
 # Environment Variables for GDSII File Handling
 setenv BOOST_DIR /opt/boost/1.57.0
 setenv FLEX_DIR /usr/bin/flex
 setenv LIMBO_DIR <absolute path to Limbo directory>
 ```
-6. Exit the shell and terminate the connection before logging back in
-7. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`
+8. Exit the shell and terminate the connection before logging back in
+9. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`
   * If nothing shows up for "bash" users, run `cp .bashrc .bash_profile` in the home directory, exit the shell, log back in, and try again
   * If nothing shows up for "tcsh" users, run `cp .cshrc .tcshrc` in the home directory, exit the shell, log back in, and try again
   * For all other errors, contact the primary maintainer
-8. Enter "Limbo/limbo/parsers/gdsii/stream" (cloned) or "Limbo-master/limbo/parsers/gdsii/stream" (downloaded) directory in working location
-9. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
-10. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
-11. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory from working location
-12. (Optional) Add GDSII file besides "nand2.gds" to working location
-13. Run `make explicit` in shell to compile executable **Test\_explicit**
-14. Run `./Test_explicit nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with your own GDSII file if provided earlier)
+10. Enter "Limbo/limbo/parsers/gdsii/stream" (cloned) or "Limbo-master/limbo/parsers/gdsii/stream" (downloaded) directory in working location
+11. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
+12. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
+13. Enter "gdsii-interface" (cloned) or "gdsii-interface-master" (downloaded) directory from working location
+14. (Optional) Add GDSII file besides "nand2.gds", "SDFFRS_X2.gds", and "4004.gds" to working location
+15. Run `make explicit` in shell to compile executable **Test\_explicit**
+16. Run `./Test_explicit --help` to get a list of available modes the executable supports
+17. Run `./Test_explicit -r nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
