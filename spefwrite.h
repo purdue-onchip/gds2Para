@@ -196,6 +196,7 @@ public:
     }
 
     // Get layer bottom z-coordinate
+    // Currently assigns -1.0 for layers with unknown absolute position
     double getZStart() const
     {
         return this->zStart;
@@ -288,6 +289,7 @@ private:
     vector<std::string> ports;                 // Name of each port
     vector<char> portDir;                      // Direction of each port
     vector<double> Z_port_source;              // Impedance of source attached to port (ohm)
+    vector<vector<double>> portCoord;          // xsup, ysup, zsup, xret, yret, zret (m)
     spMat matG;                                // Conductance matrix (S)
     spMat matC;                                // Capacitance matrix (F)
 public:
@@ -297,21 +299,25 @@ public:
         vector<std::string> ports = {};
         vector<char> portDir = {};
         vector<double> Z_port_source = {};
+        vector<vector<double>> portCoord = {{}};
         spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
         this->portDir = portDir;
+        this->Z_port_source = Z_port_source;
+        this->portCoord = portCoord;
         this->matG = emptMat;
         this->matC = emptMat;
     }
 
     // Parametrized constructor
-    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, vector<double> Z_port_source, spMat matG, spMat matC)
+    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, vector<double> Z_port_source, vector<vector<double>> portCoord, spMat matG, spMat matC)
     {
         this->nPorts = nPorts;
         this->ports = ports;
         this->portDir = portDir;
         this->Z_port_source = Z_port_source;
+        this->portCoord = portCoord;
         this->matG = matG;
         this->matC = matC;
     }
@@ -335,10 +341,16 @@ public:
         return this->portDir;
     }
 
-    // Get impedance of source attached to port (ohm)
+    // Get impedance of sources attached to ports (ohm)
     vector<double> getZPortSource() const
     {
         return this->Z_port_source;
+    }
+    
+    // Get supply-point coordinates and return-point coordinates of ports (m)
+    vector<vector<double>> getPortCoord() const
+    {
+        return this->portCoord;
     }
 
     // Get conductance matrix
@@ -504,11 +516,14 @@ public:
     {
         vector<std::string> ports = {};
         vector<char> portDir = {};
-        /*vector<vector<double>> emptMat = { {} };*/
+        vector<double> emptZ = {};
+        vector<vector<double>> emptCoord = { {} };
         spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
         this->portDir = portDir;
+        this->Z_port_source = emptZ;
+        this->portCoord = emptCoord;
         this->matG = emptMat;
         this->matC = emptMat;
     }
@@ -588,6 +603,12 @@ public:
         return this->outSPEF;
     }
 
+    // Set name of design
+    void setDesignName(std::string designName)
+    {
+        this->designName = designName;
+    }
+
     // Set simulation settings
     void setSimSettings(SimSettings newSettings)
     {
@@ -608,12 +629,27 @@ public:
 
     // Find index of layer by name
     // Returns index past number of layers if not found
-    size_t locateLayer(std::string name) const
+    size_t locateLayerName(std::string name) const
     {
         size_t indLayer;
         for (indLayer = 0; indLayer < (this->layers).size(); indLayer++)
         {
             if (name.compare((this->layers[indLayer]).getLayerName()) == 0)
+            {
+                return indLayer;
+            }
+        }
+        return indLayer;
+    }
+
+    // Find index of layer by GDSII number
+    // Returns index past number of layers if not found
+    size_t locateLayerGDSII(int gdsiiNum) const
+    {
+        size_t indLayer;
+        for (indLayer = 0; indLayer < (this->layers).size(); indLayer++)
+        {
+            if ((this->layers[indLayer]).getGDSIINum() == gdsiiNum)
             {
                 return indLayer;
             }
@@ -638,12 +674,12 @@ public:
         return names;
     }
 
-    // Read IMAP 3D file data into the solver database
-    bool readIMAPwriteGDSII(std::string imapFileName, std::string gdsiiFileName)
+    // Read interconnect modeling platform (IMP) file data into the solver database
+    bool readIMPwriteGDSII(std::string impFileName, std::string gdsiiFileName)
     {
-        // Attempt to open IMAP 3D file
-        ifstream imapFile(imapFileName.c_str());
-        if (imapFile.is_open())
+        // Attempt to open .imp file
+        ifstream impFile(impFileName.c_str());
+        if (impFile.is_open())
         {
             // Time manipulations
             char timeStr[80]; // Character array to hold formatted time
@@ -652,30 +688,30 @@ public:
             std::string time(timeStr); // Formatted time to string parametrized constructor
 
             // Build single geometric cell from limboint.h to store information
-            GeoCell cellIMAP;
-            cellIMAP.cellName = imapFileName.substr(0, imapFileName.find(".", 1));
-            cellIMAP.dateCreate = time;
-            cellIMAP.dateMod = time;
+            GeoCell cellIMP;
+            cellIMP.cellName = impFileName.substr(0, impFileName.find(".", 1));
+            cellIMP.dateCreate = time;
+            cellIMP.dateMod = time;
 
             // Build ASCII database from limboint.h
-            AsciiDataBase adbIMAP;
-            adbIMAP.setFileName(gdsiiFileName);
-            adbIMAP.setDateMod(time);
-            adbIMAP.setDateAccess(time);
+            AsciiDataBase adbIMP;
+            adbIMP.setFileName(gdsiiFileName);
+            adbIMP.setDateMod(time);
+            adbIMP.setDateAccess(time);
 
             // File is readable line-by-line
             std::string fileLine;
-            getline(imapFile, fileLine);
+            getline(impFile, fileLine);
 
             // Save opening lines as metadata (mostly ignored)
             if (fileLine.compare(0, 7, "IMAP3D ") == 0)
             {
-                // Save IMAP 3D version number
+                // Save interconnect modeling platform version number
                 std::string version = fileLine.substr(7, fileLine.length() - 7); // 7 characters in header syntax
             }
 
             // Read rest of file line-by-line
-            while (!imapFile.eof())
+            while (!impFile.eof())
             {
                 // Handle units
                 double stripLength = 2000; // Hard-coded (for now)
@@ -698,8 +734,8 @@ public:
                     else if (units.compare("dm") == 0) { multSI = 1.e-01; }
 
                     // Propagate units information to ASCII database now
-                    adbIMAP.setdbUserUnits(1.);
-                    adbIMAP.setdbUnits(multSI);
+                    adbIMP.setdbUserUnits(1.);
+                    adbIMP.setdbUnits(multSI);
                 }
                 // Handle design name
                 else if (fileLine.compare(0, 5, "NAME ") == 0)
@@ -710,7 +746,7 @@ public:
                 if (fileLine.compare(0, 5, "STACK") == 0)
                 {
                     // Move down one line
-                    getline(imapFile, fileLine);
+                    getline(impFile, fileLine);
 
                     // Keep reading until end of layer stack
                     while ((fileLine.compare(0, 10, "CONDUCTORS") != 0) && (fileLine.compare(0, 8, "BOUNDARY") != 0))
@@ -737,9 +773,9 @@ public:
                             double zStart = 0.;
                             if (indZStart != string::npos)
                             {
-                                zStart = stod(fileLine.substr(indZStart + 2, indHeight - indZStart - 3)) * adbIMAP.getdbUnits();
+                                zStart = stod(fileLine.substr(indZStart + 2, indHeight - indZStart - 3)) * adbIMP.getdbUnits();
                             }
-                            double zHeight = stod(fileLine.substr(indHeight + 2, fileLine.find(" ", indHeight) - indHeight - 2)) * adbIMAP.getdbUnits();
+                            double zHeight = stod(fileLine.substr(indHeight + 2, fileLine.find(" ", indHeight) - indHeight - 2)) * adbIMP.getdbUnits();
                             double epsilon_r = 1.;
                             if (indPermit != string::npos)
                             {
@@ -760,15 +796,15 @@ public:
                             (this->layers).emplace_back(Layer(layerName, gdsiiNum, zStart, zHeight, epsilon_r, lossTan, sigma));
                         }
                         // Keep moving down the layer stack
-                        getline(imapFile, fileLine);
+                        getline(impFile, fileLine);
                     }
                 }
                 // Handle conductors
                 if (fileLine.compare(0, 10, "CONDUCTORS") == 0)
                 {
                     // Move down one line
-                    getline(imapFile, fileLine);
-                    stripLength *= adbIMAP.getdbUnits(); // Hard-coded rescaling of length (for now)
+                    getline(impFile, fileLine);
+                    stripLength *= adbIMP.getdbUnits(); // Hard-coded rescaling of length (for now)
 
                     // Keep reading until end of conductor list
                     while ((fileLine.compare(0, 8, "BOUNDARY") != 0) && (fileLine.compare(0, 9, "PORTTABLE") != 0))
@@ -792,10 +828,10 @@ public:
                             // Save conductor information to variables
                             std::string category = fileLine.substr(0, indCategory);
                             std::string condName = fileLine.substr(indCategory + 1, indCondName - indCategory - 1);
-                            double x1 = stod(fileLine.substr(indX1 + 3, indY1 - indX1 - 4)) * adbIMAP.getdbUnits(); // Length is index difference minus space
-                            double y1 = stod(fileLine.substr(indY1 + 3, indZ1 - indY1 - 4)) * adbIMAP.getdbUnits();
-                            double x2 = stod(fileLine.substr(indX2 + 3, indY2 - indX2 - 4)) * adbIMAP.getdbUnits();
-                            double y2 = stod(fileLine.substr(indY2 + 3, indZ2 - indY2 - 4)) * adbIMAP.getdbUnits();
+                            double x1 = stod(fileLine.substr(indX1 + 3, indY1 - indX1 - 4)) * adbIMP.getdbUnits(); // Length is index difference minus space
+                            double y1 = stod(fileLine.substr(indY1 + 3, indZ1 - indY1 - 4)) * adbIMP.getdbUnits();
+                            double x2 = stod(fileLine.substr(indX2 + 3, indY2 - indX2 - 4)) * adbIMP.getdbUnits();
+                            double y2 = stod(fileLine.substr(indY2 + 3, indZ2 - indY2 - 4)) * adbIMP.getdbUnits();
                             std::string sigma = fileLine.substr(indSigma, indLayer - indSigma - 1);
                             std::string group;
                             if (indGroup != string::npos)
@@ -805,7 +841,7 @@ public:
 
                             // Assign layer number based on layer stack-up
                             int gdsiiNum = 1;
-                            size_t indThisLayer = this->locateLayer(fileLine.substr(indLayer + 6, fileLine.find(" ", indLayer)));
+                            size_t indThisLayer = this->locateLayerName(fileLine.substr(indLayer + 6, fileLine.find(" ", indLayer)));
                             if (indThisLayer < (this->layers).size())
                             {
                                 // Layer name for conductor matched name in layer stack-up
@@ -813,22 +849,23 @@ public:
                             }
 
                             // Push new box to the geometric cell
-                            cellIMAP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, {sigma, condName, category, group}, 0));
+                            cellIMP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, {sigma, condName, category, group}, 0));
                         }
                         // Keep moving down the conductor list
-                        getline(imapFile, fileLine);
+                        getline(impFile, fileLine);
                     }
                 }
                 // Handle port table
                 if (fileLine.compare(0, 9, "PORTTABLE") == 0)
                 {
                     // Move down one line
-                    getline(imapFile, fileLine);
+                    getline(impFile, fileLine);
 
                     // Keep reading until end of port table
                     vector<std::string> ports;
                     vector<char> portDir;
                     vector<double> Z_source;
+                    vector<vector<double>> portCoord;
                     while (fileLine.compare(0, 8, "ANALYSIS") != 0)
                     {
                         if (fileLine.length() >= 3)
@@ -846,22 +883,42 @@ public:
                             double Z_far = stod(fileLine.substr(indZFar));
 
                             // Register a new port in vectors
+                            vector<double> portSupRet;
+                            size_t indCond;
+                            for (indCond = 0; indCond < cellIMP.boxes.size(); indCond++)
+                            {
+                                if (groupName.compare(((cellIMP.boxes[indCond]).getProps())[1]) == 0)
+                                {
+                                    break;
+                                }
+                            }
+                            if (indCond >= cellIMP.boxes.size())
+                            {
+                                portSupRet = { 0., 0., 0., 0., 0., 0. }; // Not found default has supply and return at origin
+                            }
+                            else
+                            {
+                                vector<double> boxCoord = (cellIMP.boxes[indCond]).getBoxes(); // Coordinates of box on layer
+                                size_t indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer()); // Index of layer in structure field
+                                portSupRet = { boxCoord[0], boxCoord[1], (this->layers)[indLayer].getZStart(), boxCoord[0], boxCoord[1], 0. }; // xsup = LR xcoord, ysup = LR ycoord, zsup = layer zStart, xret = xsup, yret = ysup, zret = 0.
+                            }
                             ports.push_back(groupName);
                             portDir.push_back('B');
                             Z_source.push_back(Z_near);
+                            portCoord.push_back(portSupRet);
                         }
                         // Keep moving down the port table
-                        getline(imapFile, fileLine);
+                        getline(impFile, fileLine);
                     }
 
                     // Propagate port information to Solver Database now
-                    this->para = Parasitics(ports.size(), ports, portDir, Z_source, spMat(), spMat());
+                    this->para = Parasitics(ports.size(), ports, portDir, Z_source, portCoord, spMat(), spMat());
                 }
                 // Handle analysis parameters
                 if (fileLine.compare(0, 8, "ANALYSIS") == 0)
                 {
                     // Move down one line
-                    getline(imapFile, fileLine);
+                    getline(impFile, fileLine);
                 }
                 // Handle frequency information
                 if (fileLine.compare(0, 9, "Frequency") == 0)
@@ -897,7 +954,7 @@ public:
                     }
 
                     // Save simulation settings (hard-coded limits for now)
-                    this->settings = SimSettings(adbIMAP.getdbUnits(), {0.0, 3.000e-4, 0.0, 2.00005e-3, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight()}, 1.0, (size_t) numFreqPts, 0.0, freqList);
+                    this->settings = SimSettings(adbIMP.getdbUnits(), {0.0, 3.000e-4, 0.0, 2.00005e-3, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight()}, 1.0, (size_t) numFreqPts, 0.0, freqList);
                 }
                 // Handle length in this weird spot
                 if (fileLine.compare(0, 6, "Length") == 0)
@@ -906,23 +963,250 @@ public:
                 }
 
                 // Keep reading new lines in file
-                getline(imapFile, fileLine);
+                getline(impFile, fileLine);
             }
 
             // Close file
-            imapFile.close();
+            impFile.close();
 
             // Update ASCII database
-            adbIMAP.setLibName(this->designName);
-            adbIMAP.appendCell(cellIMAP);
-            adbIMAP.setdbUnits(adbIMAP.getdbUnits() * 1.e-3); // Rescale IMAP 0.001x to allow integer representation in GDSII
+            adbIMP.setLibName(this->designName);
+            adbIMP.appendCell(cellIMP);
+            adbIMP.setdbUnits(adbIMP.getdbUnits() * 1.e-3); // Rescale .imp file units 0.001x to allow integer representation in GDSII
 
             // Print the ASCII database
-            adbIMAP.print({ 0 });
+            adbIMP.print({ 0 });
 
             // Write GDSII file to hard drive
-            bool dumpPassed = adbIMAP.dump();
+            bool dumpPassed = adbIMP.dump();
             return dumpPassed;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
+    }
+    
+    // Load simulation input file 
+    bool readSimInput(std::string inputFileName)
+    {
+        // Attempt to open simulation input file
+        ifstream inputFile(inputFileName.c_str());
+        if (inputFile.is_open())
+        {
+            // File is readable line-by-line
+            std::string fileLine;
+            getline(inputFile, fileLine);
+
+            // Read rest of file line-by-line
+            while (!inputFile.eof())
+            {
+                // Handle total size
+                if (fileLine.compare(0, 10, "TOTAL SIZE") == 0)
+                {
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain limits of IC design size
+                    double xsup, ysup, zsup, xret, yret, zret;
+                    size_t indCoordStart = 0;
+                    size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                    xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    indCoordStart = indCoordEnd + 1;
+                    indCoordEnd = fileLine.find(" ", indCoordStart);
+                    ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    indCoordStart = indCoordEnd + 1;
+                    indCoordEnd = fileLine.find(" ", indCoordStart);
+                    zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    indCoordStart = indCoordEnd + 1;
+                    indCoordEnd = fileLine.find(" ", indCoordStart);
+                    xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    indCoordStart = indCoordEnd + 1;
+                    indCoordEnd = fileLine.find(" ", indCoordStart);
+                    yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    indCoordStart = indCoordEnd + 1;
+                    zret = stod(fileLine.substr(indCoordStart));
+                    
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain length unit
+                    double lengthUnit = stod(fileLine.substr(fileLine.find("lengthUnit = ") + 13, fileLine.find(" #")));
+                    
+                    // Update simulation settings
+                    this->settings = SimSettings(lengthUnit, { xsup * lengthUnit, ysup * lengthUnit, zsup * lengthUnit, xret * lengthUnit, yret * lengthUnit, zret * lengthUnit }, 1., 0, 0., {});
+                }
+                // Handle frequency sweep parameters
+                else if (fileLine.compare(0, 9, "FREQUENCY") == 0)
+                {
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain frequency unit
+                    double freqUnit = stod(fileLine.substr(fileLine.find("freqUnit = ") + 11, fileLine.find(" #")));
+                    
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain first frequency
+                    double freqStart = stod(fileLine.substr(fileLine.find("freqStart = ") + 12, fileLine.find(" #")));
+                    
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain last frequency
+                    double freqEnd = stod(fileLine.substr(fileLine.find("freqEnd = ") + 10, fileLine.find(" #")));
+                    
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain number of frequencies
+                    size_t nFreq = stoi(fileLine.substr(fileLine.find("nfreq = ") + 8, fileLine.find(" #")));
+                    
+                    // Move down one line
+                    getline(inputFile, fileLine);
+                    
+                    // Obtain frequency scaling
+                    double freqScale = stod(fileLine.substr(fileLine.find("freqScale = ") + 12, fileLine.find(" #")));
+
+                    // Establish frequency list
+                    vector<double> freqList;
+                    if (nFreq == 1)
+                    {
+                        freqList.push_back(freqStart);
+                    }
+                    else if (nFreq == 2)
+                    {
+                        freqList.push_back(freqStart);
+                        freqList.push_back(freqEnd);
+                    }
+                    else
+                    {
+                        double exp10Step = log10(freqEnd / freqStart) / (nFreq - 1);
+                        freqList.push_back(freqStart);
+                        for (size_t indi = 1; indi < nFreq - 1; indi++)
+                        {
+                            freqList.push_back(freqList.back() * pow(10, exp10Step));
+                        }
+                        freqList.push_back(freqEnd); // Ensure last frequency is exact
+                    }
+                    
+                    // Update simulation settings
+                    this->settings = SimSettings((this->settings).getLengthUnit(), (this->settings).getLimits(), freqUnit, nFreq, freqScale, freqList);
+                }
+                // Handle dielectric stack-up
+                else if (fileLine.compare(0, 16, "DIELECTRIC STACK") == 0)
+                {
+                    // Move down one line
+                    getline(inputFile, fileLine);
+
+                    // Obtain number of dieletric layers in stack-up
+                    size_t numStack = stoi(fileLine.substr(fileLine.find("numStack = ") + 11, fileLine.find(" #")));
+
+                    // Move down one line
+                    getline(inputFile, fileLine);
+
+                    // Read each line in dielectric stack
+                    for (size_t indStack = 0; indStack < numStack; indStack++)
+                    {
+                        // Get dielectric stack delimiters
+                        size_t indNameEnd = fileLine.find(" ");
+                        size_t indHeight = fileLine.find("h = ") + 4;
+                        size_t indRelPermit = fileLine.find("e = ") + 4;
+                        size_t indComment = fileLine.find(" #");
+
+                        // Save dielectric stack information to variables
+                        std::string layerName = fileLine.substr(0, indNameEnd);
+                        double layerHeight = stod(fileLine.substr(indHeight, indRelPermit - indHeight - 5));
+                        double layerEpsilonR = stod(fileLine.substr(indRelPermit, indComment - indRelPermit));
+
+                        // Register a new layer in layers field
+                        (this->layers).emplace_back(Layer(layerName, -1, -1.0, layerHeight, layerEpsilonR, 0.0, 0.0));
+
+                        // Keep moving down the dielectric stack
+                        getline(inputFile, fileLine);
+                    }
+                }
+                // Handle port list
+                else if (fileLine.compare(0, 4, "PORT") == 0)
+                {
+                    // Move down one line
+                    getline(inputFile, fileLine);
+
+                    // Obtain number of ports in list
+                    size_t numPort = stoi(fileLine.substr(fileLine.find("numPorts = ") + 11, fileLine.find(" #")));
+
+                    // Move down one line
+                    getline(inputFile, fileLine);
+
+                    // Read each line in the port list
+                    vector<std::string> portNames;
+                    vector<char> portDir;
+                    vector<double> Z_port_src;
+                    vector<vector<double>> portCoord;
+                    for (size_t indPort = 0; indPort < numPort; indPort++)
+                    {
+                        // Obtain limits of IC design size
+                        double xsup, ysup, zsup, xret, yret, zret;
+                        int sourceDir;
+                        size_t indCoordStart = 0;
+                        size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+
+                        // Append port information to vectors
+                        portNames.push_back("port" + to_string(indPort + 1)); // All ports officially unnamed, so use number
+                        switch (sourceDir) // Assign port direction
+                        {
+                        case -1:
+                            portDir.push_back('O');
+                            break;
+                        case +1:
+                            portDir.push_back('I');
+                            break;
+                        case 0:
+                            portDir.push_back('B');
+                            break;
+                        default:
+                            portDir.push_back('B');; // Treat as bidirectional if direction unclear
+                        }
+                        Z_port_src.push_back(50.);
+                        portCoord.push_back({ xsup, ysup, zsup, xret, yret, zret });
+                        
+
+                        // Move down one line
+                        getline(inputFile, fileLine);
+                    }
+
+                    // Propagate port list to parasitics data structure now
+                    this->para = Parasitics(numPort, portNames, portDir, Z_port_src, portCoord, spMat(numPort, numPort), spMat(numPort, numPort));
+                }
+
+                // Keep reading new lines in file
+                getline(inputFile, fileLine);
+            }
+
+            // Close file
+            inputFile.close();
+            return true;
         }
         else
         {
@@ -959,7 +1243,7 @@ public:
             // Write to file
             spef::Spef designPara = (this->para).toSPEF(this->designName, 1.0e-5);
             designPara.dump(spefFile);
-
+            
             // Close file
             spefFile.close();
             return true;

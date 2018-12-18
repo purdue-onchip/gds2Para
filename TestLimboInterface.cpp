@@ -29,18 +29,20 @@ int main(int argc, char** argv)
         if (strcmp(argv[1], "--help") == 0)
         {
             cout << "Help for Test Limbo Interface binary" << endl;
-            cout << "Usage: Test_$@ [options] file1 [file2]" << endl;
+            cout << "Usage: Test_$@ [options] file1 [file2..file3]" << endl;
             cout << "Options:" << endl;
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
             cout << "  -r, --read            Read given GDSII file into memory." << endl;
             cout << "  -p, --parrot          Immediately output given GDSII file after reading." << endl;
-            cout << "  -w, --write           Write database in memory to given file." << endl;
-            cout << "  -i, --imap            Read given IMAP 3D file and write GDSII file with name also given." << endl;
+            cout << "  -w, --write           Write database in memory to given SPEF file." << endl;
+            cout << "  -i, --imp             Read given interconnect modeling platform file and write GDSII file with name also given." << endl;
+            cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
             cout << endl << "Comments:" << endl;
-            cout << "The file passed after -r, --read, -p, or --parrot must be Calma GDSII stream file." << endl;
+            cout << "The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
-            cout << " The first file passed after -i or --imap must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
+            cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
+            cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
         }
@@ -97,6 +99,7 @@ int main(int argc, char** argv)
             vector<char> portDir = { 'I', 'I', 'I', 'I', 'O', 'O', 'O', 'I', 'O', 'I', 'O', 'I', 'I' };
             vector<double> Z_port_source;
             Z_port_source.assign(numPorts, 50.);
+            vector<vector<double>> portCoord(13, vector<double>(6, 0));
 
             // Setup the Eigen sparse conductance matrix
             spMat matG(13, 13); // Initialize sparse conductance matrix (S)
@@ -155,13 +158,12 @@ int main(int argc, char** argv)
             matC.makeCompressed(); // Capactiance matrix in compressed sparse row (CSR) format
 
             // Create variables of custom classes
-            Parasitics sample(numPorts, ports, portDir, Z_port_source, matG, matC);
+            Parasitics sample(numPorts, ports, portDir, Z_port_source, portCoord, matG, matC);
             SolverDataBase sdb(design, blank, sample);
 
             // Prepare to write to file
             string fName = argv[2];
             sdb.setOutSPEF(fName);
-            std::ifstream inFile(fName.c_str());
             bool couldDump = sdb.printDump();
         }
         else
@@ -171,23 +173,53 @@ int main(int argc, char** argv)
     }
     else if (argc == 4)
     {
-        if ((strcmp(argv[1], "-i") == 0) || (strcmp(argv[1], "--imap") == 0))
+        if ((strcmp(argv[1], "-i") == 0) || (strcmp(argv[1], "--imp") == 0))
         {
-            // Read IMAP 3D description file and write to GDSII file
+            // Read interconnect modeling platform (IMP) file and write to GDSII file
             SolverDataBase sdb;
-            string inIMAPFile = argv[2];
+            string inIMPFile = argv[2];
             string outGDSIIFile = argv[3];
-            bool sdbIsGood = sdb.readIMAPwriteGDSII(inIMAPFile, outGDSIIFile);
+            bool sdbIsGood = sdb.readIMPwriteGDSII(inIMPFile, outGDSIIFile);
             cout << "File ready at " << outGDSIIFile << endl;
         }
         else
         {
-            cerr << "Must pass a IMAP file to read and blank GDSII file to write after \"-i\" flags, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a .imp file to read and blank GDSII file to write after \"-i\" flag, rerun with \"--help\" flag for details" << endl;
+        }
+    }
+    else if (argc == 5)
+    {
+        if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0))
+        {
+            // Read simulation input file
+            SolverDataBase sdb;
+            string inSimFile = argv[3];
+            bool sdbIsGood = sdb.readSimInput(inSimFile);
+            cout << "Simulation input file read" << endl;
+
+            // Read GDSII file
+            AsciiDataBase adb;
+            string inGDSIIFile = argv[2];
+            adb.setFileName(inGDSIIFile);
+            GdsParser::GdsReader adbReader(adb);
+            bool adbIsGood = adbReader(inGDSIIFile.c_str());
+            cout << "GDSII file read" << endl;
+
+            // Output SPEF file
+            string outSPEFFile = argv[4];
+            sdb.setDesignName(adb.findNames().back());
+            sdb.setOutSPEF(outSPEFFile);
+            bool sdbCouldDump = sdb.printDump();
+            cout << "File ready at " << outSPEFFile << endl;
+        }
+        else
+        {
+            cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
         }
     }
     else
     {
-        cerr << "Either 1, 2, or 3 arguments are required, use \"--help\" flag for details" << endl;
+        cerr << "Between 1 and 4 arguments are required, use \"--help\" flag for details" << endl;
     }
 
     return 0;

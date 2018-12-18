@@ -15,8 +15,11 @@
 #include <cstring>
 #include <string>
 #include <algorithm>
+#include <stack>
+#include <tr1/unordered_map>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
+#include "fdtd.h"
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -992,6 +995,7 @@ private:
     char element;                                // Present working element read
     size_t numProp;                              // Present working property number
     vector<GeoCell> cells;                       // Vector of cells in design
+    int numCdtIn;                                // Number of conductor rows
 public:
     /// @brief constructor
     AsciiDataBase()
@@ -999,9 +1003,7 @@ public:
         std::string fileName, version, dateMod, dateAccess, libName;
         double databaseUserUnits = 1.;
         double databaseUnits = 1.;
-        size_t numCell = 0;
         char element;
-        size_t numProp = 0;
         vector<GeoCell> cells;
 
         this->fileName = fileName;
@@ -1011,10 +1013,11 @@ public:
         this->libName = libName;
         this->dbUserUnits = databaseUserUnits;
         this->dbUnits = databaseUnits;
-        this->numCell = numCell;
+        this->numCell = 0;
         this->element = element;
-        this->numProp = numProp;
+        this->numProp = 0;
         this->cells = cells;
+        this->numCdtIn = 0;
     }
 
     // Get file name
@@ -1075,6 +1078,12 @@ public:
     size_t getNumProp()
     {
         return this->numProp;
+    }
+
+    // Get number of conductor rows
+    int getNumCdtIn() const
+    {
+        return this->numCdtIn;
     }
 
     // Set file name
@@ -1210,10 +1219,167 @@ public:
         return viaList;
     }
 
-    // Print the ASCII database with the design geometry
-    void print(vector<size_t> indCellPrint) const
+    // Print all the conductor information
+    void printall(unordered_map<std::string, int> namenum, std::string name, double xo, double yo)
     {
+        // Open output file
+        std::ofstream outfile;
+        size_t indExtension = this->getFileName().find(".", 1);
+        std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
+        outfile.open(polyFileName, std::ofstream::out | std::ofstream::app);
+        if (!outfile.is_open()) // Failed to open the polygon file to write
+        {
+            return;
+        }
+
+        // Get information about this cell in ASCII database
+        const GeoCell cell = this->cells[this->locateCell(name)];
+        int numBound = cell.getNumBound();
+        int numPath = cell.getNumPath();
+        int numNode = cell.getNumNode();
+        int numBox = cell.getNumBox();
+        int numText = cell.getNumText();
+        int numSRef = cell.getNumSRef();
+
+        // Print cell information
+        cout << "  List of " << numBound << " boundaries:" << endl;
+        for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
+        {
+            char point[128];
+            vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
+            string strPoints = "    " + to_string(boundCoord.size() / 2 - 1) + " " + to_string(((cell.boundaries)[indi]).getLayer()) + " "; // Number of nodes, then layer number
+            int lay = ((cell.boundaries)[indi]).getLayer();
+            for (size_t indj = 0; indj < boundCoord.size() - 2; indj++) // C string for each ordered pair, -2 because the last point is the starting point
+            {
+                sprintf(point, "(%1.4g, %1.4g) ", boundCoord[indj++] + xo, boundCoord[indj + 1] + yo);
+                strPoints.append(point);
+            }
+            strPoints.append("\n");
+            outfile << strPoints;
+            (this->numCdtIn)++;
+        }
+        cout << "  List of " << numPath << " paths:" << endl;
+        for (size_t indi = 0; indi < numPath; indi++) // Handle each path
+        {
+            char point[128];
+            string strPoints = "    4" + to_string(((cell.paths)[indi]).getLayer()) + " ";
+            vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
+            double width = ((cell.paths)[indi]).getWidth();
+            for (size_t indj = 0; indj < pathCoord.size(); indj++) // C string for each ordered pair
+            {
+                if (indj < pathCoord.size() - 2)
+                {
+                    if (pathCoord[indj] == pathCoord[indj + 2]) // along y axis
+                    {
+                        if (pathCoord[indj + 1] > pathCoord[indj + 3]) // first point is on top of the second point
+                        {
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            indj++;
+                            indj++;
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            strPoints.append("\n");
+                            numCdtIn++;
+                            indj--;
+                        }
+                        else // second point is on the top of the first point
+                        {
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            indj++;
+                            indj++;
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            strPoints.append(" ");
+                            strPoints.append("\n");
+                            numCdtIn++;
+                            indj--;
+                        }
+                    }
+                    else // along x axis
+                    {
+                        if (pathCoord[indj] > pathCoord[indj + 2]) // first point is on the right of the second point
+                        {
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            indj++;
+                            indj++;
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            strPoints.append(" ");
+                            strPoints.append("\n");
+                            numCdtIn++;
+                            indj--;
+                        }
+                        else // second point is on the right of the first point
+                        {
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            indj++;
+                            indj++;
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
+                            strPoints.append(point);
+                            sprintf(point, " %1.4g %1.4g", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
+                            strPoints.append(point);
+                            strPoints.append(" ");
+                            strPoints.append("\n");
+                            numCdtIn++;
+                            indj--;
+                        }
+                    }
+                }
+            }
+            outfile << strPoints;
+        }
+        cout << "  List of " << numNode << " nodes:" << endl;
+        cout << "  List of " << numBox << " box outlines:" << endl;
+        for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
+        {
+            outfile << "    " << ((cell.boxes)[indi]).getNBoxPt() - 1 << " " << ((cell.boxes)[indi]).getLayer() << " ";
+            vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
+            for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) {
+                outfile << boxCoord[indj++] << " " << boxCoord[indj] << " ";
+            }
+            outfile << endl;
+            numCdtIn++;
+        }
+        cout << "  List of " << numText << " text boxes:" << endl;
+        cout << "  List of " << numSRef << " structure references:" << endl;
+        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
+        {
+            printall(namenum, (cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
+        }
+
+        // Close output file
+        outfile.close();
+    }
+
+    // Print the ASCII database with the design geometry
+    void print(vector<size_t> indCellPrint)
+    {
+        // Delete existing file
+        size_t indExtension = this->getFileName().find(".", 1);
+        std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
+        remove(polyFileName.c_str());
+
+        // Analyze design and print to terminal
         int numCell = getNumCell();
+        unordered_map<string, int> namenum;
 
         cout << "ASCII Database of IC Design:" << endl;
         cout << " File Name: " << this->fileName << endl;
@@ -1226,12 +1392,16 @@ public:
         cout << " List of " << numCell << " cells:" << endl;
         for (size_t indi = 0; indi < numCell; indi++)
         {
+            namenum[((this->cells)[indi]).getCellName()] = indi;
             cout << "  " << indi + 1 << ". " << ((this->cells)[indi]).getCellName() << endl;
             cout << "   Counts: " << (this->cells)[indi].getNumBound() << " boundaries, " << (this->cells)[indi].getNumPath() << " paths, " << (this->cells)[indi].getNumNode() << " nodes, " << (this->cells)[indi].getNumBox() << " boxes," << endl << "     " << (this->cells)[indi].getNumText() << " text boxes, and " << (this->cells)[indi].getNumSRef() << " structure references" << endl;
         }
         for (size_t indi = 0; indi < indCellPrint.size(); indi++)
         {
-            (this->cells)[indCellPrint[indi]].printAlt();
+            std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
+            cout << cellName << endl;
+            this->printall(namenum, cellName, 0., 0.);   // the origin is the (0,0) point
+            //(this->cells)[indCellPrint[indi]].printAlt();
         }
         cout << "------" << endl;
     }
