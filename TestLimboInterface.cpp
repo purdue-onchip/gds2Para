@@ -5,10 +5,12 @@
  * @brief  Primary Limbo Interface Test Function
  */
 
+#define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
+#include <ctime>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
@@ -204,6 +206,56 @@ int main(int argc, char** argv)
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(inGDSIIFile.c_str());
             cout << "GDSII file read" << endl;
+
+            // Initialize mesh and other useful variables
+            fdtdMesh sys;
+            int status;
+            clock_t t1 = clock();
+            size_t indExtension = inSimFile.find(".", 1);
+            string inStackFile = inSimFile.substr(0, indExtension) + "_stack.txt";
+            string inPolyFile = inSimFile.substr(0, indExtension) + "_polygon.txt";
+
+            // Set the number of input conductors
+            sys.numCdtRow = adb.getNumCdtIn();
+
+            // Read the input file
+            unordered_map<double, int> xi, yi, zi;
+            status = readInput(inStackFile.c_str(), inPolyFile.c_str(), &sys, xi, yi, zi);
+            if (status == 0)
+                cout << "readInput Success!" << endl;
+            else {
+                cout << "readInput Fail!" << endl;
+                return status;
+            }
+
+            // Set D_eps and D_sig
+            status = matrixConstruction(&sys);
+            if (status == 0) {
+                cout << "matrixConstruction Success!" << endl;
+            }
+            else {
+                cout << "matrixConstruction Fail!" << endl;
+                return status;
+            }
+
+            // Set port
+            status = portSet(&sys, xi, yi, zi);
+            if (status == 0)
+                cout << "portSet Success!\n";
+            else {
+                cout << "portSet Fail!\n";
+                return status;
+            }
+
+            // Parameter generation
+            status = paraGenerator(&sys, xi, yi, zi);
+            if (status == 0)
+                cout << "paraGenerator Success!" << endl;
+            else {
+                cout << "paraGenerator Fail!" << endl;
+                return status;
+            }
+            cout << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
             // Output SPEF file
             string outSPEFFile = argv[4];

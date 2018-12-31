@@ -13,11 +13,11 @@
 #include <complex>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
 #include <string>
 #include <utility>
-//#include <mkl>
-
+#include <mkl.h>
 
 using namespace std;
 
@@ -28,7 +28,7 @@ using namespace std;
 #define SIGMA (5.7e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
-//#define length (128)
+#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e-30)
 
@@ -93,6 +93,8 @@ public:
     double y1, y2;
     double z1, z2;
     int portDirection;
+    int *node;
+    int nodenum;
 } fdtdPort;
 
 typedef class{
@@ -103,24 +105,23 @@ public:
 
 
 class fdtdMesh {
-    /*mesh information*/
+    /* Mesh information */
 public: 
     double lengthUnit;
-    /* frequency parameter */
+    /* Frequency parameters */
     double freqUnit;
     double freqStart;
     double freqEnd;
     int nfreq;
     int freqScale;
 
+    int ix;    // x direction number of periods
+    int iy;    // y direction number of periods
 
-    int ix;    //x direction number of periods
-    int iy;    //y direction number of periods
+    int nx, ny, nz;    // number of nodes along x, y, z
 
-    int nx, ny, nz;    //number of nodes along x, y, z
-
-    double *xn, *yn, *zn;    //coordinates of the nodes along x, y, z
-
+    double *xn, *yn, *zn;    // coordinates of the nodes along x, y, z
+    double *xnu, *ynu, *znu;
 
     int N_cell_x;
     int N_cell_y;
@@ -152,59 +153,81 @@ public:
     double *Epoints;
     int *edgelink;
     double *Hpoints;
-    vector<vector<pair<int,double> > > nodeEdge;    // for each node which edge is connected with this node
+    vector<vector<pair<int,double>>> nodeEdge;    // for each node which edge is connected with this node
 
-    
-
-    /*upper and lower PEC*/
+    /* Upper and lower PEC */
     int *bd_node1;   //lower PEC
     int *bd_node2;   //upper PEC
     int *bd_edge;
 
-    /*material parameter*/
+    /* Material parameters */
     int numStack;
     double *stackEps;
     double *stackBegCoor;
     double *stackEndCoor;
     vector<string> stackName;
     double    *eps;
+    double *stackEpsn;
+    double *stackCdtMark;
 
-    /*conductor parameter*/
+    /* Conductor parameters */
     fdtdOneCondct *conductorIn;
     int numCdtRow;   //how many input rows
     int numCdt;
     int *markEdge;    //mark if this edge is inside a conductor
+    int *markCell;
     int *cdtNumNode;
     double *sig;
     fdtdCdt *conductor;
     int *markNode;    // mark this node if it is inside the conductor
-    
+    vector<vector<int> > edgeCell;    // for cell which edge is around it
 
-    /* patch information */
+    /* Patch information */
     fdtdPatch *patch;
 
-    /*boundary*/
+    /* Boundary information */
     fdtdBound *bound;
 
-    /*V0c row, column, value*/
+    /* V0c row, column, value */
     vector<int> v0cRowId;
     vector<int> v0cColId;
     vector<int> v0cColIdo;
     vector<double> v0cval;
     vector<double> v0cvalo;
+
     vector<int> v0c2RowId;
     vector<int> v0c2ColId;
     vector<int> v0c2ColIdo;
     vector<double> v0c2val;
+
+    vector<int> v0caRowId;
+    vector<int> v0caColId;
+    vector<int> v0caColIdo;
+    vector<double> v0caval;
+    vector<double> v0cavalo;
+
+    vector<int> v0d1aRowId;
+    vector<int> v0d1aColId;
+    vector<double> v0d1aval;
+    vector<double> v0d1avalo;
+
+    vector<int> v0d2aRowId;
+    vector<int> v0d2aColId;
+    vector<int> v0d2aColIdo;
+    vector<double> v0d2aval;
+    vector<double> v0d2avalo;
+
     vector<int> y0c2RowId;
     vector<int> y0c2ColId;
     vector<double> y0c2val;
+
+
     double *v0c2y0c2;
     double *v0c2y0c2o;
     double *yc;
     double *v0cy0c;
 
-    /* V0c'*D_sig*V0c row, column, value*/
+    /* V0c'*D_sig*V0c row, column, value */
     vector<int> AcRowId;
     vector<int> AcColId;
     vector<double> Acval;
@@ -213,8 +236,7 @@ public:
     vector<double> crhsval;
     double *crhs;
 
-
-    /* V0d row, column, value*/
+    /* V0d row, column, value */
     vector<int> v0d1RowId;
     vector<int> v0d1ColId;
     vector<double> v0d1val;
@@ -224,26 +246,23 @@ public:
     vector<int> v0d2ColIdo;
     vector<double> v0d2val;
     vector<double> v0d2valo;
-    double *yd_re, *yd_im;
+    double *yd;
 
-
-    /* final solution */
+    /* Solution storage */
     complex<double> *y;
-    complex<double> *x;    // the solution evolving all the sourcePorts
+    complex<double> *x;    // the solution involving all the sourcePorts
 
-
-    /*port coordinates*/
+    /* Port coordinates */
     int numPorts;
     fdtdPort *portCoor;
-    vector<vector<int> > portEdge;
+    vector<vector<int>> portEdge;
     vector<double> portArea;
+    unordered_set<int> portNno;
 
-
-    /*current source*/
+    /* Current sources */
     double *J;
-    
 
-    /* current V0c,s^T*I matrix */
+    /* Current V0c,s^T*I matrix */
     complex<double> *v0csJ;
     complex<double> *Y;
     complex<double> *voltage;
@@ -259,20 +278,21 @@ public:
 
 
 
-int readInput(fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi);
+int readInput(const char *stackFile, const char *polyFile, fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
 int fdtdStringWord(char*, char *word[]);
 double fdtdGetValue(char *str);
+int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 int matrixMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int>& cRowId, vector<int>& cColId, vector<double>& cval);
-// the first is read row by row, and the second one is read column by column
+// The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
-int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<int> index, fdtdMesh *sys);
-int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, double *solution, fdtdMesh *sys);
+int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<int> index, int size, fdtdMesh *sys);
+int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys);
 int output(fdtdMesh *sys);
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
 int yParaGenerator(fdtdMesh *sys);

@@ -189,7 +189,7 @@ public:
     }
 
     // Get GDSII file layer number
-    // Metallic layers are nonnegative, and -1 is used for dielectric, substrates, and undescribed planes
+    // Metallic layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for dielectric, substrates, and undescribed planes
     int getGDSIINum() const
     {
         return this->gdsiiNum;
@@ -224,6 +224,13 @@ public:
     double getSigma() const
     {
         return this->sigma;
+    }
+
+    // Set GDSII file layer number
+    // Metallic layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for dielectric, substrates, and undescribed planes
+    void setGDSIINum(int gdsiiNum)
+    {
+        this->gdsiiNum = gdsiiNum;
     }
 
     // Print the layer information
@@ -715,6 +722,7 @@ public:
             {
                 // Handle units
                 double stripLength = 2000; // Hard-coded (for now)
+                int maxGDSIILayer = 0; // Maximum GDSII layer number encountered
                 if (fileLine.compare(0, 12, "LINEARUNITS ") == 0)
                 {
                     // Extract unit text
@@ -769,6 +777,7 @@ public:
                             {
                                 size_t indNumber = layerName.find("M");
                                 gdsiiNum = stoi(layerName.substr(indNumber + 1, layerName.length() - indNumber - 1));
+                                if (gdsiiNum > maxGDSIILayer) { maxGDSIILayer = gdsiiNum; }
                             }
                             double zStart = 0.;
                             if (indZStart != string::npos)
@@ -807,6 +816,11 @@ public:
                     stripLength *= adbIMP.getdbUnits(); // Hard-coded rescaling of length (for now)
 
                     // Keep reading until end of conductor list
+                    int gdsiiNum = 1; // Layer number of target GDSII file
+                    double xmin = 0.;
+                    double xmax = 0.;
+                    double ymin = 0.;
+                    double ymax = stripLength;
                     while ((fileLine.compare(0, 8, "BOUNDARY") != 0) && (fileLine.compare(0, 9, "PORTTABLE") != 0))
                     {
                         // Record each conductor as a box
@@ -839,8 +853,13 @@ public:
                                 group = fileLine.substr(indGroup + 6);
                             }
 
+                            // Check for extrema of coordinates
+                            if (x1 < xmin) { xmin = x1; }
+                            if (x2 > xmax) { xmax = x2; }
+                            if (y1 < ymin) { ymin = y1; }
+                            if (stripLength + 2 * y2 > ymax) { ymax = stripLength + 2 * y2; }
+
                             // Assign layer number based on layer stack-up
-                            int gdsiiNum = 1;
                             size_t indThisLayer = this->locateLayerName(fileLine.substr(indLayer + 6, fileLine.find(" ", indLayer)));
                             if (indThisLayer < (this->layers).size())
                             {
@@ -849,11 +868,29 @@ public:
                             }
 
                             // Push new box to the geometric cell
-                            cellIMP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, {sigma, condName, category, group}, 0));
+                            cellIMP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, { sigma, condName, category, group }, 0));
                         }
                         // Keep moving down the conductor list
                         getline(impFile, fileLine);
                     }
+
+                    // Add on planes
+                    size_t indGroundPlane = this->locateLayerName("GroundPlane"); // Start with ground (bottom) plane
+                    ((this->layers)[indGroundPlane]).setGDSIINum(0); // Assign ground plane to layer 0
+                    vector<std::string> propGround; // Ground plane properties
+                    propGround.push_back("sigma=" + to_string(((this->layers)[indGroundPlane]).getSigma()));
+                    propGround.push_back("GroundPlane");
+                    propGround.push_back("plane");
+                    propGround.push_back("");
+                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin, xmax, ymin }, ((this->layers)[indGroundPlane]).getGDSIINum(), propGround, 0));
+                    size_t indTopPlane = this->locateLayerName("TopPlane"); // Next is top plane
+                    ((this->layers)[indTopPlane]).setGDSIINum(++maxGDSIILayer); // Assign ground plane to layer one more than maximum metallic layer
+                    vector<std::string> propTop; // Top plane properties
+                    propTop.push_back("sigma=" + to_string(((this->layers)[indTopPlane]).getSigma()));
+                    propTop.push_back("TopPlane");
+                    propTop.push_back("plane");
+                    propTop.push_back("");
+                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin, xmax, ymin }, ((this->layers)[indTopPlane]).getGDSIINum(), propTop, 0));
                 }
                 // Handle port table
                 if (fileLine.compare(0, 9, "PORTTABLE") == 0)
