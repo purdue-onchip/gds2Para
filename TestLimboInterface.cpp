@@ -199,6 +199,15 @@ int main(int argc, char** argv)
             bool sdbIsGood = sdb.readSimInput(inSimFile);
             cout << "Simulation input file read" << endl;
 
+            // Initialize mesh and other useful variables
+            fdtdMesh sys;
+            int status;
+            clock_t t1 = clock();
+            size_t indExtension = inSimFile.find(".", 1);
+            string inStackFile = inSimFile.substr(0, indExtension) + "_stack.txt";
+            //string inStackFile = inSimFile; // Use stack information contained within sim_input file
+            //string inPolyFile = inSimFile.substr(0, indExtension) + "_polygon.txt";
+
             // Read GDSII file
             AsciiDataBase adb;
             string inGDSIIFile = argv[2];
@@ -207,20 +216,12 @@ int main(int argc, char** argv)
             bool adbIsGood = adbReader(inGDSIIFile.c_str());
             cout << "GDSII file read" << endl;
 
-            // Initialize mesh and other useful variables
-            fdtdMesh sys;
-            int status;
-            clock_t t1 = clock();
-            size_t indExtension = inSimFile.find(".", 1);
-            string inStackFile = inSimFile.substr(0, indExtension) + "_stack.txt";
-            string inPolyFile = inSimFile.substr(0, indExtension) + "_polygon.txt";
-
             // Set the number of input conductors
             sys.numCdtRow = adb.getNumCdtIn();
 
             // Read the input file
             unordered_map<double, int> xi, yi, zi;
-            status = readInput(inStackFile.c_str(), inPolyFile.c_str(), &sys, xi, yi, zi);
+            status = readInput(inStackFile.c_str(), &sys, xi, yi, zi);
             if (status == 0)
                 cout << "readInput Success!" << endl;
             else {

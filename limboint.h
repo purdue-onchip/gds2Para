@@ -997,6 +997,7 @@ private:
     vector<GeoCell> cells;                       // Vector of cells in design
     int numCdtIn;                                // Number of conductor rows
     std::string strPoints;                       // Polygon output
+    fdtdOneCondct a;                             // Template for the conductor vector
 public:
     /// @brief constructor
     AsciiDataBase()
@@ -1239,9 +1240,11 @@ public:
         return viaList;
     }
 
-    // Print all the conductor information
-    void printall(std::string name, double xo, double yo)
+    // Print all the conductor information (fdtdMesh style)
+    void printall(std::string name, double xo, double yo, fdtdMesh *sys)
     {
+        int si, condj;    // Size of the vector sys->conductorIn
+
         // Open output file
         /*std::ofstream outfile;*/
         size_t indExtension = this->getFileName().find(".", 1);
@@ -1265,6 +1268,235 @@ public:
         cout << "  List of " << numBound << " boundaries:" << endl;
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
+            (this->numCdtIn)++;
+
+            vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
+            sys->conductorIn.push_back(this->a);
+            si = sys->conductorIn.size() - 1;
+            sys->conductorIn[si].numVert = boundCoord.size() / 2 - 1;
+            sys->conductorIn[si].xmax = DOUBLEMIN;
+            sys->conductorIn[si].xmin = DOUBLEMAX;
+            sys->conductorIn[si].ymax = DOUBLEMIN;
+            sys->conductorIn[si].ymin = DOUBLEMAX;
+            sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            sys->conductorIn[si].layer = ((cell.boundaries)[indi]).getLayer();
+            condj = 0;
+            for (size_t indj = 0; indj < boundCoord.size() - 2; indj++) // C string for each ordered pair, -2 because the last point is the starting point
+            {
+                sys->conductorIn[si].x[condj] = boundCoord[indj] + xo;
+                indj++;
+                sys->conductorIn[si].y[condj] = boundCoord[indj] + yo;
+                if (sys->conductorIn[si].x[condj] > sys->conductorIn[si].xmax){
+                    sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                }
+                if (sys->conductorIn[si].x[condj] < sys->conductorIn[si].xmin){
+                    sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
+                }
+                if (sys->conductorIn[si].y[condj] > sys->conductorIn[si].ymax){
+                    sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
+                }
+                if (sys->conductorIn[si].y[condj] < sys->conductorIn[si].ymin){
+                    sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
+                }
+
+                condj++;
+            }
+        }
+        cout << "  List of " << numPath << " paths:" << endl;
+        for (size_t indi = 0; indi < numPath; indi++) // Handle each path
+        {
+            vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
+            double width = ((cell.paths)[indi]).getWidth();
+            sys->conductorIn.push_back(this->a);
+            si = sys->conductorIn.size() - 1;
+            sys->conductorIn[si].numVert = 4;
+            sys->conductorIn[si].xmax = DOUBLEMIN;
+            sys->conductorIn[si].xmin = DOUBLEMAX;
+            sys->conductorIn[si].ymax = DOUBLEMIN;
+            sys->conductorIn[si].ymin = DOUBLEMAX;
+            sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            sys->conductorIn[si].layer = ((cell.paths)[indi]).getLayer();
+            condj = 0;
+            for (size_t indj = 0; indj < pathCoord.size()-2; indj++) // C string for each ordered pair
+            {
+                if (pathCoord[indj] == pathCoord[indj + 2]) // along y axis
+                {
+                    if (pathCoord[indj + 1] > pathCoord[indj + 3]) // first point is on top of the second point
+                    {
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        indj++;
+                        indj++;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        condj++;
+                        this->numCdtIn++;
+                        indj--;
+                    }
+                    else // second point is on the top of the first point
+                    {
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        indj++;
+                        indj++;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        condj++;
+                        this->numCdtIn++;
+                        indj--;
+                    }
+                }
+                else // along x axis
+                {
+                    if (pathCoord[indj] > pathCoord[indj + 2]) // first point is on the right of the second point
+                    {
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        indj++;
+                        indj++;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        condj++;
+                        this->numCdtIn++;
+                        indj--;
+                    }
+                    else // second point is on the right of the first point
+                    {
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        indj++;
+                        indj++;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
+                        condj++;
+                        this->numCdtIn++;
+                        indj--;
+                    }
+                }
+            }
+
+        }
+        cout << "  List of " << numNode << " nodes:" << endl;
+        cout << "  List of " << numBox << " box outlines:" << endl;
+        for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
+        {
+            this->numCdtIn++;
+
+            sys->conductorIn.push_back(this->a);
+            vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
+            si = sys->conductorIn.size() - 1;
+            sys->conductorIn[si].numVert = ((cell.boxes)[indi]).getNBoxPt() - 1;
+            sys->conductorIn[si].layer = ((cell.boxes)[indi]).getLayer();
+            sys->conductorIn[si].xmax = DOUBLEMIN;
+            sys->conductorIn[si].xmin = DOUBLEMAX;
+            sys->conductorIn[si].ymax = DOUBLEMIN;
+            sys->conductorIn[si].ymin = DOUBLEMAX;
+            sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            condj = 0;
+            for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) {
+                sys->conductorIn[si].x[condj] = boxCoord[indj] + xo;
+                sys->conductorIn[si].y[condj] = boxCoord[indj + 1] + yo;
+                if (sys->conductorIn[si].x[condj] > sys->conductorIn[si].xmax){
+                    sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                }
+                if (sys->conductorIn[si].x[condj] < sys->conductorIn[si].xmin){
+                    sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
+                }
+                if (sys->conductorIn[si].y[condj] > sys->conductorIn[si].ymax){
+                    sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
+                }
+                if (sys->conductorIn[si].y[condj] < sys->conductorIn[si].ymin){
+                    sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
+                }
+
+                indj++;
+                condj++;
+            }
+        }
+        cout << "  List of " << numText << " text boxes:" << endl;
+        cout << "  List of " << numSRef << " structure references:" << endl;
+        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
+        {
+            printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
+        }
+
+        // Close output file
+        /*outfile.close();*/
+    }
+
+    // Print all the conductor information (no fdtdMesh)
+    void printall(std::string name, double xo, double yo)
+    {
+        // Open output file
+        /*std::ofstream outfile;*/
+        size_t indExtension = this->getFileName().find(".", 1);
+        /*std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
+        outfile.open(polyFileName, std::ofstream::out | std::ofstream::app);
+        if (!outfile.is_open()) // Failed to open the polygon file to write
+        {
+        return;
+        }*/
+
+        // Get information about this cell in ASCII database
+        const GeoCell cell = this->cells[this->locateCell(name)];
+        int numBound = cell.getNumBound();
+        int numPath = cell.getNumPath();
+        int numNode = cell.getNumNode();
+        int numBox = cell.getNumBox();
+        int numText = cell.getNumText();
+        int numSRef = cell.getNumSRef();
+
+        // Print cell information
+        cout << "  List of " << numBound << " boundaries:" << endl;
+        for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
+        { 
             char point[128];
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
             this->strPoints.append("    " + to_string(boundCoord.size() / 2 - 1) + " " + to_string(((cell.boundaries)[indi]).getLayer()) + " "); // Number of nodes, then layer number
@@ -1304,7 +1536,7 @@ public:
                             sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
                             this->strPoints.append(point);
                             this->strPoints.append("\n");
-                            numCdtIn++;
+                            this->numCdtIn++;
                             indj--;
                         }
                         else // second point is on the top of the first point
@@ -1320,7 +1552,7 @@ public:
                             sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
                             this->strPoints.append(point);
                             this->strPoints.append("\n");
-                            numCdtIn++;
+                            this->numCdtIn++;
                             indj--;
                         }
                     }
@@ -1339,7 +1571,7 @@ public:
                             sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
                             this->strPoints.append(point);
                             this->strPoints.append("\n");
-                            numCdtIn++;
+                            this->numCdtIn++;
                             indj--;
                         }
                         else // second point is on the right of the first point
@@ -1355,7 +1587,7 @@ public:
                             sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
                             strPoints.append(point);
                             strPoints.append("\n");
-                            numCdtIn++;
+                            this->numCdtIn++;
                             indj--;
                         }
                     }
@@ -1374,12 +1606,12 @@ public:
             for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) {
                 /*outfile << boxCoord[indj++] << " " << boxCoord[indj] << " ";*/
                 //this->strPoints.append(to_string(boxCoord[indj++]) + " " + to_string(boxCoord[indj + 1]) + " ");
-                sprintf(point, "%1.4g %1.4g ", boxCoord[indj++], boxCoord[indj + 1]);
+                sprintf(point, "%1.4g %1.4g ", boxCoord[indj++] + xo, boxCoord[indj + 1] + yo);
                 this->strPoints.append(point);
             }
             this->strPoints.append("\n");
             /*outfile << endl;*/
-            numCdtIn++;
+            this->numCdtIn++;
         }
         cout << "  List of " << numText << " text boxes:" << endl;
         cout << "  List of " << numSRef << " structure references:" << endl;
@@ -1392,7 +1624,42 @@ public:
         /*outfile.close();*/
     }
 
-    // Print the ASCII database with the design geometry
+    // Print the ASCII database with the design geometry (fdtdMesh style)
+    void print(vector<size_t> indCellPrint, fdtdMesh *sys)
+    {
+        // Delete existing file
+        size_t indExtension = this->getFileName().find(".", 1);
+        /*std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
+        remove(polyFileName.c_str());*/
+
+        // Analyze design and print to terminal
+        int numCell = getNumCell();
+
+        cout << "ASCII Database of IC Design:" << endl;
+        cout << " File Name: " << this->fileName << endl;
+        cout << " Version: " << this->getVersion() << endl;
+        cout << " Date of last modification: " << this->getDateMod() << endl;
+        cout << " Date of last access: " << this->getDateAccess() << endl;
+        cout << " Name of this library: " << this->getLibName() << endl;
+        cout << " Database units: " << this->getdbUnits() << " m" << endl;
+        cout << " Database units: " << this->getdbUserUnits() << " user units" << endl;
+        cout << " List of " << numCell << " cells:" << endl;
+        for (size_t indi = 0; indi < numCell; indi++)
+        {
+            cout << "  " << indi + 1 << ". " << ((this->cells)[indi]).getCellName() << endl;
+            cout << "   Counts: " << (this->cells)[indi].getNumBound() << " boundaries, " << (this->cells)[indi].getNumPath() << " paths, " << (this->cells)[indi].getNumNode() << " nodes, " << (this->cells)[indi].getNumBox() << " boxes," << endl << "     " << (this->cells)[indi].getNumText() << " text boxes, and " << (this->cells)[indi].getNumSRef() << " structure references" << endl;
+        }
+        for (size_t indi = 0; indi < indCellPrint.size(); indi++)
+        {
+            std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
+            cout << cellName << endl;
+            this->printall(cellName, 0., 0., sys);   // the origin is the (0,0) point
+            //(this->cells)[indCellPrint[indi]].printAlt();
+        }
+        cout << "------" << endl;
+    }
+
+    // Print the ASCII database with the design geometry (no fdtdMesh)
     void print(vector<size_t> indCellPrint)
     {
         // Delete existing file

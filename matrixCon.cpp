@@ -21,6 +21,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //cout << "Number of conductors: " << sys->numCdt << endl;
     cout << "Number of edges: " << sys->N_edge << endl;
     cout << "Number of conductors: " << sys->numCdt << endl;
+    cout << "Number of ports: " << sys->numPorts << endl;
 
     /* Merged conductor node */
     /*double dcx = 5e-7, dcy = 5e-7, dcz = 5e-7;
@@ -31,7 +32,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int *cindex = (int*)calloc((sys->numCdt + 1), (sizeof(int)));
     int *acu_cnno = (int*)calloc((sys->numCdt), sizeof(int));
     cindex[0] = -1;
-    
+
     for (i = 0; i < sys->numCdt; i++){
         for (j = 0; j < sys->cdtNumNode[i] - 1; j++){    // No port, need one node removed
             mcnno = 0;
@@ -84,6 +85,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     for (i = 0; i < sys->numCdt; i++){
         n = sys->cdtNumNode[i];
+        sys->conductor[i].markPort = 0;
         for (j = 0; j < n; j++){    // No port, need one node removed
             if (sys->portNno.find(sys->conductor[i].node[j]) != sys->portNno.end()){
                 sys->conductor[i].markPort = 1;
@@ -97,6 +99,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     cindex[0] = -1;    // the last index in the sparse form for each conductor in V0c
     acu_cnno[0] = 0;
     count = 0;
+    int *map = (int*)calloc(sys->N_node, (sizeof(int)));
 
     for (i = 0; i < sys->numCdt; i++){
         if (sys->conductor[i].markPort == 1){
@@ -112,6 +115,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     sys->v0cval.push_back(sys->nodeEdge[sys->conductor[i].node[j]][k].second);
                     cindex[count + 1]++;
                 }
+                map[sys->conductor[i].node[j]] = leng_v0c + 1;
+
                 acu_cnno[count + 1]++;
                 leng_v0c++;
 
@@ -122,11 +127,21 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     sys->v0caRowId.push_back((inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny);
                     sys->v0caColId.push_back(leng_v0ca);
                     sys->v0caval.push_back(-2 / (sys->zn[inz + 1] - sys->zn[inz - 1]));
+                    if (sys->markEdge[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] - sys->N_node_s) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] - sys->N_node_s);
+                        sys->Acval.push_back(-2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
                 }
                 else if (inz == sys->N_cell_z){
                     sys->v0caRowId.push_back((inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny);
                     sys->v0caColId.push_back(leng_v0ca);
                     sys->v0caval.push_back(-1 / (sys->zn[inz] - sys->zn[inz - 1]));
+                    if (sys->markEdge[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] - sys->N_node_s) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] - sys->N_node_s);
+                        sys->Acval.push_back(-1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    } 
                 }
 
                 if (iny != 0 && iny != sys->N_cell_y){
@@ -179,12 +194,354 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 }
 
                 leng_v0ca++;
+
+                if (inx != 0 && inx != sys->N_cell_x){
+                    if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] - sys->N_cell_y - 1) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] - sys->N_cell_y - 1);
+                        sys->Acval.push_back(-2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]);
+                    }
+                    if (iny != 0 && iny != sys->N_cell_y){
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1] != 0 && sys->portNno.find(sys->conductor[i].node[j] - 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] - 1);
+                            sys->Acval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                        }
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx)+iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz])* sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx)+iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx)+iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] + 1);
+                            sys->Acval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                        }
+                    }
+                    else if (iny == sys->N_cell_y){
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1] != 0 && sys->portNno.find(sys->conductor[i].node[j] - 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] - 1);
+                            sys->Acval.push_back(-1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                        }
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                    }
+                    else{
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] + 1);
+                            sys->Acval.push_back(-1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                        }
+                    }
+                    if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + sys->N_cell_y + 1) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] + sys->N_cell_y + 1);
+                        sys->Acval.push_back(-2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]);
+                    }
+                }
+                else if (inx == sys->N_cell_x){
+                    if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] - sys->N_cell_y - 1) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] - sys->N_cell_y - 1);
+                        sys->Acval.push_back(-1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]);
+                    }
+                    if (iny != 0 && iny != sys->N_cell_y){
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1] != 0 && sys->portNno.find(sys->conductor[i].node[j] - 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] - 1);
+                            sys->Acval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                        }
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] + 1);
+                            sys->Acval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                        }
+                    }
+                    else if (iny == sys->N_cell_y){
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1] != 0 && sys->portNno.find(sys->conductor[i].node[j] - 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] - 1);
+                            sys->Acval.push_back(-1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                        }
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                    }
+                    else{
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] + 1);
+                            sys->Acval.push_back(-1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                        }
+                    }
+                }
+                else{
+                    if (iny != 0 && iny != sys->N_cell_y){
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1] != 0 && sys->portNno.find(sys->conductor[i].node[j] - 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] - 1);
+                            sys->Acval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                        }
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] + 1);
+                            sys->Acval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                        }
+                    }
+                    else if (iny == sys->N_cell_y){
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1] != 0 && sys->portNno.find(sys->conductor[i].node[j] - 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] - 1);
+                            sys->Acval.push_back(-1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                        }
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                    }
+                    else{
+                        if (inz != 0 && inz != sys->N_cell_z){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                                + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else if (inz == 0){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        else{
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j]);
+                            sys->Acval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                                + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                                + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->sig[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                        }
+                        if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + 1) == sys->portNno.end()){
+                            sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                            sys->AcColId.push_back(sys->conductor[i].node[j] + 1);
+                            sys->Acval.push_back(-1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                        }
+                    }
+                    if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + sys->N_cell_y + 1) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] + sys->N_cell_y + 1);
+                        sys->Acval.push_back(-1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]);
+                    }
+                }
+
+                if (inz != 0 && inz != sys->N_cell_z){
+                    if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + sys->N_node_s) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] + sys->N_node_s);
+                        sys->Acval.push_back(-2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny]);
+                    }
+                }
+                else if (inz == 0){
+                    if (sys->markEdge[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny] != 0 && sys->portNno.find(sys->conductor[i].node[j] + sys->N_node_s) == sys->portNno.end()){
+                        sys->AcRowId.push_back(sys->conductor[i].node[j]);
+                        sys->AcColId.push_back(sys->conductor[i].node[j] + sys->N_node_s);
+                        sys->Acval.push_back(-1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->sig[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny]);
+                    }
+                }
+ 
             }
             cindex[count + 1] = cindex[count] + cindex[count + 1];
             count++;
         }
     }
 
+    for (i = 0; i < sys->AcRowId.size(); i++){
+        sys->AcRowId[i] = map[sys->AcRowId[i]] - 1;
+        sys->AcColId[i] = map[sys->AcColId[i]] - 1;
+    }
+ 
     int leng_v0c2 = 0;
     for (i = 0; i < sys->numPorts; i++){
         temp2.clear();
@@ -204,6 +561,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         leng_v0c2++;
     }
+    /*for (i = 0; i < sys->v0c2RowId.size(); i++){
+        cout << sys->v0c2RowId[i] << " " << sys->v0c2ColId[i] << " " << sys->v0c2val[i] << endl;
+    }*/
 
     sys->v0cvalo = sys->v0cval;    // v0cvalo is the v0c values without D_sig
     for (i = 0; i < sys->v0cColId.size(); i++){
@@ -218,6 +578,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (i = 0; i < sys->numCdt; i++){
         portCdt = portCdt + sys->conductor[i].markPort;
     }
+
     /*outfile1.open("v0c.txt", std::ofstream::out | std::ofstream::trunc);
     for (i = 0; i < sys->v0cRowId.size(); i++){
         outfile1 << sys->v0cRowId[i] + 1 << " " << sys->v0cColId[i] + 1 << " " << sys->v0cvalo[i] << endl;
@@ -230,12 +591,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     outfile1.close();*/
 
     /* Compute the matrix V0c'*D_sig*V0c */
-    cout << "Entering matrixMulti() in paraGenerator()" << endl;
-    cout << "Values in aRowID: " << (sys->v0caColId)[0] << endl;
-    status = matrixMulti(sys->v0caColId, sys->v0caRowId, sys->v0caval, sys->v0cRowId, sys->v0cColId, sys->v0cval, sys->AcRowId, sys->AcColId, sys->Acval);
-    cout << "Made it out of matrixMulti() in paraGenerator()" << endl;
+    /*status = matrixMulti(sys->v0caColId, sys->v0caRowId, sys->v0caval, sys->v0cRowId, sys->v0cColId, sys->v0cval, sys->AcRowId, sys->AcColId, sys->Acval);
     if (status != 0)
-        return status;
+        return status;*/
     status = COO2CSR(sys->AcRowId, sys->AcColId, sys->Acval);
     if (status != 0)
         return status;
@@ -324,25 +682,25 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         }
     }
+
     mark = sys->v0d1ColId.back();
     while (sys->v0d1ColId.back() == mark){
         sys->v0d1RowId.pop_back();   // one node removed to make V0 full rank
         sys->v0d1ColId.pop_back();
         sys->v0d1val.pop_back();
-        leng_v0d1--;
     }
+    leng_v0d1--;
     mark = sys->v0d1aColId.back();
     while (sys->v0d1aColId.back() == mark){
         sys->v0d1aRowId.pop_back();
         sys->v0d1aColId.pop_back();
         sys->v0d1aval.pop_back();
-        leng_v0d1a--;
     }
-    
+    leng_v0d1a--;
 
     int leng_v0d2 = 0;
     int leng_v0d2a = 0;
-    if (sys->numCdt - portCdt > 0){
+    /*if (sys->numCdt - portCdt > 0){
         vector<vector<int> > ind(sys->numCdt);
         k = 0;
         for (i = 0; i < sys->numCdt; i++){
@@ -394,7 +752,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         outfile1 << sys->v0d1RowId[i] + 1 << " " << sys->v0d1ColId[i] + 1 << " " << sys->v0d1val[i] << endl;
     }
     outfile1.close();
-    cout << leng_v0d1 << endl;
+    cout << leng_v0d1 << endl;*/
 
     /* Generate the merged V0d1 */
     /*double dx = 3e-6, dy = 1e-6; // merge layer by layer
@@ -535,10 +893,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *temp1;
     int startCol;
     startCol = 0;
-    sys->x = (complex<double>*) malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
+    /*sys->x = (complex<double>*) malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
     for (i = 0; i < sys->numPorts*sys->numPorts; i++){
         sys->x[i] = complex<double> (0., 0.); // Complex double constructor from real and imaginary
-     }
+    }*/
     void *pt[64];
     int mtype;
     int iparm[64];
@@ -550,7 +908,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int nrhs = 1;
     int msglvl = 0;    //print statistical information
 
-    mtype = 1;    //real symmetric positive definite
+    mtype = 11;    // real and not symmetric
     solver = 0;
     error = 0;
     maxfct = 1;    //maximum number of numerical factorizations
@@ -562,18 +920,19 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     vector<int> v0csRowId, v0csColId;
     vector<double> v0csval;
-    int leng_v0cs;
     double *epsv0dy0d, *epsv0cy0c, *sigv0cy0c;
     double *v0csy0d, *v0csy0c, *v0cssigy0c;
+    int leng_v0cs;
+    double *epsy, *sigy;
+    double *Jr, *Ji;
     int port, sourcePort;    // show which port it is using
     int node;
     double v0csedgeleng;
-    
     complex<double> current;
     int port_N_node_s;
     double *crhs;
     double *yc_eps;
-    sys->Y = (complex<double>*) calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
+    sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
 
 
     char transa;
@@ -640,7 +999,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sourcePort = 0;
 
     while (sourcePort < sys->numPorts){
-        freq = 2.0432e+009;
+        freq = 10.e+09;
         y0c2 = (double*)calloc(leng_v0c2, sizeof(double));
         sys->v0c2y0c2 = (double*)malloc(sys->N_edge*sizeof(double));
         sys->v0c2y0c2o = (double*)malloc(sys->N_edge*sizeof(double));
@@ -650,10 +1009,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         k = sys->N_edge;
         mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0c2val[0], &sys->v0c2RowId[0], &sys->v0c2ColId[0], &sys->v0c2ColId[1], y0c2, &beta, sys->v0c2y0c2);
         for (i = 0; i < sys->N_edge; i++){
+            //if (isnan(sys->sig[i])){
+                //cout << sys->sig[i] << endl;}
             sys->v0c2y0c2o[i] = sys->v0c2y0c2[i];
             sys->v0c2y0c2[i] = -sys->v0c2y0c2[i] * sqrt(sys->sig[i]);
+            /*if (sys->v0c2y0c2[i] != 0)
+            {
+                cout << sys->v0c2y0c2[i] << " " << sys->sig[i] << "#" << endl;
+            }*/
         }
-        
+        cout << endl;
+
         /* Compute C right hand side */
         xc = (double*)calloc(leng_v0c, sizeof(double));
 
@@ -701,11 +1067,15 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         cout << "The conductor part iteration is done!\n";*/
 
         //cout << (clock() - t) * 1.0 / CLOCKS_PER_SEC << endl;
-        crhs = (double*) malloc(leng_v0c * sizeof(double));
+        crhs = (double*)malloc(leng_v0c * sizeof(double));
         transa = 'N';
-        m = leng_v0c;
+        m = leng_v0ca;
         k = sys->N_edge;
         mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0caval[0], &sys->v0caRowId[0], &sys->v0caColId[0], &sys->v0caColId[1], sys->v0c2y0c2, &beta, crhs);
+        /*for (i = 0; i < leng_v0c; i++){
+            cout << crhs[i] << " ";
+        }
+        cout << endl;*/
 
         pardisoinit(pt, &mtype, iparm);
         nrhs = 1;
@@ -740,7 +1110,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             sys->yc[i] = sys->v0cy0c[i];
             sys->v0cy0c[i] = -sys->v0cy0c[i] * sqrt(sys->eps[i]);
         }
-        cout << endl;
 
         transa = 'N';
         m = leng_v0d1;
@@ -784,7 +1153,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             for (i = 0; i < leng_v0d2; i++){
                 for (j = 0; j < leng_v0d2; j++){
-                    xd2[i] = xd2[i] + v0d2epsv0d2[i + j*leng_v0d2] * bd2[j];
+                    xd2[i] += v0d2epsv0d2[i + j*leng_v0d2] * bd2[j];
                 }
             }
         }
@@ -792,7 +1161,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         xd1 = (double*)calloc(leng_v0d1, sizeof(double));
         for (i = 0; i < leng_v0d2; i++){
             for (j = 0; j < leng_v0d1; j++){
-                xd1[j] = xd1[j] - solution_d2[j + i*leng_v0d1] * xd2[i];
+                xd1[j] -= solution_d2[j + i*leng_v0d1] * xd2[i];
             }
         }
 
@@ -823,9 +1192,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
 
         /* Form the final y */
-        sys->y = (complex<double>*) malloc(sys->N_edge * sizeof(complex<double>));
+        sys->y = (double*) malloc(sys->N_edge * sizeof(double));
         for (i = 0; i < sys->N_edge; i++){
-            sys->y[i] = sys->yd[i]+sys->yc[i];
+            sys->y[i] = sys->yd[i] + sys->yc[i];
             //cout << sys->y[i] << " ";
         }
         /*outfile.open("yd.txt", std::ofstream::out | std::ofstream::trunc);
@@ -833,7 +1202,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             outfile << sys->yd_re[i] <<" "<<sys->yd_im[i]<< "\n";
         }
         outfile.close();*/
-        
+
         xcol++;
 
         for (i = 0; i < sys->numPorts; i++){
@@ -842,7 +1211,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             v0csColId.clear();
             v0csval.clear();
             v0csin = 0;
-            
+
             for (j = 0; j < sys->portCoor[i].nodenum; j++){
                 inz = sys->portCoor[i].node[j] / sys->N_node_s;
                 inx = (sys->portCoor[i].node[j] - inz * sys->N_node_s) / (sys->N_cell_y + 1);
@@ -936,141 +1305,690 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             mdone = 1;
             cblas_daxpy(leng_v0cs, mdone, v0csy0c, ione, v0csy0d, ione);    // the addition of v0csy0d and v0csy0c
 
-            
+
             for (j = 0; j < sys->N_edge; j++){
                 if (sys->sig[j] != 0)
-                    sigv0cy0c[j] = SIGMA * sys->yc[j];
+                    sigv0cy0c[j] = sys->sig[j] * sys->yc[j];
             }
 
             mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &v0csval[0], &v0csRowId[0], &v0csColId[0], &v0csColId[1], sigv0cy0c, &beta, v0cssigy0c);
 
-            sys->v0csJ = (complex<double>*) malloc(leng_v0cs * sizeof(complex<double>));
+            sys->v0csJ = (complex<double>*)malloc(leng_v0cs * sizeof(complex<double>));
             for (j = 0; j < leng_v0cs; j++){
-                sys->v0csJ[j] = complex<double> (-v0cssigy0c[j], -v0csy0d[j]); // Use complex double constructor
+                sys->v0csJ[j] = -v0cssigy0c[j] - 1i * v0csy0d[j]; // Complex<double> literal
             }
             node = sys->portCoor[i].node[0];
             int node1;
-            double a = 0;
+            double a = 0, area, areasum;
             current = complex<double> (0., 0.);
             if (sys->portCoor[i].x1 == sys->portCoor[i].x2){
-                v0csedgeleng = -(sys->xn[(node % sys->N_node_s) / (sys->N_cell_y + 1)] - sys->xn[(node % sys->N_node_s) / (sys->N_cell_y + 1) - 1]);
-                
-                for (j = 0; j < leng_v0cs; j++){
-                    sys->v0csJ[j] *= v0csedgeleng;
-                }
-                for (l = zi[sys->portCoor[i].z1]; l < zi[sys->portCoor[i].z2]; l++){
-                    for (k = yi[sys->portCoor[i].y1]; k < yi[sys->portCoor[i].y2]; k++) {
+                inx = xi[sys->portCoor[i].x1];
+
+                for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
+                    for (k = yi[sys->portCoor[i].y1]; k <= yi[sys->portCoor[i].y2]; k++){
                         mark = (k - yi[sys->portCoor[i].y1])
                             + (l - zi[sys->portCoor[i].z1])*(yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y2] + 1);
-                        current += ((sys->v0csJ[mark] + sys->v0csJ[mark + 1] + sys->v0csJ[mark + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)] + sys->v0csJ[mark + 1 + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)]) / 4.) * (sys->yn[k + 1] - sys->yn[k]) * (sys->zn[l + 1] - sys->zn[l]);
-                        /*current.re = current.re + ((sys->v0csJ[mark].re + sys->v0csJ[mark + 1].re
-                            + sys->v0csJ[mark + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)].re
-                            + sys->v0csJ[mark + 1 + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)].re) / 4)
-                            *(sys->yn[k + 1] - sys->yn[k])*(sys->zn[l + 1] - sys->zn[l]);
-                        current.im = current.im + ((sys->v0csJ[mark].im + sys->v0csJ[mark + 1].im
-                            + sys->v0csJ[mark + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)].im
-                            + sys->v0csJ[mark + 1 + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)].im) / 4)
-                            *(sys->yn[k + 1] - sys->yn[k])*(sys->zn[l + 1] - sys->zn[l]);*/
-                        //cout << (sys->yn[k + 1] - sys->yn[k])*(sys->zn[l + 1] - sys->zn[l]) << "\n";
+                        a = 0;
+                        areasum = 0;
+                        if (k == 0){
+                            a += 1 / (sys->yn[k + 1] - sys->yn[k]);
+                            area = 1;
+                            if (inx == 0){
+                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                            }
+                            else if (inx == sys->N_cell_x){
+                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (k == sys->N_cell_y){
+                            a += 1 / (sys->yn[k] - sys->yn[k - 1]);
+                            area = 1;
+                            if (inx == 0){
+                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                            }
+                            else if (inx == sys->N_cell_x){
+                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->yn[k + 1] - sys->yn[k - 1]);
+                            area = 1;
+                            if (inx == 0){
+                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                            }
+                            else if (inx == sys->N_cell_x){
+                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        if (inx == 0){
+                            a += 1 / (sys->xn[inx + 1] - sys->xn[inx]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (inx == sys->N_cell_x){
+                            a += 1 / (sys->xn[inx] - sys->xn[inx - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->xn[inx + 1] - sys->xn[inx - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        if (l == 0){
+                            a += 1 / (sys->zn[l + 1] - sys->zn[l]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (inx == 0){
+                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                            }
+                            else if (inx == sys->N_cell_x){
+                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (l == sys->N_cell_z){
+                            a += 1 / (sys->zn[l] - sys->zn[l - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (inx == 0){
+                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                            }
+                            else if (inx == sys->N_cell_x){
+                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (inx == 0){
+                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                            }
+                            else if (inx == sys->N_cell_x){
+                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        sys->v0csJ[mark] /= -a;
+
+                        current += (sys->v0csJ[mark]) * areasum;
                     }
                 }
             }
             else if (sys->portCoor[i].y1 == sys->portCoor[i].y2){
-                /*v0csedgeleng = -(sys->yn[node % (sys->N_cell_y + 1) + 1] - sys->yn[node % (sys->N_cell_y + 1) - 1]) / 2;
-
-                for (j = 0; j < leng_v0cs; j++){
-                    sys->v0csJ[j].re = sys->v0csJ[j].re*v0csedgeleng;
-                    sys->v0csJ[j].im = sys->v0csJ[j].im*v0csedgeleng;
-                }*/
                 iny = yi[sys->portCoor[i].y1];
-                a = 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]);
-                for (j = 0; j < leng_v0cs; j++){
-                    sys->v0csJ[j] /= -a;
-                }
-                
+               
                 for (l = zi[sys->portCoor[i].z1]; l < zi[sys->portCoor[i].z2]; l++){
                     for (j = xi[sys->portCoor[i].x1]; j < xi[sys->portCoor[i].x2]; j++){
                         mark = (j - xi[sys->portCoor[i].x1])
                             + (l - zi[sys->portCoor[i].z1])*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1);
-                        node1 = l*(sys->N_node_s) + (sys->N_cell_y + 1) * j + iny;
-                        current += ((sys->v0csJ[mark] + sys->v0csJ[mark + 1] + sys->v0csJ[mark + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)] + sys->v0csJ[mark + 1 + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)]) / 4.) * (sys->xn[j + 1] - sys->xn[j]) * (sys->zn[l + 1] - sys->zn[l]);
-                        /*current.re = current.re + ((sys->v0csJ[mark].re + sys->v0csJ[mark + 1].re
-                            + sys->v0csJ[mark + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].re
-                            + sys->v0csJ[mark + 1 + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].re) / 4)
-                            *(sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]);
-                        current.im = current.im + ((sys->v0csJ[mark].im + sys->v0csJ[mark + 1].im
-                            + sys->v0csJ[mark + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].im
-                            + sys->v0csJ[mark + 1 + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].im) / 4)
-                            *(sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]);*/
-                            //cout << (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]) << "\n";
-
-
-                        /*a = 4 / (sys->yn[iny + 1] - sys->yn[iny - 1]) +4 / (sys->xn[j + 1] - sys->xn[j - 1]) + 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
-
-                        sys->v0csJ[mark].re = sys->v0csJ[mark].re / (-a);
-                        sys->v0csJ[mark].im = sys->v0csJ[mark].im / (-a);
-
-                        a = (sys->xn[j + 1] - sys->xn[j - 1]) / 2 * (sys->zn[l + 1] - sys->zn[l - 1]) / 2 * 2  +(sys->xn[j + 1] - sys->xn[j - 1]) / 2 * (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2 * 2
-                        + (sys->zn[l + 1] - sys->zn[l - 1]) / 2 * (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2 * 2;
-
-                        current.re = current.re + (sys->v0csJ[mark].re) * a;
-                        current.im = current.im + (sys->v0csJ[mark].im) * a;*/
-
-                        /*a =
-
-                        current.re = current.re + (sys->v0csJ[mark].re + sys->v0csJ[mark + 1].re
-                        + sys->v0csJ[mark + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].re
-                        + sys->v0csJ[mark + 1 + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].re) / 4
-                        *(sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]);
-                        current.im = current.im + ((sys->v0csJ[mark].im + sys->v0csJ[mark + 1].im
-                        + sys->v0csJ[mark + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].im
-                        + sys->v0csJ[mark + 1 + (xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)].im) / 4)
-                        *(sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]);*/
-
-
-                        /*if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1] != 0){
-                            current.re = current.re + (-sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1]
-                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny - 1]
-                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny - 1]
-                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny - 1]) / 4 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
+                        node1 = l*(sys->N_node_s) + (sys->N_cell_y + 1) * j + yi[sys->portCoor[i].y1];
+                        a = 0;
+                        areasum = 0;
+                        if (iny == 0){
+                            a += 1 / (sys->yn[iny + 1] - sys->yn[iny]);
+                            area = 1;
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
                         }
-                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny] != 0){
-                            current.re = current.re + (sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny]
-                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny]
-                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny]
-                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny]) / 4 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
+                        else if (iny == sys->N_cell_y){
+                            a += 1 / (sys->yn[iny] - sys->yn[iny - 1]);
+                            area = 1;
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
                         }
-                        
-                        current.im = current.im + (-sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1]
-                            - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny - 1]
-                            - sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny - 1]
-                            - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny - 1]) / 4 * 2 * PI*freq*sys->stackEpsn[l] * EPSILON0 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l])
-                            + (sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny]
-                            + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny]
-                            + sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny]
-                            + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny]) / 4 * 2 * PI*freq*sys->stackEpsn[l] * EPSILON0 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]);*/
+                        else{
+                            a += 4 / (sys->yn[iny + 1] - sys->yn[iny - 1]);
+                            area = 1;
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        if (j == 0){
+                            a += 1 / (sys->xn[j + 1] - sys->xn[j]);
+                            area = 1;
+                            if (iny == 0){
+                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                            }
+                            else if (iny == sys->N_cell_y){
+                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (j == sys->N_cell_x){
+                            a += 1 / (sys->xn[j] - sys->xn[j - 1]);
+                            area = 1;
+                            if (iny == 0){
+                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                            }
+                            else if (iny == sys->N_cell_y){
+                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->xn[j + 1] - sys->xn[j - 1]);
+                            area = 1;
+                            if (iny == 0){
+                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                            }
+                            else if (iny == sys->N_cell_y){
+                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[l + 1] - sys->zn[l]);
+                            }
+                            else if (l == sys->N_cell_z){
+                                area *= (sys->zn[l] - sys->zn[l - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        if (l == 0){
+                            a += 1 / (sys->zn[l + 1] - sys->zn[l]);
+                            area = 1;
+                            if (iny == 0){
+                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                            }
+                            else if (iny == sys->N_cell_y){
+                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                            }
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (l == sys->N_cell_z){
+                            a += 1 / (sys->zn[l] - sys->zn[l - 1]);
+                            area = 1;
+                            if (iny == 0){
+                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                            }
+                            else if (iny == sys->N_cell_y){
+                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                            }
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
+                            area = 1;
+                            if (iny == 0){
+                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                            }
+                            else if (iny == sys->N_cell_y){
+                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                            }
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+
+                        sys->v0csJ[mark] /= -a;
+
+                        current += (sys->v0csJ[mark]) * areasum; 
                     }
                 }
             }
             else{
-                v0csedgeleng = -(sys->zn[node / sys->N_node_s] - sys->zn[node / sys->N_node_s - 1]);
-                for (j = 0; j < leng_v0cs; j++){
-                    sys->v0csJ[j] *= v0csedgeleng;
-                }
-                for (j = xi[sys->portCoor[port - 1].x1]; j < xi[sys->portCoor[port - 1].x2]; j++){
-                    for (k = yi[sys->portCoor[port - 1].y1]; k < yi[sys->portCoor[port - 1].y2]; k++){
+                
+                inz = zi[sys->portCoor[i].z1];
+
+                for (j = xi[sys->portCoor[port - 1].x1]; j <= xi[sys->portCoor[port - 1].x2]; j++){
+                    for (k = yi[sys->portCoor[port - 1].y1]; k <= yi[sys->portCoor[port - 1].y2]; k++){
                         mark = (k - yi[sys->portCoor[port - 1].y1])
                             + (j - xi[sys->portCoor[port - 1].x1])*(yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1);
-                        current += ((sys->v0csJ[mark] + sys->v0csJ[mark + 1] + sys->v0csJ[mark + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)] + sys->v0csJ[mark + 1 + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)]) / 4.) * (sys->xn[j + 1] - sys->xn[j]) * (sys->yn[k + 1] - sys->yn[k]);
-                        /*current.re = current.re + ((sys->v0csJ[mark].re + sys->v0csJ[mark + 1].re
-                            + sys->v0csJ[mark + (yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1)].re
-                            + sys->v0csJ[mark + 1 + (yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1)].re) / 4)
-                            *(sys->xn[j + 1] - sys->xn[j])*(sys->yn[k + 1] - sys->yn[k]);
-                        current.im = current.im + ((sys->v0csJ[mark].im + sys->v0csJ[mark + 1].im
-                            + sys->v0csJ[mark + (yi[sys->portCoor[i].y2] - yi[sys->portCoor[port - 1].y1] + 1)].im
-                            + sys->v0csJ[mark + 1 + (yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1)].im) / 4)
-                            *(sys->xn[j + 1] - sys->xn[j])*(sys->yn[k + 1] - sys->yn[k]);*/
-                        //cout << (sys->xn[j + 1] - sys->xn[j])*(sys->yn[k + 1] - sys->yn[k]) << "\n";
+                        
+                        a = 0;
+                        areasum = 0;
+                        if (k == 0){
+                            a += 1 / (sys->yn[k + 1] - sys->yn[k]);
+                            area = 1;
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                            }
+                            else if (inz == sys->N_cell_z){
+                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (k == sys->N_cell_y){
+                            a += 1 / (sys->yn[k] - sys->yn[k - 1]);
+                            area = 1;
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            if (inz == 0){
+                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                            }
+                            else if (inz == sys->N_cell_z){
+                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->yn[k + 1] - sys->yn[k - 1]);
+                            area = 1;
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            if (inz == 0){
+                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                            }
+                            else if (inz == sys->N_cell_z){
+                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        if (j == 0){
+                            a += 1 / (sys->xn[j + 1] - sys->xn[j]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (l == 0){
+                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                            }
+                            else if (inz == sys->N_cell_z){
+                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (j == sys->N_cell_x){
+                            a += 1 / (sys->xn[j] - sys->xn[j - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (inz == 0){
+                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                            }
+                            else if (inz == sys->N_cell_z){
+                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->xn[j + 1] - sys->xn[j - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (inz == 0){
+                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                            }
+                            else if (inz == sys->N_cell_z){
+                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                            }
+                            else{
+                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+                        if (inz == 0){
+                            a += 1 / (sys->zn[inz + 1] - sys->zn[inz]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else if (inz == sys->N_cell_z){
+                            a += 1 / (sys->zn[inz] - sys->zn[inz - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            areasum += area;
+                        }
+                        else{
+                            a += 4 / (sys->zn[inz + 1] - sys->zn[inz - 1]);
+                            area = 1;
+                            if (k == 0){
+                                area *= (sys->yn[k + 1] - sys->yn[k]);
+                            }
+                            else if (k == sys->N_cell_y){
+                                area *= (sys->yn[k] - sys->yn[k - 1]);
+                            }
+                            else{
+                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                            }
+                            if (j == 0){
+                                area *= (sys->xn[j + 1] - sys->xn[j]);
+                            }
+                            else if (j == sys->N_cell_x){
+                                area *= (sys->xn[j] - sys->xn[j - 1]);
+                            }
+                            else{
+                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                            }
+                            areasum += area * 2;
+                        }
+
+                        sys->v0csJ[mark] /= -a;
+
+                        current += (sys->v0csJ[mark]) * areasum;
                     }
                 }
             }
@@ -1083,10 +2001,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(solution_b1); solution_b1 = NULL;
         free(bd1); bd1 = NULL;
         free(bd2); bd2 = NULL;
-        free(sys->yd); sys->yd = NULL;
         free(xd2); xd2 = NULL;
         free(xd1); xd1 = NULL;
         free(v0d2epsv0d1b1); v0d2epsv0d1b1 = NULL;
+        free(sys->yd); sys->yd = NULL;
         free(sys->yc); sys->yc = NULL;
         free(sys->y); sys->y = NULL;
         free(epsv0dy0d); epsv0dy0d = NULL;
@@ -1108,7 +2026,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     for (i = 0; i < sys->numPorts; i++){
         for (j = 0; j < sys->numPorts; j++){
-            cout << sys->Y[i*sys->numPorts + j].real() << " " << sys->Y[i*sys->numPorts + j].imag() << endl;
+            //cout << sys->Y[i*sys->numPorts + j].real() << " " << sys->Y[i*sys->numPorts + j].imag() << endl;
+            cout << sys->Y[i*sys->numPorts + j] << endl;
         }
     }
     //cout << "leng_v0c: " << leng_v0c << endl;
@@ -1131,17 +2050,18 @@ int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, 
     vector<char> transa;
     int m;    // number of rows
     int k;    // number of columns
-    double alpha=1, beta=0;
+    double alpha = 1, beta = 0;
     char matdescra[6];
     int *pntrb1, *pntre1;
     int *pntrb2, *pntre2;
     int i, j;
     double *y;
-    ipar = (int*) malloc((SOLVERLENGTH + 2 * nrhs) * sizeof(int));
-    dpar = (double*) malloc((SOLVERLENGTH + 2 * nrhs) * sizeof(double));
-    tmp = (double*) malloc(N*(3 + nrhs) * sizeof(double));
-    y = (double*) malloc(sys->N_edge * sizeof(double));
-    temp = (double*) malloc(N * sizeof(double));
+    int length = 128;
+    ipar = (int*)malloc((length + 2 * nrhs) * sizeof(int));
+    dpar = (double*)malloc((length + 2 * nrhs) * sizeof(double));
+    tmp = (double*)malloc(N*(3 + nrhs) * sizeof(double));
+    y = (double*)malloc(sys->N_edge * sizeof(double));
+    temp = (double*)malloc(N * sizeof(double));
     transa.push_back('T'); transa.push_back('N');
     m = N;
     k = sys->N_edge;
@@ -1160,35 +2080,37 @@ int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, 
     ipar[4] = 1000;   // set the maximum iteration number
     dfgmres_check(&N, solution, rhs, &RCI_request, ipar, dpar, tmp);
 
-RCI: dfgmres(&N, solution, rhs, &RCI_request, ipar, dpar, tmp);
-    //cout << RCI_request << " ";
-    if (RCI_request == 0){
-        goto STOP_RCI;
-    }
-    if (RCI_request == 1){
-        mkl_dcsrmv(&transa[0], &m, &k, &alpha, matdescra, a, ja, pntrb1, pntre1, tmp, &beta, y);
-        mkl_dcsrmv(&transa[1], &m, &k, &alpha, matdescra, b, jb, pntrb2, pntre2, y, &beta, &tmp[N]);
-        goto RCI;
-    }
-    if (RCI_request == 2){
-        for (j = 0; j < nrhs; j++){
-            mkl_dcsrmv(&transa[0], &m, &k, &alpha, matdescra, a, ja, pntrb1, pntre1, solution, &beta, y);
-            mkl_dcsrmv(&transa[1], &m, &k, &alpha, matdescra, b, jb, pntrb2, pntre2, y, &beta, temp);
+    while (true){
+        dfgmres(&N, solution, rhs, &RCI_request, ipar, dpar, tmp);
+        //cout << RCI_request << " ";
+        if (RCI_request == 0){
+            break;
         }
-        cblas_daxpy(N, mdone, rhs, ione, temp, ione);
-        euclidean_norm = cblas_dnrm2(N, temp, ione) / cblas_dnrm2(N, rhs, ione);
-        //cout << euclidean_norm << "\n";
-        if (euclidean_norm > 1.e-3)
-            goto RCI;
-        else
-            goto STOP_RCI;
-    }
-    else{
-        if (dpar[6] < 1e-12) goto STOP_RCI;
-        else goto RCI;
+        if (RCI_request == 1){
+            mkl_dcsrmv(&transa[0], &m, &k, &alpha, matdescra, a, ja, pntrb1, pntre1, tmp, &beta, y);
+            mkl_dcsrmv(&transa[1], &m, &k, &alpha, matdescra, b, jb, pntrb2, pntre2, y, &beta, &tmp[N]);
+            continue;
+        }
+        if (RCI_request == 2){
+            for (j = 0; j < nrhs; j++){
+                mkl_dcsrmv(&transa[0], &m, &k, &alpha, matdescra, a, ja, pntrb1, pntre1, solution, &beta, y);
+                mkl_dcsrmv(&transa[1], &m, &k, &alpha, matdescra, b, jb, pntrb2, pntre2, y, &beta, temp);
+            }
+            cblas_daxpy(N, mdone, rhs, ione, temp, ione);
+            euclidean_norm = cblas_dnrm2(N, temp, ione) / cblas_dnrm2(N, rhs, ione);
+            //cout << euclidean_norm << "\n";
+            if (euclidean_norm > 1.e-3)
+                continue;
+            else
+                break;
+        }
+        else{
+            if (dpar[6] < 1e-12) break;
+            else continue;
+        }
     }
 
-STOP_RCI: dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
+    dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
     cout << itercount << "\n";
     free(tmp);
     free(temp);
@@ -1208,18 +2130,15 @@ int matrixMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vec
     int flaga, flagb, k;
     int starta;
     double sum;
-    cout << "Made it here" << endl;
 
     flaga = aRowId[0];
     flagb = bColId[0];
-    cout << "Flags set" << endl;
     starta = 0;
     sum = 0;
     while (i < aRowId.size()){
-        cout << "Index i=" << i << " loop in matrixMulti()" << endl;
         while (j < bColId.size() && bColId[j] == flagb && i < aRowId.size() && aRowId[i] == flaga){
             if (aColId[i] == bRowId[j]){
-                sum = sum + aval[i] * bval[j];
+                sum += aval[i] * bval[j];
                 j++;
                 i++;
             }
@@ -1337,7 +2256,7 @@ int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<
     i = 0;
     v = (double*)calloc(size, sizeof(double));
     while (i < aColId.size()){
-        v[aRowId[i]] = v[aRowId[i]] + index_val[aColId[i]]*aval[i];
+        v[aRowId[i]] += index_val[aColId[i]]*aval[i];
         i++;
     }
     for (i = 0; i < size; i++){
@@ -1379,7 +2298,7 @@ int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<
                 i2++;
             }
             else{
-                val[i1] = val[i1] + sys->nodeEdge[index[j]][i2].second;
+                val[i1] += sys->nodeEdge[index[j]][i2].second;
                 if (abs(val[i1]) < 1e-10){    // if the value is 0, remove this element in the sparse form
                     rowId.erase(rowId.begin() + i1);
                     colId.pop_back();
@@ -1405,7 +2324,7 @@ int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<
     v = (double*)calloc(size, sizeof(double));
     for (i = 0; i < index.size(); i++){
         for (j = 0; j < sys->nodeEdge[index[i]].size(); j++){
-            v[sys->nodeEdge[index[i]][j].first] = v[sys->nodeEdge[index[i]][j].first] + sys->nodeEdge[index[i]][j].second;
+            v[sys->nodeEdge[index[i]][j].first] += sys->nodeEdge[index[i]][j].second;
         }
     }
     for (i = 0; i < size; i++){
@@ -1719,7 +2638,7 @@ int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int 
                         }
                     }
                     for (i = 0; i < rowId.size(); i++){
-                        v[rowId[i]] = v[rowId[i]] + ratio * val[i];
+                        v[rowId[i]] += ratio * val[i];
                     }
                     rowId.clear();
                     colId.clear();

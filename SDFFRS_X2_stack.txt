@@ -1,17 +1,23 @@
 lengthUnit = 1.e-6
 
 DIELECTRIC STACK
- numstack = 8
- GroundPlane h = 0.296 e = 4.1
- Substrate h = 0 e = 4.1
- ILD0 h = 0.12 e = 8.0
- ILDM1 h = 0.285 e = 4.1
- ILD1 h = 0.615 e = 4.1
- ILDM2 h = 0.12 e = 8.0
- ILD2 h = 0.308 e = 4.1
- TopPlane h = 1.448 e = 4.1
+ numStack = 13
+ 1 h = 1 e = 3.9
+ 2 h = 0.2 e = 3.9
+ 3 h = 0.085 e = 2.5
+ 4 h = 0.085 e = 2.5
+ 5 h = 0.13 e = 2.5
+ 6 h = 0.12 e = 2.5
+ 7 h = 0.14 e = 2.5
+ 8 h = 0.12 e = 2.5
+ 9 h = 0.14 e = 2.5
+ 10 h = 0.12 e = 2.5
+ 11 h = 0.28 e = 2.5
+ 12 h = 0.28 e = 2.5
+ 235 h = 0.29 e = 2.5
+
 
 PORT
  numPort = 2
- 150 0.05 160 0.05 ILDM1 
- 150 2000.05 160 2000.05 ILDM1 
+ 0 -0.17 0 0.17 11
+ 0 2.63 0 2.97 11

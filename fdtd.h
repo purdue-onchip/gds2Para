@@ -28,7 +28,7 @@ using namespace std;
 #define SIGMA (5.7e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
-#define SOLVERLENGTH (128)
+//#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e-30)
 
@@ -50,6 +50,7 @@ public:
     double sigma;
     int *cdtInNode;
     int *markCdtInNode;
+    int layer;
 };
 
 typedef class {
@@ -134,10 +135,6 @@ public:
     double ylim1, ylim2;
     double zlim1, zlim2;
 
-    double txmin, txmax;
-    double tymin, tymax;
-    double tzmin, tzmax;
-    
     int N_edge;
     int N_edge_s;
     int N_edge_v;
@@ -166,12 +163,12 @@ public:
     double *stackBegCoor;
     double *stackEndCoor;
     vector<string> stackName;
-    double    *eps;
+    double *eps;
     double *stackEpsn;
     double *stackCdtMark;
 
     /* Conductor parameters */
-    fdtdOneCondct *conductorIn;
+    vector<fdtdOneCondct> conductorIn;
     int numCdtRow;   //how many input rows
     int numCdt;
     int *markEdge;    //mark if this edge is inside a conductor
@@ -180,7 +177,8 @@ public:
     double *sig;
     fdtdCdt *conductor;
     int *markNode;    // mark this node if it is inside the conductor
-    vector<vector<int> > edgeCell;    // for cell which edge is around it
+    vector<vector<int>> edgeCell;    // for each cell which edge is around it
+    vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
 
     /* Patch information */
     fdtdPatch *patch;
@@ -221,7 +219,6 @@ public:
     vector<int> y0c2ColId;
     vector<double> y0c2val;
 
-
     double *v0c2y0c2;
     double *v0c2y0c2o;
     double *yc;
@@ -249,7 +246,7 @@ public:
     double *yd;
 
     /* Solution storage */
-    complex<double> *y;
+    double *y;
     complex<double> *x;    // the solution involving all the sourcePorts
 
     /* Port coordinates */
@@ -260,13 +257,12 @@ public:
     unordered_set<int> portNno;
 
     /* Current sources */
-    double *J;
+    complex<double> *J;
 
     /* Current V0c,s^T*I matrix */
     complex<double> *v0csJ;
     complex<double> *Y;
-    complex<double> *voltage;
-    
+
     fdtdMesh(){
         numCdtRow = 0;
     }
@@ -278,12 +274,13 @@ public:
 
 
 
-int readInput(const char *stackFile, const char *polyFile, fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi);
+int readInput(const char* stackFile, fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
 int fdtdStringWord(char*, char *word[]);
 double fdtdGetValue(char *str);
-int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
+int compareString(char *a, char *b);
+//int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);

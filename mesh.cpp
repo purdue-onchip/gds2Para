@@ -6,7 +6,7 @@ static bool comp(pair<double, int> a, pair<double, int> b)
     return a.second <= b.second;
 };
 
-int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi){
+int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi){
     FILE *fp, *cfp;
     char fbase[FDTD_MAXC];
     char s[FDTD_MAXC];
@@ -37,16 +37,16 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
     lyr = 0;
 
     fp = fopen(stackFile, "r");
-    cfp = fopen(polyFile, "r");
+    /*cfp = fopen(polyFile, "r");*/
 
     if (fp == NULL){
         perror("Failed: ");
         return -2;
     }
-    if (cfp == NULL){
+    /*if (cfp == NULL){
         perror("Failed: ");
         return -2;
-    }
+    }*/
 
     cout << "Begin reading the stack file!" << endl;
     while (fgets(s, FDTD_MAXC, fp) != NULL){
@@ -122,7 +122,7 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
             sys->portCoor[lyr].y2 = temp;
         }
         for (i = 0; i < sys->numStack; i++){
-            if (word[4] == sys->stackName[i]){
+            if (compareString(word[4], &sys->stackName[i][0])){
                 sys->portCoor[lyr].z1 = sys->stackBegCoor[i];
                 sys->portCoor[lyr].z2 = sys->stackEndCoor[i];
                 break;
@@ -132,15 +132,26 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
     }
 
 
-    cout << "Begin reading the polygon file!" << endl;
-    sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
+    cout << "Begin reading the conductor information!" << endl;
+    //sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
     i = 0;
-    while (fgets(s, FDTD_MAXC, cfp) != NULL){    //get one line and put each word in word arr
+    //k = 0;
+    while (true){    //get one line and put each word in word arr
+        /*count = 0;
+        while (strPoints[k] != '\n'){
+            s[count] = strPoints[k];
+            count++;
+            k++;
+        }
+        s[count] = strPoints[k];
+        /*for (m = 0; m <= count; m++)
+            cout << s[m];*/
+        /*k++;*/
         fdtdStringWord(s, word);
         if (i >= sys->numCdtRow)    //if on this line there is nothing
             break;
         else{
-            sys->conductorIn[i].numVert = (int)fdtdGetValue(word[0]);
+            /*sys->conductorIn[i].numVert = (int)fdtdGetValue(word[0]);
             sys->conductorIn[i].xmax = DOUBLEMIN;
             sys->conductorIn[i].xmin = DOUBLEMAX;
             sys->conductorIn[i].ymax = DOUBLEMIN;
@@ -148,25 +159,25 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
             sys->conductorIn[i].x = (double*)calloc(sys->conductorIn[i].numVert, sizeof(double));
             sys->conductorIn[i].y = (double*)calloc(sys->conductorIn[i].numVert, sizeof(double));
             for (j = 0; j < sys->conductorIn[i].numVert; j++){
-                if (fdtdGetValue(word[j * 2 + 2]) * sys->lengthUnit > sys->conductorIn[i].xmax){
-                    sys->conductorIn[i].xmax = fdtdGetValue(word[j * 2 + 2]) * sys->lengthUnit;
+                if (fdtdGetValue(word[j * 2 + 2]) > sys->conductorIn[i].xmax){
+                    sys->conductorIn[i].xmax = fdtdGetValue(word[j * 2 + 2]);
                 }
-                if (fdtdGetValue(word[j * 2 + 2]) * sys->lengthUnit < sys->conductorIn[i].xmin){
-                    sys->conductorIn[i].xmin = fdtdGetValue(word[j * 2 + 2]) * sys->lengthUnit;
+                if (fdtdGetValue(word[j * 2 + 2]) < sys->conductorIn[i].xmin){
+                    sys->conductorIn[i].xmin = fdtdGetValue(word[j * 2 + 2]);
                 }
-                if (fdtdGetValue(word[j * 2 + 3]) * sys->lengthUnit > sys->conductorIn[i].ymax){
-                    sys->conductorIn[i].ymax = fdtdGetValue(word[j * 2 + 3]) * sys->lengthUnit;
+                if (fdtdGetValue(word[j * 2 + 3]) > sys->conductorIn[i].ymax){
+                    sys->conductorIn[i].ymax = fdtdGetValue(word[j * 2 + 3]);
                 }
-                if (fdtdGetValue(word[j * 2 + 3]) * sys->lengthUnit < sys->conductorIn[i].ymin){
-                    sys->conductorIn[i].ymin = fdtdGetValue(word[j * 2 + 3]) * sys->lengthUnit;
+                if (fdtdGetValue(word[j * 2 + 3]) < sys->conductorIn[i].ymin){
+                    sys->conductorIn[i].ymin = fdtdGetValue(word[j * 2 + 3]);
                 }
-                sys->conductorIn[i].x[j] = fdtdGetValue(word[j * 2 + 2]) * sys->lengthUnit;
-                sys->conductorIn[i].y[j] = fdtdGetValue(word[j * 2 + 3]) * sys->lengthUnit;
-            }
-
+                sys->conductorIn[i].x[j] = fdtdGetValue(word[j * 2 + 2]);
+                sys->conductorIn[i].y[j] = fdtdGetValue(word[j * 2 + 3]);
+            }*/
             //lyr = (int)fdtdGetValue(word[1]);
+
             for (j = 0; j < sys->numStack; j++){
-                if (word[1] == sys->stackName[j]){
+                if (to_string(sys->conductorIn[i].layer) == sys->stackName[j]){
                     sys->conductorIn[i].zmin = sys->stackBegCoor[j];
                     sys->conductorIn[i].zmax = sys->stackEndCoor[j];
                     sys->stackCdtMark[j] = 1;
@@ -176,10 +187,10 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
         i++;
     }
 
-    /* Begin generate the mesh nodes based on the input conductorIn information */
+    /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
-    double disMin = 1.e-8;
+    double disMin = 1.e-10;
     double disMaxx, disMaxy;   // the max discretization in x, y, z directions
     for (i = 0; i < sys->numCdtRow; i++){
         numNode += sys->conductorIn[i].numVert;
@@ -219,12 +230,13 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
         zOrigOld[j] = sys->portCoor[i].z2;
         j++;
     }
+
     /*******************************************************************************************/
     sort(xOrigOld, xOrigOld + numNode + 2 * sys->numPorts);
     sys->nx = 1;
     xmin = xOrigOld[0];
     xmax = xOrigOld[numNode + 2 * sys->numPorts - 1];
-    disMaxx = (xmax - xmin) / 10;
+    disMaxx = (xmax - xmin) / 5;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
         if (abs(xOrigOld[i] - xOrigOld[i - 1]) > disMin){
@@ -294,7 +306,7 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
     sys->ny = 1;
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
-    disMaxy = (ymax - ymin) / 10;
+    disMaxy = (ymax - ymin) / 5;
 
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -397,7 +409,7 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
     vector<double> porteqx;    // store the eq leng caused x coordinates around each port
     vector<double> porteqy;    // store the eq leng caused y coordinates around each port
     vector<double> porteqz;    // store the eq leng caused z coordinates around each port
-    double mini;
+    /*double mini;
     for (i = 0; i < sys->numPorts; i++){
         if (sys->portCoor[i].x1 == sys->portCoor[i].x2){
             mini = DOUBLEMAX;
@@ -505,7 +517,7 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
     }
     for (i = 0; i < porteqz.size(); i++){
         zn[countz + 1 + i] = porteqz[i];
-    }
+    }*/
 
 
 
@@ -576,19 +588,19 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
             j++;
         }
     }
-    cout << "happy\n";
+
     for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
-    cout << "\n";
+    cout << "\n" << endl;
     for (i = 0; i < sys->ny; i++){
         cout << sys->yn[i] << " ";
     }
-    cout << "\n";
+    cout << "\n" << endl;
     for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n";
+    cout << "\n" << endl;
     /*vector<pair<double, int> > vx(xi.begin(), xi.end());
     sort(vx.begin(), vx.end(), comp);
     for (int i = 0; i < vx.size(); i++){
@@ -637,7 +649,9 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
     sys->markEdge = (int*)calloc(sys->N_edge, sizeof(int));   // mark which edge is inside the conductor
     sys->markNode = (int*)calloc(sys->N_node, sizeof(int));   // mark which node is inside the conductor
     double xc, yc;
+
     for (i = 0; i < sys->numCdtRow; i++){
+        //cout << polyIn((0 + 4.9e-7) / 2, -1.7e-7, sys, 2) << endl;
         numNode = (xi[sys->conductorIn[i].xmax] - xi[sys->conductorIn[i].xmin] + 1)
             *(yi[sys->conductorIn[i].ymax] - yi[sys->conductorIn[i].ymin] + 1)
             *(zi[sys->conductorIn[i].zmax] - zi[sys->conductorIn[i].zmin] + 1);
@@ -683,6 +697,7 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
                 for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
                     xc = (sys->xn[k] + sys->xn[k + 1]) / 2;
                     yc = sys->yn[j];
+                    //cout << xc << " " << yc << "" << i << " " << polyIn(xc, yc, sys, i) << endl;
                     if (polyIn(xc, yc, sys, i)){
                         sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j] = 1;
                         //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j << endl;
@@ -693,7 +708,7 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
         }
     }
 
-    fclose(cfp);
+    /*fclose(cfp);*/
     fclose(fp);
 
     /* construct edgelink */
@@ -740,7 +755,6 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
             }
         }
     }
-    
 
     /* construct nodeEdge */
     double leng;
@@ -802,102 +816,12 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
         }
     }
     for (i = 0; i < sys->N_edge; i++){
-        sys->markEdge[i] = 0;
-        if (visited[sys->edgelink[i * 2]] == visited[sys->edgelink[i * 2 + 1]] && visited[sys->edgelink[i * 2]] != 0){
+        if (sys->markEdge[i] != 0 && visited[sys->edgelink[i * 2]] == visited[sys->edgelink[i * 2 + 1]] && visited[sys->edgelink[i * 2]] != 0){
             sys->markEdge[i] = visited[sys->edgelink[i * 2 + 1]];    // Mark the edge with each color for different conductors
         }
     }
     
-
-    /* set markCell */
-    vector<int> aa;
-    sys->markCell = (int*)calloc(sys->N_cell_x * sys->N_cell_y * sys->N_cell_z, sizeof(int));
-    for (i = 0; i < sys->N_edge; i++)
-    {
-        sys->edgeCell.push_back(aa);
-    }
-    int cell;
-    for (i = 0; i < sys->N_cell_z; i++){
-        for (j = 0; j < sys->N_cell_x; j++){
-            for (k = 0; k < sys->N_cell_y; k++){
-                mark = 1;
-                cell = i * sys->N_patch_s + j * sys->N_cell_y + k;
-                count = sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k];
-                
-                
-                // y axis
-                sys->edgeCell[(i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k)].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] == 0){
-                    mark = 0;
-                }
-
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k].push_back(cell);
-                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k].push_back(cell);
-                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] != count){
-                    mark = 0;
-                }
-
-                // x axis
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k].push_back(cell);
-                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1].push_back(cell);
-                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] != count){
-                    mark = 0;
-                }
-
-                // z axis
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k] != count){
-                    mark = 0;
-                }
-
-                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1].push_back(cell);
-                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1] != count){
-                    mark = 0;
-                }
-                
-                if (mark == 1){
-                    sys->markCell[cell] = 1;
-                }
-            }
-        }
-    }
-    
-
-
-    /* construct each conductor */
+    /* Construct each conductor */
     sys->numCdt = count;
     sys->conductor = (fdtdCdt*)malloc(sys->numCdt * sizeof(fdtdCdt));
     sys->cdtNumNode = (int*)calloc(sys->numCdt, sizeof(int));
@@ -916,10 +840,153 @@ int readInput(const char *stackFile, const char *polyFile, fdtdMesh *sys, unorde
             sys->conductor[visited[i] - 1].cdtNodeind++;
         }
     }
-    
 
     free(visited);
     visited = NULL;
+
+
+    /* set markCell */
+    vector<int> aa;
+    vector<double> bb;
+    sys->markCell = (int*)calloc(sys->N_cell_x * sys->N_cell_y * sys->N_cell_z, sizeof(int));
+    for (i = 0; i < sys->N_edge; i++)
+    {
+        sys->edgeCell.push_back(aa);
+        sys->edgeCellArea.push_back(bb);
+    }
+    int cell;
+    for (i = 0; i < sys->N_cell_z; i++){
+        for (j = 0; j < sys->N_cell_x; j++){
+            for (k = 0; k < sys->N_cell_y; k++){
+                mark = 1;
+                cell = i * sys->N_patch_s + j * sys->N_cell_y + k;
+                count = sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k];
+
+                // y axis
+                sys->edgeCell[(i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k)].push_back(cell);
+                sys->edgeCellArea[(i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k)].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->zn[i + 1] - sys->zn[i]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] == 0){
+                    mark = 0;
+                }
+
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->zn[i + 1] - sys->zn[i]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k].push_back(cell);
+                sys->edgeCellArea[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->zn[i + 1] - sys->zn[i]));
+                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k].push_back(cell);
+                sys->edgeCellArea[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->zn[i + 1] - sys->zn[i]));
+                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (j + 1) * (sys->N_cell_y) + k] != count){
+                    mark = 0;
+                }
+
+                // x axis
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k].push_back((sys->yn[k + 1] - sys->yn[k]) * (sys->zn[i + 1] - sys->zn[i]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1].push_back((sys->yn[k + 1] - sys->yn[k])*(sys->zn[i + 1] - sys->zn[i])); 
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k].push_back(cell);
+                sys->edgeCellArea[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k].push_back((sys->yn[k + 1] - sys->yn[k])*(sys->zn[i + 1] - sys->zn[i])); 
+                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1].push_back(cell);
+                sys->edgeCellArea[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1].push_back((sys->yn[k + 1] - sys->yn[k]) * (sys->zn[i + 1] - sys->zn[i]));
+                if (sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[(i + 1) * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y) * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k + 1] != count){
+                    mark = 0;
+                }
+
+                // z axis
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->yn[k + 1] - sys->yn[k]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->yn[k + 1] - sys->yn[k]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j *(sys->N_cell_y + 1) + k + 1] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->yn[k + 1] - sys->yn[k]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k] != count){
+                    mark = 0;
+                }
+
+                sys->edgeCell[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1].push_back(cell);
+                sys->edgeCellArea[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1].push_back((sys->xn[j + 1] - sys->xn[j]) * (sys->yn[k + 1] - sys->yn[k]));
+                if (sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1] == 0 || sys->markEdge[i * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (j + 1) *(sys->N_cell_y + 1) + k + 1] != count){
+                    mark = 0;
+                }
+
+                if (mark == 1){
+                    sys->markCell[cell] = 1;
+                }
+            }
+        }
+    }
+
+    /*cout << sys->nodepos[sys->edgelink[8256 * 2] * 3] << " " << sys->nodepos[sys->edgelink[8256 * 2] * 3 + 1] << " " << sys->nodepos[sys->edgelink[8256 * 2] * 3 + 2] << endl;
+    cout << sys->nodepos[sys->edgelink[8256 * 2 + 1] * 3] << " " << sys->nodepos[sys->edgelink[8256 * 2 + 1] * 3 + 1] << " " << sys->nodepos[sys->edgelink[8256 * 2 + 1] * 3 + 2] << endl;*/
+
+    /*cout << "Edges around node 50851" << endl;
+    for (i = 0; i < sys->nodeEdge[sys->edgelink[50851 * 2]].size(); i++){
+        cout << sys->nodeEdge[sys->edgelink[50851 * 2]][i].first << " " << sys->markEdge[sys->nodeEdge[sys->edgelink[50851 * 2]][i].first] << endl;
+    }*/
+
+    /* construct each conductor */
+/*    sys->numCdt = count;
+    sys->conductor = (fdtdCdt*)malloc(sys->numCdt * sizeof(fdtdCdt));
+    sys->cdtNumNode = (int*)calloc(sys->numCdt, sizeof(int));
+    for (i = 0; i < sys->N_node; i++){
+        if (visited[i] != 0){
+            sys->cdtNumNode[visited[i] - 1]++;
+        }
+    }
+    for (i = 0; i < sys->numCdt; i++){
+        sys->conductor[i].node = (int*)malloc(sizeof(int) * sys->cdtNumNode[i]);
+        sys->conductor[i].cdtNodeind = 0;
+    }
+    for (i = 0; i < sys->N_node; i++){
+        if (visited[i] != 0){
+            sys->conductor[visited[i] - 1].node[sys->conductor[visited[i] - 1].cdtNodeind] = i;
+            sys->conductor[visited[i] - 1].cdtNodeind++;
+        }
+    }
+
+
+    free(visited);
+    visited = NULL;*/
+
+    /*int b;
+    for (i = 0; i < sys->N_edge; i++){
+        if (sys->markEdge[i] != 0){
+            b = 0;
+            for (j = 0; j < sys->edgeCell[i].size(); j++){
+                b = b + sys->markCell[sys->edgeCell[i][j]];
+            }
+            if (b == 0)
+                cout << i << " " << b << endl;
+        }
+    }*/
 
     return 0;
 }
@@ -947,14 +1014,17 @@ int matrixConstruction(fdtdMesh *sys){
 
     /* construct D_sig */
     sys->sig = (double*)calloc(sys->N_edge, sizeof(double));
-    int a;
+    double a, b;
     for (i = 0; i < sys->N_edge; i++){
         if (sys->markEdge[i] != 0){
             a = 0;
+            b = 0;
             for (j = 0; j < sys->edgeCell[i].size(); j++){
-                a = a + sys->markCell[sys->edgeCell[i][j]];
+                a += sys->markCell[sys->edgeCell[i][j]] * sys->edgeCellArea[i][j];
+                b += sys->edgeCellArea[i][j];
             }
-            sys->sig[i] = ((double)a / 4) * SIGMA;
+
+            sys->sig[i] = (a / b) * SIGMA;
         }
     }
 
@@ -998,22 +1068,23 @@ bool polyIn(double x, double y, fdtdMesh *sys, int inPoly){
     int npol;
     int i, j, k;
     int isCond = 0;
-
+    double disMin = 1e-10;
 
     npol = sys->conductorIn[inPoly].numVert;
 
     for (i = 0, j = npol - 1; i < npol; j = i++){
-        if ((y == sys->conductorIn[inPoly].y[j] && y == sys->conductorIn[inPoly].y[i] &&
+        //cout << x << " " << y << " " << sys->conductorIn[inPoly].x[i] << " " << sys->conductorIn[inPoly].y[i] << sys->conductorIn[inPoly].x[j] << " " << sys->conductorIn[inPoly].y[j] << endl;
+        if ((abs(y - sys->conductorIn[inPoly].y[j]) < disMin && abs(y - sys->conductorIn[inPoly].y[i]) < disMin &&
             ((x >= sys->conductorIn[inPoly].x[j] && x <= sys->conductorIn[inPoly].x[i]) ||
             (x >= sys->conductorIn[inPoly].x[i] && x <= sys->conductorIn[inPoly].x[j])))){
             return true;
         }
-        else if ((x == sys->conductorIn[inPoly].x[j] && x == sys->conductorIn[inPoly].x[i] &&
+        else if (abs(x - sys->conductorIn[inPoly].x[j]) < disMin && abs(x - sys->conductorIn[inPoly].x[i]) < disMin &&
             ((y >= sys->conductorIn[inPoly].y[j] && y <= sys->conductorIn[inPoly].y[i]) ||
-            (y >= sys->conductorIn[inPoly].y[i] && y <= sys->conductorIn[inPoly].y[j])))){
+            (y >= sys->conductorIn[inPoly].y[i] && y <= sys->conductorIn[inPoly].y[j]))){
             return true;
         }
-        else if ((sys->conductorIn[inPoly].y[i] != sys->conductorIn[inPoly].y[j] &&
+        else if ((abs(sys->conductorIn[inPoly].y[i] - sys->conductorIn[inPoly].y[j]) > disMin &&
             (((sys->conductorIn[inPoly].y[i] <= y) && (y < sys->conductorIn[inPoly].y[j])) ||
             ((sys->conductorIn[inPoly].y[j] <= y) && (y < sys->conductorIn[inPoly].y[i])))) &&
             (x < (sys->conductorIn[inPoly].x[j] - sys->conductorIn[inPoly].x[i]) * (y - sys->conductorIn[inPoly].y[i]) /
@@ -1056,3 +1127,20 @@ double fdtdGetValue(char *str)
 
 }
 
+// compareString function necessary to treat C strings as equal if terminated OR newline encountered
+int compareString(char *a, char *b)
+{
+    int i = 0;
+    while ((a[i] != '\n' && a[i] != '\0') && (b[i] != '\n' && b[i] != '\0')){
+        if (a[i] != b[i]){
+            return 0;
+        }
+        i++;
+    }
+    if ((!(a[i] >= 'a' && a[i] <= 'z') && !(a[i] >= 'A' && a[i] <= 'Z') && !(a[i] >= '0' && a[i] <= '9')) && (!(b[i] >= 'a' && b[i] <= 'z') && !(b[i] >= 'A' && b[i] <= 'Z') && !(b[i] >= '0' && b[i] <= '9'))){
+        return 1;
+    }
+    else{
+        return 0;
+    }
+}
