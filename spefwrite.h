@@ -629,6 +629,12 @@ public:
         this->layers = layers;
     }
 
+    // Set parasitics
+    void setParasitics(Parasitics para)
+    {
+        this->para = para;
+    }
+
     // Set SPEF output file name
     void setOutSPEF(std::string fileName)
     {
@@ -1189,7 +1195,15 @@ public:
                     getline(inputFile, fileLine);
 
                     // Obtain number of ports in list
-                    size_t numPort = stoi(fileLine.substr(fileLine.find("numPorts = ") + 11, fileLine.find(" #")));
+                    size_t numPort = 0;
+                    if (fileLine.find("numPorts = ") < string::npos)
+                    {
+                        numPort = stoi(fileLine.substr(fileLine.find("numPorts = ") + 11, fileLine.find(" #")));
+                    }
+                    else if (fileLine.find("numPort = ") < string::npos)
+                    {
+                        numPort = stoi(fileLine.substr(fileLine.find("numPort = ") + 10, fileLine.find(" #")));
+                    }
 
                     // Move down one line
                     getline(inputFile, fileLine);

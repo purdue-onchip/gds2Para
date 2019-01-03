@@ -260,6 +260,27 @@ int main(int argc, char** argv)
             }
             cout << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
+            // Parameter storage
+            // Setup the Eigen sparse conductance matrix
+            spMat matG(sys.numPorts, sys.numPorts); // Initialize sparse conductance matrix (S)
+            spMat matC(sys.numPorts, sys.numPorts); // Initialize sparse capacitance matrix (F)
+            vector<dTriplet> listG; // Initialize triplet list for conductance matrix
+            vector<dTriplet> listC;
+            listG.reserve(sys.numPorts); // Reserve room so matrix could be dense
+            listC.reserve(sys.numPorts);
+            for (size_t indi = 0; indi < sys.numPorts; indi++)
+            {
+                for (size_t indj = 0; indj < sys.numPorts; indj++)
+                {
+                    listG.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].real()));
+                    listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag()));
+                }
+            }
+            matG.setFromTriplets(listG.begin(), listG.end()); // Assign nonzero entries to sparse conductance matrix
+            matC.setFromTriplets(listC.begin(), listC.end()); // Do not put in compressed sparse row (CSR) format due to density
+            Parasitics oldPara = sdb.getParasitics(); // Get outdated parastics structure to update
+            sdb.setParasitics(Parasitics(oldPara.getNPort(), oldPara.getPorts(), oldPara.getPortDir(), oldPara.getZPortSource(), oldPara.getPortCoord(), matG, matC));
+
             // Output SPEF file
             string outSPEFFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
