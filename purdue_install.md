@@ -52,6 +52,7 @@ export LD_LIBRARY_PATH=/opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:$LD_LIBRARY
 export BOOST_DIR="/opt/boost/1.57.0"
 export FLEX_DIR="/usr/bin/flex"
 export LIMBO_DIR="<absolute path to Limbo directory>"
+export MKL_DIR="/opt/intel/current/mkl"
 ```
   * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
 ```tcsh
@@ -68,6 +69,7 @@ setenv LD_LIBRARY_PATH /opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:${LD_LIBRAR
 setenv BOOST_DIR /opt/boost/1.57.0
 setenv FLEX_DIR /usr/bin/flex
 setenv LIMBO_DIR <absolute path to Limbo directory>
+seten MKL_DIR /opt/intel/current/mkl
 ```
 8. Exit the shell and terminate the connection before logging back in
 9. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`
@@ -82,3 +84,4 @@ setenv LIMBO_DIR <absolute path to Limbo directory>
 15. Run `make explicit` in shell to compile executable **Test\_explicit**
 16. Run `./Test_explicit --help` to get a list of available modes the executable supports
 17. Run `./Test_explicit -r nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
+18. Perform a complete parameter extraction by running `./Test_explicit -s SDFFRS_X2.gds SDFFRS_X2.sim_input SDFFRS_X2.spef` to read in the design and simulation input file, do all analysis, and return the result in a SPEF file
