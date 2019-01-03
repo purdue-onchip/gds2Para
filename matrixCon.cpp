@@ -1321,677 +1321,681 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             int node1;
             double a = 0, area, areasum;
             current = complex<double> (0., 0.);
-            if (sys->portCoor[i].x1 == sys->portCoor[i].x2){
-                inx = xi[sys->portCoor[i].x1];
 
-                for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
-                    for (k = yi[sys->portCoor[i].y1]; k <= yi[sys->portCoor[i].y2]; k++){
-                        mark = (k - yi[sys->portCoor[i].y1])
-                            + (l - zi[sys->portCoor[i].z1])*(yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y2] + 1);
-                        a = 0;
-                        areasum = 0;
-                        if (k == 0){
-                            a += 1 / (sys->yn[k + 1] - sys->yn[k]);
-                            area = 1;
-                            if (inx == 0){
-                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
-                            }
-                            else if (inx == sys->N_cell_x){
-                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (k == sys->N_cell_y){
-                            a += 1 / (sys->yn[k] - sys->yn[k - 1]);
-                            area = 1;
-                            if (inx == 0){
-                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
-                            }
-                            else if (inx == sys->N_cell_x){
-                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->yn[k + 1] - sys->yn[k - 1]);
-                            area = 1;
-                            if (inx == 0){
-                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
-                            }
-                            else if (inx == sys->N_cell_x){
-                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        if (inx == 0){
-                            a += 1 / (sys->xn[inx + 1] - sys->xn[inx]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (inx == sys->N_cell_x){
-                            a += 1 / (sys->xn[inx] - sys->xn[inx - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->xn[inx + 1] - sys->xn[inx - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        if (l == 0){
-                            a += 1 / (sys->zn[l + 1] - sys->zn[l]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (inx == 0){
-                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
-                            }
-                            else if (inx == sys->N_cell_x){
-                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (l == sys->N_cell_z){
-                            a += 1 / (sys->zn[l] - sys->zn[l - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (inx == 0){
-                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
-                            }
-                            else if (inx == sys->N_cell_x){
-                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (inx == 0){
-                                area *= (sys->xn[inx + 1] - sys->xn[inx]);
-                            }
-                            else if (inx == sys->N_cell_x){
-                                area *= (sys->xn[inx] - sys->xn[inx - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        sys->v0csJ[mark] /= -a;
+if (sys->portCoor[i].x1 == sys->portCoor[i].x2){
 
-                        current += (sys->v0csJ[mark]) * areasum;
-                    }
+    inx = xi[sys->portCoor[i].x1];
+
+    for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
+        for (k = yi[sys->portCoor[i].y1]; k <= yi[sys->portCoor[i].y2]; k++){
+            mark = (k - yi[sys->portCoor[i].y1])
+                + (l - zi[sys->portCoor[i].z1])*(yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y2] + 1);
+            a = 0;
+            areasum = 0;
+            if (k == 0){
+                a += 1 / (sys->yn[k + 1] - sys->yn[k]);
+                area = 1;
+                if (inx == 0){
+                    area *= (sys->xn[inx + 1] - sys->xn[inx]);
                 }
+                else if (inx == sys->N_cell_x){
+                    area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                }
+                else{
+                    area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area;
             }
-            else if (sys->portCoor[i].y1 == sys->portCoor[i].y2){
-                iny = yi[sys->portCoor[i].y1];
-               
-                for (l = zi[sys->portCoor[i].z1]; l < zi[sys->portCoor[i].z2]; l++){
-                    for (j = xi[sys->portCoor[i].x1]; j < xi[sys->portCoor[i].x2]; j++){
-                        mark = (j - xi[sys->portCoor[i].x1])
-                            + (l - zi[sys->portCoor[i].z1])*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1);
-                        node1 = l*(sys->N_node_s) + (sys->N_cell_y + 1) * j + yi[sys->portCoor[i].y1];
-                        a = 0;
-                        areasum = 0;
-                        if (iny == 0){
-                            a += 1 / (sys->yn[iny + 1] - sys->yn[iny]);
-                            area = 1;
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (iny == sys->N_cell_y){
-                            a += 1 / (sys->yn[iny] - sys->yn[iny - 1]);
-                            area = 1;
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->yn[iny + 1] - sys->yn[iny - 1]);
-                            area = 1;
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        if (j == 0){
-                            a += 1 / (sys->xn[j + 1] - sys->xn[j]);
-                            area = 1;
-                            if (iny == 0){
-                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
-                            }
-                            else if (iny == sys->N_cell_y){
-                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (j == sys->N_cell_x){
-                            a += 1 / (sys->xn[j] - sys->xn[j - 1]);
-                            area = 1;
-                            if (iny == 0){
-                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
-                            }
-                            else if (iny == sys->N_cell_y){
-                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->xn[j + 1] - sys->xn[j - 1]);
-                            area = 1;
-                            if (iny == 0){
-                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
-                            }
-                            else if (iny == sys->N_cell_y){
-                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[l + 1] - sys->zn[l]);
-                            }
-                            else if (l == sys->N_cell_z){
-                                area *= (sys->zn[l] - sys->zn[l - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        if (l == 0){
-                            a += 1 / (sys->zn[l + 1] - sys->zn[l]);
-                            area = 1;
-                            if (iny == 0){
-                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
-                            }
-                            else if (iny == sys->N_cell_y){
-                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
-                            }
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (l == sys->N_cell_z){
-                            a += 1 / (sys->zn[l] - sys->zn[l - 1]);
-                            area = 1;
-                            if (iny == 0){
-                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
-                            }
-                            else if (iny == sys->N_cell_y){
-                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
-                            }
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
-                            area = 1;
-                            if (iny == 0){
-                                area *= (sys->yn[iny + 1] - sys->yn[iny]);
-                            }
-                            else if (iny == sys->N_cell_y){
-                                area *= (sys->yn[iny] - sys->yn[iny - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
-                            }
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-
-                        sys->v0csJ[mark] /= -a;
-
-                        current += (sys->v0csJ[mark]) * areasum; 
-                    }
+            else if (k == sys->N_cell_y){
+                a += 1 / (sys->yn[k] - sys->yn[k - 1]);
+                area = 1;
+                if (inx == 0){
+                    area *= (sys->xn[inx + 1] - sys->xn[inx]);
                 }
+                else if (inx == sys->N_cell_x){
+                    area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                }
+                else{
+                    area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area;
             }
             else{
-                
-                inz = zi[sys->portCoor[i].z1];
-
-                for (j = xi[sys->portCoor[port - 1].x1]; j <= xi[sys->portCoor[port - 1].x2]; j++){
-                    for (k = yi[sys->portCoor[port - 1].y1]; k <= yi[sys->portCoor[port - 1].y2]; k++){
-                        mark = (k - yi[sys->portCoor[port - 1].y1])
-                            + (j - xi[sys->portCoor[port - 1].x1])*(yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1);
-                        
-                        a = 0;
-                        areasum = 0;
-                        if (k == 0){
-                            a += 1 / (sys->yn[k + 1] - sys->yn[k]);
-                            area = 1;
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
-                            }
-                            else if (inz == sys->N_cell_z){
-                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (k == sys->N_cell_y){
-                            a += 1 / (sys->yn[k] - sys->yn[k - 1]);
-                            area = 1;
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            if (inz == 0){
-                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
-                            }
-                            else if (inz == sys->N_cell_z){
-                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->yn[k + 1] - sys->yn[k - 1]);
-                            area = 1;
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            if (inz == 0){
-                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
-                            }
-                            else if (inz == sys->N_cell_z){
-                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        if (j == 0){
-                            a += 1 / (sys->xn[j + 1] - sys->xn[j]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (l == 0){
-                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
-                            }
-                            else if (inz == sys->N_cell_z){
-                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (j == sys->N_cell_x){
-                            a += 1 / (sys->xn[j] - sys->xn[j - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (inz == 0){
-                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
-                            }
-                            else if (inz == sys->N_cell_z){
-                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->xn[j + 1] - sys->xn[j - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (inz == 0){
-                                area *= (sys->zn[inz + 1] - sys->zn[inz]);
-                            }
-                            else if (inz == sys->N_cell_z){
-                                area *= (sys->zn[inz] - sys->zn[inz - 1]);
-                            }
-                            else{
-                                area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-                        if (inz == 0){
-                            a += 1 / (sys->zn[inz + 1] - sys->zn[inz]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else if (inz == sys->N_cell_z){
-                            a += 1 / (sys->zn[inz] - sys->zn[inz - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            areasum += area;
-                        }
-                        else{
-                            a += 4 / (sys->zn[inz + 1] - sys->zn[inz - 1]);
-                            area = 1;
-                            if (k == 0){
-                                area *= (sys->yn[k + 1] - sys->yn[k]);
-                            }
-                            else if (k == sys->N_cell_y){
-                                area *= (sys->yn[k] - sys->yn[k - 1]);
-                            }
-                            else{
-                                area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
-                            }
-                            if (j == 0){
-                                area *= (sys->xn[j + 1] - sys->xn[j]);
-                            }
-                            else if (j == sys->N_cell_x){
-                                area *= (sys->xn[j] - sys->xn[j - 1]);
-                            }
-                            else{
-                                area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
-                            }
-                            areasum += area * 2;
-                        }
-
-                        sys->v0csJ[mark] /= -a;
-
-                        current += (sys->v0csJ[mark]) * areasum;
-                    }
+                a += 4 / (sys->yn[k + 1] - sys->yn[k - 1]);
+                area = 1;
+                if (inx == 0){
+                    area *= (sys->xn[inx + 1] - sys->xn[inx]);
                 }
+                else if (inx == sys->N_cell_x){
+                    area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                }
+                else{
+                    area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area * 2;
             }
+            if (inx == 0){
+                a += 1 / (sys->xn[inx + 1] - sys->xn[inx]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area;
+            }
+            else if (inx == sys->N_cell_x){
+                a += 1 / (sys->xn[inx] - sys->xn[inx - 1]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area;
+            }
+            else{
+                a += 4 / (sys->xn[inx + 1] - sys->xn[inx - 1]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area * 2;
+            }
+            if (l == 0){
+                a = a + 1 / (sys->zn[l + 1] - sys->zn[l]);
+                area = 1;
+                if (k == 0){
+                    area *=  (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (inx == 0){
+                    area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                }
+                else if (inx == sys->N_cell_x){
+                    area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                }
+                else{
+                    area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                }
+                areasum += area;
+            }
+            else if (l == sys->N_cell_z){
+                a += 1 / (sys->zn[l] - sys->zn[l - 1]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (inx == 0){
+                    area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                }
+                else if (inx == sys->N_cell_x){
+                    area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                }
+                else{
+                    area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else{
+                a += 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *= (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (inx == 0){
+                    area *= (sys->xn[inx + 1] - sys->xn[inx]);
+                }
+                else if (inx == sys->N_cell_x){
+                    area *= (sys->xn[inx] - sys->xn[inx - 1]);
+                }
+                else{
+                    area *= (sys->xn[inx + 1] - sys->xn[inx - 1]) / 2;
+                }
+                areasum += area * 2;
+            }
+            sys->v0csJ[mark] = sys->v0csJ[mark] / (-a);
+
+            current +=  (sys->v0csJ[mark]) * areasum;
+
+        }
+    }
+}
+else if (sys->portCoor[i].y1 == sys->portCoor[i].y2){
+
+    iny = yi[sys->portCoor[i].y1];
+
+    for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
+        for (j = xi[sys->portCoor[i].x1]; j <= xi[sys->portCoor[i].x2]; j++){
+            mark = (j - xi[sys->portCoor[i].x1])
+                + (l - zi[sys->portCoor[i].z1])*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1);
+            node1 = l*(sys->N_node_s) + (sys->N_cell_y + 1) * j + yi[sys->portCoor[i].y1];
+            a = 0;
+            areasum = 0;
+            if (iny == 0){
+                a +=1 / (sys->yn[iny + 1] - sys->yn[iny]);
+                area = 1;
+                if (j == 0){
+                    area *= (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *= (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else if (iny == sys->N_cell_y){
+                a += 1 / (sys->yn[iny] - sys->yn[iny - 1]);
+                area = 1;
+                if (j == 0){
+                    area *= (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *= (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area;
+            }
+            else{
+                a += 4 / (sys->yn[iny + 1] - sys->yn[iny - 1]);
+                area = 1;
+                if (j == 0){
+                    area *= (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *= (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum += area * 2;
+            }
+            if (j == 0){
+                a += 1 / (sys->xn[j + 1] - sys->xn[j]);
+                area = 1;
+                if (iny == 0){
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny]);
+                }
+                else if (iny == sys->N_cell_y){
+                    area *= (sys->yn[iny] - sys->yn[iny - 1]);
+                }
+                else{
+                    area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *= (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else if (j == sys->N_cell_x){
+                a += 1 / (sys->xn[j] - sys->xn[j - 1]);
+                area = 1;
+                if (iny == 0){
+                    area *= (sys->yn[iny + 1] - sys->yn[iny]);
+                }
+                else if (iny == sys->N_cell_y){
+                    area *=  (sys->yn[iny] - sys->yn[iny - 1]);
+                }
+                else{
+                    area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                }
+                if (l == 0){
+                    area *= (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *= (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *=  (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else{
+                a += 4 / (sys->xn[j + 1] - sys->xn[j - 1]);
+                area = 1;
+                if (iny == 0){
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny]);
+                }
+                else if (iny == sys->N_cell_y){
+                    area *=  (sys->yn[iny] - sys->yn[iny - 1]);
+                }
+                else{
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                }
+                if (l == 0){
+                    area *=  (sys->zn[l + 1] - sys->zn[l]);
+                }
+                else if (l == sys->N_cell_z){
+                    area *=  (sys->zn[l] - sys->zn[l - 1]);
+                }
+                else{
+                    area *=  (sys->zn[l + 1] - sys->zn[l - 1]) / 2;
+                }
+                areasum +=  area * 2;
+            }
+            if (l == 0){
+                a +=1 / (sys->zn[l + 1] - sys->zn[l]);
+                area = 1;
+                if (iny == 0){
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny]);
+                }
+                else if (iny == sys->N_cell_y){
+                    area *=  (sys->yn[iny] - sys->yn[iny - 1]);
+                }
+                else{
+                    area *= (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                }
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else if (l == sys->N_cell_z){
+                a += 1 / (sys->zn[l] - sys->zn[l - 1]);
+                area = 1;
+                if (iny == 0){
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny]);
+                }
+                else if (iny == sys->N_cell_y){
+                    area *=  (sys->yn[iny] - sys->yn[iny - 1]);
+                }
+                else{
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                }
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else{
+                a += 4 / (sys->zn[l + 1] - sys->zn[l - 1]);
+                area = 1;
+                if (iny == 0){
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny]);
+                }
+                else if (iny == sys->N_cell_y){
+                    area *=  (sys->yn[iny] - sys->yn[iny - 1]);
+                }
+                else{
+                    area *=  (sys->yn[iny + 1] - sys->yn[iny - 1]) / 2;
+                }
+                if (j == 0){
+                    area *= (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                areasum +=  area * 2;
+            }
+
+            sys->v0csJ[mark] = sys->v0csJ[mark] / (-a);
+
+            current += (sys->v0csJ[mark]) * areasum;
+        }
+    }
+}
+else{
+
+    inz = zi[sys->portCoor[i].z1];
+
+    for (j = xi[sys->portCoor[port - 1].x1]; j <= xi[sys->portCoor[port - 1].x2]; j++){
+        for (k = yi[sys->portCoor[port - 1].y1]; k <= yi[sys->portCoor[port - 1].y2]; k++){
+            mark = (k - yi[sys->portCoor[port - 1].y1])
+                + (j - xi[sys->portCoor[port - 1].x1])*(yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1);
+
+            a = 0;
+            areasum = 0;
+            if (k == 0){
+                a +=1 / (sys->yn[k + 1] - sys->yn[k]);
+                area = 1;
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                if (l == 0){
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz]);
+                }
+                else if (inz == sys->N_cell_z){
+                    area *=  (sys->zn[inz] - sys->zn[inz - 1]);
+                }
+                else{
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                }
+                areasum += area;
+            }
+            else if (k == sys->N_cell_y){
+                a += 1 / (sys->yn[k] - sys->yn[k - 1]);
+                area = 1;
+                if (j == 0){
+                    area *= (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *= (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                if (inz == 0){
+                    area = area * (sys->zn[inz + 1] - sys->zn[inz]);
+                }
+                else if (inz == sys->N_cell_z){
+                    area *= (sys->zn[inz] - sys->zn[inz - 1]);
+                }
+                else{
+                    area *= (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else{
+                a += 4 / (sys->yn[k + 1] - sys->yn[k - 1]);
+                area = 1;
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *= (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                if (inz == 0){
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz]);
+                }
+                else if (inz == sys->N_cell_z){
+                    area *=  (sys->zn[inz] - sys->zn[inz - 1]);
+                }
+                else{
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                }
+                areasum +=  area * 2;
+            }
+            if (j == 0){
+                a += 1 / (sys->xn[j + 1] - sys->xn[j]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *=  (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *=  (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (l == 0){
+                    area*= (sys->zn[inz + 1] - sys->zn[inz]);
+                }
+                else if (inz == sys->N_cell_z){
+                    area *=  (sys->zn[inz] - sys->zn[inz - 1]);
+                }
+                else{
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else if (j == sys->N_cell_x){
+                a += 1 / (sys->xn[j] - sys->xn[j - 1]);
+                area = 1;
+                if (k == 0){
+                    area *=  (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *=  (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *=  (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (inz == 0){
+                    area *= (sys->zn[inz + 1] - sys->zn[inz]);
+                }
+                else if (inz == sys->N_cell_z){
+                    area *=  (sys->zn[inz] - sys->zn[inz - 1]);
+                }
+                else{
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else{
+                a +=4 / (sys->xn[j + 1] - sys->xn[j - 1]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *=  (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *=  (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (inz == 0){
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz]);
+                }
+                else if (inz == sys->N_cell_z){
+                    area *=  (sys->zn[inz] - sys->zn[inz - 1]);
+                }
+                else{
+                    area *=  (sys->zn[inz + 1] - sys->zn[inz - 1]) / 2;
+                }
+                areasum += area * 2;
+            }
+            if (inz == 0){
+                a += 1 / (sys->zn[inz + 1] - sys->zn[inz]);
+                area = 1;
+                if (k == 0){
+                    area *= (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *=  (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *=  (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else if (inz == sys->N_cell_z){
+                a +=  1 / (sys->zn[inz] - sys->zn[inz - 1]);
+                area = 1;
+                if (k == 0){
+                    area *=  (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *=  (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *=  (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                areasum +=  area;
+            }
+            else{
+                a +=4 / (sys->zn[inz + 1] - sys->zn[inz - 1]);
+                area = 1;
+                if (k == 0){
+                    area *=  (sys->yn[k + 1] - sys->yn[k]);
+                }
+                else if (k == sys->N_cell_y){
+                    area *= (sys->yn[k] - sys->yn[k - 1]);
+                }
+                else{
+                    area *=  (sys->yn[k + 1] - sys->yn[k - 1]) / 2;
+                }
+                if (j == 0){
+                    area *=  (sys->xn[j + 1] - sys->xn[j]);
+                }
+                else if (j == sys->N_cell_x){
+                    area *=  (sys->xn[j] - sys->xn[j - 1]);
+                }
+                else{
+                    area *=  (sys->xn[j + 1] - sys->xn[j - 1]) / 2;
+                }
+                areasum +=  area * 2;
+            }
+
+            sys->v0csJ[mark] = sys->v0csJ[mark] / (-a);
+
+            current += (sys->v0csJ[mark]) * areasum;
+        }
+    }
+}
             sys->Y[sourcePort * sys->numPorts + i] = current;
         }
         free(y0c2); y0c2 = NULL;

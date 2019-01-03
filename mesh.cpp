@@ -132,6 +132,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     }
 
 
+    
     cout << "Begin reading the conductor information!" << endl;
     //sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
     i = 0;
@@ -186,6 +187,9 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
         i++;
     }
+    /*for (i = 0; i < sys->numCdtRow; i++){
+        cout << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].zmin << " " << sys->conductorIn[i].zmax << endl;
+    }*/
 
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
@@ -303,6 +307,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
     /***************************************************************************/
     sort(yOrigOld, yOrigOld + numNode + 2 * sys->numPorts);
+
     sys->ny = 1;
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];

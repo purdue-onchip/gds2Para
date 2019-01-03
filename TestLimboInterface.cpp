@@ -214,6 +214,8 @@ int main(int argc, char** argv)
             adb.setFileName(inGDSIIFile);
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(inGDSIIFile.c_str());
+            vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
+            adb.print(indCellPrint, &sys);
             cout << "GDSII file read" << endl;
 
             // Set the number of input conductors

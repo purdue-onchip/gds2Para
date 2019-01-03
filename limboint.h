@@ -1455,10 +1455,11 @@ public:
                 if (sys->conductorIn[si].y[condj] < sys->conductorIn[si].ymin){
                     sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                 }
-
                 indj++;
                 condj++;
+                
             }
+            cout << endl;
         }
         cout << "  List of " << numText << " text boxes:" << endl;
         cout << "  List of " << numSRef << " structure references:" << endl;
