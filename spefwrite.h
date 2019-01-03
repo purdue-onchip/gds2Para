@@ -135,7 +135,8 @@ public:
             }
             else // Two frequencies per line
             {
-                cout << "   #" << indi + 1 << " is " << (this->freqs)[indi++] << " Hz, and #" << indi + 2 << " is " << (this->freqs)[indi + 1] << " Hz" << endl;
+                cout << "   #" << indi + 1 << " is " << (this->freqs)[indi] << " Hz, and #" << indi + 2 << " is " << (this->freqs)[indi + 1] << " Hz" << endl;
+                indi++;
             }
         }
     }
@@ -710,7 +711,7 @@ public:
             std::string fileLine;
             getline(impFile, fileLine);
 
-            // Save opening lines as metadata (mostly ignored)
+            // Save opening lines as metadata (mostly ignored right now)
             if (fileLine.compare(0, 7, "IMAP3D ") == 0)
             {
                 // Save interconnect modeling platform version number
@@ -720,9 +721,13 @@ public:
             // Read rest of file line-by-line
             while (!impFile.eof())
             {
+                // Initialize file-scope varialbes
+                static double stripLength = 0; // Initialize the strip length
+                static int maxGDSIILayer = 0; // Maximum GDSII layer number encountered
+                static int numFreqPts = 0; // Number of points in frequency sweep
+                static vector<double> freqList = {}; // List of frequencies in sweep
+
                 // Handle units
-                double stripLength = 2000; // Hard-coded (for now)
-                int maxGDSIILayer = 0; // Maximum GDSII layer number encountered
                 if (fileLine.compare(0, 12, "LINEARUNITS ") == 0)
                 {
                     // Extract unit text
@@ -745,10 +750,65 @@ public:
                     adbIMP.setdbUserUnits(1.);
                     adbIMP.setdbUnits(multSI);
                 }
-                // Handle design name
+                // Handle design name and skip to analysis parameters
                 else if (fileLine.compare(0, 5, "NAME ") == 0)
                 {
                     this->designName = fileLine.substr(5, fileLine.length() - 6);
+
+                    // Save file position and jump ahead to analysis section
+                    int savedFilePos = impFile.tellg();
+                    while (!impFile.eof())
+                    {
+                        // Keep reading new lines in the file
+                        getline(impFile, fileLine);
+
+                        // Handle frequency information
+                        if (fileLine.compare(0, 9, "Frequency") == 0)
+                        {
+                            // Find frequency sweep delimiters
+                            size_t indBegin = fileLine.find("begin=");
+                            size_t indEnd = fileLine.find("end=");
+                            size_t indNoP = fileLine.find("numberofpoints=");
+
+                            // Save frequency sweep information to variables
+                            double freqBegin = stod(fileLine.substr(indBegin + 6, indEnd - indBegin - 7)); // Length is index difference minus space
+                            double freqEnd = stod(fileLine.substr(indEnd + 4, indNoP - indEnd - 5));
+                            numFreqPts = stoi(fileLine.substr(indNoP + 15));
+                            if (numFreqPts == 1)
+                            {
+                                freqList.push_back(freqBegin);
+                            }
+                            else if (numFreqPts == 2)
+                            {
+                                freqList.push_back(freqBegin);
+                                freqList.push_back(freqEnd);
+                            }
+                            else
+                            {
+                                double exp10Step = log10(freqEnd / freqBegin) / (numFreqPts - 1);
+                                freqList.push_back(freqBegin);
+                                for (size_t indi = 1; indi < numFreqPts - 1; indi++)
+                                {
+                                    freqList.push_back(freqList.back() * pow(10, exp10Step));
+                                }
+                                freqList.push_back(freqEnd); // Ensure last frequency is exact
+                            }
+
+                            // Wait to push back simulation settings after conductors are saved (need extrema of coordinates)
+                        }
+
+                        // Handle length in this weird spot
+                        if (fileLine.compare(0, 6, "Length") == 0)
+                        {
+                            // Finally can save stripline length
+                            stripLength = stod(fileLine.substr(7)) * adbIMP.getdbUnits();
+                        }
+                    }
+
+                    // Jump back to line after name section
+                    impFile.clear(); // Clear the eofbit and goodbit flags
+                    impFile.seekg(savedFilePos);
+                    getline(impFile, fileLine);
                 }
                 // Handle layer stack
                 if (fileLine.compare(0, 5, "STACK") == 0)
@@ -813,14 +873,13 @@ public:
                 {
                     // Move down one line
                     getline(impFile, fileLine);
-                    stripLength *= adbIMP.getdbUnits(); // Hard-coded rescaling of length (for now)
 
                     // Keep reading until end of conductor list
                     int gdsiiNum = 1; // Layer number of target GDSII file
                     double xmin = 0.;
                     double xmax = 0.;
                     double ymin = 0.;
-                    double ymax = stripLength;
+                    double ymax = 0.;
                     while ((fileLine.compare(0, 8, "BOUNDARY") != 0) && (fileLine.compare(0, 9, "PORTTABLE") != 0))
                     {
                         // Record each conductor as a box
@@ -857,7 +916,7 @@ public:
                             if (x1 < xmin) { xmin = x1; }
                             if (x2 > xmax) { xmax = x2; }
                             if (y1 < ymin) { ymin = y1; }
-                            if (stripLength + 2 * y2 > ymax) { ymax = stripLength + 2 * y2; }
+                            if (y2 > ymax) { ymax = y2; }
 
                             // Assign layer number based on layer stack-up
                             size_t indThisLayer = this->locateLayerName(fileLine.substr(indLayer + 6, fileLine.find(" ", indLayer)));
@@ -869,6 +928,7 @@ public:
 
                             // Push new box to the geometric cell
                             cellIMP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, { sigma, condName, category, group }, 0));
+
                         }
                         // Keep moving down the conductor list
                         getline(impFile, fileLine);
@@ -882,15 +942,18 @@ public:
                     propGround.push_back("GroundPlane");
                     propGround.push_back("plane");
                     propGround.push_back("");
-                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin, xmax, ymin }, ((this->layers)[indGroundPlane]).getGDSIINum(), propGround, 0));
+                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin }, ((this->layers)[indGroundPlane]).getGDSIINum(), propGround, 0));
                     size_t indTopPlane = this->locateLayerName("TopPlane"); // Next is top plane
-                    ((this->layers)[indTopPlane]).setGDSIINum(++maxGDSIILayer); // Assign ground plane to layer one more than maximum metallic layer
+                    ((this->layers)[indTopPlane]).setGDSIINum(++maxGDSIILayer); // Assign top plane to layer one more than maximum metallic layer
                     vector<std::string> propTop; // Top plane properties
                     propTop.push_back("sigma=" + to_string(((this->layers)[indTopPlane]).getSigma()));
                     propTop.push_back("TopPlane");
                     propTop.push_back("plane");
                     propTop.push_back("");
-                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin, xmax, ymin }, ((this->layers)[indTopPlane]).getGDSIINum(), propTop, 0));
+                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin }, ((this->layers)[indTopPlane]).getGDSIINum(), propTop, 0));
+
+                    // Save simulation settings at last
+                    this->settings = SimSettings(adbIMP.getdbUnits(), { xmin, xmax, ymin, 2 * ymax + stripLength, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight() }, 1.0, (size_t) numFreqPts, 0.0, freqList);
                 }
                 // Handle port table
                 if (fileLine.compare(0, 9, "PORTTABLE") == 0)
@@ -903,7 +966,7 @@ public:
                     vector<char> portDir;
                     vector<double> Z_source;
                     vector<vector<double>> portCoord;
-                    while (fileLine.compare(0, 8, "ANALYSIS") != 0)
+                    while ((fileLine.compare(0, 8, "ANALYSIS") != 0) && !impFile.eof())
                     {
                         if (fileLine.length() >= 3)
                         {
@@ -951,53 +1014,6 @@ public:
                     // Propagate port information to Solver Database now
                     this->para = Parasitics(ports.size(), ports, portDir, Z_source, portCoord, spMat(), spMat());
                 }
-                // Handle analysis parameters
-                if (fileLine.compare(0, 8, "ANALYSIS") == 0)
-                {
-                    // Move down one line
-                    getline(impFile, fileLine);
-                }
-                // Handle frequency information
-                if (fileLine.compare(0, 9, "Frequency") == 0)
-                {
-                    // Find frequency sweep delimiters
-                    size_t indBegin = fileLine.find("begin=");
-                    size_t indEnd = fileLine.find("end=");
-                    size_t indNoP = fileLine.find("numberofpoints=");
-
-                    // Save frequency sweep information to variables
-                    double freqBegin = stod(fileLine.substr(indBegin + 6, indEnd - indBegin - 7)); // Length is index difference minus space
-                    double freqEnd = stod(fileLine.substr(indEnd + 4, indNoP - indEnd - 5));
-                    int numFreqPts = stoi(fileLine.substr(indNoP + 15));
-                    vector<double> freqList;
-                    if (numFreqPts == 1)
-                    {
-                        freqList.push_back(freqBegin);
-                    }
-                    else if (numFreqPts == 2)
-                    {
-                        freqList.push_back(freqBegin);
-                        freqList.push_back(freqEnd);
-                    }
-                    else
-                    {
-                        double exp10Step = log10(freqEnd / freqBegin) / (numFreqPts - 1);
-                        freqList.push_back(freqBegin);
-                        for (size_t indi = 1; indi < numFreqPts - 1; indi++)
-                        {
-                            freqList.push_back(freqList.back() * pow(10, exp10Step));
-                        }
-                        freqList.push_back(freqEnd); // Ensure last frequency is exact
-                    }
-
-                    // Save simulation settings (hard-coded limits for now)
-                    this->settings = SimSettings(adbIMP.getdbUnits(), {0.0, 3.000e-4, 0.0, 2.00005e-3, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight()}, 1.0, (size_t) numFreqPts, 0.0, freqList);
-                }
-                // Handle length in this weird spot
-                if (fileLine.compare(0, 6, "Length") == 0)
-                {
-                    //double stripLength = stod(fileLine.substr(7));
-                }
 
                 // Keep reading new lines in file
                 getline(impFile, fileLine);
@@ -1013,6 +1029,7 @@ public:
 
             // Print the ASCII database
             adbIMP.print({ 0 });
+            (this->settings).print();
 
             // Write GDSII file to hard drive
             bool dumpPassed = adbIMP.dump();
