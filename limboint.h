@@ -1464,7 +1464,6 @@ public:
         cout << "  List of " << numSRef << " structure references:" << endl;
         for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
         {
-            cout << (cell.sreferences)[indi].getSRefName() << endl;
             printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
         }
 
