@@ -25,6 +25,10 @@ This GDSII file parser is written in C++ as part of a wider API for the electrom
 Please direct all questions, bug reports, and issues relating to this repository to the primary maintainer:
 * [Michael Hayashi](mailto:mhayashi@purdue.edu?subject=Inquiry%20for%20gdsii-interface), Graduate Research Assistant, School of ECE, Purdue University
 
+Developers:
+* Michael Hayashi, Graduate Research Assistant, School of ECE, Purdue University
+* Li Xue, Graduate Research Assistant School of ECE, Purdue University
+
 Many thanks are owed to the project sponsors:
 
 | <img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/purdue.png" width=100 alt="Purdue University"> | <img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/DARPA.png" width=100 alt="DARPA ERI"> |
