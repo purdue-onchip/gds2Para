@@ -1459,7 +1459,6 @@ public:
                 condj++;
                 
             }
-            cout << endl;
         }
         cout << "  List of " << numText << " text boxes:" << endl;
         cout << "  List of " << numSRef << " structure references:" << endl;
