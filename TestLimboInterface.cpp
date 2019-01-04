@@ -268,12 +268,13 @@ int main(int argc, char** argv)
             vector<dTriplet> listC;
             listG.reserve(sys.numPorts); // Reserve room so matrix could be dense
             listC.reserve(sys.numPorts);
+            double freq = 4.5e+07;
             for (size_t indi = 0; indi < sys.numPorts; indi++)
             {
                 for (size_t indj = 0; indj < sys.numPorts; indj++)
                 {
                     listG.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].real()));
-                    listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag()));
+                    listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag()/(2*PI*freq)));
                 }
             }
             matG.setFromTriplets(listG.begin(), listG.end()); // Assign nonzero entries to sparse conductance matrix

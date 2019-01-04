@@ -56,6 +56,30 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             break;
         }
     }
+
+    while (fgets(s, FDTD_MAXC, fp) != NULL){
+        fdtdStringWord(s, word);
+        if (!strncmp(word[0], "FREQUENCY", 9)){
+            if (fgets(s, FDTD_MAXC, fp) != NULL){
+                fdtdStringWord(s, word);
+                sys->freqUnit = fdtdGetValue(word[2]);
+            }
+            if (fgets(s, FDTD_MAXC, fp) != NULL){
+                fdtdStringWord(s, word);
+                sys->freqStart = fdtdGetValue(word[2]);
+            }
+            if (fgets(s, FDTD_MAXC, fp) != NULL){
+                fdtdStringWord(s, word);
+                sys->freqEnd = fdtdGetValue(word[2]);
+            }
+            if (fgets(s, FDTD_MAXC, fp) != NULL){
+                fdtdStringWord(s, word);
+                sys->nfreq = fdtdGetValue(word[2]);
+            }
+            break;
+        }
+    }
+
     while (fgets(s, FDTD_MAXC, fp) != NULL){
         fdtdStringWord(s, word);
         if (!strncmp(word[0], "NUMSTACK", 8)){
@@ -187,7 +211,8 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
         i++;
     }
-    /*for (i = 0; i < sys->numCdtRow; i++){
+    /*cout << " Print the conductor information: " << endl;
+    for (i = 0; i < sys->numCdtRow; i++){
         cout << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].zmin << " " << sys->conductorIn[i].zmax << endl;
     }*/
 
@@ -594,7 +619,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
     }
 
-    for (i = 0; i < sys->nx; i++){
+    /*for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
     cout << "\n" << endl;
@@ -605,7 +630,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << "\n" << endl;*/
     /*vector<pair<double, int> > vx(xi.begin(), xi.end());
     sort(vx.begin(), vx.end(), comp);
     for (int i = 0; i < vx.size(); i++){

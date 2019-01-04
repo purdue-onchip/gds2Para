@@ -36,4 +36,4 @@ ANALYSIS
 Frequency begin=45e6 end=5.0e10 numberofpoints=50
 Solver fullwave
 Output citi
-Length 2000
+Length 200

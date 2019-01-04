@@ -109,6 +109,7 @@ class fdtdMesh {
     /* Mesh information */
 public: 
     double lengthUnit;
+
     /* Frequency parameters */
     double freqUnit;
     double freqStart;
@@ -228,6 +229,9 @@ public:
     vector<int> AcRowId;
     vector<int> AcColId;
     vector<double> Acval;
+    vector<int> AdRowId;
+    vector<int> AdColId;
+    vector<double> Adval;
     vector<int> crhsRowId;
     vector<int> crhsColId;
     vector<double> crhsval;
@@ -289,6 +293,7 @@ int matrixMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vec
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
 int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<int> index, int size, fdtdMesh *sys);
+int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
 int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys);
 int output(fdtdMesh *sys);
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);

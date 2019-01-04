@@ -19,9 +19,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     vector<int> temp2;
 
     //cout << "Number of conductors: " << sys->numCdt << endl;
-    cout << "Number of edges: " << sys->N_edge << endl;
+    /*cout << "Number of edges: " << sys->N_edge << endl;
     cout << "Number of conductors: " << sys->numCdt << endl;
-    cout << "Number of ports: " << sys->numPorts << endl;
+    cout << "Number of ports: " << sys->numPorts << endl;*/
 
     /* Merged conductor node */
     /*double dcx = 5e-7, dcy = 5e-7, dcz = 5e-7;
@@ -541,7 +541,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->AcRowId[i] = map[sys->AcRowId[i]] - 1;
         sys->AcColId[i] = map[sys->AcColId[i]] - 1;
     }
- 
+    free(map); map = NULL;
+
     int leng_v0c2 = 0;
     for (i = 0; i < sys->numPorts; i++){
         temp2.clear();
@@ -601,11 +602,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *a = &(sys->Acval[0]);
     int *ia = &(sys->AcRowId[0]);
     int *ja = &(sys->AcColId[0]);
-
+    
     /* Construct V0d with row id, col id and its val */
     int leng_v0d1 = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
     int leng_v0d1a = 0;
-
+    map = (int*)calloc(sys->N_node, (sizeof(int)));
     for (i = 0; i < sys->N_node; i++){
         if (sys->markNode[i] == 0){
             for (j = 0; j < sys->nodeEdge[i].size(); j++){
@@ -613,8 +614,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 sys->v0d1ColId.push_back(leng_v0d1);
                 sys->v0d1val.push_back(sys->nodeEdge[i][j].second);
             }
+            map[i] = leng_v0d1 + 1;
             leng_v0d1++;
-
+            
             inz = i / sys->N_node_s;
             inx = (i - inz * sys->N_node_s) / (sys->N_cell_y + 1);
             iny = i % (sys->N_cell_y + 1);
@@ -622,13 +624,22 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 sys->v0d1aRowId.push_back((inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny);
                 sys->v0d1aColId.push_back(leng_v0d1a);
                 sys->v0d1aval.push_back(-2 / (sys->zn[inz + 1] - sys->zn[inz - 1]));
+                if (sys->markNode[i - sys->N_node_s] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i - sys->N_node_s);
+                    sys->Adval.push_back(-2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                }
             }
             else if (inz == sys->N_cell_z){
                 sys->v0d1aRowId.push_back((inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny);
                 sys->v0d1aColId.push_back(leng_v0d1a);
                 sys->v0d1aval.push_back(-1 / (sys->zn[inz] - sys->zn[inz - 1]));
+                if (sys->markNode[i - sys->N_node_s] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i - sys->N_node_s);
+                    sys->Adval.push_back(-1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                }
             }
-
             if (iny != 0 && iny != sys->N_cell_y){
                 sys->v0d1aRowId.push_back(inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1);
                 sys->v0d1aColId.push_back(leng_v0d1a);
@@ -680,10 +691,361 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             leng_v0d1a++;
 
+            if (inx != 0 && inx != sys->N_cell_x){
+                if (sys->markNode[i - sys->N_cell_y - 1] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i - sys->N_cell_y - 1);
+                    sys->Adval.push_back(-2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]);
+                }
+                if (iny != 0 && iny != sys->N_cell_y){
+                    if (sys->markNode[i - 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i - 1);
+                        sys->Adval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                    }
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx)+iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz])* sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx)+iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx)+iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    if (sys->markNode[i + 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i + 1);
+                        sys->Adval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                    }
+                }
+                else if (iny == sys->N_cell_y){
+                    if (sys->markNode[i - 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i - 1);
+                        sys->Adval.push_back(-1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                    }
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                }
+                else{
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    if (sys->markNode[i + 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i + 1);
+                        sys->Adval.push_back(-1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                    }
+                }
+                if (sys->markNode[i + sys->N_cell_y + 1] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i + sys->N_cell_y + 1);
+                    sys->Adval.push_back(-2 / (sys->xn[inx + 1] - sys->xn[inx - 1]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]);
+                }
+            }
+            else if (inx == sys->N_cell_x){
+                if (sys->markNode[i - sys->N_cell_y - 1] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i - sys->N_cell_y - 1);
+                    sys->Adval.push_back(-1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]);
+                }
+                if (iny != 0 && iny != sys->N_cell_y){
+                    if (sys->markNode[i - 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i - 1);
+                        sys->Adval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                    }
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    if (sys->markNode[i + 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i + 1);
+                        sys->Adval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                    }
+                }
+                else if (iny == sys->N_cell_y){
+                    if (sys->markNode[i - 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i - 1);
+                        sys->Adval.push_back(-1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                    }
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                }
+                else{
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / (sys->xn[inx] - sys->xn[inx - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*(inx - 1) + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    if (sys->markNode[i + 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i + 1);
+                        sys->Adval.push_back(-1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                    }
+                }
+            }
+            else{
+                if (iny != 0 && iny != sys->N_cell_y){
+                    if (sys->markNode[i - 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i - 1);
+                        sys->Adval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                    }
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    if (sys->markNode[i + 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i + 1);
+                        sys->Adval.push_back(-2 / (sys->yn[iny + 1] - sys->yn[iny - 1]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                    }
+                }
+                else if (iny == sys->N_cell_y){
+                    if (sys->markNode[i - 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i - 1);
+                        sys->Adval.push_back(-1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]);
+                    }
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / (sys->yn[iny] - sys->yn[iny - 1]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny - 1]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                }
+                else{
+                    if (inz != 0 && inz != sys->N_cell_z){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]
+                            + 2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else if (inz == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    else{
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i);
+                        sys->Adval.push_back(1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]
+                            + 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]
+                            + 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / (sys->zn[inz] - sys->zn[inz - 1]) * sys->eps[(inz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx*(sys->N_cell_y + 1) + iny]);
+                    }
+                    if (sys->markNode[i + 1] == 0){
+                        sys->AdRowId.push_back(i);
+                        sys->AdColId.push_back(i + 1);
+                        sys->Adval.push_back(-1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + inx*sys->N_cell_y + iny]);
+                    }
+                }
+                if (sys->markNode[i + sys->N_cell_y + 1] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i + sys->N_cell_y + 1);
+                    sys->Adval.push_back(-1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + (sys->N_cell_y + 1)*inx + iny]);
+                }
+            }
+
+            if (inz != 0 && inz != sys->N_cell_z){
+                if (sys->markNode[i + sys->N_node_s] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i + sys->N_node_s);
+                    sys->Adval.push_back(-2 / (sys->zn[inz + 1] - sys->zn[inz - 1]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny]);
+                }
+            }
+            else if (inz == 0){
+                if (sys->markNode[i + sys->N_node_s] == 0){
+                    sys->AdRowId.push_back(i);
+                    sys->AdColId.push_back(i + sys->N_node_s);
+                    sys->Adval.push_back(-1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->eps[inz*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny]);
+                }
+            }
+
         }
     }
+    for (i = 0; i < sys->AdRowId.size(); i++){
+        sys->AdRowId[i] = map[sys->AdRowId[i]] - 1;
+        sys->AdColId[i] = map[sys->AdColId[i]] - 1;
+        //cout << sys->AdRowId[i] << " " << sys->AdColId[i] << " " << sys->Adval[i] << endl;
+    }
+    free(map); map = NULL;
 
-    mark = sys->v0d1ColId.back();
+    status = COO2CSR(sys->AdRowId, sys->AdColId, sys->Adval);
+    if (status != 0)
+        return status;
+
+    double *d = &(sys->Adval[0]);
+    int *id = &(sys->AdRowId[0]);
+    int *jd = &(sys->AdColId[0]);
+
+
+   /* mark = sys->v0d1ColId.back();    // remove one V0d node
     while (sys->v0d1ColId.back() == mark){
         sys->v0d1RowId.pop_back();   // one node removed to make V0 full rank
         sys->v0d1ColId.pop_back();
@@ -696,7 +1058,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->v0d1aColId.pop_back();
         sys->v0d1aval.pop_back();
     }
-    leng_v0d1a--;
+    leng_v0d1a--;*/
 
     int leng_v0d2 = 0;
     int leng_v0d2a = 0;
@@ -739,8 +1101,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             }
         }
         ind.clear();
-    }
-    outfile1.open("v0d2a.txt", std::ofstream::out | std::ofstream::trunc);
+    }*/
+    /*outfile1.open("v0d2a.txt", std::ofstream::out | std::ofstream::trunc);
     for (i = 0; i < sys->v0d2aRowId.size(); i++){
         outfile1 << sys->v0d2aRowId[i] + 1 << " " << sys->v0d2aColId[i] + 1 << " " << sys->v0d2aval[i] << endl;
     }
@@ -873,7 +1235,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     /* Pick up a y0c2 cooresponding to one source port */
     ofstream outfile;
-    double freq;
     double *bd1, *bd2;
     double *bdc1, *bdc2;
     double *solution_b1;
@@ -897,16 +1258,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (i = 0; i < sys->numPorts*sys->numPorts; i++){
         sys->x[i] = complex<double> (0., 0.); // Complex double constructor from real and imaginary
     }*/
-    void *pt[64];
-    int mtype;
-    int iparm[64];
-    double dparm[64];
+    void *pt[64], *ptd[64];
+    int mtype, mtyped;
+    int iparm[64], iparmd[64];
+    double dparm[64],dparmd[64];
     int maxfct, mnum, phase, error, solver;
-    int num_proces;   //number of processors
+    int maxfctd, mnumd, phased, errord, solverd;
+    int num_proces, num_processd;   //number of processors
     int v0csin;
-    int perm;
+    int perm, permd;
     int nrhs = 1;
-    int msglvl = 0;    //print statistical information
+    int msglvl = 0, msglvld = 0;    //print statistical information
 
     mtype = 11;    // real and not symmetric
     solver = 0;
@@ -914,6 +1276,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     maxfct = 1;    //maximum number of numerical factorizations
     mnum = 1;    //which factorization to use
     phase = 13;    //analysis
+
+    mtyped = 11;    // real and not symmetric
+    solverd = 0;
+    errord = 0;
+    maxfctd = 1;    //maximum number of numerical factorizations
+    mnumd = 1;    //which factorization to use
+    phased = 13;    //analysis
 
     double *b, *xc;    // the array of the right hand side
     xcol = 0;
@@ -932,7 +1301,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int port_N_node_s;
     double *crhs;
     double *yc_eps;
-    sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
+    sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
 
 
     char transa;
@@ -999,7 +1368,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sourcePort = 0;
 
     while (sourcePort < sys->numPorts){
-        freq = 10.e+09;
         y0c2 = (double*)calloc(leng_v0c2, sizeof(double));
         sys->v0c2y0c2 = (double*)malloc(sys->N_edge*sizeof(double));
         sys->v0c2y0c2o = (double*)malloc(sys->N_edge*sizeof(double));
@@ -1127,10 +1495,20 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
 
         /* Solve (V0d1'*D_eps*V0d1)\b1 */
-        status = interativeSolver(leng_v0d1, 1, bd1, &sys->v0d1ColId[0], &sys->v0d1RowId[0], &sys->v0d1val[0], &sys->v0d1aColId[0], &sys->v0d1aRowId[0], &sys->v0d1aval[0], solution_b1, sys);
+        /*status = interativeSolver(leng_v0d1, 1, bd1, &sys->v0d1ColId[0], &sys->v0d1RowId[0], &sys->v0d1val[0], &sys->v0d1aColId[0], &sys->v0d1aRowId[0], &sys->v0d1aval[0], solution_b1, sys);
         if (status != 0)
             return status;
-        cout << "The second iteration is done!\n";
+        cout << "The second iteration is done!\n";*/
+        
+        pardisoinit(ptd, &mtyped, iparmd);
+        nrhs = 1;
+        iparmd[38] = 1;
+        iparmd[34] = 1;    //0-based indexing
+        pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, bd1, solution_b1, &errord);
+
+
+
+
         /* Solve (V0d1'*D_eps*V0d1)\(V0d1'*D_eps*V0d2) */
 
 
@@ -1290,7 +1668,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 return status;
 
             for (j = 0; j < sys->N_edge; j++){
-                epsv0dy0d[j] = 2 * PI*freq*sys->eps[j] * sys->yd[j];
+                epsv0dy0d[j] = 2 * PI * sys->freqStart * sys->freqUnit * sys->eps[j] * sys->yd[j];
             }
             transa = 'N';
             m = leng_v0cs;
@@ -1298,7 +1676,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &v0csval[0], &v0csRowId[0], &v0csColId[0], &v0csColId[1], epsv0dy0d, &beta, v0csy0d);
 
             for (j = 0; j < sys->N_edge; j++){
-                epsv0cy0c[j] = 2 * PI*freq*sys->eps[j] * sys->yc[j];
+                epsv0cy0c[j] = 2 * PI*  sys->freqStart * sys->freqUnit *sys->eps[j] * sys->yc[j];
             }
             mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &v0csval[0], &v0csRowId[0], &v0csColId[0], &v0csColId[1], epsv0cy0c, &beta, v0csy0c);
 
@@ -2028,13 +2406,15 @@ else{
     free(solution_d2); solution_d2 = NULL;
     free(cindex); cindex = NULL;
 
-    for (i = 0; i < sys->numPorts; i++){
+    for (i = 0; i < sys->nfreq; i++){
+        cout << "Frequency " << sys->freqStart + i * (sys->freqEnd - sys->freqStart) / sys->nfreq << " :" << endl;
         for (j = 0; j < sys->numPorts; j++){
-            //cout << sys->Y[i*sys->numPorts + j].real() << " " << sys->Y[i*sys->numPorts + j].imag() << endl;
-            cout << sys->Y[i*sys->numPorts + j] << endl;
+            for (k = 0; k < sys->numPorts; k++){
+                sys->Y[i * sys->numPorts * sys->numPorts + j * sys->numPorts + k] = sys->Y[j * sys->numPorts + k].real() + 1i * sys->Y[j * sys->numPorts + k].imag() / sys->freqStart * (sys->freqStart + i * (sys->freqEnd - sys->freqStart) / sys->nfreq);
+                cout << sys->Y[i * sys->numPorts * sys->numPorts + j * sys->numPorts + k] << endl;
+            }
         }
     }
-    //cout << "leng_v0c: " << leng_v0c << endl;
 
     return 0;
 }
@@ -2116,6 +2496,7 @@ int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, 
 
     dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
     cout << itercount << "\n";
+    cout << euclidean_norm << "\n";
     free(tmp);
     free(temp);
     free(ipar);
