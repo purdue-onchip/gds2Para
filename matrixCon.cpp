@@ -565,7 +565,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     /*for (i = 0; i < sys->v0c2RowId.size(); i++){
         cout << sys->v0c2RowId[i] << " " << sys->v0c2ColId[i] << " " << sys->v0c2val[i] << endl;
     }*/
-
+    
     sys->v0cvalo = sys->v0cval;    // v0cvalo is the v0c values without D_sig
     for (i = 0; i < sys->v0cColId.size(); i++){
         sys->v0cval[i] = sys->v0cval[i] * sqrt(sys->sig[sys->v0cRowId[i]]);       // Compute the sparse form of D_sig*V0c
@@ -1043,7 +1043,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *d = &(sys->Adval[0]);
     int *id = &(sys->AdRowId[0]);
     int *jd = &(sys->AdColId[0]);
-
+    
 
    /* mark = sys->v0d1ColId.back();    // remove one V0d node
     while (sys->v0d1ColId.back() == mark){
@@ -1309,7 +1309,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double alpha = 1, beta = 0;
     char matdescra[6];
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << "Begin!\n";
+    //cout << "Begin!\n";
     nrhs = leng_v0d2;
     v0d2epsv0d2 = (double*)calloc(nrhs*nrhs, sizeof(double));
     v0d2epsv0d1 = (double*)calloc(nrhs*nrhs, sizeof(double));
@@ -1366,7 +1366,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     double *y0c2;
     sourcePort = 0;
-
+    
     while (sourcePort < sys->numPorts){
         y0c2 = (double*)calloc(leng_v0c2, sizeof(double));
         sys->v0c2y0c2 = (double*)malloc(sys->N_edge*sizeof(double));
@@ -1386,7 +1386,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 cout << sys->v0c2y0c2[i] << " " << sys->sig[i] << "#" << endl;
             }*/
         }
-        cout << endl;
 
         /* Compute C right hand side */
         xc = (double*)calloc(leng_v0c, sizeof(double));
@@ -2407,7 +2406,7 @@ else{
     free(cindex); cindex = NULL;
 
     for (i = 0; i < sys->nfreq; i++){
-        cout << "Frequency " << sys->freqStart + i * (sys->freqEnd - sys->freqStart) / sys->nfreq << " :" << endl;
+        cout << "Frequency " << (sys->freqStart + i * (sys->freqEnd - sys->freqStart) / sys->nfreq) * sys->freqUnit << ":" << endl;
         for (j = 0; j < sys->numPorts; j++){
             for (k = 0; k < sys->numPorts; k++){
                 sys->Y[i * sys->numPorts * sys->numPorts + j * sys->numPorts + k] = sys->Y[j * sys->numPorts + k].real() + 1i * sys->Y[j * sys->numPorts + k].imag() / sys->freqStart * (sys->freqStart + i * (sys->freqEnd - sys->freqStart) / sys->nfreq);

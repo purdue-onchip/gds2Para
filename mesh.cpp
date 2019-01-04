@@ -155,7 +155,11 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         lyr++;
     }
 
-
+    for (i = 0; i < sys->numPorts; i++){
+        sys->portCoor[i].y2 = sys->portCoor[i].y1;
+        sys->portCoor[i].x2 = sys->portCoor[i].x1;
+        sys->portCoor[i].z2 = sys->portCoor[i].z1;
+    }
     
     cout << "Begin reading the conductor information!" << endl;
     //sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
@@ -802,7 +806,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     }
     
     /* implement dfs */
-    cout <<"Number of nodes: " << sys->N_node << endl;
+    //cout <<"Number of nodes: " << sys->N_node << endl;
     int *visited;
     vector<int> st;
     visited = (int*)calloc(sys->N_node, sizeof(int));
@@ -1103,7 +1107,6 @@ bool polyIn(double x, double y, fdtdMesh *sys, int inPoly){
     npol = sys->conductorIn[inPoly].numVert;
 
     for (i = 0, j = npol - 1; i < npol; j = i++){
-        //cout << x << " " << y << " " << sys->conductorIn[inPoly].x[i] << " " << sys->conductorIn[inPoly].y[i] << sys->conductorIn[inPoly].x[j] << " " << sys->conductorIn[inPoly].y[j] << endl;
         if ((abs(y - sys->conductorIn[inPoly].y[j]) < disMin && abs(y - sys->conductorIn[inPoly].y[i]) < disMin &&
             ((x >= sys->conductorIn[inPoly].x[j] && x <= sys->conductorIn[inPoly].x[i]) ||
             (x >= sys->conductorIn[inPoly].x[i] && x <= sys->conductorIn[inPoly].x[j])))){
