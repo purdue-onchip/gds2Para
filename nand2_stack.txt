@@ -1,0 +1,31 @@
+lengthUnit = 1.e-6
+
+FREQUENCY
+ freqUnit = 1.0e+6
+ freqStart = 1000.0
+ freqEnd = 5000.0
+ nfreq = 10
+
+DIELECTRIC STACK
+ numStack = 15
+ 1 h = 1.5 e = 3.9
+ 2 h = 0.6 e = 3.9
+ 41 h = 0.22 e = 2.5
+ 42 h = 0.22 e = 2.5
+ 43 h = 0.22 e = 2.5
+ 44 h = 0.22 e = 2.5
+ 45 h = 0.22 e = 2.5
+ 46 h = 0.11 e = 2.5
+ 47 h = 0.11 e = 2.5
+ 48 h = 0.11 e = 2.5
+ 49 h = 0.22 e = 2.5
+ 50 h = 0.11 e = 2.5
+ 51 h = 0.11 e = 2.5
+ 149 h = 1.5 e = 3.9
+ 162 h = 0.6 e = 3.9
+
+
+PORT
+ numPort = 2
+ 0 110 0 120 49
+ 149 110 149 120 49

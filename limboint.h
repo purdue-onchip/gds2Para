@@ -1308,19 +1308,19 @@ public:
         {
             vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
             double width = ((cell.paths)[indi]).getWidth();
-            sys->conductorIn.push_back(this->a);
-            si = sys->conductorIn.size() - 1;
-            sys->conductorIn[si].numVert = 4;
-            sys->conductorIn[si].xmax = DOUBLEMIN;
-            sys->conductorIn[si].xmin = DOUBLEMAX;
-            sys->conductorIn[si].ymax = DOUBLEMIN;
-            sys->conductorIn[si].ymin = DOUBLEMAX;
-            sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
-            sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
-            sys->conductorIn[si].layer = ((cell.paths)[indi]).getLayer();
-            condj = 0;
             for (size_t indj = 0; indj < pathCoord.size()-2; indj++) // C string for each ordered pair
             {
+                sys->conductorIn.push_back(this->a);
+                si = sys->conductorIn.size() - 1;
+                sys->conductorIn[si].numVert = 4;
+                sys->conductorIn[si].xmax = DOUBLEMIN;
+                sys->conductorIn[si].xmin = DOUBLEMAX;
+                sys->conductorIn[si].ymax = DOUBLEMIN;
+                sys->conductorIn[si].ymin = DOUBLEMAX;
+                sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+                sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+                sys->conductorIn[si].layer = ((cell.paths)[indi]).getLayer();
+                condj = 0;
                 if (pathCoord[indj] == pathCoord[indj + 2]) // along y axis
                 {
                     if (pathCoord[indj + 1] > pathCoord[indj + 3]) // first point is on top of the second point
@@ -1464,6 +1464,7 @@ public:
         cout << "  List of " << numSRef << " structure references:" << endl;
         for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
         {
+            cout << (cell.sreferences)[indi].getSRefName() << endl;
             printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
         }
 
@@ -1644,11 +1645,13 @@ public:
         cout << " Database units: " << this->getdbUnits() << " m" << endl;
         cout << " Database units: " << this->getdbUserUnits() << " user units" << endl;
         cout << " List of " << numCell << " cells:" << endl;
+        vector<double> pathCoord;
         for (size_t indi = 0; indi < numCell; indi++)
         {
             cout << "  " << indi + 1 << ". " << ((this->cells)[indi]).getCellName() << endl;
             cout << "   Counts: " << (this->cells)[indi].getNumBound() << " boundaries, " << (this->cells)[indi].getNumPath() << " paths, " << (this->cells)[indi].getNumNode() << " nodes, " << (this->cells)[indi].getNumBox() << " boxes," << endl << "     " << (this->cells)[indi].getNumText() << " text boxes, and " << (this->cells)[indi].getNumSRef() << " structure references" << endl;
         }
+
         for (size_t indi = 0; indi < indCellPrint.size(); indi++)
         {
             std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
