@@ -155,11 +155,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         lyr++;
     }
 
-    for (i = 0; i < sys->numPorts; i++){
-        sys->portCoor[i].y2 = sys->portCoor[i].y1;
-        sys->portCoor[i].x2 = sys->portCoor[i].x1;
-        sys->portCoor[i].z2 = sys->portCoor[i].z1;
-    }
+    
     
     cout << "Begin reading the conductor information!" << endl;
     //sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
