@@ -1,0 +1,33 @@
+TOTAL SIZE
+0.00 +1.49e-4 -4.70e-5 +1.20e-4 -1.0e-6 +1.409e-5
+lengthUnit = 1
+
+FREQUENCY
+freqUnit = 1.0e+6
+freqStart = 1000.0
+freqEnd = 3000.0
+nfreq = 2
+freqScale = 0
+
+DIELECTRIC STACK
+numStack = 15
+1 h = 1.5e-6 e = 3.9
+2 h = 6e-7 e = 3.9
+41 h = 2.2e-7 e = 2.5
+42 h = 2.2e-7 e = 2.5
+43 h = 2.2e-7 e = 2.5
+44 h = 2.2e-7 e = 2.5
+45 h = 2.2e-7 e = 2.5
+46 h = 1.1e-7 e = 2.5
+47 h = 1.1e-7 e = 2.5
+48 h = 1.1e-7 e = 2.5
+49 h = 2.2e-7 e = 2.5
+50 h = 1.1e-7 e = 2.5
+51 h = 1.1e-7 e = 2.5
+149 h = 1.5e-6 e = 3.9
+162 h = 6e-7 e = 3.9
+
+PORT
+numPort = 2
+5.3e-6 54.5e-6 5.3e-6 59.0e-6 11
+64.e-6 54.5e-6 64.e-6 59.0e-6 11
