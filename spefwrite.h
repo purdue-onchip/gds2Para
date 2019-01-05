@@ -55,9 +55,9 @@ private:
     double lengthUnit;     // Units for lengths (m)
     vector<double> limits; // xmin, xmax, ymin, ymax, zmin, zmax (m)
     double freqUnit;       // Units for frequency (Hz)
-    size_t nFreq;          // Number of frequencies in simulation
     double freqScale;      // Frequency scaling?
-    vector<double> freqs;  // List of logarithmically spaced frequencies
+    size_t nFreq;          // Number of frequencies in simulation
+    vector<double> freqs;  // List of frequencies (linear or logarithmic [preferred] spacing)
 public:
     // Default constructor
     SimSettings()
@@ -65,19 +65,43 @@ public:
         this->lengthUnit = 1.;
         this->limits = {0., 0., 0., 0., 0., 0.};
         this->freqUnit = 1.;
-        this->nFreq = 0;
         this->freqScale = 0.;
+        this->nFreq = 0;
         this->freqs = {};
     }
 
     // Parametrized constructor
-    SimSettings(double lengthUnit, vector<double> limits, double freqUnit, size_t nFreq, double freqScale, vector<double> freqs)
+    SimSettings(double lengthUnit, vector<double> limits, double freqUnit, double freqScale, vector<double> freqs)
     {
         this->lengthUnit = lengthUnit;
-        this->limits = limits;
+        if (limits.size() != 6)
+        {
+            cerr << "Must give minimum and maximum extents of design in vector of length 6. Defaulting to 0. to 0. for x, y, and z." << endl;
+            this->limits = { 0., 0., 0., 0., 0., 0. };
+        }
+        else
+        {
+            vector<double> checkLims = limits;
+            if (limits[0] > limits[1]) // xmin > xmax
+            {
+                checkLims[0] = limits[1];
+                checkLims[1] = limits[0];
+            }
+            if (limits[2] > limits[3]) // ymin > ymax
+            {
+                checkLims[2] = limits[3];
+                checkLims[3] = limits[2];
+            }
+            if (limits[4] > limits[5]) // zmin > zmax
+            {
+                checkLims[4] = limits[5];
+                checkLims[5] = limits[4];
+            }
+            this->limits = checkLims;
+        }
         this->freqUnit = freqUnit;
-        this->nFreq = nFreq;
         this->freqScale = freqScale;
+        this->nFreq = freqs.size();
         this->freqs = freqs;
     }
 
@@ -99,23 +123,78 @@ public:
         return this->freqUnit;
     }
 
-    // Get number of frequencies in simulatoin
-    size_t getNFreq() const
-    {
-        return this->nFreq;
-    }
-
     // Get frequency scaling
     double getFreqScale() const
     {
         return this->freqScale;
     }
 
-    // Get list of frequencies (logarithmic spacing)
+    // Get number of frequencies in simulation
+    size_t getNFreq() const
+    {
+        return this->nFreq;
+    }
+
+    // Get list of frequencies (linear or logarithmic [preferred] spacing)
     vector<double> getFreqs() const
     {
         return this->freqs;
     }
+
+    // Set length unit (m)
+    void setLengthUnit(double lengthUnit)
+    {
+        this->lengthUnit = lengthUnit;
+    }
+
+    // Set limits: xmin, xmax, ymin, ymax, zmin, zmax (m)
+    void setLimits(vector<double> limits)
+    {
+        if (limits.size() != 6)
+        {
+            cerr << "Must give minimum and maximum extents of design in vector of length 6. Defaulting to 0. to 0. for x, y, and z." << endl;
+            this->limits = { 0., 0., 0., 0., 0., 0. };
+        }
+        else
+        {
+            vector<double> checkLims = limits;
+            if (limits[0] > limits[1]) // xmin > xmax
+            {
+                checkLims[0] = limits[1];
+                checkLims[1] = limits[0];
+            }
+            if (limits[2] > limits[3]) // ymin > ymax
+            {
+                checkLims[2] = limits[3];
+                checkLims[3] = limits[2];
+            }
+            if (limits[4] > limits[5]) // zmin > zmax
+            {
+                checkLims[4] = limits[5];
+                checkLims[5] = limits[4];
+            }
+            this->limits = checkLims;
+        }
+    }
+
+    // Set frequency unit (Hz)
+    void setFreqUnit(double freqUnit)
+    {
+        this->freqUnit = freqUnit;
+    }
+
+    // Set frequency scaling
+    void setFreqScale(double freqScale)
+    {
+        this->freqScale = freqScale;
+    }
+    // Set list of frequencies (linear or logarithmic [preferred] spacing)
+    void setFreqs(vector<double> freqs)
+    {
+        this->freqs = freqs;
+        this->nFreq = freqs.size();
+    }
+
 
     // Print the simulation settings
     void print() const
@@ -123,9 +202,9 @@ public:
         size_t numFreq = this->getNFreq();
         cout << " ------" << endl;
         cout << " Simulation Settings:" << endl;
-        cout << "  Limits in x-direction: " << (this->limits)[0] << " m to " << (this->limits)[1] << "m" << endl;
-        cout << "  Limits in y-direction: " << (this->limits)[2] << " m to " << (this->limits)[3] << "m" << endl;
-        cout << "  Limits in z-direction: " << (this->limits)[4] << " m to " << (this->limits)[5] << "m" << endl;
+        cout << "  Limits in x-direction: " << (this->limits)[0] << " m to " << (this->limits)[1] << " m" << endl;
+        cout << "  Limits in y-direction: " << (this->limits)[2] << " m to " << (this->limits)[3] << " m" << endl;
+        cout << "  Limits in z-direction: " << (this->limits)[4] << " m to " << (this->limits)[5] << " m" << endl;
         cout << "  List of " << numFreq << " frequencies to simulate with " << this->freqScale << " scaling:" << endl;
         for (size_t indi = 0; indi < numFreq; indi++)
         {
@@ -258,6 +337,151 @@ public:
     }
 };
 
+class Port
+{
+private:
+    std::string portName;        // Name of port
+    char portDir;                // Direction of port
+    double Z_source;             // Impedance of sourced attached to port (ohm)
+    vector<double> coord;        // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m)
+public:
+    // Default constructor
+    Port()
+    {
+        this->portName = "";
+        this->portDir = 'B';
+        this->Z_source = 0.;
+        this->coord = { 0., 0., 0., 0., 0., 0. };
+    }
+
+    // Parametrized constructor
+    Port(std::string portName, char portDir, double Z_source, vector<double> coord)
+    {
+        this->portName = portName;
+        if ((portDir != 'I') || (portDir != 'O') || (portDir != 'B'))
+        {
+            cerr << "Port direction must be assigned as 'I' (input), 'O' (output), or 'B' (bidirectional). Defaulting to 'B'." << endl;
+            this->portDir = 'B';
+        }
+        else
+        {
+            this->portDir = portDir;
+        }
+        this->Z_source = Z_source;
+        if (coord.size() != 6)
+        {
+            cerr << "Must give supply then return coordinates in vector of length 6. Defaulting to origin for both." << endl;
+            this->coord = { 0., 0., 0., 0., 0., 0. };
+        }
+        else
+        {
+            this->coord = coord;
+        }
+    }
+
+    // Get port name
+    std::string getPortName() const
+    {
+        return this->portName;
+    }
+
+    // Get port direction
+    // ('I' = input, 'O' = output, 'B' = bidirectional)
+    char getPortDir() const
+    {
+        return this->portDir;
+    }
+
+    // Get impedance of attached source
+    double getZSource() const
+    {
+        return this->Z_source;
+    }
+
+    // Get supply and return coordinates
+    vector<double> getCoord() const
+    {
+        return this->coord;
+    }
+
+    // Set port name
+    void setPortName(std::string name)
+    {
+        this->portName = name;
+    }
+
+    // Set port direction
+    // ('I' = input, 'O' = output, 'B' = bidirectional)
+    void setPortDir(char dir)
+    {
+        if ((dir != 'I') || (dir != 'O') || (dir != 'B'))
+        {
+            cerr << "Port direction must be assigned as 'I' (input), 'O' (output), or 'B' (bidirectional). Defaulting to 'B'." << endl;
+            this->portDir = 'B';
+        }
+        else
+        {
+            this->portDir = dir;
+        }
+    }
+
+    // Set impedance of attached source
+    void setZSource(double Z_source)
+    {
+        this->Z_source = Z_source;
+    }
+
+    // Set supply and return coordinates
+    // xsup, ysup, zsup, xret, yret, zret (m)
+    void setCoord(vector<double> coord)
+    {
+        if (coord.size() != 6)
+        {
+            cerr << "Must give supply then return coordinates in vector of length 6. Defaulting to origin for both." << endl;
+            this->coord = { 0., 0., 0., 0., 0., 0. };
+        }
+        else
+        {
+            this->coord = coord;
+        }
+    }
+
+    // Print the layer information
+    void print() const
+    {
+        cout << "  ------" << endl;
+        cout << "  Details for port " << this->portName << ":" << endl;
+        cout << "   Port direction: ";
+        switch (this->portDir)
+        {
+        case 'O':
+            cout << "Output" << endl;
+            break;
+        case 'I':
+            cout << "Input" << endl;
+            break;
+        case 'B':
+            cout << "Bidirectional" << endl;
+            break;
+        default:
+            cout << "Bidirectional" << endl; // Treat as bidirectional if direction unclear
+        }
+        cout << "   Attached source impedance: " << this->Z_source << " ohm" << endl;
+        cout << "  Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
+        cout << "  Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
+        cout << "  ------" << endl;
+    }
+
+    // Destructor
+    ~Port()
+    {
+        /*this->portName = "";
+        this->portDir = 'B';
+        this->Z_source = 0.;
+        this->coord = { 0., 0., 0., 0., 0., 0. };*/
+    }
+};
+
 class Waveforms
 {
 private:
@@ -293,39 +517,27 @@ public:
 class Parasitics
 {
 private:
-    size_t nPorts;                             // Number of ports
-    vector<std::string> ports;                 // Name of each port
-    vector<char> portDir;                      // Direction of each port
-    vector<double> Z_port_source;              // Impedance of source attached to port (ohm)
-    vector<vector<double>> portCoord;          // xsup, ysup, zsup, xret, yret, zret (m)
-    spMat matG;                                // Conductance matrix (S)
-    spMat matC;                                // Capacitance matrix (F)
+    size_t nPorts;             // Number of ports
+    vector<Port> ports;        // Vector of port information
+    spMat matG;                // Conductance matrix (S)
+    spMat matC;                // Capacitance matrix (F)
 public:
     // Default constructor
     Parasitics()
     {
-        vector<std::string> ports = {};
-        vector<char> portDir = {};
-        vector<double> Z_port_source = {};
-        vector<vector<double>> portCoord = {{}};
+        vector<Port> ports;
         spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
-        this->portDir = portDir;
-        this->Z_port_source = Z_port_source;
-        this->portCoord = portCoord;
         this->matG = emptMat;
         this->matC = emptMat;
     }
 
     // Parametrized constructor
-    Parasitics(size_t nPorts, vector<std::string> ports, vector<char> portDir, vector<double> Z_port_source, vector<vector<double>> portCoord, spMat matG, spMat matC)
+    Parasitics(vector<Port> ports, spMat matG, spMat matC)
     {
-        this->nPorts = nPorts;
+        this->nPorts = ports.size();
         this->ports = ports;
-        this->portDir = portDir;
-        this->Z_port_source = Z_port_source;
-        this->portCoord = portCoord;
         this->matG = matG;
         this->matC = matC;
     }
@@ -336,29 +548,10 @@ public:
         return this->nPorts;
     }
 
-    // Get port names
-    vector<std::string> getPorts() const
+    // Get vector of port information
+    vector<Port> getPorts() const
     {
         return this->ports;
-    }
-
-    // Get port directions
-    // ('I' = input, 'O' = output, 'B' = bidirectional)
-    vector<char> getPortDir() const
-    {
-        return this->portDir;
-    }
-
-    // Get impedance of sources attached to ports (ohm)
-    vector<double> getZPortSource() const
-    {
-        return this->Z_port_source;
-    }
-    
-    // Get supply-point coordinates and return-point coordinates of ports (m)
-    vector<vector<double>> getPortCoord() const
-    {
-        return this->portCoord;
     }
 
     // Get conductance matrix
@@ -371,6 +564,25 @@ public:
     spMat getCMatrix() const
     {
         return this->matC;
+    }
+
+    // Set vector of port information
+    void setPorts(vector<Port> ports)
+    {
+        this->ports = ports;
+        this->nPorts = ports.size();
+    }
+
+    // Set conductance matrix
+    void setGMatrix(spMat matG)
+    {
+        this->matG = matG;
+    }
+
+    // Set capacitance matrix
+    void setCMatrix(spMat matC)
+    {
+        this->matC = matC;
     }
 
     // Return node-to-ground conductance
@@ -399,16 +611,48 @@ public:
         return (this->matC).diagonal().sum();
     }
 
+    // Find index of port by name
+    // Returns index past number of ports if not found
+    size_t locatePortName(std::string name) const
+    {
+        size_t indPort;
+        for (indPort = 0; indPort < this->getNPort(); indPort++)
+        {
+            if (name.compare((this->ports[indPort]).getPortName()) == 0)
+            {
+                return indPort;
+            }
+        }
+        return indPort;
+    }
+
+    // Return a port
+    Port getPort(size_t indPort) const
+    {
+        return (this->ports)[indPort];
+    }
+
+    // Return all port names
+    vector<string> findPortNames() const
+    {
+        vector<string> names;
+        for (size_t indi = 0; indi < this->getNPort(); indi++)
+        {
+            names.push_back(((this->ports)[indi]).getPortName());
+        }
+        return names;
+    }
+
     // Print the parasitics information
     void print() const
     {
         int numPort = getNPort();
         cout << " ------" << endl;
         cout << " Parasitics Details:" << endl;
-        cout << "  Port Names:" << endl;
+        cout << "  List of " << numPort << " ports:" << endl;
         for (size_t indi = 0; indi < numPort; indi++) // Handle each port name
         {
-            cout << "   #" << indi + 1 << ": " << (this->ports)[indi] << ", direction " << (this->portDir)[indi] << endl;
+            (this->ports)[indi].print();
         }
         cout << "  Conductance Matrix (S):" << endl;
         for (size_t indi = 0; indi < (this->matG).outerSize(); indi++)
@@ -459,9 +703,9 @@ public:
         // Populate Spef struct name map fields and ports vector
         for (size_t indi = 0; indi < numPort; indi++)
         {
-            para.name_map.emplace(indi + 1, (this->ports)[indi]); // Create name map for each port
+            para.name_map.emplace(indi + 1, (this->ports)[indi].getPortName()); // Create name map for each port
             para.ports.emplace_back("*" + to_string(indi + 1)); // Instantiate and push new port entry by name map
-            switch ((this->portDir)[indi]) // Assign port direction
+            switch ((this->ports)[indi].getPortDir()) // Assign port direction
             {
             case 'O':
                 para.ports.back().direction = spef::ConnectionDirection::OUTPUT;
@@ -488,7 +732,7 @@ public:
         for (size_t indi = 0; indi < numPort; indi++)
         {
             para.nets.back().connections.emplace_back(spef::Connection());
-            para.nets.back().connections.back().name = (this->ports)[indi];
+            para.nets.back().connections.back().name = (this->ports)[indi].getPortName();
             para.nets.back().connections.back().type = spef::ConnectionType::EXTERNAL; // All ports are external connections, not internal to cells
             para.nets.back().connections.back().direction = (para.ports[indi]).direction; // Same as port direction
             for (spMat::InnerIterator it(this->matC, indi); it; ++it)
@@ -522,16 +766,10 @@ public:
     // Destructor
     ~Parasitics()
     {
-        vector<std::string> ports = {};
-        vector<char> portDir = {};
-        vector<double> emptZ = {};
-        vector<vector<double>> emptCoord = { {} };
+        vector<Port> ports = {};
         spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
-        this->portDir = portDir;
-        this->Z_port_source = emptZ;
-        this->portCoord = emptCoord;
         this->matG = emptMat;
         this->matC = emptMat;
     }
@@ -593,6 +831,12 @@ public:
         return (this->layers).size();
     }
 
+    // Get vector of layer information
+    vector<Layer> getLayers() const
+    {
+        return this->layers;
+    }
+
     // Get waveforms
     Waveforms getWaveforms() const
     {
@@ -627,6 +871,12 @@ public:
     void setLayers(vector<Layer> layers)
     {
         this->layers = layers;
+    }
+
+    // Set waveforms
+    void setWaveforms(Waveforms wf)
+    {
+        this->wf = wf;
     }
 
     // Set parasitics
@@ -959,7 +1209,7 @@ public:
                     cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin }, ((this->layers)[indTopPlane]).getGDSIINum(), propTop, 0));
 
                     // Save simulation settings at last
-                    this->settings = SimSettings(adbIMP.getdbUnits(), { xmin, xmax, ymin, 2 * ymax + stripLength, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight() }, 1.0, (size_t) numFreqPts, 0.0, freqList);
+                    this->settings = SimSettings(adbIMP.getdbUnits(), { xmin, xmax, ymin, 2 * ymax + stripLength, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight() }, 1.0, 0.0, freqList);
                 }
                 // Handle port table
                 if (fileLine.compare(0, 9, "PORTTABLE") == 0)
@@ -968,10 +1218,7 @@ public:
                     getline(impFile, fileLine);
 
                     // Keep reading until end of port table
-                    vector<std::string> ports;
-                    vector<char> portDir;
-                    vector<double> Z_source;
-                    vector<vector<double>> portCoord;
+                    vector<Port> ports;
                     while ((fileLine.compare(0, 8, "ANALYSIS") != 0) && !impFile.eof())
                     {
                         if (fileLine.length() >= 3)
@@ -1000,7 +1247,7 @@ public:
                             }
                             if (indCond >= cellIMP.boxes.size())
                             {
-                                portSupRet = { 0., 0., 0., 0., 0., 0. }; // Not found default has supply and return at origin
+                                portSupRet = { 0., 0., 0., 0., 0., 0. }; // Not found, default has supply and return at origin
                             }
                             else
                             {
@@ -1008,17 +1255,14 @@ public:
                                 size_t indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer()); // Index of layer in structure field
                                 portSupRet = { boxCoord[0], boxCoord[1], (this->layers)[indLayer].getZStart(), boxCoord[0], boxCoord[1], 0. }; // xsup = LR xcoord, ysup = LR ycoord, zsup = layer zStart, xret = xsup, yret = ysup, zret = 0.
                             }
-                            ports.push_back(groupName);
-                            portDir.push_back('B');
-                            Z_source.push_back(Z_near);
-                            portCoord.push_back(portSupRet);
+                            ports.emplace_back(Port(groupName, 'B', Z_near, portSupRet));
                         }
                         // Keep moving down the port table
                         getline(impFile, fileLine);
                     }
 
                     // Propagate port information to Solver Database now
-                    this->para = Parasitics(ports.size(), ports, portDir, Z_source, portCoord, spMat(), spMat());
+                    this->para = Parasitics(ports, spMat(), spMat());
                 }
 
                 // Keep reading new lines in file
@@ -1069,24 +1313,24 @@ public:
                     getline(inputFile, fileLine);
                     
                     // Obtain limits of IC design size
-                    double xsup, ysup, zsup, xret, yret, zret;
+                    double xmin, xmax, ymin, ymax, zmin, zmax;
                     size_t indCoordStart = 0;
                     size_t indCoordEnd = fileLine.find(" ", indCoordStart);
-                    xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    xmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
                     indCoordEnd = fileLine.find(" ", indCoordStart);
-                    ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    xmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
                     indCoordEnd = fileLine.find(" ", indCoordStart);
-                    zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    ymin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
                     indCoordEnd = fileLine.find(" ", indCoordStart);
-                    xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    ymax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
                     indCoordEnd = fileLine.find(" ", indCoordStart);
-                    yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
-                    zret = stod(fileLine.substr(indCoordStart));
+                    zmax = stod(fileLine.substr(indCoordStart));
                     
                     // Move down one line
                     getline(inputFile, fileLine);
@@ -1094,8 +1338,8 @@ public:
                     // Obtain length unit
                     double lengthUnit = stod(fileLine.substr(fileLine.find("lengthUnit = ") + 13, fileLine.find(" #")));
                     
-                    // Update simulation settings
-                    this->settings = SimSettings(lengthUnit, { xsup * lengthUnit, ysup * lengthUnit, zsup * lengthUnit, xret * lengthUnit, yret * lengthUnit, zret * lengthUnit }, 1., 0, 0., {});
+                    // Create simulation settings
+                    this->settings = SimSettings(lengthUnit, { xmin * lengthUnit, xmax * lengthUnit, ymin * lengthUnit, ymax * lengthUnit, zmin * lengthUnit, zmax * lengthUnit }, 1., 0., {});
                 }
                 // Handle frequency sweep parameters
                 else if (fileLine.compare(0, 9, "FREQUENCY") == 0)
@@ -1153,7 +1397,9 @@ public:
                     }
                     
                     // Update simulation settings
-                    this->settings = SimSettings((this->settings).getLengthUnit(), (this->settings).getLimits(), freqUnit, nFreq, freqScale, freqList);
+                    (this->settings).setFreqUnit(freqUnit);
+                    (this->settings).setFreqScale(freqScale);
+                    (this->settings).setFreqs(freqList);
                 }
                 // Handle dielectric stack-up
                 else if (fileLine.compare(0, 16, "DIELECTRIC STACK") == 0)
@@ -1209,63 +1455,86 @@ public:
                     getline(inputFile, fileLine);
 
                     // Read each line in the port list
-                    vector<std::string> portNames;
-                    vector<char> portDir;
-                    vector<double> Z_port_src;
-                    vector<vector<double>> portCoord;
+                    vector<Port> ports;
                     for (size_t indPort = 0; indPort < numPort; indPort++)
                     {
+                        // Port information recorded differently based on how many numbers appear
+                        size_t nSpace = count(fileLine.begin(), fileLine.end(), ' ');
+
                         // Obtain limits of IC design size
                         double xsup, ysup, zsup, xret, yret, zret;
                         int sourceDir;
-                        size_t indCoordStart = 0;
-                        size_t indCoordEnd = fileLine.find(" ", indCoordStart);
-                        xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                        indCoordStart = indCoordEnd + 1;
-                        indCoordEnd = fileLine.find(" ", indCoordStart);
-                        ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                        indCoordStart = indCoordEnd + 1;
-                        indCoordEnd = fileLine.find(" ", indCoordStart);
-                        zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                        indCoordStart = indCoordEnd + 1;
-                        indCoordEnd = fileLine.find(" ", indCoordStart);
-                        xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                        indCoordStart = indCoordEnd + 1;
-                        indCoordEnd = fileLine.find(" ", indCoordStart);
-                        yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                        indCoordStart = indCoordEnd + 1;
-                        indCoordEnd = fileLine.find(" ", indCoordStart);
-                        zret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                        indCoordStart = indCoordEnd + 1;
-                        indCoordEnd = fileLine.find(" ", indCoordStart);
-                        sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+                        char portDir;
+                        if (nSpace == 4)
+                        {
+                            size_t indCoordStart = 0;
+                            size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            int portLayer = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+                            sourceDir = 0; // No soure direction information included
 
-                        // Append port information to vectors
-                        portNames.push_back("port" + to_string(indPort + 1)); // All ports officially unnamed, so use number
+                            zsup = (this->layers)[this->locateLayerGDSII(portLayer)].getZStart();
+                            zret = zsup; // Return assumed to be on same layer as supply z-coordinate
+                        }
+                        else if (nSpace >= 6)
+                        {
+                            size_t indCoordStart = 0;
+                            size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            zret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+                        }
+
+                        // Append port information to vectors (all ports officially unnamed, so use number)
                         switch (sourceDir) // Assign port direction
                         {
                         case -1:
-                            portDir.push_back('O');
+                            portDir = 'O';
                             break;
                         case +1:
-                            portDir.push_back('I');
+                            portDir = 'I';
                             break;
                         case 0:
-                            portDir.push_back('B');
+                            portDir = 'B';
                             break;
                         default:
-                            portDir.push_back('B');; // Treat as bidirectional if direction unclear
+                            portDir = 'B'; // Treat as bidirectional if direction unclear
                         }
-                        Z_port_src.push_back(50.);
-                        portCoord.push_back({ xsup, ysup, zsup, xret, yret, zret });
-                        
+                        ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., { xsup, ysup, zsup, xret, yret, zret }));
 
                         // Move down one line
                         getline(inputFile, fileLine);
                     }
 
                     // Propagate port list to parasitics data structure now
-                    this->para = Parasitics(numPort, portNames, portDir, Z_port_src, portCoord, spMat(numPort, numPort), spMat(numPort, numPort));
+                    this->para = Parasitics(ports, spMat(numPort, numPort), spMat(numPort, numPort));
                 }
 
                 // Keep reading new lines in file
@@ -1291,7 +1560,7 @@ public:
         cout << "Solver Database of IC Design, " << this->designName << ":" << endl;
         cout << " Settings for the simulation:" << endl;
         (this->settings).print(); // Print the simulation settings
-        cout << " Layers:" << endl;
+        cout << " Details of the " << numLayer << " layers:" << endl;
         for (size_t indi = 0; indi < numLayer; indi++)
         {
             (this->layers)[indi].print();

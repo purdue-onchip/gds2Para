@@ -96,12 +96,22 @@ int main(int argc, char** argv)
             // Load sample information in memory
             string design = "test_out";
             Waveforms blank;
-            size_t numPorts = 13;
-            vector<std::string> ports = { "inp1", "u1:a", "inp2", "u1:b", "out", "u3:o", "u1:o", "u4:a", "u4:o", "f1:d", "f1:a", "u2:a", "u4:b" };
-            vector<char> portDir = { 'I', 'I', 'I', 'I', 'O', 'O', 'O', 'I', 'O', 'I', 'O', 'I', 'I' };
-            vector<double> Z_port_source;
-            Z_port_source.assign(numPorts, 50.);
-            vector<vector<double>> portCoord(13, vector<double>(6, 0));
+
+            // Setup the port information vector
+            vector<Port> ports = {};
+            ports.emplace_back(Port("inp1", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u1:a", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("inp2", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u1:b", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("out", 'O', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u3:o", 'O', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u1:o", 'O', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u4:a", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u4:o", 'O', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("f1:d", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("f1:a", 'O', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u2:a", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("u4:b", 'I', 50., vector<double>(6, 0)));
 
             // Setup the Eigen sparse conductance matrix
             spMat matG(13, 13); // Initialize sparse conductance matrix (S)
@@ -160,7 +170,7 @@ int main(int argc, char** argv)
             matC.makeCompressed(); // Capactiance matrix in compressed sparse row (CSR) format
 
             // Create variables of custom classes
-            Parasitics sample(numPorts, ports, portDir, Z_port_source, portCoord, matG, matC);
+            Parasitics sample(ports, matG, matC);
             SolverDataBase sdb(design, blank, sample);
 
             // Prepare to write to file
@@ -268,18 +278,31 @@ int main(int argc, char** argv)
             vector<dTriplet> listC;
             listG.reserve(sys.numPorts); // Reserve room so matrix could be dense
             listC.reserve(sys.numPorts);
-            for (size_t indi = 0; indi < sys.numPorts; indi++)
+            for (size_t indi = 0; indi < sys.numPorts; indi++) // Loop over excitation ports
             {
-                for (size_t indj = 0; indj < sys.numPorts; indj++)
+                double sumG = 0.;
+                double sumC = 0.;
+                for (size_t indj = 0; indj < sys.numPorts; indj++) // Loop over response ports
                 {
-                    listG.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].real()));
-                    listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag()/(2*PI*sys.freqStart*sys.freqUnit)));
+                    if (indi != indj) // Off-diagonal entries are negated node-to-node admittances
+                    {
+                        listG.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].real()));
+                        listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag() / (2 * M_PI* sys.freqStart * sys.freqUnit)));
+                    }
+                    
+                    // Diagonal entries need to have sum of all attached admittances, so note them
+                    sumG += sys.Y[indi * sys.numPorts + indj].real();
+                    sumC += sys.Y[indi * sys.numPorts + indj].imag() / (2 * M_PI* sys.freqStart * sys.freqUnit);
                 }
+
+                // Record diagonal entries
+                listG.push_back(dTriplet(indi, indi, sumG));
+                listC.push_back(dTriplet(indi, indi, sumC));
             }
             matG.setFromTriplets(listG.begin(), listG.end()); // Assign nonzero entries to sparse conductance matrix
             matC.setFromTriplets(listC.begin(), listC.end()); // Do not put in compressed sparse row (CSR) format due to density
             Parasitics oldPara = sdb.getParasitics(); // Get outdated parastics structure to update
-            sdb.setParasitics(Parasitics(oldPara.getNPort(), oldPara.getPorts(), oldPara.getPortDir(), oldPara.getZPortSource(), oldPara.getPortCoord(), matG, matC));
+            sdb.setParasitics(Parasitics(oldPara.getPorts(), matG, matC));
 
             // Output SPEF file
             string outSPEFFile = argv[4];
