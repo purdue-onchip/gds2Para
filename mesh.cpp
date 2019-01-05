@@ -1110,7 +1110,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     return 0;
 }
 
-
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly){
     int npol;
     int i, j, k;
