@@ -19,6 +19,7 @@
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
 #include "limboint.h"
+#include "fdtd.h"
 using namespace std;
 
 // Define types for Eigen
@@ -1485,7 +1486,7 @@ public:
                             sourceDir = 0; // No soure direction information included
 
                             zsup = (this->layers)[this->locateLayerGDSII(portLayer)].getZStart();
-                            zret = zsup; // Return assumed to be on same layer as supply z-coordinate
+                            zret = zsup + (this->layers)[this->locateLayerGDSII(portLayer)].getZHeight(); // Return assumed to be on same layer but on upper end
                         }
                         else if (nSpace >= 6)
                         {
@@ -1550,6 +1551,95 @@ public:
             // File could not be opened
             return false;
         }
+    }
+
+    // Convert to fdtdMesh
+    fdtdMesh convertToFDTDMesh(int numCdtRow)
+    {
+        // Initialize the output
+        unordered_set<double> portCoorx, portCoory;
+        fdtdMesh data;
+        data.numCdtRow = numCdtRow; // Use the sole argument
+
+        // Use simulation settings to set fields
+        data.lengthUnit = (this->settings).getLengthUnit();
+        data.freqUnit = (this->settings).getFreqUnit();
+        data.nfreq = (this->settings).getNFreq();
+        data.freqStart = (this->settings).getFreqs().front();
+        data.freqEnd = (this->settings).getFreqs().back();
+
+        // Use layer stack-up information to set fields
+        data.numStack = this->getNumLayer();
+        data.stackEps = (double*)malloc(sizeof(double) * data.numStack);
+        data.stackBegCoor = (double*)malloc(sizeof(double) * data.numStack);
+        data.stackEndCoor = (double*)malloc(sizeof(double) * data.numStack);
+        //data.stackEpsn; // Is this needed from SolverDataBase?
+        for (size_t indi = 0; indi < data.numStack; indi++)
+        {
+            Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
+            data.stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
+            data.stackBegCoor[indi] = thisLayer.getZStart();
+            data.stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
+            data.stackName.push_back(thisLayer.getLayerName());
+        }
+
+        // Set conductor information from saved stack information
+        data.stackCdtMark = (double*)malloc(sizeof(double) * data.numStack);
+        for (size_t indi = 0; indi < data.numCdtRow; indi++)
+        {
+            for (size_t indj = 0; indj < data.numStack; indj++)
+            {
+                // See if conductor layer numbers being built correspond to existing layer name
+                /*if (to_string(data.conductorIn[indi].layer).compare(data.stackName[indj]) == 0)
+                {
+                    data.conductorIn[indi].zmin = data.stackBegCoor[indj];
+                    data.conductorIn[indi].zmax = data.stackEndCoor[indj];
+                    data.stackCdtMark[indj] = 1;
+                }*/
+
+                // See if conductor layer numbers being built correspond to GDSII layer number
+                if (data.conductorIn[indi].layer == this->getLayer(indj).getGDSIINum())
+                {
+                    data.conductorIn[indi].zmin = data.stackBegCoor[indj];
+                    data.conductorIn[indi].zmax = data.stackEndCoor[indj];
+                    data.stackCdtMark[indj] = 1;
+                }
+            }
+        }
+
+        // Use port information in parasitics data member to set fields
+        data.numPorts = (this->para).getNPort();
+        data.portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data.numPorts);
+        //data.portArea; // Is this needed at all?
+        //data.portEdge; // Is this needed from SolverDataBase?
+        //data.portNno; // Is this needed at all?
+        for (size_t indi = 0; indi < data.numPorts; indi++)
+        {
+            Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation
+
+            // Save coordinates of the port (class automatically ensures x1 < x2, y1 < y2, and z1 < z2)
+            data.portCoor[indi].x1 = thisPort.getCoord()[0];
+            data.portCoor[indi].y1 = thisPort.getCoord()[1];
+            data.portCoor[indi].z1 = thisPort.getCoord()[2];
+            data.portCoor[indi].x2 = thisPort.getCoord()[3];
+            data.portCoor[indi].y2 = thisPort.getCoord()[4];
+            data.portCoor[indi].z2 = thisPort.getCoord()[5];
+
+            // Add coordinates of port to unordered maps if need be
+            if (thisPort.getCoord()[0] == thisPort.getCoord()[3])
+            {
+                // Record this x-coordinate along the x-axis
+                portCoorx.insert(thisPort.getCoord()[0]);
+            }
+            if (thisPort.getCoord()[1] == thisPort.getCoord()[4])
+            {
+                // Record this y-coordinate along the y-axis
+                portCoory.insert(thisPort.getCoord()[1]);
+            }
+        }
+
+        // Return fdtdMesh
+        return data;
     }
 
     // Print the solver database and dump to SPEF file
