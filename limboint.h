@@ -65,6 +65,24 @@ public:
         return this->props;
     }
 
+    // Set boundary points in cell coordinates
+    void setBounds(vector<double> bounds)
+    {
+        this->bounds = bounds;
+    }
+
+    // Set boundary layer number
+    void setLayer(int layer)
+    {
+        this->layer = layer;
+    }
+
+    // Set boundary properties
+    void setProps(vector<std::string> props)
+    {
+        this->props = props;
+    }
+
     // Return number of boundary points
     size_t getNBoundPt() const
     {
@@ -131,7 +149,7 @@ public:
     {
         //this->bounds = {};
         //(this->bounds).clear();
-        this->layer = 0;
+        //this->layer = 0;
         //this->props = {};
     }
 };
@@ -167,7 +185,7 @@ public:
         }
         else
         {
-            cout << "Path type must be 0, 1, or 2. Defaulting to type 2." << endl;
+            cerr << "Path type must be 0, 1, or 2. Defaulting to type 2." << endl;
             this->type = 2; // Default to type 2 if invalid
         }
         this->width = width;
@@ -205,6 +223,46 @@ public:
         return this->width;
     }
 
+    // Set path vertices in cell coordinates
+    void setPaths(vector<double> paths)
+    {
+        this->paths = paths;
+    }
+
+    // Set path layer number
+    void setLayer(int layer)
+    {
+        this->layer = layer;
+    }
+
+    // Set path properties
+    void setProps(vector<std::string> props)
+    {
+        this->props = props;
+    }
+
+    // Set path type
+    // 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+    void setType(int type)
+    {
+        if ((type == 0) || (type == 1) || (type == 2))
+        {
+            this->type = type;
+        }
+        else
+        {
+            cerr << "Path type must be 0, 1, or 2. Defaulting to type 2." << endl;
+            this->type = 2; // Default to type 2 if invalid
+        }
+    }
+
+    // Set path width
+    // Negative values mean independent of structure scaling
+    void setWidth(double width)
+    {
+        this->width = width;
+    }
+
     // Return number of path points
     size_t getNPathPt() const
     {
@@ -224,9 +282,9 @@ public:
     ~path()
     {
         //this->paths = {};
-        this->layer = 0;
-        this->type = 2;
-        this->width = 0.;
+        //this->layer = 0;
+        //this->type = 2;
+        //this->width = 0.;
     }
 };
 
@@ -278,6 +336,30 @@ public:
     int getType() const
     {
         return this->type;
+    }
+
+    // Set node vertices in cell coordinates
+    void setNodes(vector<double> nodes)
+    {
+        this->nodes = nodes;
+    }
+
+    // Set node layer number
+    void setLayer(int layer)
+    {
+        this->layer = layer;
+    }
+
+    // Set node properties
+    void setProps(vector<std::string> props)
+    {
+        this->props = props;
+    }
+
+    // Set node type
+    void setType(int type)
+    {
+        this->type = type;
     }
 
     // Return number of node points
@@ -345,8 +427,8 @@ public:
     ~node()
     {
         //this->nodes = {};
-        this->layer = 0;
-        this->type = 0;
+        //this->layer = 0;
+        //this->type = 0;
     }
 };
 
@@ -398,6 +480,30 @@ public:
     int getType() const
     {
         return this->type;
+    }
+
+    // Set box outline vertices in cell coordinates
+    void setBoxes(vector<double> boxes)
+    {
+        this->boxes = boxes;
+    }
+
+    // Set box outline layer number
+    void setLayer(int layer)
+    {
+        this->layer = layer;
+    }
+
+    // Set box outline properties
+    void setProps(vector<std::string> props)
+    {
+        this->props = props;
+    }
+
+    // Set box outline type
+    void setType(int type)
+    {
+        this->type = type;
     }
 
     // Return number of box outline points
@@ -465,8 +571,8 @@ public:
     ~box()
     {
         //this->boxes = {};
-        this->layer = 0;
-        this->type = 0;
+        //this->layer = 0;
+        //this->type = 0;
     }
 };
 
@@ -500,12 +606,36 @@ public:
     // Parametrized constructor
     textbox(vector<double> texts, int layer, vector<std::string> props, int type, int fontID, vector<int> justs, double width, std::string textStr)
     {
-        this->texts = texts;
+        if (texts.size() != 2)
+        {
+            cerr << "Text box center coordinates must be stored in vector of length 2. Defaulting to origin (0, 0).";
+            this->texts = { 0., 0. };
+        }
+        else
+        {
+            this->texts = texts;
+        }
         this->layer = layer;
         this->props = props;
         this->type = type;
         this->fontID = fontID;
-        this->justs = justs;
+        if (justs.size() != 2)
+        {
+            cerr << "Justifications must be stored in vector of size 2. Defaulting to {1, 1} (middle, center)." << endl;
+            this->justs = { 1, 1 };
+        }
+        else
+        {
+            if ((justs[0] < 0) || (justs[0] > 2) || (justs[1] < 0) || (justs[1] > 2))
+            {
+                cerr << "Justification values must each be 0, 1, or 2. Defaulting to {1, 1} (middle, center)." << endl;
+                this->justs = { 1, 1 };
+            }
+            else
+            {
+                this->justs = justs;
+            }
+        }
         this->width = width;
         this->textStr = textStr;
     }
@@ -561,6 +691,73 @@ public:
         return this->textStr;
     }
 
+    // Set text box center in cell coordinates
+    void setTexts(vector<double> texts)
+    {
+        this->texts = texts;
+    }
+
+    // Set text box layer number
+    void setLayer(int layer)
+    {
+        this->layer = layer;
+    }
+
+    // Set text box properties
+    void setProps(vector<std::string> props)
+    {
+        this->props = props;
+    }
+
+    // Set text box type
+    void setType(int type)
+    {
+        this->type = type;
+    }
+
+    // Set text box font ID (0-3)
+    void setFontID(int fontID)
+    {
+        this->fontID = fontID;
+    }
+
+    // Set text box justifications
+    // First (vertical): 0 = top, 1 = middle, 2 = bottom
+    // Second (horizontal): 0 = left, 1 = center, 2 = right
+    void setJusts(vector<int> justs)
+    {
+        if (justs.size() != 2)
+        {
+            cerr << "Justifications must be stored in vector of size 2. Defaulting to {1, 1} (middle, center)." << endl;
+            this->justs = { 1, 1 };
+        }
+        else
+        {
+            if ((justs[0] < 0) || (justs[0] > 2) || (justs[1] < 0) || (justs[1] > 2))
+            {
+                cerr << "Justification values must each be 0, 1, or 2. Defaulting to {1, 1} (middle, center)." << endl;
+                this->justs = { 1, 1 };
+            }
+            else
+            {
+                this->justs = justs;
+            }
+        }
+    }
+
+    // Set text width
+    // Negative values mean independent of structure scaling
+    void setWidth(double width)
+    {
+        this->width = width;
+    }
+
+    // Get string in text box
+    void setTextStr(std::string textStr)
+    {
+        this->textStr = textStr;
+    }
+
     // Destructor
     ~textbox()
     {
@@ -595,7 +792,15 @@ public:
     // Parametrized constructor
     sref(vector<double> srefs, vector<std::string> props, std::string srefName)
     {
-        this->srefs = srefs;
+        if (srefs.size() != 2)
+        {
+            cerr << "Structure reference center coordinates must be stored in vector of length 2. Defaulting to origin (0, 0).";
+            this->srefs = { 0., 0. };
+        }
+        else
+        {
+            this->srefs = srefs;
+        }
         this->props = props;
         this->srefName = srefName;
     }
@@ -612,18 +817,44 @@ public:
         return this->props;
     }
 
-    // Get string in text box
+    // Get name of referred geometric cell
     std::string getSRefName() const
     {
         return this->srefName;
     }
 
+    // Set placed structure reference center in cell coordinates
+    void setSRefs(vector<double> srefs)
+    {
+        if (srefs.size() != 2)
+        {
+            cerr << "Structure reference center coordinates must be stored in vector of length 2. Defaulting to origin (0, 0).";
+            this->srefs = { 0., 0. };
+        }
+        else
+        {
+            this->srefs = srefs;
+        }
+    }
+
+    // Set structure reference properties
+    void setProps(vector<std::string> props)
+    {
+        this->props = props;
+    }
+
+    // Set name of referred geometric cell
+    void setSRefName(std::string srefName)
+    {
+        this->srefName = srefName;
+    }
+
     // Destructor
     ~sref()
     {
-        vector<double> srefs = { 0., 0. };
-        this->srefs = srefs;
-        this->srefName = "";
+        //vector<double> srefs = { 0., 0. };
+        //this->srefs = srefs;
+        //this->srefName = "";
     }
 };
 
@@ -997,7 +1228,7 @@ private:
     vector<GeoCell> cells;                       // Vector of cells in design
     int numCdtIn;                                // Number of conductor rows
     std::string strPoints;                       // Polygon output
-    fdtdOneCondct a;                             // Template for the conductor vector
+    fdtdOneCondct cond;                          // Template for the conductor vector
 public:
     /// @brief constructor
     AsciiDataBase()
@@ -1007,6 +1238,7 @@ public:
         double databaseUnits = 1.;
         char element;
         vector<GeoCell> cells;
+        fdtdOneCondct cond;
 
         this->fileName = fileName;
         this->version = version;
@@ -1021,6 +1253,7 @@ public:
         this->cells = cells;
         this->numCdtIn = 0;
         this->strPoints = "";
+        this->cond = cond;
     }
 
     // Get file name
@@ -1093,6 +1326,12 @@ public:
     std::string getPolygon()
     {
         return this->strPoints;
+    }
+
+    // Get conductor vector template
+    fdtdOneCondct getCond() const
+    {
+        return this->cond;
     }
 
     // Set file name
@@ -1271,7 +1510,7 @@ public:
             (this->numCdtIn)++;
 
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
-            sys->conductorIn.push_back(this->a);
+            sys->conductorIn.push_back(this->cond);
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = boundCoord.size() / 2 - 1;
             sys->conductorIn[si].xmax = DOUBLEMIN;
@@ -1310,7 +1549,7 @@ public:
             double width = ((cell.paths)[indi]).getWidth();
             for (size_t indj = 0; indj < pathCoord.size()-2; indj++) // C string for each ordered pair
             {
-                sys->conductorIn.push_back(this->a);
+                sys->conductorIn.push_back(this->cond);
                 si = sys->conductorIn.size() - 1;
                 sys->conductorIn[si].numVert = 4;
                 sys->conductorIn[si].xmax = DOUBLEMIN;
@@ -1428,7 +1667,7 @@ public:
         {
             this->numCdtIn++;
 
-            sys->conductorIn.push_back(this->a);
+            sys->conductorIn.push_back(this->cond);
             vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = ((cell.boxes)[indi]).getNBoxPt() - 1;
@@ -1911,11 +2150,11 @@ public:
     void general_cbk(string const& ascii_record_type, string const& ascii_data_type, ContainerType const& data)
     {
         // Data Printing
-        /*if (this->getElement() == 's')
+        /*if (this->getElement() == 't')
         {
-        cout << "ascii_record_type: " << ascii_record_type << endl
-        << "ascii_data_type: " << ascii_data_type << endl
-        << "data size: " << data.size() << endl;
+            cout << "ascii_record_type: " << ascii_record_type << endl
+            << "ascii_data_type: " << ascii_data_type << endl
+            << "data size: " << data.size() << endl;
         }*/
 
         // Data handling
@@ -2007,33 +2246,23 @@ public:
         {
             if (this->getElement() == 'b')
             {
-                boundary modBound = ((getCell(this->numCell)).boundaries).back(); // Get copy of boundary
-                ((this->cells)[this->numCell]).boundaries.pop_back(); // Remove last boundary vector entry
-                ((this->cells)[this->numCell]).boundaries.emplace_back(boundary(modBound.getBounds(), data[0], modBound.getProps())); // Put boundary back with layer update
+                ((this->cells)[this->numCell]).boundaries.back().setLayer(data[0]); // Use setter to update layer of last boundary
             }
             else if (this->getElement() == 'p')
             {
-                path modPath = getCell(this->numCell).paths.back();
-                ((this->cells)[this->numCell]).paths.pop_back();
-                ((this->cells)[this->numCell]).paths.emplace_back(path(modPath.getPaths(), data[0], modPath.getProps(), modPath.getType(), modPath.getWidth()));
+                ((this->cells)[this->numCell]).paths.back().setLayer(data[0]);
             }
             else if (this->getElement() == 'n')
             {
-                node modNode = getCell(this->numCell).nodes.back();
-                ((this->cells)[this->numCell]).nodes.pop_back();
-                ((this->cells)[this->numCell]).nodes.emplace_back(node(modNode.getNodes(), data[0], modNode.getProps(), modNode.getType()));
+                ((this->cells)[this->numCell]).nodes.back().setLayer(data[0]);
             }
             else if (this->getElement() == 'x')
             {
-                box modBox = getCell(this->numCell).boxes.back();
-                ((this->cells)[this->numCell]).boxes.pop_back();
-                ((this->cells)[this->numCell]).boxes.emplace_back(box(modBox.getBoxes(), data[0], modBox.getProps(), modBox.getType()));
+                ((this->cells)[this->numCell]).boxes.back().setLayer(data[0]);
             }
             else if (this->getElement() == 't')
             {
-                textbox modText = getCell(this->numCell).textboxes.back();
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), data[0], modText.getProps(), modText.getType(), modText.getFontID(), modText.getJusts(), modText.getWidth(), modText.getTextStr()));
+                ((this->cells)[this->numCell]).textboxes.back().setLayer(data[0]);
             }
         }
         else if (ascii_record_type == "XY")
@@ -2060,39 +2289,27 @@ public:
             // Store coordinates
             if (this->getElement() == 'b')
             {
-                boundary modBound = getCell(this->numCell).boundaries.back(); // Get copy of boundary
-                ((this->cells)[this->numCell]).boundaries.pop_back(); // Remove last boundary vector entry
-                ((this->cells)[this->numCell]).boundaries.emplace_back(boundary(coord, modBound.getLayer(), modBound.getProps())); // Put boundary back with coordinate update
+                ((this->cells)[this->numCell]).boundaries.back().setBounds(coord); // Use setter to update boundary points in cell coordinates of last boundary
             }
             else if (this->getElement() == 'p')
             {
-                path modPath = getCell(this->numCell).paths.back();
-                ((this->cells)[this->numCell]).paths.pop_back();
-                ((this->cells)[this->numCell]).paths.emplace_back(path(coord, modPath.getLayer(), modPath.getProps(), modPath.getType(), modPath.getWidth()));
+                ((this->cells)[this->numCell]).paths.back().setPaths(coord);
             }
             else if (this->getElement() == 'n')
             {
-                node modNode = getCell(this->numCell).nodes.back();
-                ((this->cells)[this->numCell]).nodes.pop_back();
-                ((this->cells)[this->numCell]).nodes.emplace_back(node(coord, modNode.getLayer(), modNode.getProps(), modNode.getType()));
+                ((this->cells)[this->numCell]).nodes.back().setNodes(coord);
             }
             else if (this->getElement() == 'x')
             {
-                box modBox = getCell(this->numCell).boxes.back();
-                ((this->cells)[this->numCell]).boxes.pop_back();
-                ((this->cells)[this->numCell]).boxes.emplace_back(box(coord, modBox.getLayer(), modBox.getProps(), modBox.getType()));
+                ((this->cells)[this->numCell]).boxes.back().setBoxes(coord);
             }
             else if (this->getElement() == 't')
             {
-                textbox modText = getCell(this->numCell).textboxes.back();
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(coord, modText.getLayer(), modText.getProps(), modText.getType(), modText.getFontID(), modText.getJusts(), modText.getWidth(), modText.getTextStr()));
+                ((this->cells)[this->numCell]).textboxes.back().setTexts(coord);
             }
             else if (this->getElement() == 's')
             {
-                sref modSRef = getCell(this->numCell).sreferences.back();
-                ((this->cells)[this->numCell]).sreferences.pop_back();
-                ((this->cells)[this->numCell]).sreferences.emplace_back(sref(coord, modSRef.getProps(), modSRef.getSRefName()));
+                ((this->cells)[this->numCell]).sreferences.back().setSRefs(coord);
             }
         }
         else if (ascii_record_type == "DATATYPE") // Unimplemented in the GDSII standard
@@ -2103,36 +2320,28 @@ public:
         {
             if (this->getElement() == 'p')
             {
-                path modPath = getCell(this->numCell).paths.back();
-                ((this->cells)[this->numCell]).paths.pop_back();
-                ((this->cells)[this->numCell]).paths.emplace_back(path(modPath.getPaths(), modPath.getLayer(), modPath.getProps(), data[0], modPath.getWidth()));
+                ((this->cells)[this->numCell]).paths.back().setType(data[0]);
             }
         }
         else if (ascii_record_type == "NODETYPE")
         {
             if (this->getElement() == 'n')
             {
-                node modNode = getCell(this->numCell).nodes.back();
-                ((this->cells)[this->numCell]).nodes.pop_back();
-                ((this->cells)[this->numCell]).nodes.emplace_back(node(modNode.getNodes(), modNode.getLayer(), modNode.getProps(), data[0]));
+                ((this->cells)[this->numCell]).nodes.back().setType(data[0]);
             }
         }
         else if (ascii_record_type == "BOXTYPE")
         {
             if (this->getElement() == 'x')
             {
-                box modBox = getCell(this->numCell).boxes.back();
-                ((this->cells)[this->numCell]).boxes.pop_back();
-                ((this->cells)[this->numCell]).boxes.emplace_back(box(modBox.getBoxes(), modBox.getLayer(), modBox.getProps(), data[0]));
+                ((this->cells)[this->numCell]).boxes.back().setType(data[0]);
             }
         }
         else if (ascii_record_type == "TEXTTYPE")
         {
             if (this->getElement() == 't')
             {
-                textbox modText = getCell(this->numCell).textboxes.back();
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modText.getProps(), data[0], modText.getFontID(), modText.getJusts(), modText.getWidth(), modText.getTextStr()));
+                ((this->cells)[this->numCell]).textboxes.back().setType(data[0]);
             }
         }
         else if (ascii_record_type == "WIDTH")
@@ -2143,15 +2352,11 @@ public:
             // Store widths
             if (this->getElement() == 'p')
             {
-                path modPath = getCell(this->numCell).paths.back();
-                ((this->cells)[this->numCell]).paths.pop_back();
-                ((this->cells)[this->numCell]).paths.emplace_back(path(modPath.getPaths(), modPath.getLayer(), modPath.getProps(), modPath.getType(), unitFactor * data[0]));
+                ((this->cells)[this->numCell]).paths.back().setWidth(unitFactor * data[0]);
             }
             else if (this->getElement() == 't')
             {
-                textbox modText = getCell(this->numCell).textboxes.back();
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modText.getProps(), modText.getType(), modText.getFontID(), modText.getJusts(), unitFactor * data[0], modText.getTextStr()));
+                ((this->cells)[this->numCell]).textboxes.back().setWidth(unitFactor * data[0]);
             }
         }
         else if (ascii_record_type == "PRESENTATION")
@@ -2164,32 +2369,29 @@ public:
             // Store text presentation information
             if (this->getElement() == 't')
             {
-                // Get existing text box record
-                textbox modText = getCell(this->numCell).textboxes.back();
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-
                 // Find font identifier based on bit pattern
                 int fontID = ((int)data[0] & fontIDMask) >> 4;
 
                 // Find vertical and horizontal justification based on bit pattern
                 int vertJust = ((int)data[0] & vertJustMask) >> 2;
                 int horizJust = ((int)data[0] & horizJustMask);
-                if (vertJust == 4)
+                if (vertJust == 3) // Only illegal value possible with bit mask
                 {
-                    cout << "Illegal text box vertical justification reset to middle" << endl;
+                    cerr << "Illegal text box vertical justification, resetting to middle" << endl;
                     vertJust = 1;
                 }
-                if (horizJust == 4)
+                if (horizJust == 3)
                 {
-                    cout << "Illegal text box horizontal justification reset to center" << endl;
+                    cerr << "Illegal text box horizontal justification, resetting to center" << endl;
                     vertJust = 1;
                 }
 
-                // Put text box back with presentation update
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modText.getProps(), modText.getType(), fontID, { vertJust, horizJust }, modText.getWidth(), modText.getTextStr()));
+                // Update presentation in last text box
+                ((this->cells)[this->numCell]).textboxes.back().setFontID(fontID);
+                ((this->cells)[this->numCell]).textboxes.back().setJusts({ vertJust, horizJust });
             }
         }
-        else if (ascii_record_type == "STRANS") // Unimplemented by user until needed
+        else if (ascii_record_type == "STRANS") // Unimplemented by programmer until needed
         {
             //cout << "Linear transformation of element: " << data[0] << endl;
         }
@@ -2209,9 +2411,7 @@ public:
             //cout << "Text box string: " << label << endl;
             if (this->getElement() == 't')
             {
-                textbox modText = getCell(this->numCell).textboxes.back();
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modText.getProps(), modText.getType(), modText.getFontID(), modText.getJusts(), modText.getWidth(), label));
+                ((this->cells)[this->numCell]).textboxes.back().setTextStr(label);
             }
         }
         else if (ascii_record_type == "SNAME")
@@ -2230,9 +2430,7 @@ public:
             //cout << "Structure reference name: " << label << endl;
             if (this->getElement() == 's')
             {
-                sref modSRef = getCell(this->numCell).sreferences.back();
-                ((this->cells)[this->numCell]).sreferences.pop_back();
-                ((this->cells)[this->numCell]).sreferences.emplace_back(sref(modSRef.getSRefs(), modSRef.getProps(), label));
+                ((this->cells)[this->numCell]).sreferences.back().setSRefName(label);
             }
         }
         else if (ascii_record_type == "PROPATTR")
@@ -2254,84 +2452,42 @@ public:
             }
             //cout << "Element property value: " << label << endl;
 
-            // Store  property (might only handle a single one)
+            // Store property (might only handle a single one)
             if (this->getElement() == 'b')
             {
-                boundary modBound = getCell(this->numCell).boundaries.back(); // Get copy of boundary
-                vector<std::string> modProps = {}; // Use empty vector for new properties, except ...
-                if (modBound.getProps().size() != 0)
-                {
-                    modProps = modBound.getProps(); // ... Replace with any existing properties of this boundary (to be used)
-                }
-                modProps.assign(this->numProp, ""); // Ensure enough elements available for property to go in correct location
-                modProps[this->numProp - 1] = label; // Put new property value in place
-                ((this->cells)[this->numCell]).boundaries.pop_back(); // Remove last boundary vector entry
-                ((this->cells)[this->numCell]).boundaries.emplace_back(boundary(modBound.getBounds(), modBound.getLayer(), modProps)); // Put boundary back with properties update
+                vector<std::string> modProps = ((this->cells)[this->numCell]).boundaries.back().getProps(); // Get copy of existing properties of last boundary
+                modProps.emplace(modProps.begin() + this->numProp - 1, label); // Add new property in specified location to copy
+                ((this->cells)[this->numCell]).boundaries.back().setProps(modProps); // Use setter to update properties of last boundary
             }
             else if (this->getElement() == 'p')
             {
-                path modPath = getCell(this->numCell).paths.back();
-                vector<std::string> modProps = {};
-                if (modPath.getProps().size() != 0)
-                {
-                    modProps = modPath.getProps();
-                }
-                modProps.assign(this->numProp, "");
-                modProps[this->numProp - 1] = label;
-                ((this->cells)[this->numCell]).paths.pop_back();
-                ((this->cells)[this->numCell]).paths.emplace_back(path(modPath.getPaths(), modPath.getLayer(), modProps, modPath.getType(), modPath.getWidth()));
+                vector<std::string> modProps = ((this->cells)[this->numCell]).paths.back().getProps();
+                modProps.emplace(modProps.begin() + this->numProp - 1, label);
+                ((this->cells)[this->numCell]).paths.back().setProps(modProps);
             }
             else if (this->getElement() == 'n')
             {
-                node modNode = getCell(this->numCell).nodes.back();
-                vector<std::string> modProps = {};
-                if (modNode.getProps().size() != 0)
-                {
-                    modProps = modNode.getProps();
-                }
-                modProps.assign(this->numProp, "");
-                modProps[this->numProp - 1] = label;
-                ((this->cells)[this->numCell]).nodes.pop_back();
-                ((this->cells)[this->numCell]).nodes.emplace_back(node(modNode.getNodes(), modNode.getLayer(), modProps, modNode.getType()));
+                vector<std::string> modProps = ((this->cells)[this->numCell]).nodes.back().getProps();
+                modProps.emplace(modProps.begin() + this->numProp - 1, label);
+                ((this->cells)[this->numCell]).nodes.back().setProps(modProps);
             }
             else if (this->getElement() == 'x')
             {
-                box modBox = getCell(this->numCell).boxes.back();
-                vector<std::string> modProps = {};
-                if (modBox.getProps().size() != 0)
-                {
-                    modProps = modBox.getProps();
-                }
-                modProps.assign(this->numProp, "");
-                modProps[this->numProp - 1] = label;
-                ((this->cells)[this->numCell]).boxes.pop_back();
-                ((this->cells)[this->numCell]).boxes.emplace_back(box(modBox.getBoxes(), modBox.getLayer(), modProps, modBox.getType()));
+                vector<std::string> modProps = ((this->cells)[this->numCell]).boxes.back().getProps();
+                modProps.emplace(modProps.begin() + this->numProp - 1, label);
+                ((this->cells)[this->numCell]).boxes.back().setProps(modProps);
             }
             else if (this->getElement() == 't')
             {
-                textbox modText = getCell(this->numCell).textboxes.back();
-                vector<std::string> modProps = {};
-                if (modText.getProps().size() != 0)
-                {
-                    modProps = modText.getProps();
-                }
-                modProps.assign(this->numProp, "");
-                modProps[this->numProp - 1] = label;
-                ((this->cells)[this->numCell]).textboxes.pop_back();
-                ((this->cells)[this->numCell]).textboxes.emplace_back(textbox(modText.getTexts(), modText.getLayer(), modProps, modText.getType(), modText.getFontID(), modText.getJusts(), modText.getWidth(), modText.getTextStr()));
+                vector<std::string> modProps = ((this->cells)[this->numCell]).textboxes.back().getProps();
+                modProps.emplace(modProps.begin() + this->numProp - 1, label);
+                ((this->cells)[this->numCell]).textboxes.back().setProps(modProps);
             }
             else if (this->getElement() == 's')
             {
-                sref modSRef = getCell(this->numCell).sreferences.back();
-                vector<std::string> modProps = {};
-                if (modSRef.getProps().size() != 0)
-                {
-                    modProps = modSRef.getProps();
-                }
-                modProps.assign(this->numProp, "");
-                modProps[this->numProp - 1] = label;
-                ((this->cells)[this->numCell]).sreferences.pop_back();
-                ((this->cells)[this->numCell]).sreferences.emplace_back(sref(modSRef.getSRefs(), modProps, modSRef.getSRefName()));
+                vector<std::string> modProps = ((this->cells)[this->numCell]).sreferences.back().getProps();
+                modProps.emplace(modProps.begin() + this->numProp - 1, label);
+                ((this->cells)[this->numCell]).sreferences.back().setProps(modProps);
             }
         }
         else if (ascii_record_type == "ENDEL")
