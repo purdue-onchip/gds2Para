@@ -88,6 +88,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
     }
     lyr = 0;
+    int lyr1 = 0;
     sys->stackEps = (double*)calloc(sys->numStack, sizeof(double));
     sys->stackBegCoor = (double*)calloc(sys->numStack, sizeof(double));
     sys->stackEndCoor = (double*)calloc(sys->numStack, sizeof(double));
@@ -98,16 +99,25 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         if (lyr >= sys->numStack){    //blank
             break;
         }
-        sys->stackEps[lyr] = fdtdGetValue(word[6]);   // get the stack eps
-        if (lyr == 0){
-            sys->stackBegCoor[lyr] = 0;
+        if (fdtdGetValue(word[3]) == 0){
+            lyr++;
+            continue;
+        }
+        sys->stackEps[lyr1] = fdtdGetValue(word[6]);   // get the stack eps
+        if (lyr1 == 0){
+            sys->stackBegCoor[lyr1] = 0;
         }
         else{
-            sys->stackBegCoor[lyr] = sys->stackEndCoor[lyr - 1];
+            sys->stackBegCoor[lyr1] = sys->stackEndCoor[lyr1 - 1];
         }
-        sys->stackEndCoor[lyr] = sys->stackBegCoor[lyr] + fdtdGetValue(word[3])*sys->lengthUnit;
+        sys->stackEndCoor[lyr1] = sys->stackBegCoor[lyr1] + fdtdGetValue(word[3])*sys->lengthUnit;
         sys->stackName.push_back(word[0]);
+        lyr1++;
         lyr++;
+    }
+    sys->numStack = lyr1;
+    for (i = 0; i < sys->numStack; i++){
+        cout << sys->stackBegCoor[i] << " " << sys->stackEndCoor[i] << " " << sys->stackEps[i] << endl;
     }
 
     while (fgets(s, FDTD_MAXC, fp) != NULL){
@@ -155,7 +165,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         lyr++;
     }
 
-    
+
     
     cout << "Begin reading the conductor information!" << endl;
     //sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
@@ -219,7 +229,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
-    double disMin = 1.e-10;
+    double disMin = 1.e-9;
     double disMaxx, disMaxy;   // the max discretization in x, y, z directions
     for (i = 0; i < sys->numCdtRow; i++){
         numNode += sys->conductorIn[i].numVert;
@@ -336,7 +346,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     sys->ny = 1;
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
-    disMaxy = (ymax - ymin) / 5;
+    disMaxy = (ymax - ymin) / 10;
 
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -618,8 +628,11 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             j++;
         }
     }
+    for (i = 0; i < sys->nz - 1; i++){
+        cout << sys->stackEpsn[i] << endl;
+    }
 
-    /*for (i = 0; i < sys->nx; i++){
+    for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
     cout << "\n" << endl;
@@ -630,7 +643,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;*/
+    cout << "\n" << endl;
     /*vector<pair<double, int> > vx(xi.begin(), xi.end());
     sort(vx.begin(), vx.end(), comp);
     for (int i = 0; i < vx.size(); i++){
@@ -1082,13 +1095,17 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
         for (j = zi[sys->portCoor[i].z1]; j <= zi[sys->portCoor[i].z2]; j++){
             for (l = xi[sys->portCoor[i].x1]; l <= xi[sys->portCoor[i].x2]; l++){
                 for (m = yi[sys->portCoor[i].y1]; m <= yi[sys->portCoor[i].y2]; m++){
+
                     sys->portCoor[i].node[n] = j * sys->N_node_s + l * (sys->N_cell_y + 1) + m;
                     sys->portNno.insert(j * sys->N_node_s + l * (sys->N_cell_y + 1) + m);
+                    
                     n++;
+                    
                 }
             }
         }
     }
+    
 
     return 0;
 }
