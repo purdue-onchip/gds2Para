@@ -1,0 +1,39 @@
+IMAP3D 1.0.0
+
+* IMAP File Generated Wed Oct 23 15:08:58 2002
+ 
+
+LINEARUNITS um
+
+NAME testmodel
+
+STACK
+
+TopPlane	h=1.448 sigma=5.e+7 
+ILD2		z=1.14 h=0.308 e=4.1 TanD=0
+ILDM2		z=1.02 h=0.12 e=8.0 TanD=0 sigma=58000000
+ILD1		z=0.405 h=0.615 e=4.1 TanD=0
+ILDM1		z=0.12 h=0.285 e=4.1 TanD=0 sigma=58000000
+ILD0		z=0. h=0.12 e=8.0 TanD=0
+Substrate	h=0 sigma=50000000
+GroundPlane	h=0.296 sigma=58000000
+
+CONDUCTORS
+
+return COND17 x1=0.0 y1=0.05 z1=0.12 x2=100.0 y2=0.05 z2=0.405 sigma=50000000 layer=ILDM1 
+signal COND11 x1=150.0 y1=0.05 z1=0.12 x2=160.0 y2=0.05 z2=0.405 sigma=50000000 layer=ILDM1 group=SG1
+return COND17 x1=210.0 y1=0.05 z1=0.12 x2=300.0 y2=0.05 z2=0.405 sigma=50000000 layer=ILDM1 
+
+BOUNDARY
+
+
+PORTTABLE
+
+PORT1  group=SG1  znear=50 zfar=50
+
+ANALYSIS
+
+Frequency begin=45e6 end=5.0e10 numberofpoints=50
+Solver fullwave
+Output citi
+Length 200
