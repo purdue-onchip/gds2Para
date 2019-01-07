@@ -1,24 +1,40 @@
-# gdsii-interface
-GDSII File Parser and Plotter
+# gds2Para
+Complete Integrated Circuit (IC) Layout Analysis from GDSII Design File to Parasitics Extraction
 
-This GDSII file parser is written in C++ as part of a wider API for the electromagnetic design validation of VLSI designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits. Please carefully read this **README.md** file for installation and usage instructions
+This IC layout analyzer is written in C++ as part of a wider API for the electromagnetic design validation of VLSI designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits. Design information from the Graphic Database Stream II (GDSII) file is parsed and stored alongside simulation input information. Once a design is loaded, the information can be written to another GDSII file or analyzed with a full-wave simulation to extract parasitics between ports. An alternate mode of operation allows an interconnect modeling platform (IMP) file to be translated to a GDSII file design. Parasitics are reported through a Standard Parasitics Exchange Format (SPEF) file. Please carefully read this **README.md** file for installation and usage instructions.
 
 ## Packages
 | Packages                                | Languages                       | Description                                                                |
 | --------------------------------------- | ------------------------------- | -------------------------------------------------------------------------- |
-| Algorithms                              | C++                             | Useful algorithms including partitioning, coloring, etc.                   |
-| FStream                                 | C++                             | Text file input and output                        |
+| Algorithms                              | C++                             | Useful algorithms including sorting                   |
+| Cctype                                  | C                               | Utilities for testing character categorization     |
+| Cerrno                                  | C                               | Utilities for C language error numbers             |
+| Cmath                                   | C                               | Utilities for basic arithmetic operations          |
+| Complex                                 | C++                             | Complex number arithmetic                         |
+| Cstdio                                  | C                               | Utilities for C language input/output              |
+| Cstdlib                                 | C                               | Utilities for common C language tasks              |
+| Cstring                                 | C                               | Utilities for manipulating char* data type         |
+| Ctime                                   | C                               | Utilities for dates and timers                      |
+| Eigen                                   | C++                             | API for sparse matrix storage                       |
+| FStream                                 | C++                             | Plain textext file input and output                        |
 | GDS2GDT                                 | C                               | Binary-to-text conversion from .gds to .gdt file           |
 | GeoCell                                 | C++                             | Custom class for GDSII geometric cell             |
 | Geometry                                | C++                             | Custom class for VLSI design geometry             |
-| gnuplot                                 | Shell                           | Command-line utility for plotting                 |
 | IOStream                                | C++                             | Command line input and output                     |
+| Limbo                                   | C/C++                           | API for GDSII file parsing and writing                      |
 | MakeUtils                               | Makefile                        | Makefile utilities that help find dependencies                             |
 | Math                                    | C++                             | Extension of math functions from STL                                       |
-| Preprocessor                            | C++                             | Macros such as assertion with message                                      |
+| MKL                                     | Fortran/C/C++                   | Intel libraries for parallel mathematics          |
+| Parser-SPEF                             | C++                             | API for SPEF file processing                      |
+| Preprocessor                            | C/C++                           | Macros such as assertion with message                                      |
 | ProgramOptions                          | C++                             | Easy API to parser command line options                                    |
-| String                                  | C++                             | Utilities to char and string                                               |
+| Set                                     | C++                             | Utilities for sets and multisets                  |
+| Stack                                   | C++                             | Utilities for handling LIFO stacks                 |
+| String                                  | C++                             | Utilities for easy string handling                                              |
 | ThirdParty                              | C/C++                           | Third party packages required                                              |
+| Unordered_map                           | C++                             | Utilities for handling associative data types     |
+| Unordered_set                           | C++                             | Utilities for handling dictionary collection types   |
+| Utility                                 | C++                             | Functions and classes for pairs and swapping       |
 | Vector                                  | C++                             | Collection data types from existing C++ data types |
 
 ## Developers
@@ -36,11 +52,18 @@ Many thanks are owed to the project sponsors:
 
 ## Installation and Usage
 1. Clone this respository into your working location
-2. Enter "gdsii-interface" directory in working location
-3. (Optional) Add GDSII file to working location
-4. Run `make all` in shell to compile executable **TestInterface**
-5. (Optional) Modify **gdsplot.sh** to work on GDSII file added
-6. Run `bash ./gdsplot.sh` in shell to produce PNG images recreating each layer in the GDSII file
+2. Repeat for the [Limbo repository](https://github.com/limbo018/Limbo), [Parser-SPEF repository](https://github.com/OpenTimer/Parser-SPEF), and [eigen-git-mirror repository](https://github.com/eigenteam/eigen-git-mirror)
+3. Ensure that you are the owner of the files that were downloaded with full read/write/execute permissions
+4. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
+5. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
+6. Exit the shell and terminate the connection before logging back in
+7. Enter the directory "Limbo/limbo/parsers/gdsii/stream" from the working location
+8. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
+9. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
+10. Enter the directory "gds2Para" from the working location
+11. (Optional) Add GDSII file to working location
+12. Run `make` in shell to compile executable **LayoutAnalyzer**
+13. Run `LayoutAnalyzer --help` in shell to view possible modes of operation for this software
 
 ## License
 GNU Public License v2.0 (see **LICENSE**)

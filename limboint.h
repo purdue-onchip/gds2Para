@@ -1504,7 +1504,7 @@ public:
         int numSRef = cell.getNumSRef();
 
         // Print cell information
-        cout << "  List of " << numBound << " boundaries:" << endl;
+        //cout << "  List of " << numBound << " boundaries:" << endl;
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
             (this->numCdtIn)++;
@@ -1542,7 +1542,7 @@ public:
                 condj++;
             }
         }
-        cout << "  List of " << numPath << " paths:" << endl;
+        //cout << "  List of " << numPath << " paths:" << endl;
         for (size_t indi = 0; indi < numPath; indi++) // Handle each path
         {
             vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
@@ -1661,8 +1661,8 @@ public:
             }
 
         }
-        cout << "  List of " << numNode << " nodes:" << endl;
-        cout << "  List of " << numBox << " box outlines:" << endl;
+        //cout << "  List of " << numNode << " nodes:" << endl;
+        //cout << "  List of " << numBox << " box outlines:" << endl;
         for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
         {
             this->numCdtIn++;
@@ -1699,11 +1699,11 @@ public:
                 
             }
         }
-        cout << "  List of " << numText << " text boxes:" << endl;
-        cout << "  List of " << numSRef << " structure references:" << endl;
+        //cout << "  List of " << numText << " text boxes:" << endl;
+        //cout << "  List of " << numSRef << " structure references:" << endl;
         for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
         {
-            printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
+            //printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
         }
 
         // Close output file
