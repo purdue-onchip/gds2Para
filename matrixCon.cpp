@@ -100,7 +100,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     acu_cnno[0] = 0;
     count = 0;
     int *map = (int*)calloc(sys->N_node, (sizeof(int)));
-
+    
     for (i = 0; i < sys->numCdt; i++){
         if (sys->conductor[i].markPort == 1){
             acu_cnno[count + 1] = acu_cnno[count];
@@ -542,7 +542,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->AcColId[i] = map[sys->AcColId[i]] - 1;
     }
     free(map); map = NULL;
-
+    
     int leng_v0c2 = 0;
     for (i = 0; i < sys->numPorts; i++){
         temp2.clear();
@@ -579,7 +579,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (i = 0; i < sys->numCdt; i++){
         portCdt = portCdt + sys->conductor[i].markPort;
     }
-
+    
     /*outfile1.open("v0c.txt", std::ofstream::out | std::ofstream::trunc);
     for (i = 0; i < sys->v0cRowId.size(); i++){
         outfile1 << sys->v0cRowId[i] + 1 << " " << sys->v0cColId[i] + 1 << " " << sys->v0cvalo[i] << endl;
@@ -1062,7 +1062,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     int leng_v0d2 = 0;
     int leng_v0d2a = 0;
-    if (sys->numCdt - portCdt > 0){
+    vector<vector<int> > ind(sys->numCdt);
+
+    k = 0;
+    for (i = 0; i < sys->numCdt; i++){
+        for (j = 0; j < sys->cdtNumNode[i]; j++){
+            ind[k].push_back(sys->conductor[i].node[j]);
+        }
+        k++;
+    }
+    /*if (sys->numCdt - portCdt > 0){
         vector<vector<int> > ind(sys->numCdt);
         k = 0;
         for (i = 0; i < sys->numCdt; i++){
@@ -1072,7 +1081,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             k++;
         }
         for (i = 0; i < sys->numCdt; i++){
-            if (sys->conductor[i].markPort != 0){    // if this conductor doesn't contain any port
+            if (sys->conductor[i].markPort == 0){    // if this conductor doesn't contain any port
                 rowId.clear();
                 colId.clear();
                 val.clear();
@@ -1086,7 +1095,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 }
                 leng_v0d2++;
 
-                /*rowId.clear();
+                rowId.clear();
                 colId.clear();
                 val.clear();
                 status = nodeAddAvg(rowId, colId, val, ind[i][0], sys->N_edge, sys);
@@ -1097,13 +1106,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     sys->v0d2aColId.push_back(leng_v0d2a);
                     sys->v0d2aval.push_back(val[j]);
                 }
-                leng_v0d2a++;*/
+                leng_v0d2a++;
             }
         }
         ind.clear();
-    }
-    leng_v0d2 = 0;
-    leng_v0d2a = 0;
+    }*/
+    
     /*outfile1.open("v0d2a.txt", std::ofstream::out | std::ofstream::trunc);
     for (i = 0; i < sys->v0d2aRowId.size(); i++){
         outfile1 << sys->v0d2aRowId[i] + 1 << " " << sys->v0d2aColId[i] + 1 << " " << sys->v0d2aval[i] << endl;
@@ -1700,12 +1708,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             int node1;
             double a = 0, area, areasum;
             current = complex<double>(0., 0.);
-
+            
             if (sys->portCoor[i].x1 == sys->portCoor[i].x2){
 
                 inx = xi[sys->portCoor[i].x1];
 
-                for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
+                /*for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
                     for (k = yi[sys->portCoor[i].y1]; k <= yi[sys->portCoor[i].y2]; k++){
                         mark = (k - yi[sys->portCoor[i].y1])
                             + (l - zi[sys->portCoor[i].z1])*(yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y2] + 1);
@@ -1923,123 +1931,226 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                         current += (sys->v0csJ[mark]) * areasum;
 
                     }
-                }
-                /*double a = 0;
-                int sign = 1;
+                }*/
+                double a = 0, b = 0;    // imag part a, real part b
+                int cond = sys->portCoor[i].portCnd - 1;
+                double sumarea;
 
-                for (int inde = 0; inde < sys->v0d2RowId.size(); inde++){
-                    if (sourcePort == i){
-                        if (sys->y[sys->v0d2RowId[inde]] * sys->v0d2val[inde] > 0){
-                            if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3]){
-                                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] != 0){
-                                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
+                if (sourcePort == i){
+                    rowId.clear();
+                    colId.clear();
+                    val.clear();
+                    status = nodeAdd(rowId, colId, val, ind[cond], sys->N_edge, sys);
+                    if (status != 0)
+                        return status;
+                    for (int inde = 0; inde < rowId.size(); inde++){
+
+                        if (sys->y[rowId[inde]] * val[inde] > 0){
+                            if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3]){    // along x axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the left node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - sys->N_cell_y - 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
                                         }
                                     }
                                 }
-                                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] != 0){
-                                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the right node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + sys->N_cell_y + 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + sys->N_cell_y + 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
                                         }
                                     }
                                 }
                             }
-                            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 1]){
-                                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] != 0){
-                                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
+                            else if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3 + 1]){    // along y axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the front node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
                                         }
                                     }
                                 }
-                                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] != 0)
-                                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the back node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + 1][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
                                     }
                                 }
                             }
-                            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 2]){
-                                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
-                                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
+                            else if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3 + 2]){    // along z axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the lower node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
                                     }
                                 }
-                                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
-                                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the upper node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
                                     }
                                 }
                             }
                         }
                     }
 
-                    else{
+                }
+                else{
+                    a = 0;
+                }
 
-                        if (sys->y[sys->v0d2RowId[inde]] * sys->v0d2val[inde] < 0){
-                            if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3]){
-                                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] != 0)
-                                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
+
+                for (l = zi[sys->portCoor[i].z1]; l < zi[sys->portCoor[i].z2]; l++){
+                    for (j = yi[sys->portCoor[i].y1]; j < yi[sys->portCoor[i].y2]; j++){
+                        
+                        if (sys->markEdge[(sys->N_edge_s + sys->N_edge_v)*l + (sys->N_cell_y) * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + j] != 0 && inx > 0){
+                            b = b + (-sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (sys->N_cell_y) * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + j]
+                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (sys->N_cell_y) * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + j + 1]
+                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (sys->N_cell_y) * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + j]
+                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (sys->N_cell_y) * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + j + 1]) / 4 * (sys->yn[j + 1] - sys->yn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
+                        }
+                        if (sys->markEdge[(sys->N_edge_s + sys->N_edge_v)*l + (sys->N_cell_y) * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + j] != 0 && inx < sys->N_cell_x){
+                            b = b + (sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (sys->N_cell_y) * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + j]
+                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (sys->N_cell_y) * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + j + 1]
+                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (sys->N_cell_y) * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + j]
+                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (sys->N_cell_y) * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + j + 1]) / 4 * (sys->yn[j + 1] - sys->yn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
+                        }
+                    }
+                }
+
+                current = b + a * 1i;
+            }
+            else if (sys->portCoor[i].y1 == sys->portCoor[i].y2){
+
+                iny = yi[sys->portCoor[i].y1];
+                double a = 0, b = 0;    // imag part a, real part b
+                int cond = sys->portCoor[i].portCnd - 1;
+                double sumarea;
+
+                if (sourcePort == i){
+                    rowId.clear();
+                    colId.clear();
+                    val.clear();
+                    status = nodeAdd(rowId, colId, val, ind[cond], sys->N_edge, sys);
+                    if (status != 0)
+                        return status;
+                    for (int inde = 0; inde < rowId.size(); inde++){
+                        
+                        if (sys->y[rowId[inde]] * val[inde] > 0){
+                            if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3]){    // along x axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the left node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - sys->N_cell_y - 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf]/sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
+                                        }
                                     }
                                 }
-                                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] != 0)
-                                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the right node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + sys->N_cell_y + 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + sys->N_cell_y + 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
+                                        }
                                     }
                                 }
                             }
-                            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 1]){
-                                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] != 0)
-                                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
+                            else if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3 + 1]){    // along y axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the front node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
+                                        }
                                     }
                                 }
-                                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] != 0)
-                                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the back node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + 1][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
                                     }
                                 }
                             }
-                            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 2]){
-                                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
-                                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
+                            else if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3 + 2]){    // along z axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the lower node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
                                     }
                                 }
-                                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
-                                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the upper node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
                                     }
                                 }
                             }
                         }
                     }
+           
+                }
+                else{
+                    a = 0;
                 }
 
-                double b = 0;
+
                 for (l = zi[sys->portCoor[i].z1]; l < zi[sys->portCoor[i].z2]; l++){
                     for (j = xi[sys->portCoor[i].x1]; j < xi[sys->portCoor[i].x2]; j++){
                         mark = (j - xi[sys->portCoor[i].x1])
                             + (l - zi[sys->portCoor[i].z1])*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1);
                         node1 = l*(sys->N_node_s) + (sys->N_cell_y + 1) * j + iny;
-                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1] != 0){
+                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1] != 0 && iny > 0){
                             b = b + (-sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1]
                                 - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny - 1]
                                 - sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny - 1]
                                 - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny - 1]) / 4 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
                         }
-                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny] != 0){
+                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny] != 0 && iny < sys->N_cell_y){
                             b = b + (sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny]
                                 + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny]
                                 + sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny]
@@ -2047,12 +2158,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                         }
                     }
                 }
-                current = b + a * 1i;*/
-            }
-            else if (sys->portCoor[i].y1 == sys->portCoor[i].y2){
+                
+                current = b + a * 1i;
 
-                iny = yi[sys->portCoor[i].y1];
-                for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
+                /*for (l = zi[sys->portCoor[i].z1]; l <= zi[sys->portCoor[i].z2]; l++){
                     for (j = xi[sys->portCoor[i].x1]; j <= xi[sys->portCoor[i].x2]; j++){
                         mark = (j - xi[sys->portCoor[i].x1])
                             + (l - zi[sys->portCoor[i].z1])*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1);
@@ -2271,137 +2380,122 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
                         current += (sys->v0csJ[mark]) * areasum;
                     }
-                }
-/*double a = 0;
-int sign = 1;
-
-for (int inde = 0; inde < sys->v0d2RowId.size(); inde++){
-    if (sourcePort == i){
-        if (sys->y[sys->v0d2RowId[inde]] * sys->v0d2val[inde] > 0){
-            if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3]){
-                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] != 0){
-                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
-                        }
-                    }
-                }
-                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] != 0){
-                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
-                        }
-                    }
-                }
-            }
-            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 1]){
-                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] != 0){
-                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
-                        }
-                    }
-                }
-                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] != 0)
-                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
-                    }
-                }
-            }
-            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 2]){
-                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
-                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
-                    }
-                }
-                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
-                            a = a + abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
-                    }
-                }
-            }
-        }
-    }
-
-    else{
-
-        if (sys->y[sys->v0d2RowId[inde]] * sys->v0d2val[inde] < 0){
-            if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3]){
-                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] != 0)
-                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
-                    }
-                }
-                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] != 0)
-                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
-                    }
-                }
-            }
-            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 1]){
-                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] != 0)
-                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
-                    }
-                }
-                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] != 0)
-                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + 1][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
-                    }
-                }
-            }
-            else if (sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1] * 3 + 2]){
-                if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
-                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
-                    }
-                }
-                else if (sys->markNode[sys->edgelink[sys->v0d2RowId[inde] * 2 + 1]] != 0){
-                    for (int indf = 0; indf < sys->edgeCellArea[sys->v0d2RowId[inde]].size(); indf++){
-                        if (sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
-                            a = a - abs(sys->y[sys->v0d2RowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[sys->v0d2RowId[inde]] * sys->edgeCellArea[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 16);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
-                    }
-                }
-            }
-        }
-    }
-}
-
-                double b = 0;
-                for (l = zi[sys->portCoor[i].z1]; l < zi[sys->portCoor[i].z2]; l++){
-                    for (j = xi[sys->portCoor[i].x1]; j < xi[sys->portCoor[i].x2]; j++){
-                        mark = (j - xi[sys->portCoor[i].x1])
-                            + (l - zi[sys->portCoor[i].z1])*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1);
-                        node1 = l*(sys->N_node_s) + (sys->N_cell_y + 1) * j + iny;
-                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1] != 0){
-                            b = b + (-sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny - 1]
-                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny - 1]
-                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny - 1]
-                                - sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny - 1]) / 4 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
-                        }
-                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny] != 0){
-                            b = b + (sys->y[(sys->N_edge_s + sys->N_edge_v)*l + j*(sys->N_cell_y) + iny]
-                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + j*(sys->N_cell_y) + iny]
-                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*l + (j + 1)*(sys->N_cell_y) + iny]
-                                + sys->y[(sys->N_edge_s + sys->N_edge_v)*(l + 1) + (j + 1)*(sys->N_cell_y) + iny]) / 4 * (sys->xn[j + 1] - sys->xn[j])*(sys->zn[l + 1] - sys->zn[l]) * SIGMA;
-                        }
-                    }
-                }
-                current = b + a * 1i;*/
+                }*/
             }
             else{
 
                 inz = zi[sys->portCoor[i].z1];
 
-                for (j = xi[sys->portCoor[port - 1].x1]; j <= xi[sys->portCoor[port - 1].x2]; j++){
+                double a = 0, b = 0;    // imag part a, real part b
+                int cond = sys->portCoor[i].portCnd - 1;
+                double sumarea;
+
+                if (sourcePort == i){
+                    rowId.clear();
+                    colId.clear();
+                    val.clear();
+                    status = nodeAdd(rowId, colId, val, ind[cond], sys->N_edge, sys);
+                    if (status != 0)
+                        return status;
+                    for (int inde = 0; inde < rowId.size(); inde++){
+
+                        if (sys->y[rowId[inde]] * val[inde] > 0){
+                            if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3]){    // along x axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the left node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - sys->N_cell_y - 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_cell_y - 1][indf]] / 4);
+                                        }
+                                    }
+                                }
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the right node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + sys->N_cell_y + 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + sys->N_cell_y + 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_cell_y + 1][indf]] / 4);
+                                        }
+                                    }
+                                }
+                            }
+                            else if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3 + 1] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3 + 1]){    // along y axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the front node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - 1][indf]] != 0){
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - 1][indf]] / 4);
+                                        }
+                                    }
+                                }
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the back node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + 1][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + 1][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + 1][indf]] / 4);
+                                    }
+                                }
+                            }
+                            else if (sys->nodepos[sys->edgelink[rowId[inde] * 2] * 3 + 2] != sys->nodepos[sys->edgelink[rowId[inde] * 2 + 1] * 3 + 2]){    // along z axis
+                                if (sys->markNode[sys->edgelink[rowId[inde] * 2]] != 0){    // the lower node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] - sys->N_edge_s - sys->N_edge_v][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] - sys->N_edge_s - sys->N_edge_v][indf]] / 4);
+                                    }
+                                }
+                                else if (sys->markNode[sys->edgelink[rowId[inde] * 2 + 1]] != 0){    // the upper node of the edge is in the conductor
+                                    sumarea = 0;
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        sumarea = sumarea + sys->edgeCellArea[rowId[inde]][indf];
+                                    }
+                                    for (int indf = 0; indf < sys->edgeCellArea[rowId[inde]].size(); indf++){
+                                        if (sys->markCell[sys->edgeCell[rowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] != 0)
+                                            a = a + abs(sys->y[rowId[inde]] * 2 * PI*sys->freqStart * sys->freqUnit * sys->eps[rowId[inde]] * sys->edgeCellArea[rowId[inde] + sys->N_edge_s + sys->N_edge_v][indf] / 4 * sys->edgeCellArea[rowId[inde] - sys->N_cell_y - 1][indf] / sumarea);// *sys->markCell[sys->edgeCell[sys->v0d2RowId[inde] + sys->N_edge_s + sys->N_edge_v][indf]] / 4);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                }
+                else{
+                    a = 0;
+                }
+
+                for (l = xi[sys->portCoor[i].x1]; l < xi[sys->portCoor[i].x2]; l++){
+                    for (j = yi[sys->portCoor[i].y1]; j < yi[sys->portCoor[i].y2]; j++){
+                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)* (inz - 1) + sys->N_edge_s + l*(sys->N_cell_y + 1) + j] != 0 && inz > 0){    // if the port is on the top of the conductor
+                            b = b + (-sys->y[(sys->N_edge_s + sys->N_edge_v)* (inz - 1) + sys->N_edge_s + l*(sys->N_cell_y + 1) + j]
+                                - sys->y[(sys->N_edge_s + sys->N_edge_v)* (inz - 1) + sys->N_edge_s + l*(sys->N_cell_y + 1) + j + 1]
+                                - sys->y[(sys->N_edge_s + sys->N_edge_v)* (inz - 1) + sys->N_edge_s + (l + 1)*(sys->N_cell_y + 1) + j]
+                                - sys->y[(sys->N_edge_s + sys->N_edge_v)* (inz - 1) + sys->N_edge_s + (l + 1)*(sys->N_cell_y + 1) + j + 1]) / 4 * (sys->xn[l + 1] - sys->xn[l])*(sys->yn[j + 1] - sys->yn[j]) * SIGMA;
+                        }
+                        if (sys->sig[(sys->N_edge_s + sys->N_edge_v)* inz + sys->N_edge_s + l*(sys->N_cell_y + 1) + j] != 0 && inz < sys->N_cell_z){
+                            b = b + (sys->y[(sys->N_edge_s + sys->N_edge_v)* inz + sys->N_edge_s + l*(sys->N_cell_y + 1) + j]
+                                + sys->y[(sys->N_edge_s + sys->N_edge_v)* inz + sys->N_edge_s + l*(sys->N_cell_y + 1) + j + 1]
+                                + sys->y[(sys->N_edge_s + sys->N_edge_v)* inz + sys->N_edge_s + (l + 1)*(sys->N_cell_y + 1) + j]
+                                + sys->y[(sys->N_edge_s + sys->N_edge_v)* inz + sys->N_edge_s + (l + 1)*(sys->N_cell_y + 1) + j + 1]) / 4 * (sys->xn[l + 1] - sys->xn[l])*(sys->yn[j + 1] - sys->yn[j]) * SIGMA;
+                        }
+                    }
+                }
+
+                current = b + a * 1i;
+                /*for (j = xi[sys->portCoor[port - 1].x1]; j <= xi[sys->portCoor[port - 1].x2]; j++){
                     for (k = yi[sys->portCoor[port - 1].y1]; k <= yi[sys->portCoor[port - 1].y2]; k++){
                         mark = (k - yi[sys->portCoor[port - 1].y1])
                             + (j - xi[sys->portCoor[port - 1].x1])*(yi[sys->portCoor[port - 1].y2] - yi[sys->portCoor[port - 1].y1] + 1);
@@ -2620,7 +2714,7 @@ for (int inde = 0; inde < sys->v0d2RowId.size(); inde++){
 
                         current += (sys->v0csJ[mark]) * areasum;
                     }
-                }
+                }*/
             }
             sys->Y[sourcePort * sys->numPorts + i] = current;
         }

@@ -25,7 +25,7 @@ using namespace std;
 #define MU (4*PI*1.e-7)
 #define CSPED (299792458.)
 #define EPSILON0 (8.854e-12)
-#define SIGMA (5.7e+7)
+#define SIGMA (5e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 //#define SOLVERLENGTH (128)
@@ -96,6 +96,7 @@ public:
     int portDirection;
     int *node;
     int nodenum;
+    int portCnd;
 } fdtdPort;
 
 typedef class{

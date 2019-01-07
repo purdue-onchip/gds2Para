@@ -116,9 +116,9 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         lyr++;
     }
     sys->numStack = lyr1;
-    for (i = 0; i < sys->numStack; i++){
+    /*for (i = 0; i < sys->numStack; i++){
         cout << sys->stackBegCoor[i] << " " << sys->stackEndCoor[i] << " " << sys->stackEps[i] << endl;
-    }
+    }*/
 
     while (fgets(s, FDTD_MAXC, fp) != NULL){
         fdtdStringWord(s, word);
@@ -599,6 +599,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     sys->ny = j + 1;
 
     sort(zn, zn + countz + 1 + porteqz.size());
+    cout << endl;
     zi.clear();
     sys->zn = (double*)calloc(sys->nz + 4 * sys->numPorts, sizeof(double));
     j = 0;
@@ -628,11 +629,11 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             j++;
         }
     }
-    for (i = 0; i < sys->nz - 1; i++){
+    /*for (i = 0; i < sys->nz - 1; i++){
         cout << sys->stackEpsn[i] << endl;
-    }
+    }*/
 
-    for (i = 0; i < sys->nx; i++){
+    /*for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
     cout << "\n" << endl;
@@ -643,7 +644,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << "\n" << endl;*/
     /*vector<pair<double, int> > vx(xi.begin(), xi.end());
     sort(vx.begin(), vx.end(), comp);
     for (int i = 0; i < vx.size(); i++){
@@ -863,6 +864,9 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             sys->markEdge[i] = visited[sys->edgelink[i * 2 + 1]];    // Mark the edge with each color for different conductors
         }
     }
+    for (i = 0; i < sys->N_node; i++){
+        sys->markNode[i] = visited[i];
+    }
     
     /* Construct each conductor */
     sys->numCdt = count;
@@ -987,49 +991,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
     }
 
-    /*cout << sys->nodepos[sys->edgelink[8256 * 2] * 3] << " " << sys->nodepos[sys->edgelink[8256 * 2] * 3 + 1] << " " << sys->nodepos[sys->edgelink[8256 * 2] * 3 + 2] << endl;
-    cout << sys->nodepos[sys->edgelink[8256 * 2 + 1] * 3] << " " << sys->nodepos[sys->edgelink[8256 * 2 + 1] * 3 + 1] << " " << sys->nodepos[sys->edgelink[8256 * 2 + 1] * 3 + 2] << endl;*/
-
-    /*cout << "Edges around node 50851" << endl;
-    for (i = 0; i < sys->nodeEdge[sys->edgelink[50851 * 2]].size(); i++){
-        cout << sys->nodeEdge[sys->edgelink[50851 * 2]][i].first << " " << sys->markEdge[sys->nodeEdge[sys->edgelink[50851 * 2]][i].first] << endl;
-    }*/
-
-    /* construct each conductor */
-/*    sys->numCdt = count;
-    sys->conductor = (fdtdCdt*)malloc(sys->numCdt * sizeof(fdtdCdt));
-    sys->cdtNumNode = (int*)calloc(sys->numCdt, sizeof(int));
-    for (i = 0; i < sys->N_node; i++){
-        if (visited[i] != 0){
-            sys->cdtNumNode[visited[i] - 1]++;
-        }
-    }
-    for (i = 0; i < sys->numCdt; i++){
-        sys->conductor[i].node = (int*)malloc(sizeof(int) * sys->cdtNumNode[i]);
-        sys->conductor[i].cdtNodeind = 0;
-    }
-    for (i = 0; i < sys->N_node; i++){
-        if (visited[i] != 0){
-            sys->conductor[visited[i] - 1].node[sys->conductor[visited[i] - 1].cdtNodeind] = i;
-            sys->conductor[visited[i] - 1].cdtNodeind++;
-        }
-    }
-
-
-    free(visited);
-    visited = NULL;*/
-
-    /*int b;
-    for (i = 0; i < sys->N_edge; i++){
-        if (sys->markEdge[i] != 0){
-            b = 0;
-            for (j = 0; j < sys->edgeCell[i].size(); j++){
-                b = b + sys->markCell[sys->edgeCell[i][j]];
-            }
-            if (b == 0)
-                cout << i << " " << b << endl;
-        }
-    }*/
 
     return 0;
 }
@@ -1098,12 +1059,13 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 
                     sys->portCoor[i].node[n] = j * sys->N_node_s + l * (sys->N_cell_y + 1) + m;
                     sys->portNno.insert(j * sys->N_node_s + l * (sys->N_cell_y + 1) + m);
-                    
+
                     n++;
-                    
+
                 }
             }
         }
+        sys->portCoor[i].portCnd = sys->markNode[sys->portCoor[i].node[0]];
     }
     
 
