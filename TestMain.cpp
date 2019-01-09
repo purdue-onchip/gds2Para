@@ -99,19 +99,19 @@ int main(int argc, char** argv)
 
             // Setup the port information vector
             vector<Port> ports = {};
-            ports.emplace_back(Port("inp1", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u1:a", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("inp2", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u1:b", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("out", 'O', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u3:o", 'O', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u1:o", 'O', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u4:a", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u4:o", 'O', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("f1:d", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("f1:a", 'O', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u2:a", 'I', 50., vector<double>(6, 0)));
-            ports.emplace_back(Port("u4:b", 'I', 50., vector<double>(6, 0)));
+            ports.emplace_back(Port("inp1", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u1:a", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("inp2", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u1:b", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("out", 'O', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u3:o", 'O', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u1:o", 'O', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u4:a", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u4:o", 'O', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("f1:d", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("f1:a", 'O', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u2:a", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u4:b", 'I', 50., vector<double>(6, 0), -1));
 
             // Setup the Eigen sparse conductance matrix
             spMat matG(13, 13); // Initialize sparse conductance matrix (S)
@@ -203,30 +203,31 @@ int main(int argc, char** argv)
     {
         if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0))
         {
-            // Read simulation input file
-            SolverDataBase sdb;
+            // Get file names
+            string inGDSIIFile = argv[2];
             string inSimFile = argv[3];
-            bool sdbIsGood = sdb.readSimInput(inSimFile);
-            cout << "Simulation input file read" << endl;
+            size_t indExtension = inGDSIIFile.find(".", 1);
+            string inStackFile = inGDSIIFile.substr(0, indExtension) + "_stack.txt";
+            //string inStackFile = inGDSIIFile; // Use stack information contained within sim_input file
 
-            // Initialize mesh and other useful variables
+            // Initialize SolverDataBase, mesh, and other useful variables
+            SolverDataBase sdb;
             fdtdMesh sys;
             int status;
             clock_t t1 = clock();
-            size_t indExtension = inSimFile.find(".", 1);
-            string inStackFile = inSimFile.substr(0, indExtension) + "_stack.txt";
-            //string inStackFile = inSimFile; // Use stack information contained within sim_input file
-            //string inPolyFile = inSimFile.substr(0, indExtension) + "_polygon.txt";
 
             // Read GDSII file
             AsciiDataBase adb;
-            string inGDSIIFile = argv[2];
             adb.setFileName(inGDSIIFile);
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(inGDSIIFile.c_str());
             vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
             adb.print(indCellPrint, &sys);
             cout << "GDSII file read" << endl;
+
+            // Read simulation input file
+            bool sdbIsGood = sdb.readSimInput(inSimFile);
+            cout << "Simulation input file read" << endl;
 
             // Set the number of input conductors
             sys.numCdtRow = adb.getNumCdtIn();
@@ -268,12 +269,11 @@ int main(int argc, char** argv)
                 cout << "paraGenerator Fail!" << endl;
                 return status;
             }
-            cout << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+            cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
             // Parameter storage
-            // Setup the Eigen sparse conductance matrix
-            spMat matG(sys.numPorts, sys.numPorts); // Initialize sparse conductance matrix (S)
-            spMat matC(sys.numPorts, sys.numPorts); // Initialize sparse capacitance matrix (F)
+            spMat matG(sys.numPorts, sys.numPorts); // Initialize Eigen sparse conductance matrix (S)
+            spMat matC(sys.numPorts, sys.numPorts); // Initialize Eigen sparse capacitance matrix (F)
             vector<dTriplet> listG; // Initialize triplet list for conductance matrix
             vector<dTriplet> listC;
             listG.reserve(sys.numPorts); // Reserve room so matrix could be dense
@@ -284,6 +284,7 @@ int main(int argc, char** argv)
                 double sumC = 0.;
                 for (size_t indj = 0; indj < sys.numPorts; indj++) // Loop over response ports
                 {
+                    // Symmetrize diagonal components before saving entry
                     double symgij = 0.5 * (sys.Y[indi * sys.numPorts + indj].real() + sys.Y[indj * sys.numPorts + indi].real());
                     double symcij = 0.5 * (sys.Y[indi * sys.numPorts + indj].imag() + sys.Y[indj * sys.numPorts + indi].imag()) / (2 * M_PI * sys.freqStart * sys.freqUnit);
                     listG.push_back(dTriplet(indj, indi, symgij));

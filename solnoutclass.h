@@ -345,6 +345,7 @@ private:
     char portDir;                // Direction of port
     double Z_source;             // Impedance of sourced attached to port (ohm)
     vector<double> coord;        // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m)
+    int gdsiiNum;                // Layer number in GDSII file on which port exists
 public:
     // Default constructor
     Port()
@@ -353,13 +354,14 @@ public:
         this->portDir = 'B';
         this->Z_source = 0.;
         this->coord = { 0., 0., 0., 0., 0., 0. };
+        this->gdsiiNum = -1;
     }
 
     // Parametrized constructor
-    Port(std::string portName, char portDir, double Z_source, vector<double> coord)
+    Port(std::string portName, char portDir, double Z_source, vector<double> coord, int gdsiiNum)
     {
         this->portName = portName;
-        if ((portDir != 'I') || (portDir != 'O') || (portDir != 'B'))
+        if ((portDir != 'I') && (portDir != 'O') && (portDir != 'B'))
         {
             cerr << "Port direction must be assigned as 'I' (input), 'O' (output), or 'B' (bidirectional). Defaulting to 'B'." << endl;
             this->portDir = 'B';
@@ -378,6 +380,7 @@ public:
         {
             this->coord = coord;
         }
+        this->gdsiiNum = gdsiiNum;
     }
 
     // Get port name
@@ -400,9 +403,17 @@ public:
     }
 
     // Get supply and return coordinates
+    // xsup, ysup, zsup, xret, yret, zret (m)
     vector<double> getCoord() const
     {
         return this->coord;
+    }
+
+    // Get GDSII layer number of port
+    // Metallic layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for dielectric, substrates, and undescribed planes
+    int getGDSIINum() const
+    {
+        return this->gdsiiNum;
     }
 
     // Set port name
@@ -447,6 +458,13 @@ public:
         }
     }
 
+    // Set GDSII layer number on which port exists
+    // Metallic layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for dielectric, substrates, and undescribed planes
+    void setGDSIINum(int gdsiiNum)
+    {
+        this->gdsiiNum = gdsiiNum;
+    }
+
     // Print the layer information
     void print() const
     {
@@ -468,8 +486,9 @@ public:
             cout << "Bidirectional" << endl; // Treat as bidirectional if direction unclear
         }
         cout << "   Attached source impedance: " << this->Z_source << " ohm" << endl;
-        cout << "  Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
-        cout << "  Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
+        cout << "   Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
+        cout << "   Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
+        cout << "   GDSII layer number: " << this->gdsiiNum << endl;
         cout << "  ------" << endl;
     }
 
@@ -642,6 +661,31 @@ public:
             names.push_back(((this->ports)[indi]).getPortName());
         }
         return names;
+    }
+
+    // Find ports in GDSII textboxes
+    vector<Port> setPortsGDSII(size_t indCell, vector<double> center, AsciiDataBase adb)
+    {
+        // Recursively search cells for textboxes
+        GeoCell thisCell = adb.getCell(indCell);
+        vector<Port> portList;
+        for (size_t indi = 0; indi < thisCell.getNumSRef(); indi++) // Follow structure references
+        {
+            string srefName = (thisCell.sreferences)[indi].getSRefName();
+            size_t indNextCell = adb.locateCell(srefName);
+            vector<double> thisSRef = (thisCell.sreferences)[indi].getSRefs();
+            vector<Port> newPorts = this->setPortsGDSII(indNextCell, { (center[0] + thisSRef[0]), (center[1] + thisSRef[1]) }, adb); // Recursion step
+            portList.insert(portList.end(), newPorts.begin(), newPorts.end());
+        }
+        for (size_t indi = 0; indi < thisCell.getNumText(); indi++) // Search cell at this level for textboxes
+        {
+            textbox thisTextBox = thisCell.textboxes[indi];
+            vector<double> coords = {(thisTextBox.getTexts()[0] + center[0]), (thisTextBox.getTexts()[1] + center[1]), 0., (thisTextBox.getTexts()[0] + center[0]), 0., 0.}; // Assume: xret = xsup, yret = 0, zsup = zret = 0 until layer heights set
+            portList.emplace_back(Port(thisTextBox.getTextStr(), 'B', 50.0, thisTextBox.getTexts(), thisTextBox.getLayer()));
+        }
+
+        // Set vector of port information
+        this->ports = portList;
     }
 
     // Print the parasitics information
@@ -920,6 +964,22 @@ public:
         for (indLayer = 0; indLayer < (this->layers).size(); indLayer++)
         {
             if ((this->layers[indLayer]).getGDSIINum() == gdsiiNum)
+            {
+                return indLayer;
+            }
+        }
+        return indLayer;
+    }
+
+    // Find index of layer by starting z-coordinate
+    // Returns index past number of layers if not found
+    size_t locateLayerZStart(double zStart) const
+    {
+        size_t indLayer;
+        for (indLayer = 0; indLayer < (this->layers).size(); indLayer++)
+        {
+            // See if layer start coordinate is within 1% of the height of that layer
+            if (abs((this->layers[indLayer]).getZStart() - zStart) < 0.01 * (this->layers[indLayer]).getZHeight())
             {
                 return indLayer;
             }
@@ -1243,7 +1303,7 @@ public:
 
                             // Register a new port in vectors
                             vector<double> portSupRet;
-                            size_t indCond;
+                            size_t indCond, indLayer;
                             for (indCond = 0; indCond < cellIMP.boxes.size(); indCond++)
                             {
                                 if (groupName.compare(((cellIMP.boxes[indCond]).getProps())[1]) == 0)
@@ -1258,10 +1318,10 @@ public:
                             else
                             {
                                 vector<double> boxCoord = (cellIMP.boxes[indCond]).getBoxes(); // Coordinates of box on layer
-                                size_t indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer()); // Index of layer in structure field
+                                indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer()); // Index of layer in structure field
                                 portSupRet = { boxCoord[0], boxCoord[1], (this->layers)[indLayer].getZStart(), boxCoord[0], boxCoord[1], 0. }; // xsup = LR xcoord, ysup = LR ycoord, zsup = layer zStart, xret = xsup, yret = ysup, zret = 0.
                             }
-                            ports.emplace_back(Port(groupName, 'B', Z_near, portSupRet));
+                            ports.emplace_back(Port(groupName, 'B', Z_near, portSupRet, (this->layers)[indLayer].getGDSIINum()));
                         }
                         // Keep moving down the port table
                         getline(impFile, fileLine);
@@ -1297,7 +1357,7 @@ public:
             return false;
         }
     }
-    
+
     // Load simulation input file 
     bool readSimInput(std::string inputFileName)
     {
@@ -1440,8 +1500,8 @@ public:
                         getline(inputFile, fileLine);
                     }
                 }
-                // Handle port list
-                else if (fileLine.compare(0, 4, "PORT") == 0)
+                // Handle port list if not already populated by GDSII file
+                else if ((fileLine.compare(0, 4, "PORT") == 0) && ((this->para).getPorts().size() == 0))
                 {
                     // Move down one line
                     getline(inputFile, fileLine);
@@ -1471,6 +1531,7 @@ public:
                         double xsup, ysup, zsup, xret, yret, zret;
                         int sourceDir;
                         char portDir;
+                        int portLayer = -1;
                         if (nSpace == 4)
                         {
                             size_t indCoordStart = 0;
@@ -1487,7 +1548,7 @@ public:
                             yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            int portLayer = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+                            portLayer = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
                             sourceDir = 0; // No soure direction information included
 
                             zsup = (this->layers)[this->locateLayerGDSII(portLayer)].getZStart();
@@ -1516,6 +1577,7 @@ public:
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
                             sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+                            portLayer = (this->layers)[this->locateLayerZStart(zsup)].getGDSIINum();
                         }
 
                         // Append port information to vectors (all ports officially unnamed, so use number)
@@ -1533,7 +1595,7 @@ public:
                         default:
                             portDir = 'B'; // Treat as bidirectional if direction unclear
                         }
-                        ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., { xsup, ysup, zsup, xret, yret, zret }));
+                        ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., { xsup, ysup, zsup, xret, yret, zret }, portLayer));
 
                         // Move down one line
                         getline(inputFile, fileLine);
