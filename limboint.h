@@ -1479,20 +1479,11 @@ public:
         return viaList;
     }
 
-    // Print all the conductor information (fdtdMesh style)
-    void printall(std::string name, double xo, double yo, fdtdMesh *sys)
+    // Save to fdtdMesh conductor information
+    void saveToMesh(std::string name, double xo, double yo, fdtdMesh *sys)
     {
+        // Set fdtdMesh variables
         int si, condj;    // Size of the vector sys->conductorIn
-
-        // Open output file
-        /*std::ofstream outfile;*/
-        size_t indExtension = this->getFileName().find(".", 1);
-        /*std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
-        outfile.open(polyFileName, std::ofstream::out | std::ofstream::app);
-        if (!outfile.is_open()) // Failed to open the polygon file to write
-        {
-            return;
-        }*/
 
         // Get information about this cell in ASCII database
         const GeoCell cell = this->cells[this->locateCell(name)];
@@ -1703,26 +1694,13 @@ public:
         //cout << "  List of " << numSRef << " structure references:" << endl;
         for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
         {
-            //printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
+            saveToMesh((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
         }
-
-        // Close output file
-        /*outfile.close();*/
     }
 
-    // Print all the conductor information (no fdtdMesh)
-    void printall(std::string name, double xo, double yo)
+    // Print details of the conductor information (no fdtdMesh)
+    void printDetails(std::string name, double xo, double yo)
     {
-        // Open output file
-        /*std::ofstream outfile;*/
-        size_t indExtension = this->getFileName().find(".", 1);
-        /*std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
-        outfile.open(polyFileName, std::ofstream::out | std::ofstream::app);
-        if (!outfile.is_open()) // Failed to open the polygon file to write
-        {
-        return;
-        }*/
-
         // Get information about this cell in ASCII database
         const GeoCell cell = this->cells[this->locateCell(name)];
         int numBound = cell.getNumBound();
@@ -1746,7 +1724,6 @@ public:
                 this->strPoints.append(point);
             }
             this->strPoints.append("\n");
-            /*outfile << strPoints;*/
             (this->numCdtIn)++;
         }
         cout << "  List of " << numPath << " paths:" << endl;
@@ -1832,38 +1809,31 @@ public:
                     }
                 }
             }
-            /*outfile << strPoints;*/
         }
         cout << "  List of " << numNode << " nodes:" << endl;
         cout << "  List of " << numBox << " box outlines:" << endl;
         for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
         {
-            /*outfile << "    " << ((cell.boxes)[indi]).getNBoxPt() - 1 << " " << ((cell.boxes)[indi]).getLayer() << " ";*/
             char point[128];
             this->strPoints.append("    " + to_string(((cell.boxes)[indi]).getNBoxPt() - 1) + " " + to_string(((cell.boxes)[indi]).getLayer()) + " ");
             vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
             for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) {
-                /*outfile << boxCoord[indj++] << " " << boxCoord[indj] << " ";*/
                 //this->strPoints.append(to_string(boxCoord[indj++]) + " " + to_string(boxCoord[indj + 1]) + " ");
                 sprintf(point, "%1.4g %1.4g ", boxCoord[indj++] + xo, boxCoord[indj + 1] + yo);
                 this->strPoints.append(point);
             }
             this->strPoints.append("\n");
-            /*outfile << endl;*/
             this->numCdtIn++;
         }
         cout << "  List of " << numText << " text boxes:" << endl;
         cout << "  List of " << numSRef << " structure references:" << endl;
-        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
+        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference recursively
         {
-            printall((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
+            this->printDetails((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
         }
-
-        // Close output file
-        /*outfile.close();*/
     }
 
-    // Print the ASCII database with the design geometry (fdtdMesh style)
+    // Print the ASCII database while setting mesh information (fdtdMesh style)
     void print(vector<size_t> indCellPrint, fdtdMesh *sys)
     {
         // Delete existing file
@@ -1894,7 +1864,7 @@ public:
         {
             std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
             cout << cellName << endl;
-            this->printall(cellName, 0., 0., sys);   // the origin is the (0,0) point
+            this->saveToMesh(cellName, 0., 0., sys);   // the origin is the (0,0) point
             //(this->cells)[indCellPrint[indi]].printAlt();
         }
         cout << "------" << endl;
@@ -1905,8 +1875,6 @@ public:
     {
         // Delete existing file
         size_t indExtension = this->getFileName().find(".", 1);
-        /*std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
-        remove(polyFileName.c_str());*/
 
         // Analyze design and print to terminal
         int numCell = getNumCell();
@@ -1929,7 +1897,7 @@ public:
         {
             std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
             cout << cellName << endl;
-            this->printall(cellName, 0., 0.);   // the origin is the (0,0) point
+            this->printDetails(cellName, 0., 0.);   // the origin is the (0,0) point
             //(this->cells)[indCellPrint[indi]].printAlt();
         }
         cout << this->strPoints << endl;

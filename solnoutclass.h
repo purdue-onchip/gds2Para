@@ -196,7 +196,6 @@ public:
         this->nFreq = freqs.size();
     }
 
-
     // Print the simulation settings
     void print() const
     {
