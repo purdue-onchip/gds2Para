@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <ctime>
+#include <unordered_set>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
@@ -203,70 +204,101 @@ int main(int argc, char** argv)
     {
         if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0))
         {
-            // Get file names
-            string inGDSIIFile = argv[2];
-            string inSimFile = argv[3];
-            size_t indExtension = inGDSIIFile.find(".", 1);
-            string inStackFile = inGDSIIFile.substr(0, indExtension) + "_stack.txt";
-            //string inStackFile = inGDSIIFile; // Use stack information contained within sim_input file
-
-            // Initialize SolverDataBase, mesh, and other useful variables
+            // Initialize SolverDataBase, mesh, and set variables for performance tracking
             SolverDataBase sdb;
             fdtdMesh sys;
             int status;
             clock_t t1 = clock();
+
+            // Get file names
+            string inGDSIIFile = argv[2];
+            string inSimFile = argv[3];
+            size_t indExtension = inGDSIIFile.find(".", 1);
+            //string inStackFile = inGDSIIFile.substr(0, indExtension) + "_stack.txt";
+            //string inStackFile = inGDSIIFile; // Use stack information contained within sim_input file
 
             // Read GDSII file
             AsciiDataBase adb;
             adb.setFileName(inGDSIIFile);
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(inGDSIIFile.c_str());
-            vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
-            adb.print(indCellPrint, &sys);
-            cout << "GDSII file read" << endl;
+            if (adbIsGood)
+            {
+                vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
+                adb.print(indCellPrint, &sys);
+                cout << "GDSII file read" << endl;
+            }
+            else
+            {
+                cerr << "Unable to read in GDSII file" << endl;
+                return status;
+            }
 
             // Read simulation input file
             bool sdbIsGood = sdb.readSimInput(inSimFile);
-            cout << "Simulation input file read" << endl;
+            if (sdbIsGood)
+            {
+                cout << "Simulation input file read" << endl;
+            }
+            else
+            {
+                cerr << "Unable to read in simulation input file" << endl;
+                return status;
+            }
 
-            // Set the number of input conductors
-            sys.numCdtRow = adb.getNumCdtIn();
+            // Append information so far to fdtdMesh
+            unordered_set<double> portCoorx, portCoory;
+            sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory);
 
-            // Read the input file
+            // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;
-            status = readInput(inStackFile.c_str(), &sys, xi, yi, zi);
+            status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
             if (status == 0)
-                cout << "readInput Success!" << endl;
-            else {
-                cout << "readInput Fail!" << endl;
+            {
+                cout << "meshAndMark Success!" << endl;
+            }
+            else
+            {
+                cerr << "meshAndMark Fail!" << endl;
                 return status;
             }
 
             // Set D_eps and D_sig
             status = matrixConstruction(&sys);
-            if (status == 0) {
+            if (status == 0)
+            {
                 cout << "matrixConstruction Success!" << endl;
             }
             else {
-                cout << "matrixConstruction Fail!" << endl;
+                cerr << "matrixConstruction Fail!" << endl;
                 return status;
             }
 
             // Set port
             status = portSet(&sys, xi, yi, zi);
             if (status == 0)
-                cout << "portSet Success!\n";
-            else {
-                cout << "portSet Fail!\n";
+            {
+                cout << "portSet Success!" << endl;
+            }
+            else
+            {
+                cerr << "portSet Fail!" << endl;
                 return status;
             }
+            string outSPEFFile = argv[4];
+            sdb.setDesignName(adb.findNames().back());
+            sdb.setOutSPEF(outSPEFFile);
+            bool sdbCouldDump = sdb.printDump();
 
             // Parameter generation
             status = paraGenerator(&sys, xi, yi, zi);
             if (status == 0)
+            {
                 cout << "paraGenerator Success!" << endl;
-            else {
-                cout << "paraGenerator Fail!" << endl;
+            }
+            else
+            {
+                cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
             cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
@@ -310,10 +342,10 @@ int main(int argc, char** argv)
             sdb.setParasitics(Parasitics(oldPara.getPorts(), matG, matC));
 
             // Output SPEF file
-            string outSPEFFile = argv[4];
+            /*string outSPEFFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutSPEF(outSPEFFile);
-            bool sdbCouldDump = sdb.printDump();
+            bool */sdbCouldDump = sdb.printDump();
             cout << "File ready at " << outSPEFFile << endl;
         }
         else

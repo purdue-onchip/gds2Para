@@ -1,12 +1,12 @@
 TOTAL SIZE
--2.30e-7 +1.277e-5 -2.30e-7 +3.03e-6 -1.0e-6 +1.409e-5
-lengthUnit = 1
+-0.230 +12.77 -0.230 +3.03 -1.0 +14.09
+lengthUnit = 1e-6
 
 FREQUENCY
 freqUnit = 1.0e+6
 freqStart = 1000.0
-freqEnd = 1000.0
-nfreq = 1
+freqEnd = 5000.0
+nfreq = 10
 freqScale = 0
 
 DIELECTRIC STACK
@@ -27,5 +27,5 @@ numStack = 13
 
 PORT
 numPort = 2
-0 -0.17 0 0.17 11
+12.54 2.63 12.54 2.97 11
 0 2.63 0 2.97 11

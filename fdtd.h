@@ -279,7 +279,7 @@ public:
 
 
 
-int readInput(const char* stackFile, fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi);
+int meshAndMark(fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
 int fdtdStringWord(char*, char *word[]);

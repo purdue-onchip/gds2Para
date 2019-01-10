@@ -1489,11 +1489,18 @@ public:
 
                         // Save dielectric stack information to variables
                         std::string layerName = fileLine.substr(0, indNameEnd);
-                        double layerHeight = stod(fileLine.substr(indHeight, indRelPermit - indHeight - 5));
+                        double layerHeight = stod(fileLine.substr(indHeight, indRelPermit - indHeight - 5)) * (this->settings).getLengthUnit();
                         double layerEpsilonR = stod(fileLine.substr(indRelPermit, indComment - indRelPermit));
 
                         // Register a new layer in layers field
-                        (this->layers).emplace_back(Layer(layerName, -1, -1.0, layerHeight, layerEpsilonR, 0.0, 0.0));
+                        if ((this->layers).size() == 0) // No layers saved yet
+                        {
+                            (this->layers).emplace_back(Layer(layerName, -1, 0.0, layerHeight, layerEpsilonR, 0.0, 0.0)); // Start at z=0
+                        }
+                        else
+                        {
+                            (this->layers).emplace_back(Layer(layerName, -1, (this->layers).back().getZStart() + (this->layers).back().getZHeight(), layerHeight, layerEpsilonR, 0.0, 0.0)); // Start at end of previous layer
+                        }
 
                         // Keep moving down the dielectric stack
                         getline(inputFile, fileLine);
@@ -1535,16 +1542,16 @@ public:
                         {
                             size_t indCoordStart = 0;
                             size_t indCoordEnd = fileLine.find(" ", indCoordStart);
-                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
                             portLayer = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
@@ -1557,22 +1564,22 @@ public:
                         {
                             size_t indCoordStart = 0;
                             size_t indCoordEnd = fileLine.find(" ", indCoordStart);
-                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
-                            zret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                            zret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
                             sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
@@ -1620,92 +1627,87 @@ public:
     }
 
     // Convert to fdtdMesh
-    fdtdMesh convertToFDTDMesh(int numCdtRow)
+    void convertToFDTDMesh(fdtdMesh *data, int numCdtRow, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
     {
-        // Initialize the output
-        unordered_set<double> portCoorx, portCoory;
-        fdtdMesh data;
-        data.numCdtRow = numCdtRow; // Use the sole argument
+        // Use the sole argument
+        data->numCdtRow = numCdtRow;
 
         // Use simulation settings to set fields
-        data.lengthUnit = (this->settings).getLengthUnit();
-        data.freqUnit = (this->settings).getFreqUnit();
-        data.nfreq = (this->settings).getNFreq();
-        data.freqStart = (this->settings).getFreqs().front();
-        data.freqEnd = (this->settings).getFreqs().back();
+        data->lengthUnit = (this->settings).getLengthUnit();
+        data->freqUnit = (this->settings).getFreqUnit();
+        data->nfreq = (this->settings).getNFreq();
+        data->freqStart = (this->settings).getFreqs().front();
+        data->freqEnd = (this->settings).getFreqs().back();
 
         // Use layer stack-up information to set fields
-        data.numStack = this->getNumLayer();
-        data.stackEps = (double*)malloc(sizeof(double) * data.numStack);
-        data.stackBegCoor = (double*)malloc(sizeof(double) * data.numStack);
-        data.stackEndCoor = (double*)malloc(sizeof(double) * data.numStack);
-        //data.stackEpsn; // Is this needed from SolverDataBase?
-        for (size_t indi = 0; indi < data.numStack; indi++)
+        data->numStack = this->getNumLayer();
+        data->stackEps = (double*)malloc(sizeof(double) * data->numStack);
+        data->stackBegCoor = (double*)malloc(sizeof(double) * data->numStack);
+        data->stackEndCoor = (double*)malloc(sizeof(double) * data->numStack);
+        //data->stackEpsn; // Is this needed from SolverDataBase?
+        for (size_t indi = 0; indi < data->numStack; indi++)
         {
             Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
-            data.stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
-            data.stackBegCoor[indi] = thisLayer.getZStart();
-            data.stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
-            data.stackName.push_back(thisLayer.getLayerName());
+            data->stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
+            data->stackBegCoor[indi] = thisLayer.getZStart();
+            data->stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
+            data->stackName.push_back(thisLayer.getLayerName());
         }
 
         // Set conductor information from saved stack information
-        data.stackCdtMark = (double*)malloc(sizeof(double) * data.numStack);
-        for (size_t indi = 0; indi < data.numCdtRow; indi++)
+        data->stackCdtMark = (double*)malloc(sizeof(double) * data->numStack);
+        for (size_t indi = 0; indi < data->numCdtRow; indi++)
         {
-            for (size_t indj = 0; indj < data.numStack; indj++)
+            for (size_t indj = 0; indj < data->numStack; indj++)
             {
                 // See if conductor layer numbers being built correspond to existing layer name
-                /*if (to_string(data.conductorIn[indi].layer).compare(data.stackName[indj]) == 0)
+                /*if (to_string(data->conductorIn[indi].layer).compare(data->stackName[indj]) == 0)
                 {
-                    data.conductorIn[indi].zmin = data.stackBegCoor[indj];
-                    data.conductorIn[indi].zmax = data.stackEndCoor[indj];
-                    data.stackCdtMark[indj] = 1;
+                    data->conductorIn[indi].zmin = data->stackBegCoor[indj];
+                    data->conductorIn[indi].zmax = data->stackEndCoor[indj];
+                    data->stackCdtMark[indj] = 1;
                 }*/
 
                 // See if conductor layer numbers being built correspond to GDSII layer number
-                if (data.conductorIn[indi].layer == this->getLayer(indj).getGDSIINum())
+                if (data->conductorIn[indi].layer == this->getLayer(indj).getGDSIINum())
                 {
-                    data.conductorIn[indi].zmin = data.stackBegCoor[indj];
-                    data.conductorIn[indi].zmax = data.stackEndCoor[indj];
-                    data.stackCdtMark[indj] = 1;
+                    data->conductorIn[indi].zmin = data->stackBegCoor[indj];
+                    data->conductorIn[indi].zmax = data->stackEndCoor[indj];
+                    data->stackCdtMark[indj] = 1;
                 }
             }
         }
 
         // Use port information in parasitics data member to set fields
-        data.numPorts = (this->para).getNPort();
-        data.portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data.numPorts);
-        //data.portArea; // Is this needed at all?
-        //data.portEdge; // Is this needed from SolverDataBase?
-        //data.portNno; // Is this needed at all?
-        for (size_t indi = 0; indi < data.numPorts; indi++)
+        data->numPorts = (this->para).getNPort();
+        data->portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data->numPorts);
+        //data->portArea; // Is this needed at all?
+        //data->portEdge; // Is this needed from SolverDataBase?
+        //data->portNno; // Is this needed at all?
+        for (size_t indi = 0; indi < data->numPorts; indi++)
         {
             Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation
 
             // Save coordinates of the port (class automatically ensures x1 < x2, y1 < y2, and z1 < z2)
-            data.portCoor[indi].x1 = thisPort.getCoord()[0];
-            data.portCoor[indi].y1 = thisPort.getCoord()[1];
-            data.portCoor[indi].z1 = thisPort.getCoord()[2];
-            data.portCoor[indi].x2 = thisPort.getCoord()[3];
-            data.portCoor[indi].y2 = thisPort.getCoord()[4];
-            data.portCoor[indi].z2 = thisPort.getCoord()[5];
+            data->portCoor[indi].x1 = thisPort.getCoord()[0];
+            data->portCoor[indi].y1 = thisPort.getCoord()[1];
+            data->portCoor[indi].z1 = thisPort.getCoord()[2];
+            data->portCoor[indi].x2 = thisPort.getCoord()[3];
+            data->portCoor[indi].y2 = thisPort.getCoord()[4];
+            data->portCoor[indi].z2 = thisPort.getCoord()[5];
 
             // Add coordinates of port to unordered maps if need be
             if (thisPort.getCoord()[0] == thisPort.getCoord()[3])
             {
                 // Record this x-coordinate along the x-axis
-                portCoorx.insert(thisPort.getCoord()[0]);
+                portCoorx->insert(thisPort.getCoord()[0]);
             }
             if (thisPort.getCoord()[1] == thisPort.getCoord()[4])
             {
                 // Record this y-coordinate along the y-axis
-                portCoory.insert(thisPort.getCoord()[1]);
+                portCoory->insert(thisPort.getCoord()[1]);
             }
         }
-
-        // Return fdtdMesh
-        return data;
     }
 
     // Print the solver database and dump to SPEF file
