@@ -1419,13 +1419,13 @@ public:
                     getline(inputFile, fileLine);
                     
                     // Obtain first frequency
-                    double freqStart = stod(fileLine.substr(fileLine.find("freqStart = ") + 12, fileLine.find(" #")));
+                    double freqStart = stod(fileLine.substr(fileLine.find("freqStart = ") + 12, fileLine.find(" #"))) * freqUnit;
                     
                     // Move down one line
                     getline(inputFile, fileLine);
                     
                     // Obtain last frequency
-                    double freqEnd = stod(fileLine.substr(fileLine.find("freqEnd = ") + 10, fileLine.find(" #")));
+                    double freqEnd = stod(fileLine.substr(fileLine.find("freqEnd = ") + 10, fileLine.find(" #"))) * freqUnit;
                     
                     // Move down one line
                     getline(inputFile, fileLine);
@@ -1636,8 +1636,9 @@ public:
         data->lengthUnit = (this->settings).getLengthUnit();
         data->freqUnit = (this->settings).getFreqUnit();
         data->nfreq = (this->settings).getNFreq();
-        data->freqStart = (this->settings).getFreqs().front();
-        data->freqEnd = (this->settings).getFreqs().back();
+        data->freqStart = (this->settings).getFreqs().front() / (this->settings).getFreqUnit();
+        data->freqEnd = (this->settings).getFreqs().back() / (this->settings).getFreqUnit();
+        data->freqScale = (this->settings).getFreqScale();
 
         // Use layer stack-up information to set fields
         data->numStack = this->getNumLayer();
@@ -1649,8 +1650,8 @@ public:
         {
             Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
             data->stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
-            data->stackBegCoor[indi] = thisLayer.getZStart();
-            data->stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
+            data->stackBegCoor[indi] = thisLayer.getZStart() / (this->settings).getLengthUnit();
+            data->stackEndCoor[indi] = (thisLayer.getZStart() + thisLayer.getZHeight()) / (this->settings).getLengthUnit();
             data->stackName.push_back(thisLayer.getLayerName());
         }
 
@@ -1663,16 +1664,16 @@ public:
                 // See if conductor layer numbers being built correspond to existing layer name
                 /*if (to_string(data->conductorIn[indi].layer).compare(data->stackName[indj]) == 0)
                 {
-                    data->conductorIn[indi].zmin = data->stackBegCoor[indj];
-                    data->conductorIn[indi].zmax = data->stackEndCoor[indj];
+                    data->conductorIn[indi].zmin = data->stackBegCoor[indj] / (this->settings).getLengthUnit();
+                    data->conductorIn[indi].zmax = data->stackEndCoor[indj] / (this->settings).getLengthUnit();
                     data->stackCdtMark[indj] = 1;
                 }*/
 
                 // See if conductor layer numbers being built correspond to GDSII layer number
                 if (data->conductorIn[indi].layer == this->getLayer(indj).getGDSIINum())
                 {
-                    data->conductorIn[indi].zmin = data->stackBegCoor[indj];
-                    data->conductorIn[indi].zmax = data->stackEndCoor[indj];
+                    data->conductorIn[indi].zmin = data->stackBegCoor[indj] / (this->settings).getLengthUnit();
+                    data->conductorIn[indi].zmax = data->stackEndCoor[indj] / (this->settings).getLengthUnit();
                     data->stackCdtMark[indj] = 1;
                 }
             }
@@ -1689,23 +1690,23 @@ public:
             Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation
 
             // Save coordinates of the port (class automatically ensures x1 < x2, y1 < y2, and z1 < z2)
-            data->portCoor[indi].x1 = thisPort.getCoord()[0];
-            data->portCoor[indi].y1 = thisPort.getCoord()[1];
-            data->portCoor[indi].z1 = thisPort.getCoord()[2];
-            data->portCoor[indi].x2 = thisPort.getCoord()[3];
-            data->portCoor[indi].y2 = thisPort.getCoord()[4];
-            data->portCoor[indi].z2 = thisPort.getCoord()[5];
+            data->portCoor[indi].x1 = thisPort.getCoord()[0] / (this->settings).getLengthUnit();
+            data->portCoor[indi].y1 = thisPort.getCoord()[1] / (this->settings).getLengthUnit();
+            data->portCoor[indi].z1 = thisPort.getCoord()[2] / (this->settings).getLengthUnit();
+            data->portCoor[indi].x2 = thisPort.getCoord()[3] / (this->settings).getLengthUnit();
+            data->portCoor[indi].y2 = thisPort.getCoord()[4] / (this->settings).getLengthUnit();
+            data->portCoor[indi].z2 = thisPort.getCoord()[5] / (this->settings).getLengthUnit();
 
             // Add coordinates of port to unordered maps if need be
             if (thisPort.getCoord()[0] == thisPort.getCoord()[3])
             {
                 // Record this x-coordinate along the x-axis
-                portCoorx->insert(thisPort.getCoord()[0]);
+                portCoorx->insert(thisPort.getCoord()[0] / (this->settings).getLengthUnit());
             }
             if (thisPort.getCoord()[1] == thisPort.getCoord()[4])
             {
                 // Record this y-coordinate along the y-axis
-                portCoory->insert(thisPort.getCoord()[1]);
+                portCoory->insert(thisPort.getCoord()[1] / (this->settings).getLengthUnit());
             }
         }
     }

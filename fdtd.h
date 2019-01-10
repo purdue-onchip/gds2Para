@@ -206,6 +206,7 @@ public:
     vector<double> v0caval;
     vector<double> v0cavalo;
 
+    /* V0d1 and V0d2 and y0c2 row, column, value */
     vector<int> v0d1aRowId;
     vector<int> v0d1aColId;
     vector<double> v0d1aval;
@@ -271,6 +272,7 @@ public:
     fdtdMesh(){
         numCdtRow = 0;
     }
+    void print();
     ~fdtdMesh(){
         numCdtRow = 0;
     }

@@ -262,6 +262,7 @@ int main(int argc, char** argv)
                 cerr << "meshAndMark Fail!" << endl;
                 return status;
             }
+            sys.print();
 
             // Set D_eps and D_sig
             status = matrixConstruction(&sys);
@@ -289,6 +290,7 @@ int main(int argc, char** argv)
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutSPEF(outSPEFFile);
             bool sdbCouldDump = sdb.printDump();
+            //sys.print();
 
             // Parameter generation
             status = paraGenerator(&sys, xi, yi, zi);
