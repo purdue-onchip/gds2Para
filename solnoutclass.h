@@ -27,9 +27,10 @@ typedef Eigen::Triplet<double, int> dTriplet;
 typedef Eigen::SparseMatrix<double, Eigen::RowMajor> spMat;
 struct myPruneFunctor
 {
-private:
+  private:
     double reference;
-public:
+
+  public:
     // Default constructor
     myPruneFunctor()
     {
@@ -43,7 +44,7 @@ public:
     }
 
     // Functor magic overloading parentheses
-    inline bool operator() (const int& row, const int& col, const double& value) const
+    inline bool operator()(const int &row, const int &col, const double &value) const
     {
         return (abs(value) > this->reference);
     }
@@ -52,14 +53,14 @@ public:
 // Custom classes for containing solution and output SPEF writer
 class SimSettings
 {
-private:
+  private:
     double lengthUnit;     // Units for lengths (m)
     vector<double> limits; // xmin, xmax, ymin, ymax, zmin, zmax (m)
     double freqUnit;       // Units for frequency (Hz)
     double freqScale;      // Frequency scaling?
     size_t nFreq;          // Number of frequencies in simulation
     vector<double> freqs;  // List of frequencies (linear or logarithmic [preferred] spacing)
-public:
+  public:
     // Default constructor
     SimSettings()
     {
@@ -78,7 +79,7 @@ public:
         if (limits.size() != 6)
         {
             cerr << "Must give minimum and maximum extents of design in vector of length 6. Defaulting to 0. to 0. for x, y, and z." << endl;
-            this->limits = { 0., 0., 0., 0., 0., 0. };
+            this->limits = {0., 0., 0., 0., 0., 0.};
         }
         else
         {
@@ -154,7 +155,7 @@ public:
         if (limits.size() != 6)
         {
             cerr << "Must give minimum and maximum extents of design in vector of length 6. Defaulting to 0. to 0. for x, y, and z." << endl;
-            this->limits = { 0., 0., 0., 0., 0., 0. };
+            this->limits = {0., 0., 0., 0., 0., 0.};
         }
         else
         {
@@ -229,15 +230,15 @@ public:
 
 class Layer
 {
-private:
-    std::string layerName;        // Name of layer in physical stack-up
-    int gdsiiNum;                 // Layer number in GDSII file
-    double zStart;                // Z-coordinate of bottom of layer (m)
-    double zHeight;               // Height of layer in z-direction (m)
-    double epsilon_r;             // Relative permittivity of material
-    double lossTan;               // Loss tangent of material
-    double sigma;                 // (Real) Conductivity of material (S/m)
-public:
+  private:
+    std::string layerName; // Name of layer in physical stack-up
+    int gdsiiNum;          // Layer number in GDSII file
+    double zStart;         // Z-coordinate of bottom of layer (m)
+    double zHeight;        // Height of layer in z-direction (m)
+    double epsilon_r;      // Relative permittivity of material
+    double lossTan;        // Loss tangent of material
+    double sigma;          // (Real) Conductivity of material (S/m)
+  public:
     // Default constructor
     Layer()
     {
@@ -339,20 +340,20 @@ public:
 
 class Port
 {
-private:
-    std::string portName;        // Name of port
-    char portDir;                // Direction of port
-    double Z_source;             // Impedance of sourced attached to port (ohm)
-    vector<double> coord;        // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m)
-    int gdsiiNum;                // Layer number in GDSII file on which port exists
-public:
+  private:
+    std::string portName; // Name of port
+    char portDir;         // Direction of port
+    double Z_source;      // Impedance of sourced attached to port (ohm)
+    vector<double> coord; // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m)
+    int gdsiiNum;         // Layer number in GDSII file on which port exists
+  public:
     // Default constructor
     Port()
     {
         this->portName = "";
         this->portDir = 'B';
         this->Z_source = 0.;
-        this->coord = { 0., 0., 0., 0., 0., 0. };
+        this->coord = {0., 0., 0., 0., 0., 0.};
         this->gdsiiNum = -1;
     }
 
@@ -373,7 +374,7 @@ public:
         if (coord.size() != 6)
         {
             cerr << "Must give supply then return coordinates in vector of length 6. Defaulting to origin for both." << endl;
-            this->coord = { 0., 0., 0., 0., 0., 0. };
+            this->coord = {0., 0., 0., 0., 0., 0.};
         }
         else
         {
@@ -449,7 +450,7 @@ public:
         if (coord.size() != 6)
         {
             cerr << "Must give supply then return coordinates in vector of length 6. Defaulting to origin for both." << endl;
-            this->coord = { 0., 0., 0., 0., 0., 0. };
+            this->coord = {0., 0., 0., 0., 0., 0.};
         }
         else
         {
@@ -503,9 +504,9 @@ public:
 
 class Waveforms
 {
-private:
-    std::string name;             // Placeholder name
-public:
+  private:
+    std::string name; // Placeholder name
+  public:
     // Default constructor
     Waveforms()
     {
@@ -535,12 +536,12 @@ public:
 
 class Parasitics
 {
-private:
-    size_t nPorts;             // Number of ports
-    vector<Port> ports;        // Vector of port information
-    spMat matG;                // Conductance matrix (S)
-    spMat matC;                // Capacitance matrix (F)
-public:
+  private:
+    size_t nPorts;      // Number of ports
+    vector<Port> ports; // Vector of port information
+    spMat matG;         // Conductance matrix (S)
+    spMat matC;         // Capacitance matrix (F)
+  public:
     // Default constructor
     Parasitics()
     {
@@ -673,7 +674,7 @@ public:
             string srefName = (thisCell.sreferences)[indi].getSRefName();
             size_t indNextCell = adb.locateCell(srefName);
             vector<double> thisSRef = (thisCell.sreferences)[indi].getSRefs();
-            vector<Port> newPorts = this->setPortsGDSII(indNextCell, { (center[0] + thisSRef[0]), (center[1] + thisSRef[1]) }, adb); // Recursion step
+            vector<Port> newPorts = this->setPortsGDSII(indNextCell, {(center[0] + thisSRef[0]), (center[1] + thisSRef[1])}, adb); // Recursion step
             portList.insert(portList.end(), newPorts.begin(), newPorts.end());
         }
         for (size_t indi = 0; indi < thisCell.getNumText(); indi++) // Search cell at this level for textboxes
@@ -721,12 +722,12 @@ public:
     spef::Spef toSPEF(std::string designName, double saveThresh)
     {
         // Initialize variables
-        spef::Spef para; // Spef struct for parasitics
-        char timeStr[80]; // Character array to hold formatted time
-        time_t rawtime; // Timer variable
+        spef::Spef para;                                                              // Spef struct for parasitics
+        char timeStr[80];                                                             // Character array to hold formatted time
+        time_t rawtime;                                                               // Timer variable
         strftime(timeStr, sizeof(timeStr), "%d-%m-%Y %H:%M:%S", localtime(&rawtime)); // Use local timezone to format string
-        std::string time(timeStr); // Formatted time to string parametrized constructor
-        size_t numPort = this->getNPort(); // Number of ports
+        std::string time(timeStr);                                                    // Formatted time to string parametrized constructor
+        size_t numPort = this->getNPort();                                            // Number of ports
 
         // Populate Spef struct header fields
         para.standard = "\"IEEE 1481-1998\"";
@@ -748,8 +749,8 @@ public:
         for (size_t indi = 0; indi < numPort; indi++)
         {
             para.name_map.emplace(indi + 1, (this->ports)[indi].getPortName()); // Create name map for each port
-            para.ports.emplace_back("*" + to_string(indi + 1)); // Instantiate and push new port entry by name map
-            switch ((this->ports)[indi].getPortDir()) // Assign port direction
+            para.ports.emplace_back("*" + to_string(indi + 1));                 // Instantiate and push new port entry by name map
+            switch ((this->ports)[indi].getPortDir())                           // Assign port direction
             {
             case 'O':
                 para.ports.back().direction = spef::ConnectionDirection::OUTPUT;
@@ -780,11 +781,11 @@ public:
         {
             para.nets.back().connections.emplace_back(spef::Connection());
             para.nets.back().connections.back().name = (this->ports)[indi].getPortName();
-            para.nets.back().connections.back().type = spef::ConnectionType::EXTERNAL; // All ports are external connections, not internal to cells
+            para.nets.back().connections.back().type = spef::ConnectionType::EXTERNAL;    // All ports are external connections, not internal to cells
             para.nets.back().connections.back().direction = (para.ports[indi]).direction; // Same as port direction
             for (spMat::InnerIterator it(this->matC, indi); it; ++it)
             {
-                para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, it.value())); 
+                para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, it.value()));
                 /*if ((it.row() == it.col()) && (abs(this->getCNodeGround(indi)) >= saveThresh * capTot)) // Diagonal element, so sufficient admittance to ground
                 {
                     para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, "", this->getCNodeGround(indi)));
@@ -812,6 +813,85 @@ public:
         return para;
     }
 
+    // Translate parasitics to Xyce (SPICE) subcircuit
+    bool toXyce(std::string outXyceFile, std::string designName, double saveThresh)
+    {
+        // Initialize variables
+        char timeStr[80];                                                             // Character array to hold formatted time
+        time_t rawtime;                                                               // Timer variable
+        strftime(timeStr, sizeof(timeStr), "%d-%m-%Y %H:%M:%S", localtime(&rawtime)); // Use local timezone to format string
+        std::string time(timeStr);                                                    // Formatted time to string parametrized constructor
+        size_t numPort = this->getNPort();                                            // Number of ports
+
+        // Attempt to open file
+        ofstream xyceFile(outXyceFile.c_str());
+        if (xyceFile.is_open())
+        {
+            // Write SPICE subcircuit header
+            xyceFile << "* File: " << outXyceFile << endl;
+            xyceFile << "* Design: " << designName << endl;
+            xyceFile << "* Vendor: DARPA ERI Contributors" << endl;
+            xyceFile << "* Program: Xyce Writer from DARPA ERI" << endl;
+            xyceFile << "* Author: Purdue University" << endl;
+            xyceFile << "* Date: " << time << endl;
+            xyceFile << endl;
+
+            // Write the subcircuit definition line
+            xyceFile << ".subckt " << designName; // Start subcircuit definition line
+            for (size_t indi = 0; indi < numPort; indi++)
+            {
+                xyceFile << " " << (this->ports)[indi].getPortName();
+            }
+            xyceFile << endl; // End the subcircuit definition line
+
+            // Write each circuit element
+            double capTot = this->getCTotal();
+            double condTot = this->getGTotal();
+            (this->matC).prune(myPruneFunctor(saveThresh * capTot)); // Prune away nonzeros sufficiently smaller than threshold
+            (this->matG).prune(myPruneFunctor(saveThresh * condTot));
+            int numCap = 1; // Running number of capacitors
+            int numRes = 1; // Running number of resistors
+
+            for (size_t indi = 0; indi < numPort; indi++) // Uses y-parameter storage in matC, matG
+            {
+                for (spMat::InnerIterator it(this->matC, indi); it; ++it)
+                {
+                    if ((it.row() == it.col()) && (abs(it.value()) >= saveThresh * capTot)) // Diagonal element
+                    {
+                        xyceFile << "C" << numCap++ << " " << (this->ports)[indi].getPortName() << " 0 " << abs(it.value()) << endl;
+                    }
+                    else if (it.col() > it.row()) // Upper triangular element
+                    {
+                        xyceFile << "C" << numCap++ << " " << (this->ports)[indi].getPortName() << " " << (this->ports)[it.col()].getPortName() << " " << abs(it.value()) << endl;
+                    }
+                }
+                for (spMat::InnerIterator it(this->matG, indi); it; ++it)
+                {
+                    if ((it.row() == it.col()) && (abs(it.value()) >= saveThresh * condTot)) // Diagonal element
+                    {
+                        xyceFile << "R" << numRes++ << " " << (this->ports)[indi].getPortName() << " 0 " << abs(1.0 / it.value()) << endl;
+                    }
+                    else if (it.col() > it.row()) // Upper triangular element
+                    {
+                        xyceFile << "R" << numRes++ << " " << (this->ports)[indi].getPortName() << " " << (this->ports)[it.col()].getPortName() << " " << abs(1.0 / it.value()) << endl;
+                    }
+                }
+            }
+
+            // Write the end of the subcircuit
+            xyceFile << ".ends" << endl;
+
+            // Close file
+            xyceFile.close();
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
+    }
+
     // Destructor
     ~Parasitics()
     {
@@ -826,14 +906,15 @@ public:
 
 struct SolverDataBase
 {
-private:
+  private:
     std::string designName; // Name of design
     SimSettings settings;   // Simulation settings
     vector<Layer> layers;   // Layer stack-up information
     Waveforms wf;           // Waveforms
     Parasitics para;        // Parasitics
     std::string outSPEF;    // SPEF output file name
-public:
+    std::string outXyce;    // Xyce (SPICE) output file name
+  public:
     // Default constructor
     SolverDataBase()
     {
@@ -847,6 +928,7 @@ public:
         this->wf = wf;
         this->para = para;
         this->outSPEF = "";
+        this->outXyce = "";
     }
 
     // Parametrized constructor
@@ -860,6 +942,7 @@ public:
         this->wf = wf;
         this->para = para;
         this->outSPEF = "";
+        this->outXyce = "";
     }
 
     // Get name of design
@@ -904,6 +987,12 @@ public:
         return this->outSPEF;
     }
 
+    // Get Xyce (SPICE) output file name
+    std::string getOutXyce() const
+    {
+        return this->outXyce;
+    }
+
     // Set name of design
     void setDesignName(std::string designName)
     {
@@ -938,6 +1027,12 @@ public:
     void setOutSPEF(std::string fileName)
     {
         this->outSPEF = fileName;
+    }
+
+    // Set Xyce (SPICE) output file name
+    void setOutXyce(std::string fileName)
+    {
+        this->outXyce = fileName;
     }
 
     // Find index of layer by name
@@ -1011,10 +1106,10 @@ public:
         if (impFile.is_open())
         {
             // Time manipulations
-            char timeStr[80]; // Character array to hold formatted time
-            time_t rawtime; // Timer variable
+            char timeStr[80];                                                             // Character array to hold formatted time
+            time_t rawtime;                                                               // Timer variable
             strftime(timeStr, sizeof(timeStr), "%d-%m-%Y %H:%M:%S", localtime(&rawtime)); // Use local timezone to format string
-            std::string time(timeStr); // Formatted time to string parametrized constructor
+            std::string time(timeStr);                                                    // Formatted time to string parametrized constructor
 
             // Build single geometric cell from limboint.h to store information
             GeoCell cellIMP;
@@ -1043,9 +1138,9 @@ public:
             while (!impFile.eof())
             {
                 // Initialize file-scope varialbes
-                static double stripLength = 0; // Initialize the strip length
-                static int maxGDSIILayer = 0; // Maximum GDSII layer number encountered
-                static int numFreqPts = 0; // Number of points in frequency sweep
+                static double stripLength = 0;       // Initialize the strip length
+                static int maxGDSIILayer = 0;        // Maximum GDSII layer number encountered
+                static int numFreqPts = 0;           // Number of points in frequency sweep
                 static vector<double> freqList = {}; // List of frequencies in sweep
 
                 // Handle units
@@ -1056,16 +1151,46 @@ public:
 
                     // Find SI multiplier for given units
                     double multSI = 1.0;
-                    if (units.compare("ym") == 0) { multSI = 1.e-24; }
-                    else if (units.compare("zm") == 0) { multSI = 1.e-21; }
-                    else if (units.compare("am") == 0) { multSI = 1.e-18; }
-                    else if (units.compare("fm") == 0) { multSI = 1.e-15; }
-                    else if (units.compare("pm") == 0) { multSI = 1.e-12; }
-                    else if (units.compare("nm") == 0) { multSI = 1.e-09; }
-                    else if (units.compare("um") == 0) { multSI = 1.e-06; }
-                    else if (units.compare("mm") == 0) { multSI = 1.e-03; }
-                    else if (units.compare("cm") == 0) { multSI = 1.e-02; }
-                    else if (units.compare("dm") == 0) { multSI = 1.e-01; }
+                    if (units.compare("ym") == 0)
+                    {
+                        multSI = 1.e-24;
+                    }
+                    else if (units.compare("zm") == 0)
+                    {
+                        multSI = 1.e-21;
+                    }
+                    else if (units.compare("am") == 0)
+                    {
+                        multSI = 1.e-18;
+                    }
+                    else if (units.compare("fm") == 0)
+                    {
+                        multSI = 1.e-15;
+                    }
+                    else if (units.compare("pm") == 0)
+                    {
+                        multSI = 1.e-12;
+                    }
+                    else if (units.compare("nm") == 0)
+                    {
+                        multSI = 1.e-09;
+                    }
+                    else if (units.compare("um") == 0)
+                    {
+                        multSI = 1.e-06;
+                    }
+                    else if (units.compare("mm") == 0)
+                    {
+                        multSI = 1.e-03;
+                    }
+                    else if (units.compare("cm") == 0)
+                    {
+                        multSI = 1.e-02;
+                    }
+                    else if (units.compare("dm") == 0)
+                    {
+                        multSI = 1.e-01;
+                    }
 
                     // Propagate units information to ASCII database now
                     adbIMP.setdbUserUnits(1.);
@@ -1158,7 +1283,10 @@ public:
                             {
                                 size_t indNumber = layerName.find("M");
                                 gdsiiNum = stoi(layerName.substr(indNumber + 1, layerName.length() - indNumber - 1));
-                                if (gdsiiNum > maxGDSIILayer) { maxGDSIILayer = gdsiiNum; }
+                                if (gdsiiNum > maxGDSIILayer)
+                                {
+                                    maxGDSIILayer = gdsiiNum;
+                                }
                             }
                             double zStart = 0.;
                             if (indZStart != string::npos)
@@ -1234,10 +1362,22 @@ public:
                             }
 
                             // Check for extrema of coordinates
-                            if (x1 < xmin) { xmin = x1; }
-                            if (x2 > xmax) { xmax = x2; }
-                            if (y1 < ymin) { ymin = y1; }
-                            if (y2 > ymax) { ymax = y2; }
+                            if (x1 < xmin)
+                            {
+                                xmin = x1;
+                            }
+                            if (x2 > xmax)
+                            {
+                                xmax = x2;
+                            }
+                            if (y1 < ymin)
+                            {
+                                ymin = y1;
+                            }
+                            if (y2 > ymax)
+                            {
+                                ymax = y2;
+                            }
 
                             // Assign layer number based on layer stack-up
                             size_t indThisLayer = this->locateLayerName(fileLine.substr(indLayer + 6, fileLine.find(" ", indLayer)));
@@ -1248,8 +1388,7 @@ public:
                             }
 
                             // Push new box to the geometric cell
-                            cellIMP.boxes.emplace_back(box({ x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1 }, gdsiiNum, { sigma, condName, category, group }, 0));
-
+                            cellIMP.boxes.emplace_back(box({x2, y1, x2, y2 + stripLength, x1, y2 + stripLength, x1, y1, x2, y1}, gdsiiNum, {sigma, condName, category, group}, 0));
                         }
                         // Keep moving down the conductor list
                         getline(impFile, fileLine);
@@ -1257,24 +1396,24 @@ public:
 
                     // Add on planes
                     size_t indGroundPlane = this->locateLayerName("GroundPlane"); // Start with ground (bottom) plane
-                    ((this->layers)[indGroundPlane]).setGDSIINum(0); // Assign ground plane to layer 0
-                    vector<std::string> propGround; // Ground plane properties
+                    ((this->layers)[indGroundPlane]).setGDSIINum(0);              // Assign ground plane to layer 0
+                    vector<std::string> propGround;                               // Ground plane properties
                     propGround.push_back("sigma=" + to_string(((this->layers)[indGroundPlane]).getSigma()));
                     propGround.push_back("GroundPlane");
                     propGround.push_back("plane");
                     propGround.push_back("");
-                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin }, ((this->layers)[indGroundPlane]).getGDSIINum(), propGround, 0));
-                    size_t indTopPlane = this->locateLayerName("TopPlane"); // Next is top plane
+                    cellIMP.boxes.emplace_back(box({xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin}, ((this->layers)[indGroundPlane]).getGDSIINum(), propGround, 0));
+                    size_t indTopPlane = this->locateLayerName("TopPlane");     // Next is top plane
                     ((this->layers)[indTopPlane]).setGDSIINum(++maxGDSIILayer); // Assign top plane to layer one more than maximum metallic layer
-                    vector<std::string> propTop; // Top plane properties
+                    vector<std::string> propTop;                                // Top plane properties
                     propTop.push_back("sigma=" + to_string(((this->layers)[indTopPlane]).getSigma()));
                     propTop.push_back("TopPlane");
                     propTop.push_back("plane");
                     propTop.push_back("");
-                    cellIMP.boxes.emplace_back(box({ xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin }, ((this->layers)[indTopPlane]).getGDSIINum(), propTop, 0));
+                    cellIMP.boxes.emplace_back(box({xmax, ymin, xmax, 2 * ymax + stripLength, xmin, 2 * ymax + stripLength, xmin, ymin, xmax, ymin}, ((this->layers)[indTopPlane]).getGDSIINum(), propTop, 0));
 
                     // Save simulation settings at last
-                    this->settings = SimSettings(adbIMP.getdbUnits(), { xmin, xmax, ymin, 2 * ymax + stripLength, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight() }, 1.0, 0.0, freqList);
+                    this->settings = SimSettings(adbIMP.getdbUnits(), {xmin, xmax, ymin, 2 * ymax + stripLength, (this->layers).back().getZStart(), (this->layers).front().getZStart() + (this->layers).front().getZHeight()}, 1.0, 0.0, freqList);
                 }
                 // Handle port table
                 if (fileLine.compare(0, 9, "PORTTABLE") == 0)
@@ -1312,13 +1451,13 @@ public:
                             }
                             if (indCond >= cellIMP.boxes.size())
                             {
-                                portSupRet = { 0., 0., 0., 0., 0., 0. }; // Not found, default has supply and return at origin
+                                portSupRet = {0., 0., 0., 0., 0., 0.}; // Not found, default has supply and return at origin
                             }
                             else
                             {
-                                vector<double> boxCoord = (cellIMP.boxes[indCond]).getBoxes(); // Coordinates of box on layer
-                                indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer()); // Index of layer in structure field
-                                portSupRet = { boxCoord[0], boxCoord[1], (this->layers)[indLayer].getZStart(), boxCoord[0], boxCoord[1], 0. }; // xsup = LR xcoord, ysup = LR ycoord, zsup = layer zStart, xret = xsup, yret = ysup, zret = 0.
+                                vector<double> boxCoord = (cellIMP.boxes[indCond]).getBoxes();                                               // Coordinates of box on layer
+                                indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer());                                      // Index of layer in structure field
+                                portSupRet = {boxCoord[0], boxCoord[1], (this->layers)[indLayer].getZStart(), boxCoord[0], boxCoord[1], 0.}; // xsup = LR xcoord, ysup = LR ycoord, zsup = layer zStart, xret = xsup, yret = ysup, zret = 0.
                             }
                             ports.emplace_back(Port(groupName, 'B', Z_near, portSupRet, (this->layers)[indLayer].getGDSIINum()));
                         }
@@ -1343,7 +1482,7 @@ public:
             adbIMP.setdbUnits(adbIMP.getdbUnits() * 1.e-3); // Rescale .imp file units 0.001x to allow integer representation in GDSII
 
             // Print the ASCII database
-            adbIMP.print({ 0 });
+            adbIMP.print({0});
             (this->settings).print();
 
             // Write GDSII file to hard drive
@@ -1357,7 +1496,7 @@ public:
         }
     }
 
-    // Load simulation input file 
+    // Load simulation input file
     bool readSimInput(std::string inputFileName)
     {
         // Attempt to open simulation input file
@@ -1376,7 +1515,7 @@ public:
                 {
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain limits of IC design size
                     double xmin, xmax, ymin, ymax, zmin, zmax;
                     size_t indCoordStart = 0;
@@ -1396,46 +1535,46 @@ public:
                     zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
                     zmax = stod(fileLine.substr(indCoordStart));
-                    
+
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain length unit
                     double lengthUnit = stod(fileLine.substr(fileLine.find("lengthUnit = ") + 13, fileLine.find(" #")));
-                    
+
                     // Create simulation settings
-                    this->settings = SimSettings(lengthUnit, { xmin * lengthUnit, xmax * lengthUnit, ymin * lengthUnit, ymax * lengthUnit, zmin * lengthUnit, zmax * lengthUnit }, 1., 0., {});
+                    this->settings = SimSettings(lengthUnit, {xmin * lengthUnit, xmax * lengthUnit, ymin * lengthUnit, ymax * lengthUnit, zmin * lengthUnit, zmax * lengthUnit}, 1., 0., {});
                 }
                 // Handle frequency sweep parameters
                 else if (fileLine.compare(0, 9, "FREQUENCY") == 0)
                 {
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain frequency unit
                     double freqUnit = stod(fileLine.substr(fileLine.find("freqUnit = ") + 11, fileLine.find(" #")));
-                    
+
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain first frequency
                     double freqStart = stod(fileLine.substr(fileLine.find("freqStart = ") + 12, fileLine.find(" #")));
-                    
+
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain last frequency
                     double freqEnd = stod(fileLine.substr(fileLine.find("freqEnd = ") + 10, fileLine.find(" #")));
-                    
+
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain number of frequencies
                     size_t nFreq = stoi(fileLine.substr(fileLine.find("nfreq = ") + 8, fileLine.find(" #")));
-                    
+
                     // Move down one line
                     getline(inputFile, fileLine);
-                    
+
                     // Obtain frequency scaling
                     double freqScale = stod(fileLine.substr(fileLine.find("freqScale = ") + 12, fileLine.find(" #")));
 
@@ -1460,7 +1599,7 @@ public:
                         }
                         freqList.push_back(freqEnd); // Ensure last frequency is exact
                     }
-                    
+
                     // Update simulation settings
                     (this->settings).setFreqUnit(freqUnit);
                     (this->settings).setFreqScale(freqScale);
@@ -1548,7 +1687,7 @@ public:
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
                             portLayer = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
-                            sourceDir = 0; // No soure direction information included
+                            sourceDir = 0;                                                                 // No soure direction information included
 
                             zsup = (this->layers)[this->locateLayerGDSII(portLayer)].getZStart();
                             zret = zsup + (this->layers)[this->locateLayerGDSII(portLayer)].getZHeight(); // Return assumed to be on same layer but on upper end
@@ -1594,7 +1733,7 @@ public:
                         default:
                             portDir = 'B'; // Treat as bidirectional if direction unclear
                         }
-                        ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., { xsup, ysup, zsup, xret, yret, zret }, portLayer));
+                        ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., {xsup, ysup, zsup, xret, yret, zret}, portLayer));
 
                         // Move down one line
                         getline(inputFile, fileLine);
@@ -1636,13 +1775,13 @@ public:
 
         // Use layer stack-up information to set fields
         data.numStack = this->getNumLayer();
-        data.stackEps = (double*)malloc(sizeof(double) * data.numStack);
-        data.stackBegCoor = (double*)malloc(sizeof(double) * data.numStack);
-        data.stackEndCoor = (double*)malloc(sizeof(double) * data.numStack);
+        data.stackEps = (double *)malloc(sizeof(double) * data.numStack);
+        data.stackBegCoor = (double *)malloc(sizeof(double) * data.numStack);
+        data.stackEndCoor = (double *)malloc(sizeof(double) * data.numStack);
         //data.stackEpsn; // Is this needed from SolverDataBase?
         for (size_t indi = 0; indi < data.numStack; indi++)
         {
-            Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
+            Layer thisLayer = this->getLayer(indi);        // Get copy of layer for this iteration
             data.stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
             data.stackBegCoor[indi] = thisLayer.getZStart();
             data.stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
@@ -1650,7 +1789,7 @@ public:
         }
 
         // Set conductor information from saved stack information
-        data.stackCdtMark = (double*)malloc(sizeof(double) * data.numStack);
+        data.stackCdtMark = (double *)malloc(sizeof(double) * data.numStack);
         for (size_t indi = 0; indi < data.numCdtRow; indi++)
         {
             for (size_t indj = 0; indj < data.numStack; indj++)
@@ -1675,7 +1814,7 @@ public:
 
         // Use port information in parasitics data member to set fields
         data.numPorts = (this->para).getNPort();
-        data.portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data.numPorts);
+        data.portCoor = (fdtdPort *)malloc(sizeof(fdtdPort) * data.numPorts);
         //data.portArea; // Is this needed at all?
         //data.portEdge; // Is this needed from SolverDataBase?
         //data.portNno; // Is this needed at all?
@@ -1709,7 +1848,7 @@ public:
     }
 
     // Print the solver database and dump to SPEF file
-    bool printDump()
+    bool printDumpSPEF()
     {
         // Print
         int numLayer = this->getNumLayer();
@@ -1736,7 +1875,7 @@ public:
             // Write to file
             spef::Spef designPara = (this->para).toSPEF(this->designName, 1.0e-5);
             designPara.dump(spefFile);
-            
+
             // Close file
             spefFile.close();
             return true;
@@ -1746,6 +1885,30 @@ public:
             // File could not be opened
             return false;
         }
+    }
+
+    // Print the solver database and dump to Xyce (SPICE) subcircuit file
+    bool printDumpXyce()
+    {
+        // Print
+        int numLayer = this->getNumLayer();
+        cout << "Solver Database of IC Design, " << this->designName << ":" << endl;
+        cout << " Settings for the simulation:" << endl;
+        (this->settings).print(); // Print the simulation settings
+        cout << " Details of the " << numLayer << " layers:" << endl;
+        for (size_t indi = 0; indi < numLayer; indi++)
+        {
+            (this->layers)[indi].print();
+        }
+        cout << " Waveforms:" << endl;
+        (this->wf).print(); // Print the waveforms
+        cout << " Parasitics in file " << this->outSPEF << ":" << endl;
+        (this->para).print(); // Print the parasitics
+        cout << "------" << endl;
+
+        // Attempt to dump to Xyce File
+        bool couldDump = (this->para).toXyce(this->outXyce, this->designName, 1.0e-5);
+        return couldDump;
     }
 
     // Destructor

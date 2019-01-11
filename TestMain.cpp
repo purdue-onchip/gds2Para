@@ -39,12 +39,14 @@ int main(int argc, char** argv)
             cout << "  -p, --parrot          Immediately output given GDSII file after reading." << endl;
             cout << "  -w, --write           Write database in memory to given SPEF file." << endl;
             cout << "  -i, --imp             Read given interconnect modeling platform file and write GDSII file with name also given." << endl;
-            cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
+            //cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
+            cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to Xyce (SPICE) subcircuit file." << endl;
             cout << endl << "Comments:" << endl;
             cout << "The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
-            cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
+            //cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
+            cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
         }
@@ -176,7 +178,7 @@ int main(int argc, char** argv)
             // Prepare to write to file
             string fName = argv[2];
             sdb.setOutSPEF(fName);
-            bool couldDump = sdb.printDump();
+            bool couldDump = sdb.printDumpSPEF();
         }
         else
         {
@@ -309,16 +311,24 @@ int main(int argc, char** argv)
             Parasitics oldPara = sdb.getParasitics(); // Get outdated parastics structure to update
             sdb.setParasitics(Parasitics(oldPara.getPorts(), matG, matC));
 
-            // Output SPEF file
+            /*// Output SPEF file
             string outSPEFFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutSPEF(outSPEFFile);
-            bool sdbCouldDump = sdb.printDump();
-            cout << "File ready at " << outSPEFFile << endl;
+            bool sdbCouldDump = sdb.printDumpSPEF();
+            cout << "File ready at " << outSPEFFile << endl; */
+
+            // Output Xyce subcircuit file
+            string outXyceFile = argv[4];
+            sdb.setDesignName(adb.findNames().back());
+            sdb.setOutXyce(outXyceFile);
+            bool sdbCouldDump = sdb.printDumpXyce();
+            cout << "File ready at " << outXyceFile << endl;
         }
         else
         {
-            cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
+            //cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
         }
     }
     else
