@@ -3,6 +3,10 @@ Complete Integrated Circuit (IC) Layout Analysis from GDSII Design File to Paras
 
 This IC layout analyzer is written in C++ as part of a wider API for the electromagnetic design validation of VLSI designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits. Design information from the Graphic Database Stream II (GDSII) file is parsed and stored alongside simulation input information. Once a design is loaded, the information can be written to another GDSII file or analyzed with a full-wave simulation to extract parasitics between ports. An alternate mode of operation allows an interconnect modeling platform (IMP) file to be translated to a GDSII file design. Parasitics are reported through a Standard Parasitics Exchange Format (SPEF) file. Please carefully read this **README.md** file for installation and usage instructions.
 
+## Overview
+### Simulate (-s) Mode Top-level Flowchart
+| <img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/gds2Para_mode-s.png" width=100 alt="Simulate (-s) Mode Flowchart">
+
 ## Packages
 | Packages                                | Languages                       | Description                                                                |
 | --------------------------------------- | ------------------------------- | -------------------------------------------------------------------------- |
@@ -13,7 +17,7 @@ This IC layout analyzer is written in C++ as part of a wider API for the electro
 | Complex                                 | C++                             | Complex number arithmetic                         |
 | Cstdio                                  | C                               | Utilities for C language input/output              |
 | Cstdlib                                 | C                               | Utilities for common C language tasks              |
-| Cstring                                 | C                               | Utilities for manipulating char* data type         |
+| Cstring                                 | C                               | Utilities for manipulating char\* data type         |
 | Ctime                                   | C                               | Utilities for dates and timers                      |
 | Eigen                                   | C++                             | API for sparse matrix storage                       |
 | FStream                                 | C++                             | Plain textext file input and output                        |
@@ -32,8 +36,8 @@ This IC layout analyzer is written in C++ as part of a wider API for the electro
 | Stack                                   | C++                             | Utilities for handling LIFO stacks                 |
 | String                                  | C++                             | Utilities for easy string handling                                              |
 | ThirdParty                              | C/C++                           | Third party packages required                                              |
-| Unordered_map                           | C++                             | Utilities for handling associative data types     |
-| Unordered_set                           | C++                             | Utilities for handling dictionary collection types   |
+| Unordered\_map                           | C++                             | Utilities for handling associative data types     |
+| Unordered\_set                           | C++                             | Utilities for handling dictionary collection types   |
 | Utility                                 | C++                             | Functions and classes for pairs and swapping       |
 | Vector                                  | C++                             | Collection data types from existing C++ data types |
 
