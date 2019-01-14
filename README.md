@@ -5,7 +5,7 @@ This IC layout analyzer is written in C++ as part of a wider API for the electro
 
 ## Overview
 ### Simulate (-s) Mode Top-level Flowchart
-| <img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/gds2Para_mode-s.png" width=100 alt="Simulate (-s) Mode Flowchart">
+<img src="https://github.com/purdue-onchip/gdsii-interface/blob/master/images/gds2Para_mode-s.png" width=600 alt="Simulate (-s) Mode Flowchart">
 
 ## Packages
 | Packages                                | Languages                       | Description                                                                |
