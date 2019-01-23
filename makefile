@@ -68,10 +68,10 @@ TestMain.o: TestMain.cpp fdtd.h limboint.h solnoutclass.h #$(LIMBO_ROOT_DIR)/lim
 	g++ -std=c++17 -g -lstdc++fs -c TestMain.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
 	
 mesh.o: mesh.cpp fdtd.h
-	g++ -c mesh.cpp -I $(MKL_ROOT_DIR)/include
+	g++ -c -g mesh.cpp -I $(MKL_ROOT_DIR)/include
 
 matrixCon.o: matrixCon.cpp fdtd.h
-	g++ -c matrixCon.cpp -I $(MKL_ROOT_DIR)/include
+	g++ -c -g matrixCon.cpp -I $(MKL_ROOT_DIR)/include
 
 .PHONY: clean
 clean: cleandep

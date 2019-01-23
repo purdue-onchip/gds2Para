@@ -21,6 +21,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     double xmin, xmax, ymin, ymax, xwid, ywid;
     unordered_set<double> portCoorx, portCoory;
 
+    cout << "h\n";
     xmin = DOUBLEMAX;    // whole structure xmin
     xmax = DOUBLEMIN;    // whole structure xmax
     ymin = DOUBLEMAX;    // whole structure ymin
@@ -137,8 +138,11 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             break;
         sys->portCoor[lyr].x1 = fdtdGetValue(word[0])*sys->lengthUnit;
         sys->portCoor[lyr].y1 = fdtdGetValue(word[1])*sys->lengthUnit;
-        sys->portCoor[lyr].x2 = fdtdGetValue(word[2])*sys->lengthUnit;
-        sys->portCoor[lyr].y2 = fdtdGetValue(word[3])*sys->lengthUnit;
+        sys->portCoor[lyr].x2 = fdtdGetValue(word[3])*sys->lengthUnit;
+        sys->portCoor[lyr].y2 = fdtdGetValue(word[4])*sys->lengthUnit;
+        sys->portCoor[lyr].z1 = fdtdGetValue(word[2])*sys->lengthUnit;
+        sys->portCoor[lyr].z2 = fdtdGetValue(word[5])*sys->lengthUnit;
+
         if (sys->portCoor[lyr].x1 == sys->portCoor[lyr].x2){
             portCoorx.insert(sys->portCoor[lyr].x1);    // the x coordinates on the yz plane is recorded
         }
@@ -155,13 +159,12 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             sys->portCoor[lyr].y1 = sys->portCoor[lyr].y2;
             sys->portCoor[lyr].y2 = temp;
         }
-        for (i = 0; i < sys->numStack; i++){
-            if (compareString(word[4], &sys->stackName[i][0])){
-                sys->portCoor[lyr].z1 = sys->stackBegCoor[i];
-                sys->portCoor[lyr].z2 = sys->stackEndCoor[i];
-                break;
-            }
+        if (sys->portCoor[lyr].z1 > sys->portCoor[lyr].z2){
+            temp = sys->portCoor[lyr].z1;
+            sys->portCoor[lyr].z1 = sys->portCoor[lyr].z2;
+            sys->portCoor[lyr].z2 = temp;
         }
+        sys->portCoor[lyr].portDirection = (int)fdtdGetValue(word[6]);
         lyr++;
     }
 
@@ -346,7 +349,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     sys->ny = 1;
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
-    disMaxy = (ymax - ymin) / 10;
+    disMaxy = (ymax-ymin)/5;
 
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -449,115 +452,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     vector<double> porteqx;    // store the eq leng caused x coordinates around each port
     vector<double> porteqy;    // store the eq leng caused y coordinates around each port
     vector<double> porteqz;    // store the eq leng caused z coordinates around each port
-    /*double mini;
-    for (i = 0; i < sys->numPorts; i++){
-        if (sys->portCoor[i].x1 == sys->portCoor[i].x2){
-            mini = DOUBLEMAX;
-            if (sys->portCoor[i].x1 - sys->xnu[xi[sys->portCoor[i].x1] - 1] < mini){
-                mini = sys->portCoor[i].x1 - sys->xnu[xi[sys->portCoor[i].x1] - 1];
-            }
-            if (sys->xnu[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1 < mini){
-                mini = sys->xnu[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1;
-            }
-            if (sys->portCoor[i].y1 - sys->ynu[yi[sys->portCoor[i].y1] - 1] < mini){
-                mini = sys->portCoor[i].y1 - sys->ynu[yi[sys->portCoor[i].y1] - 1];
-            }
-            if (sys->portCoor[i].z1 - sys->znu[zi[sys->portCoor[i].z1] - 1] < mini){
-                mini = sys->portCoor[i].z1 - sys->znu[zi[sys->portCoor[i].z1] - 1];
-            }
-            if (sys->ynu[yi[sys->portCoor[i].y2] + 1] - sys->portCoor[i].y2 < mini){
-                mini = sys->ynu[yi[sys->portCoor[i].y2] + 1] - sys->portCoor[i].y2;
-            }
-            if (sys->znu[zi[sys->portCoor[i].z2] + 1] - sys->portCoor[i].z2 < mini){
-                mini = sys->znu[zi[sys->portCoor[i].z2] + 1] - sys->portCoor[i].z2;
-            }
-            porteqx.push_back(sys->portCoor[i].x1 - mini);
-            porteqx.push_back(sys->portCoor[i].x1 + mini);
-            porteqy.push_back(sys->portCoor[i].y1 - mini);
-            porteqy.push_back(sys->portCoor[i].y2 + mini);
-            porteqz.push_back(sys->portCoor[i].z1 - mini);
-            porteqz.push_back(sys->portCoor[i].z2 + mini);
-
-            porteqy.push_back(sys->portCoor[i].y1 + mini);
-            porteqy.push_back(sys->portCoor[i].y2 - mini);
-            porteqz.push_back(sys->portCoor[i].z1 + mini);
-            porteqz.push_back(sys->portCoor[i].z2 - mini);
-        }
-        else if (sys->portCoor[i].y1 == sys->portCoor[i].y2){
-            mini = DOUBLEMAX;
-            if (sys->portCoor[i].y1 - sys->ynu[yi[sys->portCoor[i].y1] - 1] < mini){
-                mini = sys->portCoor[i].y1 - sys->ynu[yi[sys->portCoor[i].y1] - 1];
-            }
-            if (sys->ynu[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1 < mini){
-                mini = sys->ynu[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1;
-            }
-            if (sys->portCoor[i].x1 - sys->xnu[xi[sys->portCoor[i].x1] - 1] < mini){
-                mini = sys->portCoor[i].x1 - sys->xnu[xi[sys->portCoor[i].x1] - 1];
-            }
-            if (sys->portCoor[i].z1 - sys->znu[zi[sys->portCoor[i].z1] - 1] < mini){
-                mini = sys->portCoor[i].z1 - sys->znu[zi[sys->portCoor[i].z1] - 1];
-            }
-            if (sys->xnu[xi[sys->portCoor[i].x2] + 1] - sys->portCoor[i].x2 < mini){
-                mini = sys->xnu[xi[sys->portCoor[i].x2] + 1] - sys->portCoor[i].x2;
-            }
-            if (sys->znu[zi[sys->portCoor[i].z2] + 1] - sys->portCoor[i].z2 < mini){
-                mini = sys->znu[zi[sys->portCoor[i].z2] + 1] - sys->portCoor[i].z2;
-            }
-            porteqx.push_back(sys->portCoor[i].x1 - mini);
-            porteqx.push_back(sys->portCoor[i].x2 + mini);
-            porteqy.push_back(sys->portCoor[i].y1 - mini);
-            porteqy.push_back(sys->portCoor[i].y1 + mini);
-            porteqz.push_back(sys->portCoor[i].z1 - mini);
-            porteqz.push_back(sys->portCoor[i].z2 + mini);
-
-            porteqx.push_back(sys->portCoor[i].x1 + mini);
-            porteqx.push_back(sys->portCoor[i].x2 - mini);
-            porteqz.push_back(sys->portCoor[i].z1 + mini);
-            porteqz.push_back(sys->portCoor[i].z2 - mini);
-        }
-        else if (sys->portCoor[i].z1 == sys->portCoor[i].z2){
-            mini = DOUBLEMAX;
-            if (sys->portCoor[i].z1 - sys->znu[zi[sys->portCoor[i].z1] - 1] < mini){
-                mini = sys->portCoor[i].z1 - sys->znu[zi[sys->portCoor[i].z1] - 1];
-            }
-            if (sys->znu[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1 < mini){
-                mini = sys->znu[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1;
-            }
-            if (sys->portCoor[i].x1 - sys->xnu[xi[sys->portCoor[i].x1] - 1] < mini){
-                mini = sys->portCoor[i].x1 - sys->xnu[xi[sys->portCoor[i].x1] - 1];
-            }
-            if (sys->portCoor[i].y1 - sys->ynu[yi[sys->portCoor[i].y1] - 1] < mini){
-                mini = sys->portCoor[i].y1 - sys->ynu[yi[sys->portCoor[i].y1] - 1];
-            }
-            if (sys->xnu[xi[sys->portCoor[i].x2] + 1] - sys->portCoor[i].x2 < mini){
-                mini = sys->xnu[xi[sys->portCoor[i].x2] + 1] - sys->portCoor[i].x2;
-            }
-            if (sys->ynu[yi[sys->portCoor[i].y2] + 1] - sys->portCoor[i].y2 < mini){
-                mini = sys->ynu[yi[sys->portCoor[i].y2] + 1] - sys->portCoor[i].y2;
-            }
-            porteqx.push_back(sys->portCoor[i].x1 - mini);
-            porteqx.push_back(sys->portCoor[i].x2 + mini);
-            porteqy.push_back(sys->portCoor[i].y1 - mini);
-            porteqy.push_back(sys->portCoor[i].y2 + mini);
-            porteqz.push_back(sys->portCoor[i].z1 - mini);
-            porteqz.push_back(sys->portCoor[i].z1 + mini);
-
-            porteqx.push_back(sys->portCoor[i].x1 + mini);
-            porteqx.push_back(sys->portCoor[i].x2 - mini);
-            porteqy.push_back(sys->portCoor[i].y1 + mini);
-            porteqy.push_back(sys->portCoor[i].y2 - mini);
-        }
-
-    }
-    for (i = 0; i < porteqx.size(); i++){
-        xn[countx + 1 + i] = porteqx[i];
-    }
-    for (i = 0; i < porteqy.size(); i++){
-        yn[county + 1 + i] = porteqy[i];
-    }
-    for (i = 0; i < porteqz.size(); i++){
-        zn[countz + 1 + i] = porteqz[i];
-    }*/
 
 
 
@@ -633,7 +527,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         cout << sys->stackEpsn[i] << endl;
     }*/
 
-    /*for (i = 0; i < sys->nx; i++){
+    for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
     cout << "\n" << endl;
@@ -644,7 +538,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;*/
+    cout << "\n" << endl;
     /*vector<pair<double, int> > vx(xi.begin(), xi.end());
     sort(vx.begin(), vx.end(), comp);
     for (int i = 0; i < vx.size(); i++){
@@ -880,6 +774,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     for (i = 0; i < sys->numCdt; i++){
         sys->conductor[i].node = (int*)malloc(sizeof(int) * sys->cdtNumNode[i]);
         sys->conductor[i].cdtNodeind = 0;
+        sys->conductor[i].markPort = 0;
     }
     for (i = 0; i < sys->N_node; i++){
         if (visited[i] != 0){
@@ -1028,7 +923,7 @@ int matrixConstruction(fdtdMesh *sys){
                 b += sys->edgeCellArea[i][j];
             }
 
-            sys->sig[i] = (a / b) * SIGMA;
+            sys->sig[i] = SIGMA;/*(a / b) * SIGMA;*/
         }
     }
 
@@ -1038,6 +933,10 @@ int matrixConstruction(fdtdMesh *sys){
     }
     outfile.close();
 
+    sys->edgeCell.clear();
+    sys->edgeCellArea.clear();
+    free(sys->markCell); sys->markCell = NULL;
+
     return 0;
 }
 
@@ -1045,29 +944,118 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 
     char s[FDTD_MAXC];
     char *word[FDTD_MAXC];
-    int j, i, l, m;
+    int j, i, mark, l, m;
+    int node;
     vector<int> edge;
-
+    double a;
     for (i = 0; i < sys->numPorts; i++)
     {
-        sys->portCoor[i].node = (int*)malloc((zi[sys->portCoor[i].z2] - zi[sys->portCoor[i].z1] + 1)*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)*(yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1)*sizeof(int));
-        sys->portCoor[i].nodenum = (zi[sys->portCoor[i].z2] - zi[sys->portCoor[i].z1] + 1)*(xi[sys->portCoor[i].x2] - xi[sys->portCoor[i].x1] + 1)*(yi[sys->portCoor[i].y2] - yi[sys->portCoor[i].y1] + 1);
-        int n = 0;
-        for (j = zi[sys->portCoor[i].z1]; j <= zi[sys->portCoor[i].z2]; j++){
-            for (l = xi[sys->portCoor[i].x1]; l <= xi[sys->portCoor[i].x2]; l++){
-                for (m = yi[sys->portCoor[i].y1]; m <= yi[sys->portCoor[i].y2]; m++){
-
-                    sys->portCoor[i].node[n] = j * sys->N_node_s + l * (sys->N_cell_y + 1) + m;
-                    sys->portNno.insert(j * sys->N_node_s + l * (sys->N_cell_y + 1) + m);
-
-                    n++;
-
+        edge.clear();
+        if (sys->portCoor[i].x1 != sys->portCoor[i].x2){
+            if (sys->portCoor[i].x1 < sys->portCoor[i].x2){
+                for (j = xi[sys->portCoor[i].x1]; j < xi[sys->portCoor[i].x2]; j++){
+                    edge.push_back((sys->N_edge_s + sys->N_edge_v)*zi[sys->portCoor[i].z1] + (sys->N_cell_y)*(sys->N_cell_x + 1) + j*(sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]);
                 }
             }
+            else{
+                for (j = xi[sys->portCoor[i].x2]; j < xi[sys->portCoor[i].x1]; j++){
+                    edge.push_back((sys->N_edge_s + sys->N_edge_v)*zi[sys->portCoor[i].z1] + (sys->N_cell_y)*(sys->N_cell_x + 1) + j*(sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]);
+                }
+            }
+            a = 1;
+            if (yi[sys->portCoor[i].y1] == 0){
+                a = a * (sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1);
+            }
+            else if (yi[sys->portCoor[i].y1] == sys->N_cell_y){
+                a = a * (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]);
+            }
+            else{
+                a = a * ((sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1) / 2 + (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]) / 2);
+            }
+            if (zi[sys->portCoor[i].z1] == 0){
+                a = a *(sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1);
+            }
+            else if (zi[sys->portCoor[i].z1] == sys->N_cell_z){
+                a = a * (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]);
+            }
+            else{
+                a = a * ((sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1) / 2 + (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]) / 2);
+            }
+            sys->portArea.push_back(a);
         }
-        sys->portCoor[i].portCnd = sys->markNode[sys->portCoor[i].node[0]];
+        else if (sys->portCoor[i].y1 != sys->portCoor[i].y2){
+            if (sys->portCoor[i].y1 < sys->portCoor[i].y2){
+                for (j = yi[sys->portCoor[i].y1]; j < yi[sys->portCoor[i].y2]; j++){
+                    edge.push_back((sys->N_edge_s + sys->N_edge_v)*zi[sys->portCoor[i].z1] + (sys->N_cell_y)*xi[sys->portCoor[i].x1] + j);
+                }
+            }
+            else{
+                for (j = yi[sys->portCoor[i].y2]; j < yi[sys->portCoor[i].y1]; j++){
+                    edge.push_back((sys->N_edge_s + sys->N_edge_v)*zi[sys->portCoor[i].z1] + (sys->N_cell_y)*xi[sys->portCoor[i].x1] + j);
+                }
+            }
+            a = 1;
+            if (xi[sys->portCoor[i].x1] == 0){
+                a = a * (sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1);
+            }
+            else if (xi[sys->portCoor[i].x1] == sys->N_cell_x){
+                a = a * (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]);
+            }
+            else{
+                a = a * ((sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1) / 2 + (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]) / 2);
+            }
+            if (zi[sys->portCoor[i].z1] == 0){
+                a = a *(sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1);
+            }
+            else if (zi[sys->portCoor[i].z1] == sys->N_cell_z){
+                a = a * (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]);
+            }
+            else{
+                a = a * ((sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1) / 2 + (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]) / 2);
+            }
+            sys->portArea.push_back(a);
+        }
+        else if (sys->portCoor[i].z1 != sys->portCoor[i].z2){
+            if (sys->portCoor[i].z1 < sys->portCoor[i].z2){
+                for (j = zi[sys->portCoor[i].z1]; j < zi[sys->portCoor[i].z2]; j++){
+                    edge.push_back((sys->N_edge_s + sys->N_edge_v)*j + sys->N_edge_s + (sys->N_cell_y + 1)*xi[sys->portCoor[i].x1] + yi[sys->portCoor[i].y1]);
+                }
+            }
+            else{
+                for (j = zi[sys->portCoor[i].z2]; j < zi[sys->portCoor[i].z1]; j++){
+                    edge.push_back((sys->N_edge_s + sys->N_edge_v)*j + sys->N_edge_s + (sys->N_cell_y + 1)*xi[sys->portCoor[i].x1] + yi[sys->portCoor[i].y1]);
+                }
+            }
+            a = 1;
+            if (xi[sys->portCoor[i].x1] == 0){
+                a = a * (sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1);
+            }
+            else if (xi[sys->portCoor[i].x1] == sys->N_cell_x){
+                a = a * (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]);
+            }
+            else{
+                a = a * ((sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1) / 2 + (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]) / 2);
+            }
+            if (yi[sys->portCoor[i].y1] == 0){
+                a = a *(sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1);
+            }
+            else if (yi[sys->portCoor[i].y1] == sys->N_cell_y){
+                a = a * (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]);
+            }
+            else{
+                a = a * ((sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1) / 2 + (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]) / 2);
+            }
+            sys->portArea.push_back(a);
+
+        }
+        sys->portEdge.push_back(edge);
+
     }
-    
+    for (i = 0; i < sys->numPorts; i++){
+        cout << sys->portArea[i] << " ";
+    }
+    cout << endl << endl;
+
 
     return 0;
 }

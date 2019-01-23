@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 #include <mkl.h>
+#include <stack>  
 
 using namespace std;
 
@@ -189,37 +190,17 @@ public:
     fdtdBound *bound;
 
     /* V0c row, column, value */
-    vector<int> v0cRowId;
-    vector<int> v0cColId;
-    vector<int> v0cColIdo;
-    vector<double> v0cval;
-    vector<double> v0cvalo;
+    int *v0cRowId;
+    int *v0cColId;
+    int *v0cColIdo;
+    double *v0cval;
+    double *v0cvalo;
 
-    vector<int> v0c2RowId;
-    vector<int> v0c2ColId;
-    vector<int> v0c2ColIdo;
-    vector<double> v0c2val;
-
-    vector<int> v0caRowId;
-    vector<int> v0caColId;
-    vector<int> v0caColIdo;
-    vector<double> v0caval;
-    vector<double> v0cavalo;
-
-    vector<int> v0d1aRowId;
-    vector<int> v0d1aColId;
-    vector<double> v0d1aval;
-    vector<double> v0d1avalo;
-
-    vector<int> v0d2aRowId;
-    vector<int> v0d2aColId;
-    vector<int> v0d2aColIdo;
-    vector<double> v0d2aval;
-    vector<double> v0d2avalo;
-
-    vector<int> y0c2RowId;
-    vector<int> y0c2ColId;
-    vector<double> y0c2val;
+    int *v0caRowId;
+    int *v0caColId;
+    int *v0caColIdo;
+    double *v0caval;
+    double *v0cavalo;
 
     double *v0c2y0c2;
     double *v0c2y0c2o;
@@ -227,31 +208,46 @@ public:
     double *v0cy0c;
 
     /* V0c'*D_sig*V0c row, column, value */
-    vector<int> AcRowId;
-    vector<int> AcColId;
-    vector<double> Acval;
-    vector<int> AdRowId;
-    vector<int> AdColId;
-    vector<double> Adval;
-    vector<int> crhsRowId;
-    vector<int> crhsColId;
-    vector<double> crhsval;
+    int *AcRowId;
+    int *AcRowId1;
+    int *AcColId;
+    double *Acval;
+    int *AdRowId;
+    int *AdRowId1;
+    int *AdColId;
+    double *Adval;
+
     double *crhs;
 
     /* V0d row, column, value */
-    vector<int> v0d1RowId;
-    vector<int> v0d1ColId;
-    vector<double> v0d1val;
-    vector<double> v0d1valo;
-    vector<int> v0d2RowId;
-    vector<int> v0d2ColId;
-    vector<int> v0d2ColIdo;
-    vector<double> v0d2val;
-    vector<double> v0d2valo;
+    int *v0d1RowId;
+    int *v0d1ColId;
+    int *v0d1ColIdo;
+    double *v0d1val;
+    double *v0d1valo;
+
+    int *v0d1aRowId;
+    int *v0d1aColId;
+    int *v0d1aColIdo;
+    double *v0d1aval;
+    double *v0d1avalo;
+
+    int *v0d2RowId;
+    int *v0d2ColId;
+    int *v0d2ColIdo;
+    double *v0d2val;
+    double *v0d2valo;
+
+    int *v0d2aRowId;
+    int *v0d2aColId;
+    int *v0d2aColIdo;
+    double *v0d2aval;
+    double *v0d2avalo;
+
     double *yd;
 
     /* Solution storage */
-    double *y;
+    complex<double> *y;
     complex<double> *x;    // the solution involving all the sourcePorts
 
     /* Port coordinates */
@@ -262,7 +258,7 @@ public:
     unordered_set<int> portNno;
 
     /* Current sources */
-    complex<double> *J;
+    double *J;
 
     /* Current V0c,s^T*I matrix */
     complex<double> *v0csJ;
@@ -293,10 +289,15 @@ int matrixMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vec
 // The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
-int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<int> index, int size, fdtdMesh *sys);
-int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
+int nodeAdd(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2);
+int nodeAdd_count(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2);
+int nodeAddAvg(int index, int size, fdtdMesh *sys, int &v0d2anum, int &leng_v0d2a);
+int nodeAddAvg_count(int index, int size, fdtdMesh *sys, int &v0d2anum, int &leng_v0d2a);
 int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys);
 int output(fdtdMesh *sys);
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
 int yParaGenerator(fdtdMesh *sys);
+int solveV0dSystem(fdtdMesh *sys, double *dRhs, complex<double> *y0d, double *v0d2epsv0d2, double *solution_d2, int leng_v0d1, int leng_v0d2);
+int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);
+int COO2CSR_malloc(int *rowId, int *ColId, double *val, int totalnum, int leng, int *rowId1);
 #endif

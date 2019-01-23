@@ -1529,7 +1529,6 @@ public:
                 if (sys->conductorIn[si].y[condj] < sys->conductorIn[si].ymin){
                     sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                 }
-
                 condj++;
             }
         }
@@ -1900,7 +1899,7 @@ public:
             this->printDetails(cellName, 0., 0.);   // the origin is the (0,0) point
             //(this->cells)[indCellPrint[indi]].printAlt();
         }
-        cout << this->strPoints << endl;
+        //cout << this->strPoints << endl;
         cout << "------" << endl;
     }
 
