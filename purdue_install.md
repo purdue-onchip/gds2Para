@@ -43,10 +43,25 @@ Please direct all questions, bug reports, and issues relating to installing or r
 7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
   * For "bash", edit the file ".bashrc" in your home directory by appending the following:
 ```bash
-# Improve gcc Version
+# Skip rest of file if not interactive
+if [ -z "$PS1" ]; then
+    return
+fi
+
+# Improve Compilers
 alias cc="gcc"
+export CC=/opt/gcc/7.1.0/bin/gcc
+export CXX=/opt/gcc/7.1.0/bin/gcc
+export FC=/opt/gcc/7.1.0/bin/gfortran
 export PATH=/opt/gcc/7.1.0/bin:$PATH
 export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
+
+# Improve OpenMPI Version
+export PATH=/opt/mpich2-gcc/1.4.1p1/bin:${PATH}
+export LD_LIBRARY_PATH=/opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
+export OMPI_CC=/opt/gcc/7.1.0/bin/gcc
+export OMPI_CXX=/opt/gcc/7.1.0/bin/gcc
+export OMPI_FC=/opt/gcc/7.1.0/bin/gfortran
 
 # Improve git Version
 export PATH=/opt/git/2.18.0/bin:$PATH
@@ -60,13 +75,28 @@ export MKL_DIR="/opt/intel/current/mkl"
 ```
   * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
 ```tcsh
+# Skip Rest of File if Not Interactive
+if (! $?prompt) then
+    exit 0
+endif
+
 # Improve gcc Version
 alias cc 'gcc'
+setenv CC /opt/gcc/7.1.0/bin/gcc
+setenv CXX /opt/gcc/7.1.0/bin/gcc
+setenv FC /opt/gcc/7.1.0/bin/gfortran
 setenv PATH /opt/gcc/7.1.0/bin:${PATH}
 setenv LD_LIBRARY_PATH /opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:${LD_LIBRARY_PATH}
 
-# Improve git Version                                                                                 
-setenv PATH /opt/git/2.18.0/bin:${PATH}                                                               
+# Improve OpenMPI Version
+setenv PATH /opt/mpich2-gcc/1.4.1p1/bin:${PATH}
+setenv LD_LIBRARY_PATH /opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
+setenv OMPI_CC /opt/gcc/7.1.0/bin/gcc
+setenv OMPI_CXX /opt/gcc/7.1.0/bin/gcc
+setenv OMPI_FC /opt/gcc/7.1.0/bin/gfortran
+
+# Improve git Version
+setenv PATH /opt/git/2.18.0/bin:${PATH}
 setenv LD_LIBRARY_PATH /opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:${LD_LIBRARY_PATH}
 
 # Environment Variables for GDSII File Handling
@@ -81,13 +111,32 @@ setenv MKL_DIR /opt/intel/current/mkl
   * If nothing shows up for "tcsh" users, run `cp .cshrc .tcshrc` in the home directory, exit the shell, log back in, and try again
   * For all other errors, contact the primary maintainer
 10. Enter the directory "Limbo/limbo/parsers/gdsii/stream" from the working location
-11. Run `make CXX=g++ CC=gcc FC=gfortran` in this directory
+11. Run `make` in this directory to build Limbo libraries
 12. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
-13. Enter the directory "gds2Para" from the working location
-14. (Optional) Add GDSII file besides "nand2.gds", "SDFFRS_X2.gds", and "4004.gds" to working location
+13. Follow the instructions in [HYPRE Setup](#HYPRE-Setup) to prepare multigrid methods from HYPRE
+  * It is necessary to make all changes to ".bashrc" and ".cshrc" in the home directory before following these instructions
+  * Continue following these steps once HYPRE is installed
+14. Enter the directory "gds2Para" from the working location
+15. (Optional) Add GDSII file besides "nand2.gds", "SDFFRS_X2.gds", and "4004.gds" to working location
   * Some usage modes of this software may also require a simulation input file in a similar format to "nand2.sim_input", "SDFFRS_X2.sim_input", and "4004.sim_input" (the file name before the suffix must match that of the GDSII file before ".gds")
   * Files created from the software will be added directly to the present working directly, which is "gds2Para" within the working location for these instructions
-15. Run `make` in shell to compile executable **LayoutAnalyzer**
-16. Run `LayoutAnalyzer --help` to get a list of available modes the executable supports
-17. Run `LayoutAnalyser -r nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
-18. Perform a complete parameter extraction by running `LayoutAnalyzer -s SDFFRS_X2.gds SDFFRS_X2.sim_input SDFFRS_X2.spef` to read in the design and simulation input file, do all analysis, and return the results in SPEF files
+16. Run `make` in shell to compile executable **LayoutAnalyzer**
+17. Run `LayoutAnalyzer --help` to get a list of available modes the executable supports
+18. Run `LayoutAnalyser -r nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
+19. Perform a complete parameter extraction by running `LayoutAnalyzer -s SDFFRS_X2.gds SDFFRS_X2.sim_input SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a SPICE subcircuit
+
+## HYPRE Setup
+1. Clone the [HYPRE repository](https://github.com/LLNL/hypre) into your working location with `git clone git@github.com:LLNL/hypre.git`
+  * This requires the setup of an SSH key for a secure connection
+  * Setup will follow the instructions at "hyper/INSTALL" using information known to affect Purdue ECN users
+2. Enter the directory "hypre/src/cmbuild" from the working location
+  * Configuration options may be viewed using `../configure --help`
+<!---3. Run the command `./configure --enable-shared --enable-complex --with-MPI=/opt/mpich2-gcc/1.4.1p1 --with-MPI-include=/opt/mpich2-gcc/1.4.1p1/include/ --with-MPI-libs="" --with-MPI-lib-dirs=/opt/mpich2-gcc/1.4.1p1/lib64/ CC=/opt/gcc/7.1.0/bin/gcc CFLAGS="-g" CXX=/opt/gcc/7.1.0/bin/gcc CXXFLAGS="-g" FC=/opt/gcc/7.1.0/bin/gfortran`--->
+3. Run `cmake --version` and ensure that the version of CMake installed is at least 2.8.8
+4. Run `cmake -LA ..` and ensure that CMake found the correct versions of the compilers
+  * CMake is rather temperamental and tends to overlook common methods of specifying different compilers system-wide
+  * Check ".bashrc" or ".cshrc" in your home directory to see in the environment variables for the compilers are properly set
+  * For all other issues, contact the primary maintainer
+5. Run `cmake ..` to produce a makefile
+6. Run `make install` from within the same location ("hypre/src/cmbuild" in the working location) to install header files
+7. Return to working directory and ensure that a new library file named **HYPRE.h** exists by running `ls -lh hypre/src/hypre/include`
