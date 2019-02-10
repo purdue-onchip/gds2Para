@@ -1565,10 +1565,10 @@ public:
                         indj++;
                         indj++;
                         condj++;
-                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
                         condj++;
-                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
                         sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
                         condj++;
@@ -1588,10 +1588,10 @@ public:
                         indj++;
                         indj++;
                         condj++;
-                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
                         condj++;
-                        sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
                         sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
                         condj++;

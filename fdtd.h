@@ -12,6 +12,7 @@
 #include <set>
 #include <complex>
 #include <vector>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
@@ -182,6 +183,9 @@ public:
     int *markNode;    // mark this node if it is inside the conductor
     vector<vector<int>> edgeCell;    // for each cell which edge is around it
     vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
+    int *acu_cnno;
+    int *cindex;
+    int *exciteCdtLayer;
 
     /* Patch information */
     fdtdPatch *patch;
@@ -285,19 +289,27 @@ int compareString(char *a, char *b);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
-int matrixMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int>& cRowId, vector<int>& cColId, vector<double>& cval);
+int matrixMulti(int *aRowId, int *aColId, double *aval, int anum, int *bRowId, int *bColId, double *bval, int bnum, fdtdMesh *sys, int &leng, int mark);
+int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int> &cRowId, vector<int> &cColId, vector<double> &cval);
 // The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
-int nodeAdd(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2);
+int nodeAdd(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2, int mark);
+int nodeAddLarger(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng, int *RowId, int *ColId, double *Val);
 int nodeAdd_count(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2);
-int nodeAddAvg(int index, int size, fdtdMesh *sys, int &v0d2anum, int &leng_v0d2a);
-int nodeAddAvg_count(int index, int size, fdtdMesh *sys, int &v0d2anum, int &leng_v0d2a);
+int nodeAddAvg(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng, int mark);
+int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng, int* RowId, int *ColId, double *Val);
+int nodeAddAvg_count(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng);
 int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys);
 int output(fdtdMesh *sys);
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
 int yParaGenerator(fdtdMesh *sys);
 int solveV0dSystem(fdtdMesh *sys, double *dRhs, complex<double> *y0d, double *v0d2epsv0d2, double *solution_d2, int leng_v0d1, int leng_v0d2);
 int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);
+int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend);
 int COO2CSR_malloc(int *rowId, int *ColId, double *val, int totalnum, int leng, int *rowId1);
+//int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, double sideLen);
+int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a);
+int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, int &v0cnum, int &leng_v0c, int &v0canum, int &leng_v0ca);
+int setsideLen(int node, int iz, double sideLen, int *markLayerNode, fdtdMesh *sys);
 #endif

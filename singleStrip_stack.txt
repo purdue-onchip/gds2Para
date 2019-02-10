@@ -2,9 +2,9 @@ lengthUnit = 1.e-6
 
 FREQUENCY
  freqUnit = 1.0e+6
- freqStart = 45
- freqEnd = 45
- nfreq = 1
+ freqStart = 1000
+ freqEnd = 10000
+ nfreq = 10
 
 DIELECTRIC STACK
  numstack = 8
@@ -19,5 +19,5 @@ DIELECTRIC STACK
 
 PORT
  numPort = 2
- 149.999 0.049 0.296 149.999 0.049 0.416 1 
+ 149.999 0.049 0.296 149.999 0.049 0.416 1
  149.999 200.049 0.296 149.999 200.049 0.416 1 
