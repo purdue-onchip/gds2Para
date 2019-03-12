@@ -19,9 +19,13 @@
 #include <string>
 #include <utility>
 #include <mkl.h>
+#include <mkl_spblas.h>
 #include <stack>  
 
 using namespace std;
+using std::cerr;
+using std::cout;
+using std::endl;
 
 #define PI (3.1415926)
 #define MU (4*PI*1.e-7)
@@ -32,7 +36,7 @@ using namespace std;
 #define STACKNUM (20)
 //#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
-#define DOUBLEMIN (-1.e-30)
+#define DOUBLEMIN (-1.e+30)
 
 
 class fdtdOneCondct {
@@ -111,6 +115,7 @@ public:
 class fdtdMesh {
     /* Mesh information */
 public: 
+    int markCondt;
     double lengthUnit;
 
     /* Frequency parameters */
@@ -155,6 +160,7 @@ public:
     int *edgelink;
     double *Hpoints;
     vector<vector<pair<int,double>>> nodeEdge;    // for each node which edge is connected with this node
+    vector<vector<pair<int, double>>> nodeEdgea;    // for each node which edge is connected with this node
 
     /* Upper and lower PEC */
     int *bd_node1;   //lower PEC
@@ -186,6 +192,8 @@ public:
     int *acu_cnno;
     int *cindex;
     int *exciteCdtLayer;
+    vector<unordered_set<int>> cond2condIn;
+    int *markProSide;
 
     /* Patch information */
     fdtdPatch *patch;
@@ -220,6 +228,7 @@ public:
     int *AdRowId1;
     int *AdColId;
     double *Adval;
+    
 
     double *crhs;
 
@@ -289,6 +298,7 @@ int compareString(char *a, char *b);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
+int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark);
 int matrixMulti(int *aRowId, int *aColId, double *aval, int anum, int *bRowId, int *bColId, double *bval, int bnum, fdtdMesh *sys, int &leng, int mark);
 int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int> &cRowId, vector<int> &cColId, vector<double> &cval);
 // The first is read row by row, and the second one is read column by column
@@ -304,12 +314,13 @@ int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, 
 int output(fdtdMesh *sys);
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
 int yParaGenerator(fdtdMesh *sys);
-int solveV0dSystem(fdtdMesh *sys, double *dRhs, complex<double> *y0d, double *v0d2epsv0d2, double *solution_d2, int leng_v0d1, int leng_v0d2);
+int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1);
 int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);
 int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend);
 int COO2CSR_malloc(int *rowId, int *ColId, double *val, int totalnum, int leng, int *rowId1);
 //int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, double sideLen);
-int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a);
-int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, int &v0cnum, int &leng_v0c, int &v0canum, int &leng_v0ca);
-int setsideLen(int node, int iz, double sideLen, int *markLayerNode, fdtdMesh *sys);
+int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, int *map, double sideLen);
+int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, int &v0cnum, int &leng_v0c, int &v0canum, int &leng_v0ca, int *map);
+int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, fdtdMesh *sys);
+int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_Ad, double *bin, int leng_v0d1, double *solution);
 #endif

@@ -20,7 +20,6 @@
 #include <Eigen/Sparse>
 #include "limboint.h"
 #include "fdtd.h"
-using namespace std;
 
 // Define types for Eigen
 typedef Eigen::Triplet<double, int> dTriplet;

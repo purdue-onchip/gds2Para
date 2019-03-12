@@ -16,6 +16,7 @@
 #include <Eigen/Sparse>
 #include "limboint.h"
 #include "solnoutclass.h"
+
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -234,20 +235,25 @@ int main(int argc, char** argv)
             // Set the number of input conductors
             sys.numCdtRow = adb.getNumCdtIn();
 
+            clock_t t2 = clock();
             // Read the input file
             unordered_map<double, int> xi, yi, zi;
             status = readInput(inStackFile.c_str(), &sys, xi, yi, zi);
-            if (status == 0)
+            if (status == 0){
                 cout << "readInput Success!" << endl;
+                cout << "readInput time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+            }
             else {
                 cout << "readInput Fail!" << endl;
                 return status;
             }
 
             // Set D_eps and D_sig
+            clock_t t3 = clock();
             status = matrixConstruction(&sys);
             if (status == 0) {
                 cout << "matrixConstruction Success!" << endl;
+                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else {
                 cout << "matrixConstruction Fail!" << endl;
@@ -255,23 +261,30 @@ int main(int argc, char** argv)
             }
 
             // Set port
+            clock_t t4 = clock();
             status = portSet(&sys, xi, yi, zi);
-            if (status == 0)
+            if (status == 0){
                 cout << "portSet Success!\n";
+                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
+            }
             else {
                 cout << "portSet Fail!\n";
                 return status;
             }
 
             // Parameter generation
+            clock_t t5 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
-            if (status == 0)
+            if (status == 0){
                 cout << "paraGenerator Success!" << endl;
+                cout << "paraGenerator time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+            }
             else {
                 cout << "paraGenerator Fail!" << endl;
                 return status;
             }
-            cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
             // Parameter storage
             spMat matG(sys.numPorts, sys.numPorts); // Initialize Eigen sparse conductance matrix (S)

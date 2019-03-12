@@ -20,9 +20,7 @@
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
 #include "fdtd.h"
-using std::cerr;
-using std::cout;
-using std::endl;
+
 
 class boundary
 {
@@ -1556,12 +1554,12 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
                         condj++;
@@ -1570,7 +1568,7 @@ public:
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
@@ -1579,12 +1577,12 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
                         condj++;
@@ -1593,7 +1591,7 @@ public:
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
@@ -1605,12 +1603,12 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
                         condj++;
@@ -1619,7 +1617,7 @@ public:
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
@@ -1628,12 +1626,12 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
                         condj++;
@@ -1642,14 +1640,13 @@ public:
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
                     }
                 }
             }
-
         }
         //cout << "  List of " << numNode << " nodes:" << endl;
         //cout << "  List of " << numBox << " box outlines:" << endl;
