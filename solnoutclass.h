@@ -1662,7 +1662,8 @@ struct SolverDataBase
                     for (size_t indPort = 0; indPort < numPort; indPort++)
                     {
                         // Port information recorded differently based on how many numbers appear
-                        size_t nSpace = count(fileLine.begin(), fileLine.end(), ' ');
+                        std::string noComment = fileLine.substr(0, fileLine.find(" #"));
+                        size_t nSpace = count(noComment.begin(), noComment.end(), ' ');
 
                         // Obtain limits of IC design size
                         double xsup, ysup, zsup, xret, yret, zret;

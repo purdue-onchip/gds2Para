@@ -1,0 +1,61 @@
+TOTAL SIZE
+0.0000 +4.2600e-3 0.0000 +3.5600e-3 0.0000 +2.9920e-3
+lengthUnit = 1
+
+FREQUENCY
+freqUnit = 1.0e+6
+freqStart = 1000.0
+freqEnd = 1000.0
+nfreq = 1
+freqScale = 0
+
+DIELECTRIC STACK
+numStack = 43
+1  h = 6.629e-5 e = 3.57 # Top layer 1, TU-883 composite dielectric, z = 2.92532e-3, TanD = 0.0046
+2  h = 9.804e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.82727e-3
+3  h = 6.100e-5 e = 3.57 # GND layer 2, TU-883 composite dielectric, z = 2.76631e-3
+4  h = 5.080e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.71551e-3
+5  h = 6.100e-5 e = 3.57 # PWR layer 3, TU-883 composite dielectric, z = 2.65455e-3
+6  h = 1.850e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.46913e-3
+7  h = 6.100e-5 e = 3.57 # PWR layer 4, TU-883 composite dielectric, z = 2.40817e-3
+8  h = 5.080e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.35737e-3
+9  h = 6.100e-5 e = 3.57 # GND layer 5, TU-883 composite dielectric, z = 2.29641e-3
+10 h = 1.138e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.18262e-3
+11 h = 1.520e-5 e = 3.57 # Sig layer 6, TU-883 composite dielectric, z = 2.16738e-3
+12 h = 1.020e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.06738e-3
+13 h = 1.520e-5 e = 3.57 # GND layer 7, TU-883 composite dielectric, z = 2.05054e-3
+14 h = 1.120e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.93878e-3
+15 h = 1.520e-5 e = 3.57 # Sig layer 8, TU-883 composite dielectric, z = 1.92354e-3
+16 h = 1.020e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.82194e-3
+17 h = 1.520e-5 e = 3.57 # PWR layer 9, TU-883 composite dielectric, z = 1.80670e-3
+18 h = 1.209e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.68580e-3
+19 h = 1.520e-5 e = 3.57 # GND layer 10, TU-883 composite dielectric, z = 1.67056e-3
+20 h = 1.020e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.56896e-3
+21 h = 1.520e-5 e = 3.57 # Sig layer 11, TU-883 composite dielectric, z = 1.55372e-3
+22 h = 1.120e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.44196e-3
+23 h = 1.520e-5 e = 3.57 # GND layer 12, TU-883 composite dielectric, z = 1.42672e-3
+24 h = 1.020e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.32512e-3
+25 h = 1.520e-5 e = 3.57 # Sig layer 13, TU-883 composite dielectric, z = 1.30988e-3
+26 h = 1.120e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.19812e-3
+27 h = 1.520e-5 e = 3.57 # GND layer 14, TU-883 composite dielectric, z = 1.18288e-3
+28 h = 1.020e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 1.08128e-3
+29 h = 1.520e-5 e = 3.57 # Sig layer 15, TU-883 composite dielectric, z = 1.06604e-3
+30 h = 1.120e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 9.5428e-4
+31 h = 1.520e-5 e = 3.57 # GND layer 16, TU-883 composite dielectric, z = 9.3904e-4
+32 h = 1.020e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 8.3744e-4
+33 h = 1.520e-5 e = 3.57 # Sig layer 17, TU-883 composite dielectric, z = 8.2220e-4
+34 h = 1.107e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 7.1145e-4
+35 h = 6.100e-5 e = 3.57 # GND layer 18, TU-883 composite dielectric, z = 6.5049e-4
+36 h = 5.080e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 5.9969e-4
+37 h = 6.100e-5 e = 3.57 # PWR layer 19, TU-883 composite dielectric, z = 5.3873e-4
+38 h = 2.017e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 3.3706e-4
+39 h = 6.100e-5 e = 3.57 # PWR layer 20, TU-883 composite dielectric, z = 2.7610e-4
+40 h = 5.080e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.2530e-4
+41 h = 6.100e-5 e = 3.57 # GND layer 21, TU-883 composite dielectric, z = 1.6434e-4
+42 h = 9.804e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 6.629e-5
+43 h = 6.629e-5 e = 3.57 # Bottom layer, TU-883 composite dielectric, z = 0.000, TanD = 0.0046
+
+PORT
+numPort = 2
+3.39828e-1 3.50900e-1 3.38558e-1 3.50900e-1 43 # GND via to GND via bottom layer test point
+3.50916e-1 3.21299e-1 3.38558e-1 3.50900e-1 43 # VDD12V_BP U32026.8 pin to GND via bottom layer test point
