@@ -591,6 +591,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     double xc, yc;
     
     for (i = 0; i < sys->numCdtRow; i++){
+        cout << "Index: " << i << " out of " << sys->numCdtRow << endl;
         numNode = (xi[sys->conductorIn[i].xmax] - xi[sys->conductorIn[i].xmin] + 1)
             *(yi[sys->conductorIn[i].ymax] - yi[sys->conductorIn[i].ymin] + 1)
             *(zi[sys->conductorIn[i].zmax] - zi[sys->conductorIn[i].zmin] + 1);
@@ -599,8 +600,13 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         sys->conductorIn[i].numNode = 0;
 
         for (j = xi[sys->conductorIn[i].xmin]; j <= xi[sys->conductorIn[i].xmax]; j++){
+            cout << "Second index part 1: " << j << " out of " << xi[sys->conductorIn[i].xmax] << endl;
+            cout << "Starting point of third index: " << yi[sys->conductorIn[i].ymin] << endl;
+            cout << "Ending point of third index: " << yi[sys->conductorIn[i].ymax] << endl;
             for (k = yi[sys->conductorIn[i].ymin]; k <= yi[sys->conductorIn[i].ymax]; k++){
+                cout << "Third index part 1: " << k << endl;
                 if (polyIn(sys->xn[j], sys->yn[k], sys, i)){
+                    cout << "polyIn == True" << endl;
                     for (m = zi[sys->conductorIn[i].zmin]; m < zi[sys->conductorIn[i].zmax]; m++){
                         //cout << sys->xn[j] << " " << sys->yn[k] << endl;
                         sys->conductorIn[i].cdtInNode[sys->conductorIn[i].numNode] = m*sys->N_node_s + (sys->N_cell_y + 1)*j + k;
@@ -619,6 +625,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
         for (j = xi[sys->conductorIn[i].xmin]; j <= xi[sys->conductorIn[i].xmax]; j++){   // set the y direction markEdge
+            cout << "Second index part 2: " << j << " out of " << xi[sys->conductorIn[i].xmax] << endl;
             for (k = yi[sys->conductorIn[i].ymin]; k < yi[sys->conductorIn[i].ymax]; k++){
                 for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
                     xc = sys->xn[j];
@@ -632,6 +639,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
         for (j = yi[sys->conductorIn[i].ymin]; j <= yi[sys->conductorIn[i].ymax]; j++){    // set the x direction markEdge
+            cout << "Second index part 3: " << j << " out of " << yi[sys->conductorIn[i].ymax] << endl;
             for (k = xi[sys->conductorIn[i].xmin]; k < xi[sys->conductorIn[i].xmax]; k++){
                 for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
                     xc = (sys->xn[k] + sys->xn[k + 1]) / 2;
@@ -647,7 +655,9 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     }
     
     /*fclose(cfp);*/
+    cout << "Trying to close file" << endl;
     fclose(fp);
+    cout << "File closed" << endl;
     
     /* construct edgelink */
     int eno;
@@ -1332,10 +1342,11 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     return 0;
 }
 
+// Is point (x,y) within the polygon?
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly){
     int npol;
     int i, j, k;
-    int isCond = 0;
+    bool isCond = false;
     double disMin = 1e-10;
 
     npol = sys->conductorIn[inPoly].numVert;
@@ -1351,6 +1362,7 @@ bool polyIn(double x, double y, fdtdMesh *sys, int inPoly){
             (y >= sys->conductorIn[inPoly].y[i] && y <= sys->conductorIn[inPoly].y[j]))){
             return true;
         }
+        
         else if ((abs(sys->conductorIn[inPoly].y[i] - sys->conductorIn[inPoly].y[j]) > disMin &&
             (((sys->conductorIn[inPoly].y[i] <= y) && (y < sys->conductorIn[inPoly].y[j])) ||
             ((sys->conductorIn[inPoly].y[j] <= y) && (y < sys->conductorIn[inPoly].y[i])))) &&
