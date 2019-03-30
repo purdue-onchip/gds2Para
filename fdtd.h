@@ -20,7 +20,9 @@
 #include <utility>
 #include <mkl.h>
 #include <mkl_spblas.h>
-#include <stack>  
+#include <stack>
+
+
 
 using namespace std;
 using std::cerr;
@@ -38,6 +40,10 @@ using std::endl;
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
 
+typedef struct{
+    double re;
+    double i;
+}doublecomplex;
 
 class fdtdOneCondct {
 public:
@@ -259,6 +265,10 @@ public:
 
     double *yd;
 
+    /* Se and Sh */
+    int *SRowId, *SColId;
+    complex<double> *Sval;
+
     /* Solution storage */
     complex<double> *y;
     complex<double> *x;    // the solution involving all the sourcePorts
@@ -317,10 +327,12 @@ int yParaGenerator(fdtdMesh *sys);
 int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1);
 int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);
 int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend);
+int pardisoSolve_r(fdtdMesh *sys, complex<double> *rhs, int *RowId, int *ColId, complex<double> *val, int nnz, int size, complex<double> *solution);
 int COO2CSR_malloc(int *rowId, int *ColId, double *val, int totalnum, int leng, int *rowId1);
 //int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, double sideLen);
-int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, int *map, double sideLen);
+int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, int *map, double sideLen);
 int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, int &v0cnum, int &leng_v0c, int &v0canum, int &leng_v0ca, int *map);
 int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, fdtdMesh *sys);
-int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_Ad, double *bin, int leng_v0d1, double *solution);
+int generateStiff(fdtdMesh *sys);
+int mklMatrixMulti_nt(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval);
 #endif

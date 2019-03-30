@@ -101,23 +101,20 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         if (lyr >= sys->numStack){    //blank
             break;
         }
-        if (fdtdGetValue(word[3]) == 0){
+        if (fdtdGetValue(word[6]) == 0){
             lyr++;
             continue;
         }
-        sys->stackEps[lyr1] = fdtdGetValue(word[6]);   // get the stack eps
-        if (lyr1 == 0){
-            sys->stackBegCoor[lyr1] = 0;
-        }
-        else{
-            sys->stackBegCoor[lyr1] = sys->stackEndCoor[lyr1 - 1];
-        }
-        sys->stackEndCoor[lyr1] = sys->stackBegCoor[lyr1] + fdtdGetValue(word[3])*sys->lengthUnit;
+        sys->stackEps[lyr1] = fdtdGetValue(word[9]);   // get the stack eps
+        
+        sys->stackBegCoor[lyr1] = fdtdGetValue(word[3]) * sys->lengthUnit;
+        
+        sys->stackEndCoor[lyr1] = sys->stackBegCoor[lyr1] + fdtdGetValue(word[6]) * sys->lengthUnit;
         sys->stackName.push_back(word[0]);
         lyr1++;
         lyr++;
     }
-    /*sys->numStack = lyr1;*/
+    sys->numStack = lyr1;
     /*for (i = 0; i < sys->numStack; i++){
         cout << sys->stackBegCoor[i] << " " << sys->stackEndCoor[i] << " " << sys->stackEps[i] << endl;
         }*/
@@ -278,13 +275,13 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     xmax = xOrigOld[numNode + 2 * sys->numPorts - 1];
     int xMaxInd = 10;
     disMaxx = (xmax - xmin) / xMaxInd;
-
+    
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
         if (abs(xOrigOld[i] - xOrigOld[i - 1]) > disMin){
             sys->nx++;
         }
     }
-    double *xn = (double*)calloc(numNode + 6 * sys->numPorts + xMaxInd, sizeof(double));
+    double *xn = (double*)calloc(numNode + 6 * sys->numPorts + 4000/*xMaxInd*/, sizeof(double));
     xn[0] = xOrigOld[0];
     j = 0;
     sys->nx = 1;
@@ -333,12 +330,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     }
     sys->nx = j + 1;
 
-    /*vector<pair<double, int> > v(xi.begin(), xi.end());
-    sort(v.begin(), v.end(), comp);
-    for (i = 0; i < v.size(); i++){
-    cout << v[i].first << " " << v[i].second << endl;
-    }
-    cout << sys->nx << endl;*/
     
 
 
@@ -349,13 +340,13 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
     int yMaxInd = 10;    // the max discretization of y is total / 120
     disMaxy = (ymax - ymin) / yMaxInd;
-
+    
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
         if (abs(yOrigOld[i] - yOrigOld[i - 1]) > disMin){
             sys->ny++;
         }
     }
-    double *yn = (double*)calloc(numNode + 6 * sys->numPorts + yMaxInd, sizeof(double));
+    double *yn = (double*)calloc(numNode + 6 * sys->numPorts + 4000/*yMaxInd*/, sizeof(double));
     yn[0] = yOrigOld[0];
     j = 0;
     sys->ny = 1;
@@ -407,12 +398,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     
     
     sys->ny = j + 1;
-    /*vector<pair<double, int> > v(yi.begin(), yi.end());
-    sort(v.begin(), v.end(), comp);
-    for (i = 0; i < v.size(); i++){
-    cout << v[i].first << " " << v[i].second << endl;
-    }*/
-    //cout << sys->ny << endl;
+    
 
     
 
@@ -430,30 +416,15 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         zn[i] = zOrigOld[i];
     }
     int countz = 2 * sys->numStack + 2 * sys->numPorts - 1;
-    //sort(zn, zn + countz + 1);
 
-    //sys->znu = (double*)calloc(sys->nz, sizeof(double));
-    //sys->znu[0] = zOrigOld[0];
-    //zi[sys->znu[0]] = 0;
-    j = 0;
-    for (i = 1; i < 2 * sys->numStack + 2 * sys->numPorts; i++){
-        if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMin){
-            j++;
-            //sys->znu[j] = zOrigOld[i];
-            //zi[sys->znu[j]] = j;
-        }
-        else{
-            //zi[zOrigOld[i]] = j;    // considering the double precision, put all the show up y in the map
-        }
-    }
-    
+
 
     /*************************************************************************************/
 
     
     sort(xn, xn + countx + 1);
     xi.clear();
-    sys->xn = (double*)calloc(sys->nx + 4 * sys->numPorts, sizeof(double));
+    sys->xn = (double*)calloc(sys->nx, sizeof(double));
     j = 0;
     sys->xn[0] = xn[0];
     //xi[sys->xn[0]] = j;
@@ -472,7 +443,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     
     sort(yn, yn + county + 1);
     yi.clear();
-    sys->yn = (double*)calloc(sys->ny + 4 * sys->numPorts, sizeof(double));
+    sys->yn = (double*)calloc(sys->ny, sizeof(double));
     j = 0;
     sys->yn[0] = yn[0];
     yi[sys->yn[0]] = j;
@@ -492,7 +463,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     
     sort(zn, zn + countz + 1);
     zi.clear();
-    sys->zn = (double*)calloc(sys->nz + 4 * sys->numPorts, sizeof(double));
+    sys->zn = (double*)calloc(sys->nz, sizeof(double));
     j = 0;
     sys->zn[0] = zn[0];
     zi[sys->zn[0]] = j;
@@ -511,15 +482,30 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     
     sys->stackEpsn = (double*)calloc(sys->nz - 1, sizeof(double));
     i = 0;
-    j = 0;
     
-    while (i < sys->nz - 1){
-        if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]){
-            sys->stackEpsn[i] = sys->stackEps[j];
-            i++;
+    
+    if (sys->stackBegCoor[0] == 0){
+        j = 0;
+        while (i < sys->nz - 1){
+            if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]){
+                sys->stackEpsn[i] = sys->stackEps[j];
+                i++;
+            }
+            else{
+                j++;
+            }
         }
-        else{
-            j++;
+    }
+    else{
+        while (i < sys->nz - 1){
+            j = sys->numStack - 1;
+            if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]){
+                sys->stackEpsn[i] = sys->stackEps[j];
+                i++;
+            }
+            else{
+                j--;
+            }
         }
     }
     /*for (i = 0; i < sys->nz - 1; i++){
@@ -539,29 +525,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     }
     cout << "\n" << endl;
 
-    /*vector<pair<double, int> > vx(xi.begin(), xi.end());
-    sort(vx.begin(), vx.end(), comp);
-    for (int i = 0; i < vx.size(); i++){
-    cout << vx[i].first << " " << vx[i].second << ", ";
-    }
-    cout << endl;
-    cout << sys->nx << endl;
-
-    vector<pair<double, int> > vy(yi.begin(), yi.end());
-    sort(vy.begin(), vy.end(), comp);
-    for (int i = 0; i < vy.size(); i++){
-    cout << vy[i].first << " " << vy[i].second << ", ";
-    }
-    cout << endl;
-    cout << sys->ny << endl;
-
-    vector<pair<double, int> > vz(zi.begin(), zi.end());
-    sort(vz.begin(), vz.end(), comp);
-    for (int i = 0; i < vz.size(); i++){
-    cout << vz[i].first << " " <<vz[i].second << ", ";
-    }
-    cout << endl;
-    cout << sys->nz << endl;*/
     /***********************************************************************************************/
 
     sys->xlim1 = sys->xn[0];
@@ -679,9 +642,16 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
     }
+    /*ofstream outfile;
+    outfile.open("edgelink.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < sys->N_edge; i++){
+        outfile << sys->edgelink[i * 2] << " " << sys->edgelink[i * 2 + 1] << endl;
+    }
+    outfile.close();*/
     
     /* construct nodepos */
     int nno;
+
     sys->nodepos = (double*)malloc(sizeof(double)*sys->N_node * 3);   //N_node rows and 3 columns, input row by row
     for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++){
         for (i = 1; i <= sys->N_cell_x + 1; i++){
@@ -693,6 +663,12 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
     }
+    
+    /*outfile.open("nodepos.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < sys->N_node; i++){
+        outfile << sys->nodepos[i * 3] << " " << sys->nodepos[i * 3 + 1] << " " << sys->nodepos[i * 3 + 2] << endl;
+    }
+    outfile.close();*/
 
     /* construct nodeEdge */
     double leng;
@@ -999,7 +975,7 @@ int matrixConstruction(fdtdMesh *sys){
         }
     }
     /*outfile.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge; i++){
+    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
         outfile << sys->eps[i] << endl;
     }
     outfile.close();*/
@@ -1021,7 +997,7 @@ int matrixConstruction(fdtdMesh *sys){
     }
 
     /*outfile.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge; i++){
+    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
         outfile << sys->sig[i] << endl;
     }
     outfile.close();*/
@@ -1037,13 +1013,13 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     ofstream outfile;
     char s[FDTD_MAXC];
     char *word[FDTD_MAXC];
-    int j, i, mark, l, m;
+    int j, i, mark, l, m, k;
     int node;
     vector<int> edge;
     double a;
     double sideLen = 0;
     
-    cout << "numCdtRow is " << sys->numCdtRow << endl;
+    
     sys->exciteCdtLayer = (int*)calloc(sys->nz, sizeof(int));
     for (i = 0; i < sys->numPorts; i++)
     {
@@ -1163,9 +1139,9 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     }
     
     clock_t t1 = clock();
-    sys->markProSide = (int*)calloc(sys->N_node_s, sizeof(int));
+    sys->markProSide = (int*)calloc(sys->N_node, sizeof(int));
     double x1, x2, y1, y2;
-    int x1_ind, x2_ind, y1_ind, y2_ind;
+    int x1_ind, x2_ind, y1_ind, y2_ind, z1_ind, z2_ind;
     for (i = 0; i < sys->numPorts; i++){
         for (auto ci : sys->cond2condIn[sys->portCoor[i].portCnd - 1]){
             for (l = 0; l < sys->conductorIn[ci - 1].numVert - 1; l++){
@@ -1201,9 +1177,14 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                         y2_ind++;
                     }
                     y2_ind--;
-                    for (j = x1_ind; j <= x2_ind; j++){
-                        for (m = y1_ind; m <= y2_ind; m++){
-                            sys->markProSide[j * (sys->N_cell_y + 1) + m] = 1;
+                    z1_ind = zi[sys->conductorIn[ci - 1].zmin];
+                    z2_ind = zi[sys->conductorIn[ci - 1].zmax];
+                    for (k = z1_ind; k <= z2_ind; k++){
+                        for (j = x1_ind; j <= x2_ind; j++){
+                            for (m = y1_ind; m <= y2_ind; m++){
+                                if (sys->markNode[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] == 0)
+                                    sys->markProSide[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] = 1;
+                            }
                         }
                     }
                 }
@@ -1239,9 +1220,14 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                         y2_ind++;
                     }
                     y2_ind--;
-                    for (j = x1_ind; j <= x2_ind; j++){
-                        for (m = y1_ind; m <= y2_ind; m++){
-                            sys->markProSide[j * (sys->N_cell_y + 1) + m] = 1;
+                    z1_ind = zi[sys->conductorIn[ci - 1].zmin];
+                    z2_ind = zi[sys->conductorIn[ci - 1].zmax];
+                    for (k = z1_ind; k <= z2_ind; k++){
+                        for (j = x1_ind; j <= x2_ind; j++){
+                            for (m = y1_ind; m <= y2_ind; m++){
+                                if (sys->markNode[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] == 0)
+                                    sys->markProSide[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] = 1;
+                            }
                         }
                     }
                 }
@@ -1279,9 +1265,14 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                     y2_ind++;
                 }
                 y2_ind--;
-                for (j = x1_ind; j <= x2_ind; j++){
-                    for (m = y1_ind; m <= y2_ind; m++){
-                        sys->markProSide[j * (sys->N_cell_y + 1) + m] = 1;
+                z1_ind = zi[sys->conductorIn[ci - 1].zmin];
+                z2_ind = zi[sys->conductorIn[ci - 1].zmax];
+                for (k = z1_ind; k <= z2_ind; k++){
+                    for (j = x1_ind; j <= x2_ind; j++){
+                        for (m = y1_ind; m <= y2_ind; m++){
+                            if (sys->markNode[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] == 0)
+                                sys->markProSide[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] = 1;
+                        }
                     }
                 }
             }
@@ -1317,9 +1308,14 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                     y2_ind++;
                 }
                 y2_ind--;
-                for (j = x1_ind; j <= x2_ind; j++){
-                    for (m = y1_ind; m <= y2_ind; m++){
-                        sys->markProSide[j * (sys->N_cell_y + 1) + m] = 1;
+                z1_ind = zi[sys->conductorIn[ci - 1].zmin];
+                z2_ind = zi[sys->conductorIn[ci - 1].zmax];
+                for (k = z1_ind; k <= z2_ind; k++){
+                    for (j = x1_ind; j <= x2_ind; j++){
+                        for (m = y1_ind; m <= y2_ind; m++){
+                            if (sys->markNode[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] == 0)
+                                sys->markProSide[k * sys->N_node_s + j * (sys->N_cell_y + 1) + m] = 1;
+                        }
                     }
                 }
             }
@@ -1328,7 +1324,11 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
     sys->conductorIn.clear();
-
+    /*outfile.open("markProside.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < sys->N_node_s; i++){
+        outfile << sys->markProSide[i] << " ";
+    }
+    outfile.close();*/
     return 0;
 }
 

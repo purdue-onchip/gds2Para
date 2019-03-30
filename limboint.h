@@ -1493,12 +1493,12 @@ public:
         int numSRef = cell.getNumSRef();
 
         // Print cell information
-        //cout << "  List of " << numBound << " boundaries:" << endl;
+        /*cout << "  List of " << numBound << " boundaries:" << endl;*/
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
-            (this->numCdtIn)++;
 
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
+            (this->numCdtIn)++;
             sys->conductorIn.push_back(this->cond);
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = boundCoord.size() / 2 - 1;

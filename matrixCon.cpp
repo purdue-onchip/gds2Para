@@ -1,15 +1,95 @@
 //#include "stdafx.h"
 #include <ctime>
 #include "fdtd.h"
-#include "_hypre_utilities.h"
-#include "HYPRE_krylov.h"
-#include "HYPRE.h"
-#include "HYPRE_parcsr_ls.h"
+#include "hypreSolverh.h"
+
 
 static bool comp(pair<double, int> a, pair<double, int> b)
 {
     return a.first <= b.first;
 };
+
+int setHYPREMatrix(int *ARowId, int *AColId, double *Aval, int leng_v0, HYPRE_IJMatrix &a, HYPRE_ParCSRMatrix &parcsr_a){
+    int i;
+    int myid, num_procs;
+    int N, n;
+
+    int ilower, iupper;
+    int local_size, extra;
+
+    int solver_id;
+    int vis, print_system;
+
+    double h, h2;
+
+    HYPRE_IJMatrix A;
+    HYPRE_ParCSRMatrix parcsr_A;
+
+    /* Initialize MPI */
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+    N = leng_v0;
+    local_size = N / num_procs;
+    extra = N - local_size * num_procs;
+
+    ilower = local_size * myid;
+    ilower += hypre_min(myid, extra);
+
+    iupper = local_size * (myid + 1);
+    iupper += hypre_min(myid + 1, extra);
+    iupper = iupper - 1;
+
+    /* How many rows do I have? */
+    local_size = iupper - ilower + 1;
+
+    /* Create the matrix.
+    Note that this is a square matrix, so we indicate the row partition
+    size twice (since number of rows = number of cols) */
+    HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
+
+    /* Choose a parallel csr format storage (see the User's Manual) */
+    HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
+
+    /* Initialize before setting coefficients */
+    HYPRE_IJMatrixInitialize(A);
+
+    {
+        int nnz;
+        vector<double> values;
+        vector<int> cols;
+        int index = 0;
+
+        for (i = ilower; i <= iupper; i++)
+        {
+            nnz = 0;   // Number of non-zeros on row i
+
+            while (ARowId[index] == i){
+                cols.push_back(AColId[index]);
+                values.push_back(Aval[index]);
+                nnz++;
+                index++;
+            }
+
+            /* Set the values for row i */
+            HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
+
+            cols.clear();
+            values.clear();
+        }
+    }
+
+    /* Assemble after setting the coefficients */
+    HYPRE_IJMatrixAssemble(A);
+
+    /* Get the parcsr matrix object to use */
+    HYPRE_IJMatrixGetObject(A, (void**)&parcsr_A);
+
+    a = A;
+    parcsr_a = parcsr_A;
+
+    return 0;
+}
 
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi){
     int i, j, mark, k, l, n;
@@ -23,7 +103,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     vector<int> temp2;
     int inx, iny, inz;
 
-
+    cout << "Number of edges in one layer: " << sys->N_edge_s << endl;
     cout << "Number of edges: " << sys->N_edge << endl;
     cout << "Number of nodes in one layer: " << sys->N_node_s << endl;
     cout << "Number of nodes: " << sys->N_node << endl;
@@ -40,15 +120,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     block1_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
     block2_x = 0;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 50;
     block2_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 50;
-    block3_x = (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
-    block3_y = (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
-    //cout << "V0d's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
-    //cout << "V0d's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
+    block3_x = 0;
+    block3_y = 0;
+    cout << "V0d's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
+    cout << "V0d's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
+    cout << "V0d's block3_x and block3_y are " << block3_x << " " << block3_y << endl;
     sideLen = 0;    // around the conductor 10um is considered with rapid potential change
 
 
     clock_t t1 = clock();
-    status = merge_v0d1(sys, block1_x, block1_y, block2_x, block2_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
+    status = merge_v0d1(sys, block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
     cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
     
     /*outfile1.open("map.txt", std::ofstream::out | std::ofstream::trunc);
@@ -116,8 +197,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     
     cout << "Length of V0d1 is " << leng_v0d1 << endl;
     cout << "Number of NNZ in V0d1 is " << v0d1num << endl;
-    cout << "v0d1num and v0d1anum are " << v0d1num << " " << v0d1anum << endl;
-
+    
     sparse_status_t s;
 
     /* V0d^T's csr form handle for MKL */
@@ -145,14 +225,25 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         vector<pair<int, double>> v(Ad1[i].begin(), Ad1[i].end());
         sort(v.begin(), v.end());
         for (auto adi : v){
-            sys->AdRowId[j] = i;
-            sys->AdColId[j] = adi.first;
-            sys->Adval[j] = adi.second;
-            j++;
+            if (abs(adi.second) > 1e-8){
+                sys->AdRowId[j] = i;
+                sys->AdColId[j] = adi.first;
+                sys->Adval[j] = adi.second;
+                j++;
+            }
         }
         v.clear();
     }
     Ad1.clear();
+
+    int *argc;
+    char ***argv;
+    /*  trial of first set HYPRE matrix Ad */
+    HYPRE_IJMatrix ad;
+    HYPRE_ParCSRMatrix parcsr_ad;
+    MPI_Init(argc, argv);
+    status = setHYPREMatrix(sys->AdRowId, sys->AdColId, sys->Adval, leng_v0d1, ad, parcsr_ad);
+    /* End */
     
     //sys->AdRowId1 = (int*)malloc((leng_v0d1 + 1) * sizeof(int));
     //status = COO2CSR_malloc(sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, leng_v0d1, sys->AdRowId1);
@@ -193,7 +284,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //cout << "V0c's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
     //cout << "V0c's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
     status = merge_v0c(sys, block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
-    
+    j = 0;
+
+    /*for (i = 0; i < sys->numCdt + 1; i++){
+        cout << sys->acu_cnno[i] << " ";
+    }
+    cout << endl;*/
+
     for (i = 0; i < v0canum; i++){    // the upper and lower planes are PEC
         if (map[sys->edgelink[sys->v0caRowId[i] * 2]] != sys->v0caColId[i] + 1 && map[sys->edgelink[sys->v0caRowId[i] * 2]] != 0){
             Ac[sys->v0caColId[i]][map[sys->edgelink[sys->v0caRowId[i] * 2]] - 1] += sys->v0caval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3], 2)
@@ -217,6 +314,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[i]]);
         }
     }
+    sys->cindex[j + 1] = v0canum - 1;
     for (i = 0; i < leng_v0c; i++){
         leng_Ac += Ac[i].size();
     }
@@ -224,18 +322,36 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sys->AcColId = (int*)calloc(leng_Ac, sizeof(int));
     sys->Acval = (double*)calloc(leng_Ac, sizeof(double));
     j = 0;
+    k = 1;
     for (i = 0; i < leng_v0c; i++){
         vector<pair<int, double>> v(Ac[i].begin(), Ac[i].end());
         sort(v.begin(), v.end());
         for (auto aci : v){
-            sys->AcRowId[j] = i;
-            sys->AcColId[j] = aci.first;
-            sys->Acval[j] = aci.second;
-            j++;
+            if (abs(aci.second) > 1e5){
+                sys->AcRowId[j] = i;
+                sys->AcColId[j] = aci.first;
+                sys->Acval[j] = aci.second;
+                if (sys->AcRowId[j] >= sys->acu_cnno[k]){
+                    sys->cindex[k] = j - 1;
+                    k++;
+                }
+                j++;
+            }
         }
         v.clear();
     }
+    sys->cindex[k] = j - 1;
+    
+    
     Ac.clear();
+
+    /*  trial of first set HYPRE matrix Ac */
+    HYPRE_IJMatrix ac;
+    HYPRE_ParCSRMatrix parcsr_ac;
+    status = setHYPREMatrix(sys->AcRowId, sys->AcColId, sys->Acval, leng_v0c, ac, parcsr_ac);
+    /* End */
+
+
     /*outfile1.open("map.txt", std::ofstream::out | std::ofstream::trunc);
     for (i = 0; i < sys->N_node; i++){
         outfile1 << map[i] << endl;
@@ -283,6 +399,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     cout << "leng v0c " << leng_v0c << endl;
     cout << "The number of nonzeros in Ac is " << leng_Ac << endl;
+    
     /*for (i = 0; i < sys->numCdt + 1; i++){
         cout << sys->acu_cnno[i] << " ";
     }
@@ -290,9 +407,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (i = 0; i < sys->numCdt + 1; i++){
         cout << sys->cindex[i] << " ";
     }
-    cout << endl;
-    */
-    /*outfile1.open("Ac1.txt", std::ofstream::out | std::ofstream::trunc);
+    cout << endl;*/
+    
+    
+    /*outfile1.open("Ac2.txt", std::ofstream::out | std::ofstream::trunc);
     for (i = 0; i < leng_Ac; i++){
         outfile1 << sys->AcRowId[i] + 1 << " " << sys->AcColId[i] + 1 << " " << sys->Acval[i] << endl;
     }
@@ -365,12 +483,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int startCol;
     startCol = 0;
     sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
-    cout << "h\n";
     sys->x = (complex<double>*) calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
     for (i = 0; i < sys->numPorts*sys->numPorts; i++){
         sys->x[i] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
     }
-    cout << "h\n";
+    
     
     double *b, *xc;    // the array of the right hand side
     xcol = 0;
@@ -405,8 +522,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *yd1, *yd2;
     double *v0caJ, *v0daJ, *y0d, *ydt, *y0d2;
     double leng;
-    int *argc;
-    char ***argv;
+    
     sourcePort = 0;
     struct matrix_descr descr;
 
@@ -419,7 +535,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sparse_matrix_t V0ct;
     s = mkl_sparse_d_create_csr(&V0ct, SPARSE_INDEX_BASE_ZERO, leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cvalo);
 
-    MPI_Init(argc, argv);
+    
 
     
     while (sourcePort < sys->numPorts){
@@ -427,8 +543,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (i = 0; i < sys->portEdge[sourcePort].size(); i++){
             sys->J[sys->portEdge[sourcePort][i]] = sys->portCoor[sourcePort].portDirection;
+            //cout << sys->portEdge[sourcePort][i] - sys->N_edge_s << " ";
         }
-        cout << sys->portCoor[sourcePort].portDirection << endl;
+        //cout << endl;
+        
 
         dRhs = (double*)malloc(sys->N_edge*sizeof(double));
         for (i = 0; i < sys->N_edge; i++){
@@ -446,8 +564,19 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, dRhs, beta, v0daJ);
 
+        /*outfile.open("rhs.txt", std::ofstream::out | std::ofstream::trunc);
+        for (i = 0; i < leng_v0d1; i++){
+            outfile << v0daJ[i] << endl;
+        }
+        outfile.close();*/
+
         /* solve V0d system */
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
+        t1 = clock();
+        status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
+        /*status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);*/
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        /* End of solving */
+
         /*t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
         cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;*/
@@ -509,40 +638,44 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         
 
         /*solve c system block by block*/
+        t1 = clock();
         for (i = 1; i <= 1; i++){
 
             //pardisoSolve_c(sys, &v0caJ[sys->acu_cnno[i - 1]], &y0c[sys->acu_cnno[i - 1]], sys->acu_cnno[i - 1], sys->acu_cnno[i] - 1, sys->cindex[i - 1] + 1, sys->cindex[i]);
 
-            /*a = (double*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(double));
-            ia = (int*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(int));
-            ja = (int*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(int));
-            crhss = (double*)malloc((sys->acu_cnno[i] - sys->acu_cnno[i - 1]) * sizeof(double));
-            y0cs = (double*)calloc((sys->acu_cnno[i] - sys->acu_cnno[i - 1]), sizeof(double));
+            //a = (double*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(double));
+            //ia = (int*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(int));
+            //ja = (int*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(int));
+            //crhss = (double*)malloc((sys->acu_cnno[i] - sys->acu_cnno[i - 1]) * sizeof(double));
+            //y0cs = (double*)calloc((sys->acu_cnno[i] - sys->acu_cnno[i - 1]), sizeof(double));
 
-            for (j = sys->acu_cnno[i - 1]; j <= sys->acu_cnno[i] - 1; j++){
-            crhss[j - sys->acu_cnno[i - 1]] = v0caJ[j];
-            }
-            for (j = sys->cindex[i - 1] + 1; j <= sys->cindex[i]; j++){
-            a[j - sys->cindex[i - 1] - 1] = sys->Acval[j];
-            ia[j - sys->cindex[i - 1] - 1] = sys->AcRowId[j] - sys->AcRowId[sys->cindex[i - 1] + 1];
-            ja[j - sys->cindex[i - 1] - 1] = sys->AcColId[j] - sys->AcColId[sys->cindex[i - 1] + 1];
-            }
+            //for (j = sys->acu_cnno[i - 1]; j <= sys->acu_cnno[i] - 1; j++){
+            //    crhss[j - sys->acu_cnno[i - 1]] = v0caJ[j];
+            //}
+            //for (j = sys->cindex[i - 1] + 1; j <= sys->cindex[i]; j++){
+            //    a[j - sys->cindex[i - 1] - 1] = sys->Acval[j];
+            //    ia[j - sys->cindex[i - 1] - 1] = sys->AcRowId[j] - sys->AcRowId[sys->cindex[i - 1] + 1];
+            //    ja[j - sys->cindex[i - 1] - 1] = sys->AcColId[j] - sys->AcColId[sys->cindex[i - 1] + 1];
+            //    //cout << a[j - sys->cindex[i - 1] - 1] << " " << ia[j - sys->cindex[i - 1] - 1] << " " << ja[j - sys->cindex[i - 1] - 1] << endl;
+            //}
 
-            status = hypreSolve(sys, ia, ja, a, (sys->cindex[i] - sys->cindex[i - 1]), crhss, (sys->acu_cnno[i] - sys->acu_cnno[i - 1]), y0cs);
+            //status = hypreSolve(sys, ia, ja, a, (sys->cindex[i] - sys->cindex[i - 1]), crhss, (sys->acu_cnno[i] - sys->acu_cnno[i - 1]), y0cs);
 
-            for (j = sys->acu_cnno[i - 1]; j <= sys->acu_cnno[i] - 1; j++){
-            y0c[j] = y0cs[j - sys->acu_cnno[i - 1]];
-            }
+            //for (j = sys->acu_cnno[i - 1]; j <= sys->acu_cnno[i] - 1; j++){
+            //    y0c[j] = y0cs[j - sys->acu_cnno[i - 1]];
+            //}
 
-            free(a); a = NULL;
-            free(ia); ia = NULL;
-            free(ja); ja = NULL;
-            free(crhss); crhss = NULL;
-            free(y0cs); y0cs = NULL;*/
+            //free(a); a = NULL;
+            //free(ia); ia = NULL;
+            //free(ja); ja = NULL;
+            //free(crhss); crhss = NULL;
+            //free(y0cs); y0cs = NULL;
 
-            status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
+            status = hypreSolve(sys, ac, parcsr_ac, leng_Ac, v0caJ, leng_v0c, y0c);
+            //status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
         
 
 
@@ -579,7 +712,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, yccp, beta, dRhs2);
 
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
+        t1 = clock();
+        status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, dRhs2, leng_v0d1, y0d2);
+        //status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+
+
         /*outfile1.open("y0d.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < leng_v0d1; i++){
             outfile1 << sqrt(pow(y0d[i], 2) + pow(y0d2[i], 2)) << endl;
@@ -623,13 +761,21 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             }
         }
+        /*ofstream outfile2;
+        outfile2.open("x.txt", std::ofstream::out | std::ofstream::trunc);
+        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
+            outfile2 << sys->y[i].real() << " " << sys->y[i].imag() << endl;
+        }
+        outfile2.close();*/
+
+
         free(y0c); y0c = NULL;
         free(yd); yd = NULL;
         free(ydcp); ydcp = NULL;
         free(yc); yc = NULL;
         free(yccp); yccp = NULL;
         free(v0caJ); v0caJ = NULL;
-        free(sys->y); sys->y = NULL;
+        //free(sys->y); sys->y = NULL;
         free(dRhs); dRhs = NULL;
         free(sys->J); sys->J = NULL;
         free(crhs); crhs = NULL;
@@ -696,7 +842,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     mkl_sparse_destroy(V0dat);
     mkl_sparse_destroy(V0ct);
     mkl_sparse_destroy(V0cat);
-    
+
+    HYPRE_IJMatrixDestroy(ad);
+    HYPRE_IJMatrixDestroy(ac);
 
     return 0;
 }
@@ -2703,7 +2851,7 @@ int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1){
 
 }
 
-int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, int *map, double sideLen){
+int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, int *map, double sideLen){
     int *visited;
     clock_t t1;
     double t, ta;
@@ -2718,15 +2866,24 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     int indnum;
     int *markLayerNode = (int*)calloc(sys->N_node_s, sizeof(int));
     //int *markProSide = (int*)calloc(sys->N_node_s, sizeof(int));
-    unordered_set<int> layerNode;
 
 
     for (int i = 0; i < sys->numPorts; i++){
         for (int j = 0; j < sys->cdtNumNode[sys->portCoor[i].portCnd-1]; j++){
             markLayerNode[sys->conductor[sys->portCoor[i].portCnd - 1].node[j] % (sys->N_node_s)] = 1;
-            //layerNode.insert(sys->conductor[sys->portCoor[i].portCnd - 1].node[j] % (sys->N_node_s));
         }
     }
+    
+    /*for (int i = 0; i < sys->N_node_s; i++){
+        indx = i / (sys->N_cell_y + 1);
+        indy = i % (sys->N_cell_y + 1);
+        if (sys->xn[indx] >= 2256.2e-6 && sys->xn[indx] <= 2814.4e-6){
+            if (sys->yn[indy] >= 3079.8e-6 && sys->yn[indy] <= 3861.3e-6){
+                markLayerNode[i] = 1;
+            }
+        }
+    }*/
+
     
     //t1 = clock();
     //for (auto ni : layerNode){
@@ -2774,7 +2931,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 if (visited[ix * (sys->N_cell_y + 1) + iy] == 0 && sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] == 0){
                     va.clear();
                     v.clear();
-                    if (markLayerNode[ix * (sys->N_cell_y + 1) + iy] == 0 && sys->markProSide[ix * (sys->N_cell_y + 1) + iy] == 0){    // this point is not visited and it is outside the conductor, not in the projection of the excited conductor
+                    if (markLayerNode[ix * (sys->N_cell_y + 1) + iy] == 0 && sys->markProSide[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] == 0){    // this point is not visited and it is outside the conductor, not in the projection of the excited conductor
                         //if (!ind.empty())
                         //    ind.clear();
                         startx = sys->xn[ix];
@@ -2795,7 +2952,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             indx = (st.back()) / (sys->N_cell_y + 1);
                             indy = st.back() % (sys->N_cell_y + 1);
                             if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block1_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block1_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + indx * (sys->N_cell_y + 1) + indy){
@@ -2831,7 +2988,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 }
                             }
                             if (indx != 0){    // it must have a left x edge, thus left x node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block1_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block1_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (indx - 1) * (sys->N_cell_y + 1) + indy){
@@ -2867,7 +3024,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 }
                             }
                             if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && sys->markProSide[indx * (sys->N_cell_y + 1) + indy + 1] == 0){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && sys->markProSide[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block1_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block1_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy){
@@ -2903,7 +3060,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 }
                             }
                             if (indy != 0){    // it must have a closer y edge, thus closer y node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && sys->markProSide[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && sys->markProSide[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block1_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block1_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1){
@@ -2969,7 +3126,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
 
                     }
 
-                    else if (markLayerNode[ix * (sys->N_cell_y + 1) + iy] == 1){//&& sys->exciteCdtLayer[iz] == 1){    // this point is not visited and it is outside the conductor, in the projection of the excited conductor
+                    else if (markLayerNode[ix * (sys->N_cell_y + 1) + iy] == 1 && sys->markProSide[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] == 0){//&& sys->exciteCdtLayer[iz] == 1){    // this point is not visited and it is outside the conductor, in the projection of the excited conductor
                         //while (!ind.empty())
                         //    ind.clear();
                         startx = sys->xn[ix];
@@ -2990,7 +3147,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             indy = st.back() % (sys->N_cell_y + 1);
 
                             if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 1){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 1 && sys->markProSide[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block2_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block2_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + indx * (sys->N_cell_y + 1) + indy){
@@ -3025,7 +3182,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 }
                             }
                             if (indx != 0){    // it must have a left x edge, thus left x node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 1){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 1 && sys->markProSide[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block2_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block2_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (indx - 1) * (sys->N_cell_y + 1) + indy){
@@ -3060,7 +3217,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 }
                             }
                             if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 1){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 1 && sys->markProSide[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block2_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block2_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy){
@@ -3095,7 +3252,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 }
                             }
                             if (indy != 0){    // it must have a closer y edge, thus closer y node
-                                if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (sys->N_cell_y + 1) + indy - 1] == 1){    // this node is in dielectric and this node is not visited
+                                if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (sys->N_cell_y + 1) + indy - 1] == 1 && sys->markProSide[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block2_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block2_y){    // this node is within the block area
                                         for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1].size(); i++){
                                             if (sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1){
@@ -3156,7 +3313,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                         }
                     }
                     else{
-                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
+                        /*for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
                             v0d1RowId[v0d1num] = sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first;
                             v0d1ColId[v0d1num] = leng_v0d1;
                             v0d1val[v0d1num] = sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
@@ -3171,7 +3328,194 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             v0d1aval[v0d1anum] = sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
                             v0d1anum++;
                         }
-                        leng_v0d1a++;
+                        leng_v0d1a++;*/
+
+
+                       
+                        
+                        
+                        startx = sys->xn[ix];
+                        starty = sys->yn[iy];
+
+                        map[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] = count;
+                        st.push_back(ix * (sys->N_cell_y + 1) + iy);
+                        visited[ix * (sys->N_cell_y + 1) + iy] = 1;
+                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
+                            va[sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
+                        }
+                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
+                            v[sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
+                        }
+                        while (!st.empty()){
+                            mark = 0;
+                            indx = (st.back()) / (sys->N_cell_y + 1);
+                            indy = st.back() % (sys->N_cell_y + 1);
+
+                            if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
+                                if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 1){    // this node is in dielectric and this node is not visited
+                                    if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block3_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block3_y){    // this node is within the block area
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy].size(); i++){
+                                            if (sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + indx * (sys->N_cell_y + 1) + indy){
+                                                ratio = -1 / sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].second * va[sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first];
+                                                break;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy].size(); i++){
+                                            if (va.find(sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first) == va.end()){
+                                                va[sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first] = ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].second;
+                                            }
+                                            else{
+                                                va.erase(sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first);
+                                                //va[sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first] += ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].second;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy].size(); i++){
+                                            if (v.find(sys->nodeEdge[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first) == v.end()){
+                                                v[sys->nodeEdge[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first] = sys->nodeEdge[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].second;
+                                            }
+                                            else{
+                                                v.erase(sys->nodeEdge[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy][i].first);
+                                            }
+                                        }
+                                        //ind.push_back(iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy);
+                                        st.push_back((indx + 1)*(sys->N_cell_y + 1) + indy);
+                                        visited[(indx + 1)*(sys->N_cell_y + 1) + indy] = 1;
+                                        map[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy] = count;
+                                        mark = 1;
+                                        continue;
+                                    }
+                                }
+                            }
+                            if (indx != 0){    // it must have a left x edge, thus left x node
+                                if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 1){    // this node is in dielectric and this node is not visited
+                                    if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block3_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block3_y){    // this node is within the block area
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy].size(); i++){
+                                            if (sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (indx - 1) * (sys->N_cell_y + 1) + indy){
+                                                ratio = -1 / sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].second * va[sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first];
+                                                break;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy].size(); i++){
+                                            if (va.find(sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first) == va.end()){
+                                                va[sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first] = ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].second;
+                                            }
+                                            else{
+                                                va.erase(sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first);
+                                                //va[sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first] += ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].second;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy].size(); i++){
+                                            if (v.find(sys->nodeEdge[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first) == v.end()){
+                                                v[sys->nodeEdge[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first] = sys->nodeEdge[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].second;
+                                            }
+                                            else{
+                                                v.erase(sys->nodeEdge[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy][i].first);
+                                            }
+                                        }
+                                        //ind.push_back(iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy);
+                                        st.push_back((indx - 1)*(sys->N_cell_y + 1) + indy);
+                                        visited[(indx - 1)*(sys->N_cell_y + 1) + indy] = 1;
+                                        map[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = count;
+                                        mark = 1;
+                                        continue;
+                                    }
+                                }
+                            }
+                            if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
+                                if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && sys->markProSide[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 1){    // this node is in dielectric and this node is not visited
+                                    if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block3_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block3_y){    // this node is within the block area
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1].size(); i++){
+                                            if (sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy){
+                                                ratio = -1 / sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].second * va[sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first];
+                                                break;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1].size(); i++){
+                                            if (va.find(sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first) == va.end()){
+                                                va[sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first] = ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].second;
+                                            }
+                                            else{
+                                                va.erase(sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first);
+                                                //va[sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first] += ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].second;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1].size(); i++){
+                                            if (v.find(sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first) == v.end()){
+                                                v[sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first] = sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].second;
+                                            }
+                                            else{
+                                                v.erase(sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1][i].first);
+                                            }
+                                        }
+                                        //ind.push_back(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1);
+                                        st.push_back((indx)*(sys->N_cell_y + 1) + indy + 1);
+                                        visited[(indx)*(sys->N_cell_y + 1) + indy + 1] = 1;
+                                        map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = count;
+                                        mark = 1;
+                                        continue;
+                                    }
+                                }
+                            }
+                            if (indy != 0){    // it must have a closer y edge, thus closer y node
+                                if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && sys->markProSide[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 1){    // this node is in dielectric and this node is not visited
+                                    if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block3_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block3_y){    // this node is within the block area
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1].size(); i++){
+                                            if (sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first == iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1){
+                                                ratio = -1 / sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].second * va[sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first];
+                                                break;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1].size(); i++){
+                                            if (va.find(sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first) == va.end()){
+                                                va[sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first] = ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].second;
+                                            }
+                                            else{
+                                                va.erase(sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first);
+                                                //va[sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first] += ratio * sys->nodeEdgea[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].second;
+                                            }
+                                        }
+                                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1].size(); i++){
+                                            if (v.find(sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first) == v.end()){
+                                                v[sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first] = sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].second;
+                                            }
+                                            else{
+                                                v.erase(sys->nodeEdge[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1][i].first);
+                                            }
+                                        }
+                                        //ind.push_back(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1);
+                                        st.push_back((indx)*(sys->N_cell_y + 1) + indy - 1);
+                                        visited[(indx)*(sys->N_cell_y + 1) + indy - 1] = 1;
+                                        map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = count;
+                                        mark = 1;
+                                        continue;
+                                    }
+                                }
+                            }
+                            if (mark == 0){
+                                st.pop_back();
+                            }
+                        }
+                        indnum = v.size();
+
+                        if (indnum != 0){
+
+                            for (auto vi : v){
+                                v0d1RowId[v0d1num] = vi.first;
+                                v0d1ColId[v0d1num] = leng_v0d1;
+                                v0d1val[v0d1num] = vi.second;
+                                v0d1num++;
+                            }
+                            leng_v0d1++;
+
+                            for (auto vai : va){
+                                v0d1aRowId[v0d1anum] = vai.first;
+                                v0d1aColId[v0d1anum] = leng_v0d1a;
+                                v0d1aval[v0d1anum] = vai.second;
+                                v0d1anum++;
+                            }
+                            leng_v0d1a++;
+                            count++;
+                        }
                     }
                 }
 
@@ -3180,6 +3524,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         free(visited); visited = NULL;
     }
 
+    
 
     /* V0d2 generation */
     int j;
@@ -3316,7 +3661,9 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             }
         }
     }
+    
 
+    
     
     sys->v0d1RowId = (int*)malloc(v0d1num * sizeof(int));
     sys->v0d1ColId = (int*)malloc(v0d1num * sizeof(int));
@@ -3330,14 +3677,13 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         sys->v0d1RowId[i] = v0d1RowId[i];
         sys->v0d1ColId[i] = v0d1ColId[i];
         sys->v0d1val[i] = v0d1val[i];
-        
     }
     for (int i = 0; i < v0d1anum; i++){
         sys->v0d1aRowId[i] = v0d1aRowId[i];
         sys->v0d1aColId[i] = v0d1aColId[i];
         sys->v0d1aval[i] = v0d1aval[i];
     }
-
+    
 
     free(v0d1RowId); v0d1RowId = NULL;
     free(v0d1ColId); v0d1ColId = NULL;
@@ -3346,8 +3692,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     free(v0d1aColId); v0d1aColId = NULL;
     free(v0d1aval); v0d1aval = NULL;
 
-    /*ind.clear();*/
-    layerNode.clear();
+    
 
     /*ofstream outfile;
     outfile.open("color.txt", std::ofstream::out | std::ofstream::trunc);
@@ -3459,8 +3804,9 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
     unordered_map<int, double> v, va;
     visited = (int*)calloc(sys->N_node, sizeof(int));
 
+
     for (int ic = 0; ic < sys->numCdt; ic++){
-        //cout << ic << endl;
+        
         if (sys->conductor[ic].markPort <= 0){    // not excited conductors
             markcond = ic + 1;
             //visited = (int*)calloc(sys->N_node, sizeof(int));

@@ -61,23 +61,26 @@ $(OBJDIR)/%.d: %.cpp
 LimboInterface: $(OBJS) $(LIBDIR)/lib$(LIB_PREFIX)parser.a
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LIB) -l$(LIB_PREFIX)parser $(INCLUDE)
 
-LayoutAnalyzer: TestMain.o mesh.o matrixCon.o hypreSolve.o
-	mpicxx $(CXXFLAGS) -o $@ TestMain.o mesh.o matrixCon.o hypreSolve.o $(LIB) $(INCLUDE) $(MKLFLAGS) $(LFLAGS)
+LayoutAnalyzer: TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o
+	mpicxx $(CXXFLAGS) -o $@ TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o $(LIB) $(INCLUDE) $(MKLFLAGS) $(LFLAGS)
 
 explicit: TestMain.o mesh.o matrixCon.o
 	g++ -std=c++17 -g -lstdc++fs -o Test_$@ TestMain.o mesh.o matrixCon.o hypreSolve.o -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I$(MKL_ROOT_DIR)/include -Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_lp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group  -lm -pthread -ldl -L $(HYPRE_DIR)/lib
 
 TestMain.o: TestMain.cpp fdtd.h limboint.h solnoutclass.h #$(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/GdsReader.h $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/GdsWriter.h $(PARSER_SPEF_ROOT_DIR)/parser-spef/parser-spef.hpp $(EIGEN_ROOT_DIR)/Eigen/Sparse
-	g++ -std=c++17 -g -lstdc++fs -c TestMain.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include -L $(HYPRE_DIR)/lib -lHYPRE -lm
+	g++ -std=c++17 -g -lstdc++fs -c TestMain.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
 	
 mesh.o: mesh.cpp fdtd.h
 	g++ -c -g mesh.cpp -I $(MKL_ROOT_DIR)/include
 
-matrixCon.o: matrixCon.cpp fdtd.h
+matrixCon.o: matrixCon.cpp fdtd.h hypreSolverh.h
 	mpicxx -c -g matrixCon.cpp -I $(MKL_ROOT_DIR)/include -I $(HYPRE_DIR)/include -L $(HYPRE_DIR)/lib -lHYPRE -lm $(LFLAGS)
 
-hypreSolve.o: hypreSolve.cpp fdtd.h vis.c
+hypreSolve.o: hypreSolve.cpp fdtd.h hypreSolverh.h
 	mpicxx -c -g hypreSolve.cpp -I $(MKL_ROOT_DIR)/include -I $(HYPRE_DIR)/include -L $(HYPRE_DIR)/lib -lHYPRE -lm $(LFLAGS)
+
+generateStiff.o: generateStiff.cpp fdtd.h
+	g++ -c -g generateStiff.cpp -I $(MKL_ROOT_DIR)/include
 
 
 .PHONY: clean

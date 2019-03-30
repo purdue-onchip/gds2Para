@@ -283,6 +283,17 @@ int main(int argc, char** argv)
                 cout << "paraGenerator Fail!" << endl;
                 return status;
             }
+
+            /*status = generateStiff(&sys);
+            if (status == 0){
+                cout << "generateStiff Success!" << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+            }
+            else {
+                cout << "generateStiff Fail!" << endl;
+                return status;
+            }*/
+
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 

@@ -1,10 +1,7 @@
 #include <math.h>
 #include <ctime>
 #include "fdtd.h"
-#include "_hypre_utilities.h"
-#include "HYPRE_krylov.h"
-#include "HYPRE.h"
-#include "HYPRE_parcsr_ls.h"
+#include "hypreSolverh.h"
 
 #include "vis.c"
 
@@ -12,8 +9,7 @@ int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, int iterations,
     double rel_residual_norm);
 
 
-int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_A, double *bin, int leng_v0, double *solution){
-    clock_t t1 = clock();
+int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, int leng_A, double *bin, int leng_v0, double *solution){
     int i;
     int myid, num_procs;
     int N, n;
@@ -26,8 +22,8 @@ int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_A
 
     double h, h2;
 
-    HYPRE_IJMatrix A;
-    HYPRE_ParCSRMatrix parcsr_A;
+    /*HYPRE_IJMatrix A;
+    HYPRE_ParCSRMatrix parcsr_A;*/
     HYPRE_IJVector b;
     HYPRE_ParVector par_b;
     HYPRE_IJVector x;
@@ -53,48 +49,48 @@ int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_A
     /* How many rows do I have? */
     local_size = iupper - ilower + 1;
     
-    /* Create the matrix.
-    Note that this is a square matrix, so we indicate the row partition
-    size twice (since number of rows = number of cols) */
-    HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
+    ///* Create the matrix.
+    //Note that this is a square matrix, so we indicate the row partition
+    //size twice (since number of rows = number of cols) */
+    //HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
 
-    /* Choose a parallel csr format storage (see the User's Manual) */
-    HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
+    ///* Choose a parallel csr format storage (see the User's Manual) */
+    //HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
 
-    /* Initialize before setting coefficients */
-    HYPRE_IJMatrixInitialize(A);
+    ///* Initialize before setting coefficients */
+    //HYPRE_IJMatrixInitialize(A);
+    //
+    //{
+    //    int nnz;
+    //    vector<double> values;
+    //    vector<int> cols;
+    //    int index = 0;
+
+    //    for (i = ilower; i <= iupper; i++)
+    //    {
+    //        nnz = 0;   // Number of non-zeros on row i
+
+    //        while (ARowId[index] == i){
+    //            cols.push_back(AColId[index]);
+    //            values.push_back(Aval[index]);
+    //            nnz++;
+    //            index++;
+    //        }
+    //        
+    //        /* Set the values for row i */
+    //        HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
+    //        
+    //        cols.clear();
+    //        values.clear();
+    //    }
+    //}
+    //
+    ///* Assemble after setting the coefficients */
+    //HYPRE_IJMatrixAssemble(A);
+    //
+    ///* Get the parcsr matrix object to use */
+    //HYPRE_IJMatrixGetObject(A, (void**)&parcsr_A);
     
-    {
-        int nnz;
-        vector<double> values;
-        vector<int> cols;
-        int index = 0;
-
-        for (i = ilower; i <= iupper; i++)
-        {
-            nnz = 0;   // Number of non-zeros on row i
-
-            while (ARowId[index] == i){
-                cols.push_back(AColId[index]);
-                values.push_back(Aval[index]);
-                nnz++;
-                index++;
-            }
-            
-            /* Set the values for row i */
-            HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
-            
-            cols.clear();
-            values.clear();
-        }
-    }
-    
-    /* Assemble after setting the coefficients */
-    HYPRE_IJMatrixAssemble(A);
-    
-    /* Get the parcsr matrix object to use */
-    HYPRE_IJMatrixGetObject(A, (void**)&parcsr_A);
-
     /* Create the rhs and solution */
     HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &b);
     HYPRE_IJVectorSetObjectType(b, HYPRE_PARCSR);
@@ -132,7 +128,6 @@ int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_A
 
     HYPRE_IJVectorAssemble(x);
     HYPRE_IJVectorGetObject(x, (void **)&par_x);
-
     /* AMG */
     //{
     //    int num_iterations;
@@ -235,6 +230,7 @@ int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_A
     //}
     
 
+    
 
     /* Flexible GMRES with AMG Preconditioner */
     {
@@ -306,12 +302,11 @@ int hypreSolve(fdtdMesh *sys, int *ARowId, int *AColId, double *Aval, int leng_A
         HYPRE_BoomerAMGDestroy(precond);
 
     }
-
+    
     /* Clean up */
-    HYPRE_IJMatrixDestroy(A);
+    //HYPRE_IJMatrixDestroy(A);
     HYPRE_IJVectorDestroy(b);
     HYPRE_IJVectorDestroy(x);
-    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
     
 
     return(0);
