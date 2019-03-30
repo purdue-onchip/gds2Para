@@ -129,7 +129,7 @@ public:
             vector<double> revBound;
             revBound.push_back((this->bounds)[0]); // Same first x-coordinate
             revBound.push_back((this->bounds)[1]); // Same first y-coordinate
-            for (size_t indi = nBoundPt - 1; indi > 0; indi++)
+            for (size_t indi = nBoundPt - 1; indi > 0; indi--)
             {
                 revBound.push_back((this->bounds)[2 * indi]); // x-coordinate
                 revBound.push_back((this->bounds)[2 * indi + 1]); // y-coordinate
@@ -408,7 +408,7 @@ public:
             vector<double> revNode;
             revNode.push_back((this->nodes)[0]); // Same first x-coordinate
             revNode.push_back((this->nodes)[1]); // Same first y-coordinate
-            for (size_t indi = nNodePt - 1; indi > 0; indi++)
+            for (size_t indi = nNodePt - 1; indi > 0; indi--)
             {
                 revNode.push_back((this->nodes)[2 * indi]); // x-coordinate
                 revNode.push_back((this->nodes)[2 * indi + 1]); // y-coordinate
@@ -552,7 +552,7 @@ public:
             vector<double> revBox;
             revBox.push_back((this->boxes)[0]); // Same first x-coordinate
             revBox.push_back((this->boxes)[1]); // Same first y-coordinate
-            for (size_t indi = nBoxPt - 1; indi > 0; indi++)
+            for (size_t indi = nBoxPt - 1; indi > 0; indi--)
             {
                 revBox.push_back((this->boxes)[2 * indi]); // x-coordinate
                 revBox.push_back((this->boxes)[2 * indi + 1]); // y-coordinate
