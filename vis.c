@@ -447,7 +447,7 @@ void GLVis_PrintSStructVector(HYPRE_SStructVector sol,
 
    int i, j, k, ni, nj, nk;
    double *values;
-   int ilower[3], iupper[3];
+   HYPRE_Int ilower[3], iupper[3];
 
    HYPRE_SStructVariable vartype = grid->pgrids[0]->vartypes[var];
 
@@ -751,7 +751,7 @@ void GLVis_PrintStructVector(HYPRE_StructVector sol,
 
    int i, j, k, ni, nj, nk;
    double *values;
-   int ilower[3], iupper[3];
+   HYPRE_Int ilower[3], iupper[3];
 
    sprintf(solfile, "%s.%06d", solfile_prefix, myid);
    if ((file = fopen(solfile, "w")) == NULL)

@@ -9,16 +9,16 @@ static bool comp(pair<double, int> a, pair<double, int> b)
     return a.first <= b.first;
 };
 
-int setHYPREMatrix(int *ARowId, int *AColId, double *Aval, int leng_v0, HYPRE_IJMatrix &a, HYPRE_ParCSRMatrix &parcsr_a){
-    int i;
+int setHYPREMatrix(myint *ARowId, myint *AColId, double *Aval, myint leng_v0, HYPRE_IJMatrix &a, HYPRE_ParCSRMatrix &parcsr_a){
+    HYPRE_Int i;
     int myid, num_procs;
-    int N, n;
+    HYPRE_Int N, n;
 
-    int ilower, iupper;
-    int local_size, extra;
+    HYPRE_Int ilower, iupper;
+    HYPRE_Int local_size, extra;
 
     int solver_id;
-    int vis, print_system;
+    HYPRE_Int vis, print_system;
 
     double h, h2;
 
@@ -55,9 +55,9 @@ int setHYPREMatrix(int *ARowId, int *AColId, double *Aval, int leng_v0, HYPRE_IJ
     HYPRE_IJMatrixInitialize(A);
 
     {
-        int nnz;
+        HYPRE_Int nnz;
         vector<double> values;
-        vector<int> cols;
+        vector<HYPRE_Int> cols;
         int index = 0;
 
         for (i = ilower; i <= iupper; i++)
@@ -92,7 +92,7 @@ int setHYPREMatrix(int *ARowId, int *AColId, double *Aval, int leng_v0, HYPRE_IJ
 }
 
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi){
-    int i, j, mark, k, l, n;
+    myint i, j, mark, k, l, n;
     int status;
     int count;
     int xcol;
@@ -109,14 +109,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     cout << "Number of nodes: " << sys->N_node << endl;
 
     /* Construct V0d with row id, col id and its val */
-    int leng_v0d1 = 0, v0d1num = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
-    int leng_v0d1a = 0, v0d1anum = 0;
-    int leng_Ad = 0;
-    int *map = (int*)calloc(sys->N_node, (sizeof(int)));
+    myint leng_v0d1 = 0, v0d1num = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
+    myint leng_v0d1a = 0, v0d1anum = 0;
+    myint leng_Ad = 0;
+    myint *map = (myint*)calloc(sys->N_node, (sizeof(myint)));
     double block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, sideLen;
-    unordered_map<int, unordered_map<int, double>> Ad1;
+    unordered_map<myint, unordered_map<myint, double>> Ad1;
 
-    block1_x = 0;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
+    block1_x = 0;    // 
     block1_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
     block2_x = 0;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 50;
     block2_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 50;
@@ -179,18 +179,18 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
     
 
-    int leng_v0d = leng_v0d1;
-    sys->v0d1ColIdo = (int*)malloc(v0d1num * sizeof(int));
+    myint leng_v0d = leng_v0d1;
+    sys->v0d1ColIdo = (myint*)malloc(v0d1num * sizeof(myint));
     for (i = 0; i < v0d1num; i++)
         sys->v0d1ColIdo[i] = sys->v0d1ColId[i];
-    free(sys->v0d1ColId); sys->v0d1ColId = (int*)malloc((leng_v0d1 + 1) * sizeof(int));
+    free(sys->v0d1ColId); sys->v0d1ColId = (myint*)malloc((leng_v0d1 + 1) * sizeof(myint));
     status = COO2CSR_malloc(sys->v0d1ColIdo, sys->v0d1RowId, sys->v0d1val, v0d1num, leng_v0d1, sys->v0d1ColId);
     if (status != 0)
         return status;
-    sys->v0d1aColIdo = (int*)malloc(v0d1anum * sizeof(int));
+    sys->v0d1aColIdo = (myint*)malloc(v0d1anum * sizeof(myint));
     for (i = 0; i < v0d1anum; i++)
         sys->v0d1aColIdo[i] = sys->v0d1aColId[i];
-    free(sys->v0d1aColId); sys->v0d1aColId = (int*)malloc((leng_v0d1a + 1) * sizeof(int));
+    free(sys->v0d1aColId); sys->v0d1aColId = (myint*)malloc((leng_v0d1a + 1) * sizeof(myint));
     status = COO2CSR_malloc(sys->v0d1aColIdo, sys->v0d1aRowId, sys->v0d1aval, v0d1anum, leng_v0d1a, sys->v0d1aColId);
     if (status != 0)
         return status;
@@ -217,12 +217,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     cout << "Matrix mutiplication time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;*/
     
     ///*****************************************************************/
-    sys->AdRowId = (int*)calloc(leng_Ad, sizeof(int));
-    sys->AdColId = (int*)calloc(leng_Ad, sizeof(int));
+    sys->AdRowId = (myint*)calloc(leng_Ad, sizeof(myint));
+    sys->AdColId = (myint*)calloc(leng_Ad, sizeof(myint));
     sys->Adval = (double*)calloc(leng_Ad, sizeof(double));
     j = 0;
     for (i = 0; i < leng_v0d1; i++){
-        vector<pair<int, double>> v(Ad1[i].begin(), Ad1[i].end());
+        vector<pair<myint, double>> v(Ad1[i].begin(), Ad1[i].end());
         sort(v.begin(), v.end());
         for (auto adi : v){
             if (abs(adi.second) > 1e-8){
@@ -243,6 +243,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     HYPRE_ParCSRMatrix parcsr_ad;
     MPI_Init(argc, argv);
     status = setHYPREMatrix(sys->AdRowId, sys->AdColId, sys->Adval, leng_v0d1, ad, parcsr_ad);
+   
     /* End */
     
     //sys->AdRowId1 = (int*)malloc((leng_v0d1 + 1) * sizeof(int));
@@ -258,11 +259,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     outfile1.close();*/
 
     /* Construct V0c with row id, col id and its val */
-    int leng_v0c = 0, v0cnum = 0;
-    int leng_v0ca = 0, v0canum = 0;
+    myint leng_v0c = 0, v0cnum = 0;
+    myint leng_v0ca = 0, v0canum = 0;
 
     int numPortCdt = 0;
-    int leng_Ac = 0;
+    myint leng_Ac = 0;
     count = 0;
 
 
@@ -273,10 +274,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     
 
 
-    unordered_map<int, unordered_map<int, double>> Ac;
+    unordered_map<myint, unordered_map<myint, double>> Ac;
     count = 0;
     free(map);
-    map = (int*)calloc(sys->N_node, sizeof(int));
+    map = (myint*)calloc(sys->N_node, sizeof(myint));
     block1_x = 0;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
     block1_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
     block2_x = 0;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 300;
@@ -318,13 +319,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (i = 0; i < leng_v0c; i++){
         leng_Ac += Ac[i].size();
     }
-    sys->AcRowId = (int*)calloc(leng_Ac, sizeof(int));
-    sys->AcColId = (int*)calloc(leng_Ac, sizeof(int));
+    sys->AcRowId = (myint*)calloc(leng_Ac, sizeof(myint));
+    sys->AcColId = (myint*)calloc(leng_Ac, sizeof(myint));
     sys->Acval = (double*)calloc(leng_Ac, sizeof(double));
     j = 0;
     k = 1;
     for (i = 0; i < leng_v0c; i++){
-        vector<pair<int, double>> v(Ac[i].begin(), Ac[i].end());
+        vector<pair<myint, double>> v(Ac[i].begin(), Ac[i].end());
         sort(v.begin(), v.end());
         for (auto aci : v){
             if (abs(aci.second) > 1e5){
@@ -380,17 +381,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
 
 
-    sys->v0cColIdo = (int*)malloc(v0cnum * sizeof(int));
+    sys->v0cColIdo = (myint*)malloc(v0cnum * sizeof(myint));
     for (i = 0; i < v0cnum; i++)
         sys->v0cColIdo[i] = sys->v0cColId[i];
-    free(sys->v0cColId); sys->v0cColId = (int*)malloc((leng_v0c + 1) * sizeof(int));
+    free(sys->v0cColId); sys->v0cColId = (myint*)malloc((leng_v0c + 1) * sizeof(myint));
     status = COO2CSR_malloc(sys->v0cColIdo, sys->v0cRowId, sys->v0cval, v0cnum, leng_v0c, sys->v0cColId);
     if (status != 0)
         return status;
-    sys->v0caColIdo = (int*)malloc(v0canum * sizeof(int));
+    sys->v0caColIdo = (myint*)malloc(v0canum * sizeof(myint));
     for (i = 0; i < v0canum; i++)
         sys->v0caColIdo[i] = sys->v0caColId[i];
-    free(sys->v0caColId); sys->v0caColId = (int*)malloc((leng_v0ca + 1)*sizeof(int));
+    free(sys->v0caColId); sys->v0caColId = (myint*)malloc((leng_v0ca + 1)*sizeof(myint));
     status = COO2CSR_malloc(sys->v0caColIdo, sys->v0caRowId, sys->v0caval, v0canum, leng_v0ca, sys->v0caColId);
     if (status != 0)
         return status;
@@ -522,6 +523,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *yd1, *yd2;
     double *v0caJ, *v0daJ, *y0d, *ydt, *y0d2;
     double leng;
+    double *u0d, *u0c;
+    double nn;
     
     sourcePort = 0;
     struct matrix_descr descr;
@@ -555,10 +558,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
         y0d = (double*)calloc(leng_v0d1, sizeof(double));
-        /*transa = 'N';
-        m = leng_v0d1;
-        k = sys->N_edge;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0d1avalo[0], &sys->v0d1aRowId[0], &sys->v0d1aColId[0], &sys->v0d1aColId[1], dRhs, &beta, v0daJ);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
@@ -591,23 +591,26 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         ydt = (double*)calloc(sys->N_edge, sizeof(double));
         yd1 = (double*)malloc(sys->N_edge * sizeof(double));
-        /*transa = 'T';
-        m = leng_v0d1;
-        k = sys->N_edge;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0d1valo[0], &sys->v0d1RowId[0], &sys->v0d1ColId[0], &sys->v0d1ColId[1], y0d, &beta, ydt);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d, beta, ydt);
         
+        u0d = (double*)malloc(sys->N_edge * sizeof(double));
+        nn = 0;
+        for (i = 0; i < sys->N_edge; i++){
+            nn += ydt[i] * ydt[i];
+        }
+        nn = sqrt(nn);
+        for (i = 0; i < sys->N_edge; i++){
+            u0d[i] = ydt[i] / nn;
+        }
 
         /* Compute C right hand side */
         y0c = (double*)calloc(leng_v0c, sizeof(double));
         v0caJ = (double*)calloc(leng_v0c, sizeof(double));
-        /*transa = 'N';
-        m = leng_v0ca;
-        k = sys->N_edge;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0cavalo[0], &sys->v0caRowId[0], &sys->v0caColId[0], &sys->v0caColId[1], sys->J, &beta, v0caJ);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
@@ -621,10 +624,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             ydt[i] = -ydt[i] * (2 * PI*sys->freqStart * sys->freqUnit)*sys->eps[i];
         }
 
-        /*transa = 'N';
-        m = leng_v0c;
-        k = sys->N_edge;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0cavalo[0], &sys->v0caRowId[0], &sys->v0caColId[0], &sys->v0caColId[1], ydt, &beta, crhs);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
@@ -684,10 +684,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         yccp = (double*)malloc(sys->N_edge * sizeof(double));
         dRhs2 = (double*)calloc(leng_v0d1, sizeof(double));
         y0d2 = (double*)calloc(leng_v0d1, sizeof(double));
-        /*transa = 'T';
-        k = sys->N_edge;
-        m = leng_v0c;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0cvalo[0], &sys->v0cRowId[0], &sys->v0cColId[0], &sys->v0cColId[1], y0c, &beta, yc);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
@@ -703,10 +700,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             yccp[i] = -yc[i] * sys->eps[i];
 
         }
-        /*transa = 'N';
-        k = sys->N_edge;
-        m = leng_v0d1;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0d1avalo[0], &sys->v0d1aRowId[0], &sys->v0d1aColId[0], &sys->v0d1aColId[1], yccp, &beta, dRhs2);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
@@ -725,14 +719,21 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         outfile1.close();*/
 
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
-        /*transa = 'T';
-        k = sys->N_edge;
-        m = leng_v0d1;
-        mkl_dcsrmv(&transa, &m, &k, &alpha, matdescra, &sys->v0d1valo[0], &sys->v0d1RowId[0], &sys->v0d1ColId[0], &sys->v0d1ColId[1], y0d2, &beta, yd2);*/
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d2, beta, yd2);
+
+        u0c = (double*)malloc(sys->N_edge * sizeof(double));
+        nn = 0;
+        for (i = 0; i < sys->N_edge; i++){
+            nn += (yd2[i] + yc[i]) * (yd2[i] + yc[i]);
+        }
+        nn = sqrt(nn);
+        for (i = 0; i < sys->N_edge; i++){
+            u0c[i] = (yd2[i] + yc[i]) / nn;
+        }
 
         
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
@@ -761,24 +762,23 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             }
         }
-        /*ofstream outfile2;
-        outfile2.open("x.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-            outfile2 << sys->y[i].real() << " " << sys->y[i].imag() << endl;
-        }
-        outfile2.close();*/
 
+        //status = find_Vh(sys, u0d, u0c, sourcePort);
+        
 
+        free(ydt); ydt = NULL;
         free(y0c); y0c = NULL;
         free(yd); yd = NULL;
         free(ydcp); ydcp = NULL;
         free(yc); yc = NULL;
         free(yccp); yccp = NULL;
         free(v0caJ); v0caJ = NULL;
-        //free(sys->y); sys->y = NULL;
+        free(sys->y); sys->y = NULL;
         free(dRhs); dRhs = NULL;
         free(sys->J); sys->J = NULL;
         free(crhs); crhs = NULL;
+        free(u0d); u0d = NULL;
+        free(u0c); u0c = NULL;
 
         sourcePort++;
         xcol++;
@@ -848,84 +848,84 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     return 0;
 }
-int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend){
-
-    /*solve Ac system block by block*/
-    int leng = nodeend - nodestart + 1;
-    int status;
-    double *a = (double*)malloc((indend - indstart + 1) * sizeof(double));
-    int *ia = (int*)malloc((indend - indstart + 1) * sizeof(int));
-    int *ja = (int*)malloc((indend - indstart + 1) * sizeof(int));
-
-    for (int i = 0; i < (indend - indstart + 1); i++){
-        a[i] = sys->Acval[indstart + i];
-        ia[i] = sys->AcRowId[indstart + i] - sys->AcRowId[indstart];
-        ja[i] = sys->AcColId[indstart + i] - sys->AcColId[indstart];
-    }
-
-    /* use pardiso to solve */
-    {
-         int *ia1 = (int*)malloc((leng + 1) * sizeof(int));
-        /* status = COO2CSR_malloc(ia, ja, a, indstart - indend + 1, leng, ia1);
-         if (status != 0)
-             return status;*/
-         int count = 0;
-         int i = 0;
-         int k = 0;
-         int start;
-         ia1[k] = 0;
-         k++;
-         while (i < (indend - indstart + 1)){
-             start = ia[i];
-             while (i < (indend - indstart + 1) && ia[i] == start) {
-                 count++;
-                 i++;
-             }
-             ia1[k] = (count);
-             k++;
-         }
-
-         void *pt[64];
-         int mtype;
-         int iparm[64];
-         double dparm[64];
-         int maxfct, mnum, phase, error, solver;
-         int num_process;   //number of processors
-         int v0csin;
-         int perm;
-         int nrhs = 1;
-         int msglvl = 0;    //print statistical information
-
-         mtype = 11;    // real and not symmetric
-         solver = 0;
-         error = 0;
-         maxfct = 1;    //maximum number of numerical factorizations
-         mnum = 1;    //which factorization to use
-         phase = 13;    //analysis
-
-         pardisoinit(pt, &mtype, iparm);
-         nrhs = 1;
-         iparm[38] = 1;
-         iparm[34] = 1;    //0-based indexing
-         
-         pardiso(pt, &maxfct, &mnum, &mtype, &phase, &leng, a, ia1, ja, &perm, &nrhs, iparm, &msglvl, rhs, solution, &error);
-         free(ia1); ia1 = NULL;
-    }
-
-    /* use HYPRE to solve */
-    /*{
-        status = hypreSolve(sys, ia, ja, a, indend - indstart + 1, rhs, leng, solution);
-    }*/
-    
-    
-    free(a); a = NULL;
-    free(ia); ia = NULL;
-    free(ja); ja = NULL;
-    
-    
-
-    return 0;
-}
+//int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend){
+//
+//    /*solve Ac system block by block*/
+//    int leng = nodeend - nodestart + 1;
+//    int status;
+//    double *a = (double*)malloc((indend - indstart + 1) * sizeof(double));
+//    int *ia = (int*)malloc((indend - indstart + 1) * sizeof(int));
+//    int *ja = (int*)malloc((indend - indstart + 1) * sizeof(int));
+//
+//    for (int i = 0; i < (indend - indstart + 1); i++){
+//        a[i] = sys->Acval[indstart + i];
+//        ia[i] = sys->AcRowId[indstart + i] - sys->AcRowId[indstart];
+//        ja[i] = sys->AcColId[indstart + i] - sys->AcColId[indstart];
+//    }
+//
+//    /* use pardiso to solve */
+//    {
+//         int *ia1 = (int*)malloc((leng + 1) * sizeof(int));
+//        /* status = COO2CSR_malloc(ia, ja, a, indstart - indend + 1, leng, ia1);
+//         if (status != 0)
+//             return status;*/
+//         int count = 0;
+//         int i = 0;
+//         int k = 0;
+//         int start;
+//         ia1[k] = 0;
+//         k++;
+//         while (i < (indend - indstart + 1)){
+//             start = ia[i];
+//             while (i < (indend - indstart + 1) && ia[i] == start) {
+//                 count++;
+//                 i++;
+//             }
+//             ia1[k] = (count);
+//             k++;
+//         }
+//
+//         void *pt[64];
+//         int mtype;
+//         int iparm[64];
+//         double dparm[64];
+//         int maxfct, mnum, phase, error, solver;
+//         int num_process;   //number of processors
+//         int v0csin;
+//         int perm;
+//         int nrhs = 1;
+//         int msglvl = 0;    //print statistical information
+//
+//         mtype = 11;    // real and not symmetric
+//         solver = 0;
+//         error = 0;
+//         maxfct = 1;    //maximum number of numerical factorizations
+//         mnum = 1;    //which factorization to use
+//         phase = 13;    //analysis
+//
+//         pardisoinit(pt, &mtype, iparm);
+//         nrhs = 1;
+//         iparm[38] = 1;
+//         iparm[34] = 1;    //0-based indexing
+//         
+//         pardiso(pt, &maxfct, &mnum, &mtype, &phase, &leng, a, ia1, ja, &perm, &nrhs, iparm, &msglvl, rhs, solution, &error);
+//         free(ia1); ia1 = NULL;
+//    }
+//
+//    /* use HYPRE to solve */
+//    /*{
+//        status = hypreSolve(sys, ia, ja, a, indend - indstart + 1, rhs, leng, solution);
+//    }*/
+//    
+//    
+//    free(a); a = NULL;
+//    free(ia); ia = NULL;
+//    free(ja); ja = NULL;
+//    
+//    
+//
+//    return 0;
+//}
 
 
 
@@ -1015,318 +1015,318 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //    return 0;
 //}
 
-int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark){
-    // ArowId, AcolId, and Aval should be in the COO format
-    sparse_status_t s0;
-    sparse_matrix_t a, a_csr;
-    sparse_index_base_t indexing1 = SPARSE_INDEX_BASE_ZERO;
-    int row, col;
-    int *cols, *cole, *rowi;
-    double *val;
-    MKL_INT *AcolId;
-    double *Aval;
-    int k;
+//int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark){
+//    // ArowId, AcolId, and Aval should be in the COO format
+//    sparse_status_t s0;
+//    sparse_matrix_t a, a_csr;
+//    sparse_index_base_t indexing1 = SPARSE_INDEX_BASE_ZERO;
+//    int row, col;
+//    int *cols, *cole, *rowi;
+//    double *val;
+//    MKL_INT *AcolId;
+//    double *Aval;
+//    int k;
+//
+//    s0 = mkl_sparse_d_create_csc(&a, SPARSE_INDEX_BASE_ZERO, arow, acol, &aColId[0], &aColId[1], aRowId, aval);
+//
+//
+//    sparse_matrix_t b, b_csr;
+//    s0 = mkl_sparse_d_create_csc(&b, SPARSE_INDEX_BASE_ZERO, arow, acol, &bColId[0], &bColId[1], bRowId, bval);
+//    
+//    s0 = mkl_sparse_convert_csr(a, SPARSE_OPERATION_NON_TRANSPOSE, &a_csr);
+//
+//    s0 = mkl_sparse_convert_csr(b, SPARSE_OPERATION_NON_TRANSPOSE, &b_csr);
+//
+//    sparse_matrix_t A;
+//    s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, a_csr, b_csr, &A);
+//    
+//
+//    sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+//    int ARows, ACols;
+//    MKL_INT *ArowStart, *ArowEnd;
+//    s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+//    
+//    leng_A = ArowEnd[ARows - 1];
+//    
+//    if (mark == 1){    // dielectric
+//        sys->AdRowId = (int*)malloc(leng_A * sizeof(int));
+//        sys->AdColId = (int*)malloc(leng_A * sizeof(int));
+//        sys->Adval = (double*)malloc(leng_A * sizeof(double));
+//        int count, num, j;
+//
+//        j = 0;
+//        for (int i = 0; i < ARows; i++){
+//            num = ArowEnd[i] - ArowStart[i];
+//            count = 0;
+//            while (count < num){
+//                sys->AdRowId[j] = i;
+//                sys->AdColId[j] = AcolId[j];
+//                sys->Adval[j] = Aval[j];
+//                j++;
+//                count++;
+//            }
+//        }
+//    }
+//    else if (mark == 2){    // conductor
+//        sys->AcRowId = (int*)malloc(leng_A * sizeof(int));
+//        sys->AcColId = (int*)malloc(leng_A * sizeof(int));
+//        sys->Acval = (double*)malloc(leng_A * sizeof(double));
+//        int count, num, j;
+//
+//        j = 0;
+//        k = 1;
+//        sys->cindex[k] = sys->cindex[k - 1];
+//        for (int i = 0; i < ARows; i++){
+//            num = ArowEnd[i] - ArowStart[i];
+//            count = 0;
+//            while (count < num){
+//                sys->AcRowId[j] = i;
+//                sys->AcColId[j] = AcolId[j];
+//                sys->Acval[j] = Aval[j];
+//                if (k - 1 <= i){
+//                    sys->cindex[k]++;
+//                }
+//                else{
+//                    k++;
+//                    sys->cindex[k] = sys->cindex[k - 1];
+//                    sys->cindex[k]++;
+//                }
+//                j++;
+//                count++;
+//            }
+//        }
+//    }
+//    
+//    mkl_sparse_destroy(a);
+//    mkl_sparse_destroy(b);
+//    mkl_sparse_destroy(A);
+//    
+//   
+//    return 0;
+//}
 
-    s0 = mkl_sparse_d_create_csc(&a, SPARSE_INDEX_BASE_ZERO, arow, acol, &aColId[0], &aColId[1], aRowId, aval);
-
-
-    sparse_matrix_t b, b_csr;
-    s0 = mkl_sparse_d_create_csc(&b, SPARSE_INDEX_BASE_ZERO, arow, acol, &bColId[0], &bColId[1], bRowId, bval);
-    
-    s0 = mkl_sparse_convert_csr(a, SPARSE_OPERATION_NON_TRANSPOSE, &a_csr);
-
-    s0 = mkl_sparse_convert_csr(b, SPARSE_OPERATION_NON_TRANSPOSE, &b_csr);
-
-    sparse_matrix_t A;
-    s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, a_csr, b_csr, &A);
-    
-
-    sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
-    int ARows, ACols;
-    MKL_INT *ArowStart, *ArowEnd;
-    s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
-    
-    leng_A = ArowEnd[ARows - 1];
-    
-    if (mark == 1){    // dielectric
-        sys->AdRowId = (int*)malloc(leng_A * sizeof(int));
-        sys->AdColId = (int*)malloc(leng_A * sizeof(int));
-        sys->Adval = (double*)malloc(leng_A * sizeof(double));
-        int count, num, j;
-
-        j = 0;
-        for (int i = 0; i < ARows; i++){
-            num = ArowEnd[i] - ArowStart[i];
-            count = 0;
-            while (count < num){
-                sys->AdRowId[j] = i;
-                sys->AdColId[j] = AcolId[j];
-                sys->Adval[j] = Aval[j];
-                j++;
-                count++;
-            }
-        }
-    }
-    else if (mark == 2){    // conductor
-        sys->AcRowId = (int*)malloc(leng_A * sizeof(int));
-        sys->AcColId = (int*)malloc(leng_A * sizeof(int));
-        sys->Acval = (double*)malloc(leng_A * sizeof(double));
-        int count, num, j;
-
-        j = 0;
-        k = 1;
-        sys->cindex[k] = sys->cindex[k - 1];
-        for (int i = 0; i < ARows; i++){
-            num = ArowEnd[i] - ArowStart[i];
-            count = 0;
-            while (count < num){
-                sys->AcRowId[j] = i;
-                sys->AcColId[j] = AcolId[j];
-                sys->Acval[j] = Aval[j];
-                if (k - 1 <= i){
-                    sys->cindex[k]++;
-                }
-                else{
-                    k++;
-                    sys->cindex[k] = sys->cindex[k - 1];
-                    sys->cindex[k]++;
-                }
-                j++;
-                count++;
-            }
-        }
-    }
-    
-    mkl_sparse_destroy(a);
-    mkl_sparse_destroy(b);
-    mkl_sparse_destroy(A);
-    
-   
-    return 0;
-}
-
-int matrixMulti(int *aRowId, int *aColId, double *aval, int anum, int *bRowId, int *bColId, double *bval, int bnum, fdtdMesh *sys, int &leng, int mark){
-    //the first matrix is row by row, the second matrix is column by column
-    // leng is used to record the number of elements in the derived matrix
-
-    int i = 0, j = 0;
-    int flaga, flagb, k;
-    int starta;
-    double sum;
-    /*vector<int> cRowId;
-    vector<int> cColId;
-    vector<double> cval;*/
-    
-
-    flaga = aRowId[0];
-    flagb = bColId[0];
-    starta = 0;
-    sum = 0;
-    while (i < anum){
-        while (j < bnum && bColId[j] == flagb && i < anum && aRowId[i] == flaga){
-            if (aColId[i] == bRowId[j]){
-                sum += aval[i] * bval[j];
-                j++;
-                i++;
-            }
-            else if (aColId[i] < bRowId[j]){
-                i++;
-            }
-            else if (aColId[i] > bRowId[j]){
-                j++;
-            }
-        }
-        if (sum != 0){
-            /*cRowId.push_back(flaga);
-            cColId.push_back(flagb);
-            cval.push_back(sum);*/
-            sum = 0;
-            leng++;
-        }
-        if (i == anum){
-            if (j == bnum)
-                break;
-            else{
-                i = starta;
-                while (bColId[j] == flagb){
-                    j++;
-                    if (j == bnum){
-                        while (i < anum && aRowId[i] == flaga){
-                            i++;
-                        }
-                        starta = i;
-                        if (i == anum)    //run all of the datas
-                            break;
-                        flaga = aRowId[i];
-                        j = 0;
-                        break;
-                    }
-                }
-                flagb = bColId[j];
-                continue;
-            }
-        }
-        if (j == bnum){
-            while (i < anum && aRowId[i] == flaga){
-                i++;
-            }
-            starta = i;
-            if (i == anum)    //run all of the datas
-                break;
-            flaga = aRowId[i];
-            j = 0;
-        }
-        else{
-            if (bColId[j] != flagb && aRowId[i] != flaga){
-                flagb = bColId[j];
-                i = starta;
-            }
-            else if (bColId[j] != flagb){
-                flagb = bColId[j];
-                i = starta;
-            }
-            else if (aRowId[i] != flaga){
-                i = starta;
-                while (bColId[j] == flagb){
-                    j++;
-                    if (j == bnum){
-                        while (i < anum && aRowId[i] == flaga){
-                            i++;
-                        }
-                        starta = i;
-                        if (i == anum)    //run all of the datas
-                            break;
-                        flaga = aRowId[i];
-                        j = 0;
-                        break;
-                    }
-                }
-                flagb = bColId[j];
-            }
-
-        }
-    }
-    if (mark == 1){
-        sys->AdRowId = (int*)malloc(leng * sizeof(int));
-        sys->AdColId = (int*)malloc(leng * sizeof(int));
-        sys->Adval = (double*)malloc(leng * sizeof(double));
-    }
-    else if (mark == 2) {
-        sys->AcRowId = (int*)malloc(leng * sizeof(int));
-        sys->AcColId = (int*)malloc(leng * sizeof(int));
-        sys->Acval = (double*)malloc(leng * sizeof(double));
-    }
-    leng = 0;
-
-    flaga = aRowId[0];
-    flagb = bColId[0];
-    starta = 0;
-    sum = 0;
-    i = 0;
-    j = 0;
-    int count = 1;
-    sys->cindex[count] = sys->cindex[count - 1];
-    while (i < anum){
-        while (j < bnum && bColId[j] == flagb && i < anum && aRowId[i] == flaga){
-            if (aColId[i] == bRowId[j]){
-                sum += aval[i] * bval[j];
-                j++;
-                i++;
-            }
-            else if (aColId[i] < bRowId[j]){
-                i++;
-            }
-            else if (aColId[i] > bRowId[j]){
-                j++;
-            }
-        }
-        if (sum != 0){
-            if (mark == 1){
-                sys->AdRowId[leng] = (flaga);
-                sys->AdColId[leng] = (flagb);
-                sys->Adval[leng] = (sum);
-            }
-            else if (mark == 2){
-                sys->AcRowId[leng] = (flaga);
-                sys->AcColId[leng] = (flagb);
-                sys->Acval[leng] = (sum);
-                if (flaga < sys->acu_cnno[count]){
-                    sys->cindex[count]++;
-                }
-                else{
-                    count++;
-                    sys->cindex[count] = sys->cindex[count - 1];
-                    sys->cindex[count]++;
-                }
-            }
-            sum = 0;
-            leng++;
-        }
-        if (i == anum){
-            if (j == bnum)
-                break;
-            else{
-                i = starta;
-                while (bColId[j] == flagb){
-                    j++;
-                    if (j == bnum){
-                        while (i < anum && aRowId[i] == flaga){
-                            i++;
-                        }
-                        starta = i;
-                        if (i == anum)    //run all of the datas
-                            break;
-                        flaga = aRowId[i];
-                        j = 0;
-                        break;
-                    }
-                }
-                flagb = bColId[j];
-                continue;
-            }
-        }
-        if (j == bnum){
-            while (i < anum && aRowId[i] == flaga){
-                i++;
-            }
-            starta = i;
-            if (i == anum)    //run all of the datas
-                break;
-            flaga = aRowId[i];
-            j = 0;
-        }
-        else{
-            if (bColId[j] != flagb && aRowId[i] != flaga){
-                flagb = bColId[j];
-                i = starta;
-            }
-            else if (bColId[j] != flagb){
-                flagb = bColId[j];
-                i = starta;
-            }
-            else if (aRowId[i] != flaga){
-                i = starta;
-                while (bColId[j] == flagb){
-                    j++;
-                    if (j == bnum){
-                        while (i < anum && aRowId[i] == flaga){
-                            i++;
-                        }
-                        starta = i;
-                        if (i == anum)    //run all of the datas
-                            break;
-                        flaga = aRowId[i];
-                        j = 0;
-                        break;
-                    }
-                }
-                flagb = bColId[j];
-            }
-        }
-    }
-    
-    return 0;
-}
+//int matrixMulti(int *aRowId, int *aColId, double *aval, int anum, int *bRowId, int *bColId, double *bval, int bnum, fdtdMesh *sys, int &leng, int mark){
+//    //the first matrix is row by row, the second matrix is column by column
+//    // leng is used to record the number of elements in the derived matrix
+//
+//    int i = 0, j = 0;
+//    int flaga, flagb, k;
+//    int starta;
+//    double sum;
+//    /*vector<int> cRowId;
+//    vector<int> cColId;
+//    vector<double> cval;*/
+//    
+//
+//    flaga = aRowId[0];
+//    flagb = bColId[0];
+//    starta = 0;
+//    sum = 0;
+//    while (i < anum){
+//        while (j < bnum && bColId[j] == flagb && i < anum && aRowId[i] == flaga){
+//            if (aColId[i] == bRowId[j]){
+//                sum += aval[i] * bval[j];
+//                j++;
+//                i++;
+//            }
+//            else if (aColId[i] < bRowId[j]){
+//                i++;
+//            }
+//            else if (aColId[i] > bRowId[j]){
+//                j++;
+//            }
+//        }
+//        if (sum != 0){
+//            /*cRowId.push_back(flaga);
+//            cColId.push_back(flagb);
+//            cval.push_back(sum);*/
+//            sum = 0;
+//            leng++;
+//        }
+//        if (i == anum){
+//            if (j == bnum)
+//                break;
+//            else{
+//                i = starta;
+//                while (bColId[j] == flagb){
+//                    j++;
+//                    if (j == bnum){
+//                        while (i < anum && aRowId[i] == flaga){
+//                            i++;
+//                        }
+//                        starta = i;
+//                        if (i == anum)    //run all of the datas
+//                            break;
+//                        flaga = aRowId[i];
+//                        j = 0;
+//                        break;
+//                    }
+//                }
+//                flagb = bColId[j];
+//                continue;
+//            }
+//        }
+//        if (j == bnum){
+//            while (i < anum && aRowId[i] == flaga){
+//                i++;
+//            }
+//            starta = i;
+//            if (i == anum)    //run all of the datas
+//                break;
+//            flaga = aRowId[i];
+//            j = 0;
+//        }
+//        else{
+//            if (bColId[j] != flagb && aRowId[i] != flaga){
+//                flagb = bColId[j];
+//                i = starta;
+//            }
+//            else if (bColId[j] != flagb){
+//                flagb = bColId[j];
+//                i = starta;
+//            }
+//            else if (aRowId[i] != flaga){
+//                i = starta;
+//                while (bColId[j] == flagb){
+//                    j++;
+//                    if (j == bnum){
+//                        while (i < anum && aRowId[i] == flaga){
+//                            i++;
+//                        }
+//                        starta = i;
+//                        if (i == anum)    //run all of the datas
+//                            break;
+//                        flaga = aRowId[i];
+//                        j = 0;
+//                        break;
+//                    }
+//                }
+//                flagb = bColId[j];
+//            }
+//
+//        }
+//    }
+//    if (mark == 1){
+//        sys->AdRowId = (int*)malloc(leng * sizeof(int));
+//        sys->AdColId = (int*)malloc(leng * sizeof(int));
+//        sys->Adval = (double*)malloc(leng * sizeof(double));
+//    }
+//    else if (mark == 2) {
+//        sys->AcRowId = (int*)malloc(leng * sizeof(int));
+//        sys->AcColId = (int*)malloc(leng * sizeof(int));
+//        sys->Acval = (double*)malloc(leng * sizeof(double));
+//    }
+//    leng = 0;
+//
+//    flaga = aRowId[0];
+//    flagb = bColId[0];
+//    starta = 0;
+//    sum = 0;
+//    i = 0;
+//    j = 0;
+//    int count = 1;
+//    sys->cindex[count] = sys->cindex[count - 1];
+//    while (i < anum){
+//        while (j < bnum && bColId[j] == flagb && i < anum && aRowId[i] == flaga){
+//            if (aColId[i] == bRowId[j]){
+//                sum += aval[i] * bval[j];
+//                j++;
+//                i++;
+//            }
+//            else if (aColId[i] < bRowId[j]){
+//                i++;
+//            }
+//            else if (aColId[i] > bRowId[j]){
+//                j++;
+//            }
+//        }
+//        if (sum != 0){
+//            if (mark == 1){
+//                sys->AdRowId[leng] = (flaga);
+//                sys->AdColId[leng] = (flagb);
+//                sys->Adval[leng] = (sum);
+//            }
+//            else if (mark == 2){
+//                sys->AcRowId[leng] = (flaga);
+//                sys->AcColId[leng] = (flagb);
+//                sys->Acval[leng] = (sum);
+//                if (flaga < sys->acu_cnno[count]){
+//                    sys->cindex[count]++;
+//                }
+//                else{
+//                    count++;
+//                    sys->cindex[count] = sys->cindex[count - 1];
+//                    sys->cindex[count]++;
+//                }
+//            }
+//            sum = 0;
+//            leng++;
+//        }
+//        if (i == anum){
+//            if (j == bnum)
+//                break;
+//            else{
+//                i = starta;
+//                while (bColId[j] == flagb){
+//                    j++;
+//                    if (j == bnum){
+//                        while (i < anum && aRowId[i] == flaga){
+//                            i++;
+//                        }
+//                        starta = i;
+//                        if (i == anum)    //run all of the datas
+//                            break;
+//                        flaga = aRowId[i];
+//                        j = 0;
+//                        break;
+//                    }
+//                }
+//                flagb = bColId[j];
+//                continue;
+//            }
+//        }
+//        if (j == bnum){
+//            while (i < anum && aRowId[i] == flaga){
+//                i++;
+//            }
+//            starta = i;
+//            if (i == anum)    //run all of the datas
+//                break;
+//            flaga = aRowId[i];
+//            j = 0;
+//        }
+//        else{
+//            if (bColId[j] != flagb && aRowId[i] != flaga){
+//                flagb = bColId[j];
+//                i = starta;
+//            }
+//            else if (bColId[j] != flagb){
+//                flagb = bColId[j];
+//                i = starta;
+//            }
+//            else if (aRowId[i] != flaga){
+//                i = starta;
+//                while (bColId[j] == flagb){
+//                    j++;
+//                    if (j == bnum){
+//                        while (i < anum && aRowId[i] == flaga){
+//                            i++;
+//                        }
+//                        starta = i;
+//                        if (i == anum)    //run all of the datas
+//                            break;
+//                        flaga = aRowId[i];
+//                        j = 0;
+//                        break;
+//                    }
+//                }
+//                flagb = bColId[j];
+//            }
+//        }
+//    }
+//    
+//    return 0;
+//}
 
 int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int> &cRowId, vector<int> &cColId, vector<double> &cval){
     //the first matrix is row by row, the second matrix is column by column
@@ -1450,7 +1450,7 @@ int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val){
     return 0;
 }
 
-int COO2CSR_malloc(int *rowId, int *ColId, double *val, int totalnum, int leng, int *rowId1){    // totalnum is the total number of entries, leng is the row number
+int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1){    // totalnum is the total number of entries, leng is the row number
     int i;
     int *rowId2;
     int count, start;
@@ -2813,45 +2813,45 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
 }
 
 
-int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1){
-    
-    clock_t t1 = clock();
-    /* A\b1 */
-    double *d = &(sys->Adval[0]);
-    int *id = &(sys->AdRowId1[0]);
-    int *jd = &(sys->AdColId[0]);
-    
-    void *ptd[64];
-    int mtyped;
-    int iparmd[64];
-    double dparmd[64];
-    int maxfctd, mnumd, phased, errord, solverd;
-    int num_processd;   //number of processors
-    int v0csin;
-    int permd;
-    int nrhs = 1;
-    int msglvld = 0;    //print statistical information
+//int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1){
+//    
+//    clock_t t1 = clock();
+//    /* A\b1 */
+//    double *d = &(sys->Adval[0]);
+//    int *id = &(sys->AdRowId1[0]);
+//    int *jd = &(sys->AdColId[0]);
+//    
+//    void *ptd[64];
+//    int mtyped;
+//    int iparmd[64];
+//    double dparmd[64];
+//    int maxfctd, mnumd, phased, errord, solverd;
+//    int num_processd;   //number of processors
+//    int v0csin;
+//    int permd;
+//    int nrhs = 1;
+//    int msglvld = 0;    //print statistical information
+//
+//    mtyped = 11;    // real and not symmetric
+//    solverd = 0;
+//    errord = 0;
+//    maxfctd = 1;    //maximum number of numerical factorizations
+//    mnumd = 1;    //which factorization to use
+//    phased = 13;    //analysis
+//
+//    pardisoinit(ptd, &mtyped, iparmd);
+//    nrhs = 1;
+//    iparmd[38] = 1;
+//    iparmd[34] = 1;    //0-based indexing
+//    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
+//    
+//    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+//
+//    return 0;
+//
+//}
 
-    mtyped = 11;    // real and not symmetric
-    solverd = 0;
-    errord = 0;
-    maxfctd = 1;    //maximum number of numerical factorizations
-    mnumd = 1;    //which factorization to use
-    phased = 13;    //analysis
-
-    pardisoinit(ptd, &mtyped, iparmd);
-    nrhs = 1;
-    iparmd[38] = 1;
-    iparmd[34] = 1;    //0-based indexing
-    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
-    
-    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-
-    return 0;
-
-}
-
-int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, int &v0d1num, int &leng_v0d1, int &v0d1anum, int &leng_v0d1a, int *map, double sideLen){
+int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
     int *visited;
     clock_t t1;
     double t, ta;
@@ -2914,15 +2914,15 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     v0d1num = 0;
     v0d1anum = 0;
     /* first asign a larger number of storage, don't need to calculate the entries twice */
-    int *v0d1RowId = (int*)malloc(sys->N_edge * 2 * sizeof(int));
-    int *v0d1ColId = (int*)malloc(sys->N_edge * 2 * sizeof(int));
+    myint *v0d1RowId = (myint*)malloc(sys->N_edge * 2 * sizeof(myint));
+    myint *v0d1ColId = (myint*)malloc(sys->N_edge * 2 * sizeof(myint));
     double *v0d1val = (double*)malloc(sys->N_edge * 2 * sizeof(double));
-    int *v0d1aRowId = (int*)malloc(sys->N_edge * 2 * sizeof(int));
-    int *v0d1aColId = (int*)malloc(sys->N_edge * 2 * sizeof(int));
+    myint *v0d1aRowId = (myint*)malloc(sys->N_edge * 2 * sizeof(myint));
+    myint *v0d1aColId = (myint*)malloc(sys->N_edge * 2 * sizeof(myint));
     double *v0d1aval = (double*)malloc(sys->N_edge * 2 * sizeof(double));
     int count = 1;    /* count which box it is */
     clock_t t2 = clock();
-    unordered_map<int, double> va, v;
+    unordered_map<myint, double> va, v;
     t = 0; ta = 0;
     for (int iz = 1; iz < sys->nz - 1; iz++){    // merge on each layer, not in the conductor
         visited = (int*)calloc(sys->nx * sys->ny, sizeof(int));
@@ -3665,20 +3665,20 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
 
     
     
-    sys->v0d1RowId = (int*)malloc(v0d1num * sizeof(int));
-    sys->v0d1ColId = (int*)malloc(v0d1num * sizeof(int));
+    sys->v0d1RowId = (myint*)malloc(v0d1num * sizeof(myint));
+    sys->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
     sys->v0d1val = (double*)malloc(v0d1num * sizeof(double));
-    sys->v0d1aRowId = (int*)malloc(v0d1anum * sizeof(int));
-    sys->v0d1aColId = (int*)malloc(v0d1anum * sizeof(int));
+    sys->v0d1aRowId = (myint*)malloc(v0d1anum * sizeof(myint));
+    sys->v0d1aColId = (myint*)malloc(v0d1anum * sizeof(myint));
     sys->v0d1aval = (double*)malloc(v0d1anum * sizeof(double));
     
 
-    for (int i = 0; i < v0d1num; i++){
+    for (myint i = 0; i < v0d1num; i++){
         sys->v0d1RowId[i] = v0d1RowId[i];
         sys->v0d1ColId[i] = v0d1ColId[i];
         sys->v0d1val[i] = v0d1val[i];
     }
-    for (int i = 0; i < v0d1anum; i++){
+    for (myint i = 0; i < v0d1anum; i++){
         sys->v0d1aRowId[i] = v0d1aRowId[i];
         sys->v0d1aColId[i] = v0d1aColId[i];
         sys->v0d1aval[i] = v0d1aval[i];
@@ -3773,7 +3773,7 @@ int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, f
     return 0;
 }
 
-int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, int &v0cnum, int &leng_v0c, int &v0canum, int &leng_v0ca, int *map){
+int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, myint &v0cnum, myint &leng_v0c, myint &v0canum, myint &leng_v0ca, myint *map){
     int *visited;
     double ratio;
     double startx, starty;    // the start coordinates of each block
@@ -3795,13 +3795,13 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
     int i, j;
     int map_count = 1;
     
-    int *v0cRowId = (int*)malloc(2 * sys->N_edge * sizeof(int));
-    int *v0cColId = (int*)malloc(2 * sys->N_edge * sizeof(int));
+    myint *v0cRowId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
+    myint *v0cColId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
     double *v0cval = (double*)malloc(2 * sys->N_edge * sizeof(double));
-    int *v0caRowId = (int*)malloc(2 * sys->N_edge * sizeof(int));
-    int *v0caColId = (int*)malloc(2 * sys->N_edge * sizeof(int));
+    myint *v0caRowId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
+    myint *v0caColId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
     double *v0caval = (double*)malloc(2 * sys->N_edge * sizeof(double));
-    unordered_map<int, double> v, va;
+    unordered_map<myint, double> v, va;
     visited = (int*)calloc(sys->N_node, sizeof(int));
 
 
@@ -4244,11 +4244,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
     }
 
     cout << endl;
-    sys->v0cRowId = (int*)malloc(v0cnum * sizeof(int));
-    sys->v0cColId = (int*)malloc(v0cnum * sizeof(int));
+    sys->v0cRowId = (myint*)malloc(v0cnum * sizeof(myint));
+    sys->v0cColId = (myint*)malloc(v0cnum * sizeof(myint));
     sys->v0cval = (double*)malloc(v0cnum * sizeof(double));
-    sys->v0caRowId = (int*)malloc(v0canum * sizeof(int));
-    sys->v0caColId = (int*)malloc(v0canum * sizeof(int));
+    sys->v0caRowId = (myint*)malloc(v0canum * sizeof(myint));
+    sys->v0caColId = (myint*)malloc(v0canum * sizeof(myint));
     sys->v0caval = (double*)malloc(v0canum * sizeof(double));
     
     for (int i = 0; i < v0cnum; i++){

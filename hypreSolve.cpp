@@ -5,20 +5,20 @@
 
 #include "vis.c"
 
-int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, int iterations,
+int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
     double rel_residual_norm);
 
 
-int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, int leng_A, double *bin, int leng_v0, double *solution){
-    int i;
+int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution){
+    HYPRE_Int i;
     int myid, num_procs;
-    int N, n;
+    HYPRE_Int N, n;
 
-    int ilower, iupper;
-    int local_size, extra;
+    HYPRE_Int ilower, iupper;
+    HYPRE_Int local_size, extra;
 
-    int solver_id;
-    int vis, print_system;
+    HYPRE_Int solver_id;
+    HYPRE_Int vis, print_system;
 
     double h, h2;
 
@@ -103,11 +103,11 @@ int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, int
     /* Set the rhs values to h^2 and the solution to zero */
     {
         double *rhs_values, *x_values;
-        int    *rows;
+        HYPRE_Int    *rows;
 
         rhs_values = (double*)calloc(local_size, sizeof(double));
         x_values = (double*)calloc(local_size, sizeof(double));
-        rows = (int*)calloc(local_size, sizeof(int));
+        rows = (HYPRE_Int*)calloc(local_size, sizeof(HYPRE_Int));
 
         for (i = 0; i<local_size; i++)
         {
@@ -234,10 +234,10 @@ int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, int
 
     /* Flexible GMRES with AMG Preconditioner */
     {
-        int    num_iterations;
+        HYPRE_Int    num_iterations;
         double final_res_norm;
-        int    restart = 10;
-        int    modify = 1;
+        HYPRE_Int    restart = 10;
+        HYPRE_Int    modify = 1;
 
         
         /* Create solver */
@@ -314,7 +314,7 @@ int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, int
 
 }
 
-int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, int iterations,
+int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
     double rel_residual_norm)
 {
 

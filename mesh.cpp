@@ -1,10 +1,7 @@
 //#include "stdafx.h"
 #include "fdtd.h"
 
-static bool comp(pair<double, int> a, pair<double, int> b)
-{
-    return a.second <= b.second;
-};
+
 
 int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi){
     FILE *fp, *cfp;
@@ -12,8 +9,8 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     char s[FDTD_MAXC];
     char *word[FDTD_MAXC];
     int lyr;
-    int i;
-    int j, k, m;
+    myint i;
+    myint j, k, m;
     double upper, lower;
     int status;
     int count;
@@ -227,7 +224,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
-    double disMin = 1.e-9;
+    double disMin = MINDIS;
     double disMaxx, disMaxy;   // the max discretization in x, y, z directions
     for (i = 0; i < sys->numCdtRow; i++){
         numNode += sys->conductorIn[i].numVert;
@@ -416,7 +413,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         zn[i] = zOrigOld[i];
     }
     int countz = 2 * sys->numStack + 2 * sys->numPorts - 1;
-
+    
 
 
     /*************************************************************************************/
@@ -497,8 +494,8 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
     }
     else{
+        j = sys->numStack - 1;
         while (i < sys->nz - 1){
-            j = sys->numStack - 1;
             if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]){
                 sys->stackEpsn[i] = sys->stackEps[j];
                 i++;
@@ -533,9 +530,9 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     sys->ylim2 = sys->yn[sys->ny - 1];
     sys->zlim1 = sys->zn[0];
     sys->zlim2 = sys->zn[sys->nz - 1];
-    sys->N_cell_x = sys->nx - 1;
-    sys->N_cell_y = sys->ny - 1;
-    sys->N_cell_z = sys->nz - 1;
+    sys->N_cell_x = sys->nx - (myint)1;
+    sys->N_cell_y = sys->ny - (myint)1;
+    sys->N_cell_z = sys->nz - (myint)1;
     
 
     sys->N_edge_s = sys->N_cell_y*(sys->N_cell_x + 1) + sys->N_cell_x*(sys->N_cell_y + 1);
@@ -549,34 +546,31 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     sys->N_patch_v = (sys->N_cell_x + 1)*sys->N_cell_y + (sys->N_cell_y + 1)*sys->N_cell_x;
     sys->N_patch = sys->N_patch_s*(sys->N_cell_z + 1) + sys->N_patch_v*sys->N_cell_z;
     
-    sys->markEdge = (int*)calloc(sys->N_edge, sizeof(int));   // mark which edge is inside the conductor
-    sys->markNode = (int*)calloc(sys->N_node, sizeof(int));   // mark which node is inside the conductor
+    sys->markEdge = (myint*)calloc(sys->N_edge, sizeof(myint));   // mark which edge is inside the conductor
+    sys->markNode = (myint*)calloc(sys->N_node, sizeof(myint));   // mark which node is inside the conductor
+    cout << "N_edge = " << sys->N_edge << endl;
+    cout << "N_node = " << sys->N_node << endl;
     double xc, yc;
-    
+
     for (i = 0; i < sys->numCdtRow; i++){
-        cout << "Index: " << i << " out of " << sys->numCdtRow << endl;
+        //cout << polyIn((0 + 4.9e-7) / 2, -1.7e-7, sys, 2) << endl;
         numNode = (xi[sys->conductorIn[i].xmax] - xi[sys->conductorIn[i].xmin] + 1)
             *(yi[sys->conductorIn[i].ymax] - yi[sys->conductorIn[i].ymin] + 1)
             *(zi[sys->conductorIn[i].zmax] - zi[sys->conductorIn[i].zmin] + 1);
-        //cout << xi[sys->conductorIn[i].xmax] << " " << xi[sys->conductorIn[i].xmin] << " " << yi[sys->conductorIn[i].ymax] << " " << yi[sys->conductorIn[i].ymin] << " " << zi[sys->conductorIn[i].zmax] << " " << zi[sys->conductorIn[i].zmin] << " " << numNode << endl;
+        //cout << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].zmax << " " << sys->conductorIn[i].zmin << endl;
         sys->conductorIn[i].cdtInNode = (int*)malloc(numNode*sizeof(int));
         sys->conductorIn[i].numNode = 0;
 
         for (j = xi[sys->conductorIn[i].xmin]; j <= xi[sys->conductorIn[i].xmax]; j++){
-            cout << "Second index part 1: " << j << " out of " << xi[sys->conductorIn[i].xmax] << endl;
-            cout << "Starting point of third index: " << yi[sys->conductorIn[i].ymin] << endl;
-            cout << "Ending point of third index: " << yi[sys->conductorIn[i].ymax] << endl;
             for (k = yi[sys->conductorIn[i].ymin]; k <= yi[sys->conductorIn[i].ymax]; k++){
-                cout << "Third index part 1: " << k << endl;
                 if (polyIn(sys->xn[j], sys->yn[k], sys, i)){
-                    cout << "polyIn == True" << endl;
                     for (m = zi[sys->conductorIn[i].zmin]; m < zi[sys->conductorIn[i].zmax]; m++){
                         //cout << sys->xn[j] << " " << sys->yn[k] << endl;
                         sys->conductorIn[i].cdtInNode[sys->conductorIn[i].numNode] = m*sys->N_node_s + (sys->N_cell_y + 1)*j + k;
                         sys->conductorIn[i].numNode++;
                         sys->markNode[m*sys->N_node_s + (sys->N_cell_y + 1)*j + k] = 1;
                         if (sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k] == 0){   // set the z direction markEdge
-                            sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k] = i + 1;    // mark this edge's corresponding index in conductorIn
+                            sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k] = i + 1;
                             //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k << endl;
                         }
                     }
@@ -588,13 +582,12 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
         for (j = xi[sys->conductorIn[i].xmin]; j <= xi[sys->conductorIn[i].xmax]; j++){   // set the y direction markEdge
-            cout << "Second index part 2: " << j << " out of " << xi[sys->conductorIn[i].xmax] << endl;
             for (k = yi[sys->conductorIn[i].ymin]; k < yi[sys->conductorIn[i].ymax]; k++){
                 for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
                     xc = sys->xn[j];
                     yc = (sys->yn[k] + sys->yn[k + 1]) / 2;
                     if (polyIn(xc, yc, sys, i)){
-                        sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k] = i + 1;    // mark this edge's corresponding index in conductorIn
+                        sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k] = i + 1;
                         //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k << endl;
                         //cout << zi[sys->conductorIn[i].zmax] * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k << endl;
                     }
@@ -602,13 +595,13 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
         for (j = yi[sys->conductorIn[i].ymin]; j <= yi[sys->conductorIn[i].ymax]; j++){    // set the x direction markEdge
-            cout << "Second index part 3: " << j << " out of " << yi[sys->conductorIn[i].ymax] << endl;
             for (k = xi[sys->conductorIn[i].xmin]; k < xi[sys->conductorIn[i].xmax]; k++){
                 for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
                     xc = (sys->xn[k] + sys->xn[k + 1]) / 2;
                     yc = sys->yn[j];
+                    //cout << xc << " " << yc << "" << i << " " << polyIn(xc, yc, sys, i) << endl;
                     if (polyIn(xc, yc, sys, i)){
-                        sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j] = i + 1;    // mark this edge's corresponding index in conductorIn
+                        sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j] = i + 1;
                         //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j << endl;
                         //cout << zi[sys->conductorIn[i].zmax] * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j << endl;
                     }
@@ -617,14 +610,15 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         }
     }
     
+
     /*fclose(cfp);*/
     cout << "Trying to close file" << endl;
     fclose(fp);
     cout << "File closed" << endl;
     
     /* construct edgelink */
-    int eno;
-    sys->edgelink = (int*)malloc(2 * sizeof(int)*sys->N_edge);
+    myint eno;
+    sys->edgelink = (myint*)malloc(2 * sizeof(myint)*sys->N_edge);
     for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++){
         for (i = 1; i <= sys->N_cell_x + 1; i++){    //edge along y axis
             for (j = 1; j <= sys->N_cell_y; j++){
@@ -660,7 +654,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     outfile.close();*/
     
     /* construct nodepos */
-    int nno;
+    myint nno;
 
     sys->nodepos = (double*)malloc(sizeof(double)*sys->N_node * 3);   //N_node rows and 3 columns, input row by row
     for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++){
@@ -682,7 +676,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
     /* construct nodeEdge */
     double leng;
-    vector<pair<int, double> > a;
+    vector<pair<myint, double> > a;
     for (i = 0; i < sys->N_node; i++){
         sys->nodeEdge.push_back(a);
         sys->nodeEdgea.push_back(a);
@@ -760,10 +754,10 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     
     /* implement dfs */
     //cout <<"Number of nodes: " << sys->N_node << endl;
-    int *visited;
+    myint *visited;
     vector<int> st;
     unordered_set<int> base;
-    visited = (int*)calloc(sys->N_node, sizeof(int));
+    visited = (myint*)calloc(sys->N_node, sizeof(myint));
     count = 0;
     
     for (i = 0; i < sys->N_node; i++){
@@ -811,7 +805,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
     }
-    
+    cout << "Number of conductors is " << count << endl;
     /*for (i = 0; i < sys->N_node; i++){
         if (visited[i] != 0){
             for (j = 0; j < sys->nodeEdge[i].size(); j++){
@@ -836,14 +830,14 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     /* Construct each conductor */
     sys->numCdt = count;
     sys->conductor = (fdtdCdt*)malloc(sys->numCdt * sizeof(fdtdCdt));
-    sys->cdtNumNode = (int*)calloc(sys->numCdt, sizeof(int));
+    sys->cdtNumNode = (myint*)calloc(sys->numCdt, sizeof(myint));
     for (i = 0; i < sys->N_node; i++){
         if (visited[i] != 0){
             sys->cdtNumNode[visited[i] - 1]++;
         }
     }
     for (i = 0; i < sys->numCdt; i++){
-        sys->conductor[i].node = (int*)malloc(sizeof(int) * sys->cdtNumNode[i]);
+        sys->conductor[i].node = (myint*)malloc(sizeof(myint) * sys->cdtNumNode[i]);
         sys->conductor[i].cdtNodeind = 0;
         sys->conductor[i].markPort = 0;
     }
@@ -1001,7 +995,6 @@ int matrixConstruction(fdtdMesh *sys){
                 a += sys->markCell[sys->edgeCell[i][j]] * sys->edgeCellArea[i][j];
                 b += sys->edgeCellArea[i][j];
             }*/
-
             sys->sig[i] = SIGMA;/*(a / b) * SIGMA;*/
         }
     }
@@ -1030,9 +1023,9 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     double sideLen = 0;
     
     
-    sys->exciteCdtLayer = (int*)calloc(sys->nz, sizeof(int));
     for (i = 0; i < sys->numPorts; i++)
     {
+        
         if (sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]] != 0 && sys->conductor[sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]] - 1].markPort != -1){
             sys->portCoor[i].portCnd = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
             sys->conductor[sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]] - 1].markPort = i + 1;    // markPort start from 1
@@ -1151,7 +1144,8 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     clock_t t1 = clock();
     sys->markProSide = (int*)calloc(sys->N_node, sizeof(int));
     double x1, x2, y1, y2;
-    int x1_ind, x2_ind, y1_ind, y2_ind, z1_ind, z2_ind;
+    myint x1_ind, x2_ind, y1_ind, y2_ind, z1_ind, z2_ind;
+    
     for (i = 0; i < sys->numPorts; i++){
         for (auto ci : sys->cond2condIn[sys->portCoor[i].portCnd - 1]){
             for (l = 0; l < sys->conductorIn[ci - 1].numVert - 1; l++){
@@ -1347,7 +1341,7 @@ bool polyIn(double x, double y, fdtdMesh *sys, int inPoly){
     int npol;
     int i, j, k;
     bool isCond = false;
-    double disMin = 1e-10;
+    double disMin = 1.e-10;
 
     npol = sys->conductorIn[inPoly].numVert;
 
