@@ -378,6 +378,10 @@ class Port
         else
         {
             this->coord = coord;
+            if (!validateCoord())
+            {
+                cerr << "Warning: Supply and return should only differ by a single coordinate. The program will run but may behave unusually." << endl;
+            }
         }
         this->gdsiiNum = gdsiiNum;
     }
@@ -454,6 +458,10 @@ class Port
         else
         {
             this->coord = coord;
+            if (!validateCoord())
+            {
+                cerr << "Warning: Supply and return should only differ by a single coordinate. The program will run but may behave unusually." << endl;
+            }
         }
     }
 
@@ -462,6 +470,15 @@ class Port
     void setGDSIINum(int gdsiiNum)
     {
         this->gdsiiNum = gdsiiNum;
+    }
+
+    // Validate port coordinates (supply and return change EXACTLY one Cartesian coordinate)
+    bool validateCoord() const
+    {
+        bool xEqual = this->coord[0] == this->coord[3];
+        bool yEqual = this->coord[1] == this->coord[4];
+        bool zEqual = this->coord[2] == this->coord[5];
+        return (xEqual && yEqual && !zEqual) || (xEqual && !yEqual && zEqual) || (!xEqual && yEqual && zEqual);
     }
 
     // Print the layer information
