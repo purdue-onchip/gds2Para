@@ -17,6 +17,7 @@
 #include <Eigen/Sparse>
 #include "limboint.h"
 #include "solnoutclass.h"
+
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -40,12 +41,14 @@ int main(int argc, char** argv)
             cout << "  -p, --parrot          Immediately output given GDSII file after reading." << endl;
             cout << "  -w, --write           Write database in memory to given SPEF file." << endl;
             cout << "  -i, --imp             Read given interconnect modeling platform file and write GDSII file with name also given." << endl;
-            cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
+            //cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
+            cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to Xyce (SPICE) subcircuit file." << endl;
             cout << endl << "Comments:" << endl;
             cout << "The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
-            cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
+            //cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
+            cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
         }
@@ -177,7 +180,7 @@ int main(int argc, char** argv)
             // Prepare to write to file
             string fName = argv[2];
             sdb.setOutSPEF(fName);
-            bool couldDump = sdb.printDump();
+            bool couldDump = sdb.printDumpSPEF();
         }
         else
         {
@@ -264,11 +267,26 @@ int main(int argc, char** argv)
             }
             sys.print();
 
+            //clock_t t2 = clock();
+            //// Read the input file [part of master branch]
+            //unordered_map<double, int> xi, yi, zi;
+            //status = readInput(inStackFile.c_str(), &sys, xi, yi, zi);
+            //if (status == 0){
+            //    cout << "readInput Success!" << endl;
+            //    cout << "readInput time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+            //}
+            //else {
+            //    cerr << "readInput Fail!" << endl;
+            //    return status;
+            //}
+
             // Set D_eps and D_sig
+            clock_t t3 = clock();
             status = matrixConstruction(&sys);
             if (status == 0)
             {
                 cout << "matrixConstruction Success!" << endl;
+                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else {
                 cerr << "matrixConstruction Fail!" << endl;
@@ -276,10 +294,12 @@ int main(int argc, char** argv)
             }
 
             // Set port
+            clock_t t4 = clock();
             status = portSet(&sys, xi, yi, zi);
             if (status == 0)
             {
                 cout << "portSet Success!" << endl;
+                //cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else
             {
@@ -292,18 +312,38 @@ int main(int argc, char** argv)
             bool sdbCouldDump = sdb.printDump();
             //sys.print();
 
+            // Generate Stiffness Matrix
+            clock_t t5 = clock();
+            status = generateStiff(&sys);
+            if (status == 0)
+            {
+                cout << "generateStiff Success!" << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+            }
+            else
+            {
+                cerr << "generateStiff Fail!" << endl;
+                return status;
+            }
+
             // Parameter generation
+            t5 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;
+                //cout << "paraGenerator time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else
             {
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-            cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+
+            
+
+            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
             // Parameter storage
             spMat matG(sys.numPorts, sys.numPorts); // Initialize Eigen sparse conductance matrix (S)
@@ -343,16 +383,24 @@ int main(int argc, char** argv)
             Parasitics oldPara = sdb.getParasitics(); // Get outdated parastics structure to update
             sdb.setParasitics(Parasitics(oldPara.getPorts(), matG, matC));
 
-            // Output SPEF file
-            /*string outSPEFFile = argv[4];
+            /*// Output SPEF file
+            string outSPEFFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutSPEF(outSPEFFile);
-            bool */sdbCouldDump = sdb.printDump();
-            cout << "File ready at " << outSPEFFile << endl;
+            bool sdbCouldDump = sdb.printDumpSPEF();
+            cout << "File ready at " << outSPEFFile << endl; */
+
+            // Output Xyce subcircuit file
+            string outXyceFile = argv[4];
+            sdb.setDesignName(adb.findNames().back());
+            sdb.setOutXyce(outXyceFile);
+            bool sdbCouldDump = sdb.printDumpXyce();
+            cout << "File ready at " << outXyceFile << endl;
         }
         else
         {
-            cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
+            //cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
         }
     }
     else

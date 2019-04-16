@@ -20,9 +20,7 @@
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
 #include "fdtd.h"
-using std::cerr;
-using std::cout;
-using std::endl;
+
 
 class boundary
 {
@@ -131,7 +129,7 @@ public:
             vector<double> revBound;
             revBound.push_back((this->bounds)[0]); // Same first x-coordinate
             revBound.push_back((this->bounds)[1]); // Same first y-coordinate
-            for (size_t indi = nBoundPt - 1; indi > 0; indi++)
+            for (size_t indi = nBoundPt - 1; indi > 0; indi--)
             {
                 revBound.push_back((this->bounds)[2 * indi]); // x-coordinate
                 revBound.push_back((this->bounds)[2 * indi + 1]); // y-coordinate
@@ -410,7 +408,7 @@ public:
             vector<double> revNode;
             revNode.push_back((this->nodes)[0]); // Same first x-coordinate
             revNode.push_back((this->nodes)[1]); // Same first y-coordinate
-            for (size_t indi = nNodePt - 1; indi > 0; indi++)
+            for (size_t indi = nNodePt - 1; indi > 0; indi--)
             {
                 revNode.push_back((this->nodes)[2 * indi]); // x-coordinate
                 revNode.push_back((this->nodes)[2 * indi + 1]); // y-coordinate
@@ -554,7 +552,7 @@ public:
             vector<double> revBox;
             revBox.push_back((this->boxes)[0]); // Same first x-coordinate
             revBox.push_back((this->boxes)[1]); // Same first y-coordinate
-            for (size_t indi = nBoxPt - 1; indi > 0; indi++)
+            for (size_t indi = nBoxPt - 1; indi > 0; indi--)
             {
                 revBox.push_back((this->boxes)[2 * indi]); // x-coordinate
                 revBox.push_back((this->boxes)[2 * indi + 1]); // y-coordinate
@@ -1495,12 +1493,12 @@ public:
         int numSRef = cell.getNumSRef();
 
         // Print cell information
-        //cout << "  List of " << numBound << " boundaries:" << endl;
+        /*cout << "  List of " << numBound << " boundaries:" << endl;*/
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
-            (this->numCdtIn)++;
 
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
+            (this->numCdtIn)++;
             sys->conductorIn.push_back(this->cond);
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = boundCoord.size() / 2 - 1;
@@ -1529,7 +1527,6 @@ public:
                 if (sys->conductorIn[si].y[condj] < sys->conductorIn[si].ymin){
                     sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                 }
-
                 condj++;
             }
         }
@@ -1557,21 +1554,21 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
-                        condj++;
-                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
-                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
@@ -1580,21 +1577,21 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
-                        condj++;
-                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
-                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        condj++;
+                        sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
@@ -1606,12 +1603,12 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
                         condj++;
@@ -1620,7 +1617,7 @@ public:
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
@@ -1629,12 +1626,12 @@ public:
                     {
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmin = pathCoord[indj] - width / 2 + xo;
-                        sys->conductorIn[si].ymax = pathCoord[indj + 1] + width / 2 + yo;
+                        sys->conductorIn[si].xmin = sys->conductorIn[si].x[condj];
+                        sys->conductorIn[si].ymax = sys->conductorIn[si].y[condj];
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] - width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] - width / 2 + yo;
-                        sys->conductorIn[si].ymin = pathCoord[indj + 1] - width / 2 + yo;
+                        sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                         indj++;
                         indj++;
                         condj++;
@@ -1643,14 +1640,13 @@ public:
                         condj++;
                         sys->conductorIn[si].x[condj] = pathCoord[indj] + width / 2 + xo;
                         sys->conductorIn[si].y[condj] = pathCoord[indj + 1] + width / 2 + yo;
-                        sys->conductorIn[si].xmax = pathCoord[indj] + width / 2 + xo;
+                        sys->conductorIn[si].xmax = sys->conductorIn[si].x[condj];
                         condj++;
                         this->numCdtIn++;
                         indj--;
                     }
                 }
             }
-
         }
         //cout << "  List of " << numNode << " nodes:" << endl;
         //cout << "  List of " << numBox << " box outlines:" << endl;
@@ -1900,7 +1896,7 @@ public:
             this->printDetails(cellName, 0., 0.);   // the origin is the (0,0) point
             //(this->cells)[indCellPrint[indi]].printAlt();
         }
-        cout << this->strPoints << endl;
+        //cout << this->strPoints << endl;
         cout << "------" << endl;
     }
 

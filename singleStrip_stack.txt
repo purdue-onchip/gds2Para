@@ -2,22 +2,22 @@ lengthUnit = 1.e-6
 
 FREQUENCY
  freqUnit = 1.0e+6
- freqStart = 45
- freqEnd = 45
- nfreq = 1
+ freqStart = 1000
+ freqEnd = 10000
+ nfreq = 10
 
 DIELECTRIC STACK
  numstack = 8
- 0 h = 0.296 e = 4.1
- Substrate h = 0 e = 4.1
- ILD0 h = 0.12 e = 8.0
- 1 h = 0.285 e = 4.1
- ILD1 h = 0.615 e = 4.1
- ILDM2 h = 0.12 e = 8.0
- ILD2 h = 0.308 e = 4.1
- 3 h = 1.448 e = 4.1
+ 0 z = 0 h = 0.296 e = 4.1
+ Substrate z = 0.296 h = 0 e = 4.1
+ ILD0 z = 0.296 h = 0.12 e = 8.0
+ 1 z = 0.416 h = 0.285 e = 4.1
+ ILD1 z = 0.701 h = 0.615 e = 4.1
+ ILDM2 z = 1.316 h = 0.12 e = 8.0
+ ILD2 z = 1.436 h = 0.308 e = 4.1
+ 3 z = 1.744 h = 1.448 e = 4.1
 
 PORT
  numPort = 2
- 150 0.049 160 0.049 1 
- 150 200.049 160 200.049 1 
+ 149.999 0.049 0.296 149.999 0.049 0.416 1
+ 149.999 200.049 0.296 149.999 200.049 0.416 1 

@@ -12,14 +12,23 @@
 #include <set>
 #include <complex>
 #include <vector>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 #include <string>
 #include <utility>
+//#define MKL_ILP64 (1)
 #include <mkl.h>
+#include <mkl_spblas.h>
+#include <stack>
+
+
 
 using namespace std;
+using std::cerr;
+using std::cout;
+using std::endl;
 
 #define PI (3.1415926)
 #define MU (4*PI*1.e-7)
@@ -30,8 +39,25 @@ using namespace std;
 #define STACKNUM (20)
 //#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
-#define DOUBLEMIN (-1.e-30)
+#define DOUBLEMIN (-1.e+30)
+#define MINDIS (1.e-9)
+#define DT (1.e-16)
+//#define HYPRE_BIGINT (1)
+//#define LARGE_SYSTEM (1)
 
+#ifdef LARGE_SYSTEM
+typedef int myint;
+#else
+typedef int myint;
+#endif
+
+
+
+// Deletion candidate:
+/*typedef struct{
+    double re;
+    double i;
+}doublecomplex;*/
 
 class fdtdOneCondct {
 public:
@@ -39,7 +65,7 @@ public:
     int vcc;
     int plaStackId;
     int portId;
-    int numNode;
+    myint numNode;
     int numVert;
     double *x;
     double *y;
@@ -48,14 +74,14 @@ public:
     double ymin, ymax;
     double zmin, zmax;
     double sigma;
-    int *cdtInNode;
+    myint *cdtInNode;
     int *markCdtInNode;
     int layer;
 };
 
 typedef class {
 public:
-    int *node;
+    myint *node;
     int markPort;
     int *portNode;
     int portind;
@@ -109,6 +135,7 @@ public:
 class fdtdMesh {
     /* Mesh information */
 public: 
+    int markCondt;
     double lengthUnit;
 
     /* Frequency parameters */
@@ -121,14 +148,14 @@ public:
     int ix;    // x direction number of periods
     int iy;    // y direction number of periods
 
-    int nx, ny, nz;    // number of nodes along x, y, z
+    myint nx, ny, nz;    // number of nodes along x, y, z
 
     double *xn, *yn, *zn;    // coordinates of the nodes along x, y, z
     double *xnu, *ynu, *znu;
 
-    int N_cell_x;
-    int N_cell_y;
-    int N_cell_z;
+    myint N_cell_x;
+    myint N_cell_y;
+    myint N_cell_z;
 
     double factor_x;
     double factor_y;
@@ -137,22 +164,23 @@ public:
     double ylim1, ylim2;
     double zlim1, zlim2;
 
-    int N_edge;
-    int N_edge_s;
-    int N_edge_v;
+    myint N_edge;
+    myint N_edge_s;
+    myint N_edge_v;
 
-    int N_node;
-    int N_node_s;
+    myint N_node;
+    myint N_node_s;
 
-    int N_patch;
-    int N_patch_s;
-    int N_patch_v;
+    myint N_patch;
+    myint N_patch_s;
+    myint N_patch_v;
 
     double *nodepos;
     double *Epoints;
-    int *edgelink;
+    myint *edgelink;
     double *Hpoints;
-    vector<vector<pair<int,double>>> nodeEdge;    // for each node which edge is connected with this node
+    vector<vector<pair<myint,double>>> nodeEdge;    // for each node which edge is connected with this node
+    vector<vector<pair<myint, double>>> nodeEdgea;    // for each node which edge is connected with this node
 
     /* Upper and lower PEC */
     int *bd_node1;   //lower PEC
@@ -171,16 +199,21 @@ public:
 
     /* Conductor parameters */
     vector<fdtdOneCondct> conductorIn;
-    int numCdtRow;   //how many input rows
-    int numCdt;
-    int *markEdge;    //mark if this edge is inside a conductor
+    myint numCdtRow;   //how many input rows
+    myint numCdt;
+    myint *markEdge;    //mark if this edge is inside a conductor
     int *markCell;
-    int *cdtNumNode;
+    myint *cdtNumNode;
     double *sig;
     fdtdCdt *conductor;
-    int *markNode;    // mark this node if it is inside the conductor
+    myint *markNode;    // mark this node if it is inside the conductor
     vector<vector<int>> edgeCell;    // for each cell which edge is around it
     vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
+    int *acu_cnno;
+    int *cindex;
+    int *exciteCdtLayer;
+    vector<unordered_set<int>> cond2condIn;
+    int *markProSide;
 
     /* Patch information */
     fdtdPatch *patch;
@@ -189,70 +222,82 @@ public:
     fdtdBound *bound;
 
     /* V0c row, column, value */
-    vector<int> v0cRowId;
-    vector<int> v0cColId;
-    vector<int> v0cColIdo;
+    vector<myint> v0cRowId;
+    vector<myint> v0cColId;
+    vector<myint> v0cColIdo;
     vector<double> v0cval;
     vector<double> v0cvalo;
 
-    vector<int> v0c2RowId;
-    vector<int> v0c2ColId;
-    vector<int> v0c2ColIdo;
-    vector<double> v0c2val;
-
-    vector<int> v0caRowId;
-    vector<int> v0caColId;
-    vector<int> v0caColIdo;
+    vector<myint> v0caRowId;
+    vector<myint> v0caColId;
+    vector<myint> v0caColIdo;
     vector<double> v0caval;
     vector<double> v0cavalo;
 
     /* V0d1 and V0d2 and y0c2 row, column, value */
-    vector<int> v0d1aRowId;
-    vector<int> v0d1aColId;
+    vector<myint> v0d1aRowId;
+    vector<myint> v0d1aColId;
+    vector<myint> v0d1aColIdo;
     vector<double> v0d1aval;
     vector<double> v0d1avalo;
 
-    vector<int> v0d2aRowId;
-    vector<int> v0d2aColId;
-    vector<int> v0d2aColIdo;
+    vector<myint> v0d2aRowId;
+    vector<myint> v0d2aColId;
+    vector<myint> v0d2aColIdo;
     vector<double> v0d2aval;
     vector<double> v0d2avalo;
 
-    vector<int> y0c2RowId;
-    vector<int> y0c2ColId;
-    vector<double> y0c2val;
-
-    double *v0c2y0c2;
-    double *v0c2y0c2o;
-    double *yc;
-    double *v0cy0c;
+    vector<double> v0c2y0c2;
+    vector<double> v0c2y0c2o;
+    vector<double> yc;
+    vector<double> v0cy0c;
 
     /* V0c'*D_sig*V0c row, column, value */
-    vector<int> AcRowId;
-    vector<int> AcColId;
+    vector<myint> AcRowId;
+    vector<myint> AcRowId1;
+    vector<myint> AcColId;
     vector<double> Acval;
-    vector<int> AdRowId;
-    vector<int> AdColId;
+    vector<myint> AdRowId;
+    vector<myint> AdRowId1;
+    vector<myint> AdColId;
     vector<double> Adval;
-    vector<int> crhsRowId;
-    vector<int> crhsColId;
-    vector<double> crhsval;
+
     double *crhs;
 
     /* V0d row, column, value */
-    vector<int> v0d1RowId;
-    vector<int> v0d1ColId;
+    vector<myint> v0d1RowId;
+    vector<myint> v0d1ColId;
+    vector<myint> v0d1ColIdo;
     vector<double> v0d1val;
     vector<double> v0d1valo;
-    vector<int> v0d2RowId;
-    vector<int> v0d2ColId;
-    vector<int> v0d2ColIdo;
+
+    vector<myint> v0d1aRowId;
+    vector<myint> v0d1aColId;
+    vector<myint> v0d1aColIdo;
+    vector<double> v0d1aval;
+    vector<double> v0d1avalo;
+
+    vector<myint> v0d2RowId;
+    vector<myint> v0d2ColId;
+    vector<myint> v0d2ColIdo;
     vector<double> v0d2val;
     vector<double> v0d2valo;
+
+    vector<myint> v0d2aRowId;
+    vector<myint> v0d2aColId;
+    vector<myint> v0d2aColIdo;
+    vector<double> v0d2aval;
+    vector<double> v0d2avalo;
+
     double *yd;
 
+    /* Se and Sh */
+    myint *SRowId, *SColId;
+    double *Sval;
+    myint leng_S;
+
     /* Solution storage */
-    double *y;
+    complex<double> *y;
     complex<double> *x;    // the solution involving all the sourcePorts
 
     /* Port coordinates */
@@ -263,16 +308,21 @@ public:
     unordered_set<int> portNno;
 
     /* Current sources */
-    complex<double> *J;
+    double *J;
 
     /* Current V0c,s^T*I matrix */
     complex<double> *v0csJ;
     complex<double> *Y;
 
+    /* Default Constructor */
     fdtdMesh(){
         numCdtRow = 0;
     }
+
+    /* Print Function */
     void print();
+
+    /* Destructor */
     ~fdtdMesh(){
         numCdtRow = 0;
     }
@@ -291,14 +341,32 @@ int compareString(char *a, char *b);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
-int matrixMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int>& cRowId, vector<int>& cColId, vector<double>& cval);
+int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark);
+int matrixMulti(int *aRowId, int *aColId, double *aval, int anum, int *bRowId, int *bColId, double *bval, int bnum, fdtdMesh *sys, int &leng, int mark);
+int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int> &cRowId, vector<int> &cColId, vector<double> &cval);
 // The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
-int nodeAdd(vector<int> &rowId, vector<int> &colId, vector<double> &val, vector<int> index, int size, fdtdMesh *sys);
-int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
+int nodeAdd(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2, int mark);
+int nodeAddLarger(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng, int *RowId, int *ColId, double *Val);
+int nodeAdd_count(int *index, int size, int total_size, fdtdMesh *sys, int &v0d2num, int &leng_v0d2);
+int nodeAddAvg(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng, int mark);
+int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng, int* RowId, int *ColId, double *Val);
+int nodeAddAvg_count(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng);
 int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys);
 int output(fdtdMesh *sys);
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
 int yParaGenerator(fdtdMesh *sys);
+int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1);
+int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);
+int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend);
+int pardisoSolve_r(fdtdMesh *sys, complex<double> *rhs, int *RowId, int *ColId, complex<double> *val, int nnz, int size, complex<double> *solution);
+int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1);
+int generateStiff(fdtdMesh *sys);
+int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen);
+int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, double block2_y, myint &v0cnum, myint &leng_v0c, myint &v0canum, myint &leng_v0ca, myint *map);
+int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, fdtdMesh *sys);
+int generateStiff(fdtdMesh *sys);
+int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval);
+int find_Vh(fdtdMesh *sys, double *u0d, double *u0c, int sourcePort);
 #endif
