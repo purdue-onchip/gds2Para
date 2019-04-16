@@ -6,7 +6,7 @@ FREQUENCY
 freqUnit = 1.0e+6
 freqStart = 1000.0
 freqEnd = 5000.0
-nfreq = 10
+nfreq = 3
 freqScale = 0
 
 DIELECTRIC STACK
@@ -27,5 +27,5 @@ numStack = 13
 
 PORT
 numPort = 2
-12.54 2.63 12.54 2.97 11
-0 2.63 0 2.97 11
+0 -0.17 0 +0.17 11
+0 +2.63 0 +2.97 11
