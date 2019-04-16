@@ -211,6 +211,7 @@ int main(int argc, char** argv)
             SolverDataBase sdb;
             fdtdMesh sys;
             int status;
+            bool adbIsGood, sdbIsGood, sdbCouldDump;
             clock_t t1 = clock();
 
             // Get file names
@@ -224,7 +225,7 @@ int main(int argc, char** argv)
             AsciiDataBase adb;
             adb.setFileName(inGDSIIFile);
             GdsParser::GdsReader adbReader(adb);
-            bool adbIsGood = adbReader(inGDSIIFile.c_str());
+            adbIsGood = adbReader(inGDSIIFile.c_str());
             if (adbIsGood)
             {
                 vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
@@ -238,7 +239,7 @@ int main(int argc, char** argv)
             }
 
             // Read simulation input file
-            bool sdbIsGood = sdb.readSimInput(inSimFile);
+            sdbIsGood = sdb.readSimInput(inSimFile);
             if (sdbIsGood)
             {
                 cout << "Simulation input file read" << endl;
@@ -255,10 +256,12 @@ int main(int argc, char** argv)
 
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;
+            clock_t t2 = clock();
             status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
             if (status == 0)
             {
                 cout << "meshAndMark Success!" << endl;
+                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else
             {
@@ -266,19 +269,6 @@ int main(int argc, char** argv)
                 return status;
             }
             sys.print();
-
-            //clock_t t2 = clock();
-            //// Read the input file [part of master branch]
-            //unordered_map<double, int> xi, yi, zi;
-            //status = readInput(inStackFile.c_str(), &sys, xi, yi, zi);
-            //if (status == 0){
-            //    cout << "readInput Success!" << endl;
-            //    cout << "readInput time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
-            //}
-            //else {
-            //    cerr << "readInput Fail!" << endl;
-            //    return status;
-            //}
 
             // Set D_eps and D_sig
             clock_t t3 = clock();
@@ -299,7 +289,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "portSet Success!" << endl;
-                //cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else
             {
@@ -309,7 +299,7 @@ int main(int argc, char** argv)
             string outSPEFFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutSPEF(outSPEFFile);
-            bool sdbCouldDump = sdb.printDump();
+            sdbCouldDump = sdb.printDumpSPEF();
             //sys.print();
 
             // Generate Stiffness Matrix
@@ -332,16 +322,13 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;
-                //cout << "paraGenerator time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "paraGenerator time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else
             {
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-
-            
-
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
@@ -394,7 +381,7 @@ int main(int argc, char** argv)
             string outXyceFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutXyce(outXyceFile);
-            bool sdbCouldDump = sdb.printDumpXyce();
+            sdbCouldDump = sdb.printDumpXyce();
             cout << "File ready at " << outXyceFile << endl;
         }
         else

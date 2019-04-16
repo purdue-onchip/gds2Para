@@ -234,23 +234,11 @@ public:
     vector<double> v0caval;
     vector<double> v0cavalo;
 
-    /* V0d1 and V0d2 and y0c2 row, column, value */
-    vector<myint> v0d1aRowId;
-    vector<myint> v0d1aColId;
-    vector<myint> v0d1aColIdo;
-    vector<double> v0d1aval;
-    vector<double> v0d1avalo;
-
-    vector<myint> v0d2aRowId;
-    vector<myint> v0d2aColId;
-    vector<myint> v0d2aColIdo;
-    vector<double> v0d2aval;
-    vector<double> v0d2avalo;
-
-    vector<double> v0c2y0c2;
-    vector<double> v0c2y0c2o;
-    vector<double> yc;
-    vector<double> v0cy0c;
+    /* V0c2 and yc row, column, value */
+    double *v0c2y0c2;
+    double *v0c2y0c2o;
+    double *yc;
+    double *v0cy0c;
 
     /* V0c'*D_sig*V0c row, column, value */
     vector<myint> AcRowId;
