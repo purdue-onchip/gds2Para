@@ -218,8 +218,6 @@ int main(int argc, char** argv)
             string inGDSIIFile = argv[2];
             string inSimFile = argv[3];
             size_t indExtension = inGDSIIFile.find(".", 1);
-            //string inStackFile = inGDSIIFile.substr(0, indExtension) + "_stack.txt";
-            //string inStackFile = inGDSIIFile; // Use stack information contained within sim_input file
 
             // Read GDSII file
             AsciiDataBase adb;
@@ -296,11 +294,7 @@ int main(int argc, char** argv)
                 cerr << "portSet Fail!" << endl;
                 return status;
             }
-            string outSPEFFile = argv[4];
-            sdb.setDesignName(adb.findNames().back());
-            sdb.setOutSPEF(outSPEFFile);
-            sdbCouldDump = sdb.printDumpSPEF();
-            //sys.print();
+            sys.print();
 
             // Generate Stiffness Matrix
             clock_t t5 = clock();

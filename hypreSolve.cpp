@@ -287,7 +287,6 @@ int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myi
             printf("\n");
             printf("Iterations = %d\n", num_iterations);
             printf("Final Relative Residual Norm = %e\n", final_res_norm);
-            printf("\n");
         }
 
         /* Output the final solution */

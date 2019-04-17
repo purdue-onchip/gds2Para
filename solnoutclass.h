@@ -14,8 +14,10 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <cctype>
 #include <cmath>
 #include <ctime>
+#include <algorithm>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
 #include "limboint.h"
@@ -479,6 +481,37 @@ class Port
         bool yEqual = this->coord[1] == this->coord[4];
         bool zEqual = this->coord[2] == this->coord[5];
         return (xEqual && yEqual && !zEqual) || (xEqual && !yEqual && zEqual) || (!xEqual && yEqual && zEqual);
+    }
+
+    // Does the current flow in direction of increasing coordinate WITHIN the source? (+1 for yes, -1 for no, and 0 for bidirectional)
+    int positiveCoordFlow() const
+    {
+        // Logic: (xsup > xret) || (ysup > yret) || (zsup > zret) == TRUE means that at least one supply coordinate is strictly greater than the corresponding return coordinate
+        // Logic: (xsup > xret) || (ysup > yret) || (zsup > zret) == FALSE means that all return coordinates are greater than or equal to the supply coordinates
+        bool xSupGreater = this->coord[0] > this->coord[3];
+        bool ySupGreater = this->coord[1] > this->coord[4];
+        bool zSupGreater = this->coord[2] > this->coord[5];
+        bool coordEffect = xSupGreater || ySupGreater || zSupGreater;
+
+        switch (this->portDir) // Decipher port direction effect with ternary operator trickery
+        {
+        case 'O':
+            // Output pin means that current flows out of source and FROM return TO supply within source
+            // Logic for output pins: coord == TRUE means current flows in positive direction:   ret o------->-------o sup
+            // Logic for output pins: coord == FALSE means current flows in negative direction:   sup o-------<-------o ret
+            return (coordEffect ? +1 : -1);
+            break;
+        case 'I':
+            // Input pin means that current flows into source and FROM supply TO return within source
+            // Logic for input pins: coord == TRUE means current flows in negative direction:   ret o-------<-------o sup
+            // Logic for input pins: coord == FALSE means current flows in positive direction:   sup o------->-------o ret
+            return (coordEffect ? -1 : +1);
+            break;
+        case 'B':
+            // Bidirectional pin means current can flow EITHER direction within source
+            return 0;
+            break;
+        }
     }
 
     // Print the layer information
@@ -1638,24 +1671,71 @@ struct SolverDataBase
                     {
                         // Get dielectric stack delimiters
                         size_t indNameEnd = fileLine.find(" ");
-                        size_t indHeight = fileLine.find("h = ") + 4;
-                        size_t indRelPermit = fileLine.find("e = ") + 4;
-                        size_t indComment = fileLine.find(" #");
+                        size_t indZStart = fileLine.find("z = ");
+                        size_t indHeight = fileLine.find("h = ");
+                        size_t indRelPermit = fileLine.find("e = ");
+                        size_t indLossTan = fileLine.find("TanD = ");
+                        size_t indConduc = fileLine.find("sigma = ");
 
                         // Save dielectric stack information to variables
                         std::string layerName = fileLine.substr(0, indNameEnd);
-                        double layerHeight = stod(fileLine.substr(indHeight, indRelPermit - indHeight - 5)) * (this->settings).getLengthUnit();
-                        double layerEpsilonR = stod(fileLine.substr(indRelPermit, indComment - indRelPermit));
+                        bool numberInName = true; // Assume GDSII number could be assigned from name
+                        int layerNumGDSII = -1; // Default value for undescribed layers
+                        if (layerName.find('M') != string::npos) // Give leeway for layer names that have a word, followed by 'M' for metal layer, and then the number
+                        {
+                            size_t indNumber = layerName.find("M");
+                            for (size_t indChar = indNumber + 1; indChar < layerName.length(); indChar++)
+                            {
+                                if (!isdigit(layerName[indChar]))
+                                {
+                                    numberInName = false;
+                                }
+                            }
+                            // Remaining layer name is an integer
+                            if (numberInName)
+                            {
+                                layerNumGDSII = stoi(layerName.substr(indNumber + 1, layerName.length() - indNumber - 1));
+                            }
+                        }
+                        else // The layer name might just be the number
+                        {
+                            for (size_t indChar = 0; indChar < layerName.length(); indChar++)
+                            {
+                                if (!isdigit(layerName[indChar]))
+                                {
+                                    numberInName = false;
+                                }
+                            }
+                            // Whole layer name is an integer
+                            if (numberInName)
+                            {
+                                layerNumGDSII = stoi(layerName);
+                            }
+                        }
+                        double layerZStart = 0.; // Assume first layer has bottom at z_start = 0.0 unless specified
+                        if (indZStart < string::npos) // Bottom z-coordinate of layer was given
+                        {
+                            layerZStart = stod(fileLine.substr(indZStart + 4, fileLine.find(" ", indZStart) - indZStart - 4)) * (this->settings).getLengthUnit();
+                        }
+                        else if ((indZStart == string::npos) || (indStack > 0)) // No bottom z-coordinate given, so assume it builds up where previous layer ends
+                        {
+                            layerZStart = (this->layers).back().getZStart() + (this->layers).back().getZHeight();
+                        }
+                        double layerHeight = stod(fileLine.substr(indHeight + 4, fileLine.find(" ", indHeight) - indHeight - 4)) * (this->settings).getLengthUnit();
+                        double layerEpsilonR = stod(fileLine.substr(indRelPermit + 4, fileLine.find(" ", indRelPermit) - indRelPermit - 4));
+                        double layerLossTan = 0.;
+                        if (indLossTan < string::npos) // Loss tangent was given
+                        {
+                            layerLossTan = stod(fileLine.substr(indLossTan + 7, fileLine.find(" ", indLossTan) - indLossTan - 7));
+                        }
+                        double layerSigma = 0.;
+                        if (indConduc < string::npos) // Conductivity inside layer was given
+                        {
+                            layerSigma = stod(fileLine.substr(indConduc + 8, fileLine.find(" ", indConduc) - indConduc - 8));
+                        }
 
                         // Register a new layer in layers field
-                        if ((this->layers).size() == 0) // No layers saved yet
-                        {
-                            (this->layers).emplace_back(Layer(layerName, -1, 0.0, layerHeight, layerEpsilonR, 0.0, 0.0)); // Start at z=0
-                        }
-                        else
-                        {
-                            (this->layers).emplace_back(Layer(layerName, -1, (this->layers).back().getZStart() + (this->layers).back().getZHeight(), layerHeight, layerEpsilonR, 0.0, 0.0)); // Start at end of previous layer
-                        }
+                        (this->layers).emplace_back(Layer(layerName, layerNumGDSII, layerZStart, layerHeight, layerEpsilonR, layerLossTan, layerSigma));
 
                         // Keep moving down the dielectric stack
                         getline(inputFile, fileLine);
@@ -1792,9 +1872,15 @@ struct SolverDataBase
         data->lengthUnit = (this->settings).getLengthUnit();
         data->freqUnit = (this->settings).getFreqUnit();
         data->nfreq = (this->settings).getNFreq();
-        data->freqStart = (this->settings).getFreqs().front() / (this->settings).getFreqUnit();
-        data->freqEnd = (this->settings).getFreqs().back() / (this->settings).getFreqUnit();
+        data->freqStart = (this->settings).getFreqs().front();
+        data->freqEnd = (this->settings).getFreqs().back();
         data->freqScale = (this->settings).getFreqScale();
+        data->xlim1 = (this->settings).getLimits()[0] / (this->settings).getLengthUnit();
+        data->xlim2 = (this->settings).getLimits()[1] / (this->settings).getLengthUnit();
+        data->ylim1 = (this->settings).getLimits()[2] / (this->settings).getLengthUnit();
+        data->ylim2 = (this->settings).getLimits()[3] / (this->settings).getLengthUnit();
+        data->zlim1 = (this->settings).getLimits()[4] / (this->settings).getLengthUnit();
+        data->zlim2 = (this->settings).getLimits()[5] / (this->settings).getLengthUnit();
 
         // Use layer stack-up information to set fields
         data->numStack = this->getNumLayer();
@@ -1806,8 +1892,8 @@ struct SolverDataBase
         {
             Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
             data->stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
-            data->stackBegCoor[indi] = thisLayer.getZStart() / (this->settings).getLengthUnit();
-            data->stackEndCoor[indi] = (thisLayer.getZStart() + thisLayer.getZHeight()) / (this->settings).getLengthUnit();
+            data->stackBegCoor[indi] = thisLayer.getZStart();
+            data->stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
             data->stackName.push_back(thisLayer.getLayerName());
         }
 
@@ -1817,19 +1903,11 @@ struct SolverDataBase
         {
             for (size_t indj = 0; indj < data->numStack; indj++)
             {
-                // See if conductor layer numbers being built correspond to existing layer name
-                /*if (to_string(data->conductorIn[indi].layer).compare(data->stackName[indj]) == 0)
-                {
-                    data->conductorIn[indi].zmin = data->stackBegCoor[indj] / (this->settings).getLengthUnit();
-                    data->conductorIn[indi].zmax = data->stackEndCoor[indj] / (this->settings).getLengthUnit();
-                    data->stackCdtMark[indj] = 1;
-                }*/
-
                 // See if conductor layer numbers being built correspond to GDSII layer number
                 if (data->conductorIn[indi].layer == this->getLayer(indj).getGDSIINum())
                 {
-                    data->conductorIn[indi].zmin = data->stackBegCoor[indj] / (this->settings).getLengthUnit();
-                    data->conductorIn[indi].zmax = data->stackEndCoor[indj] / (this->settings).getLengthUnit();
+                    data->conductorIn[indi].zmin = data->stackBegCoor[indj];
+                    data->conductorIn[indi].zmax = data->stackEndCoor[indj];
                     data->stackCdtMark[indj] = 1;
                 }
             }
@@ -1845,24 +1923,27 @@ struct SolverDataBase
         {
             Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation
 
-            // Save coordinates of the port (class automatically ensures x1 < x2, y1 < y2, and z1 < z2)
-            data->portCoor[indi].x1 = thisPort.getCoord()[0] / (this->settings).getLengthUnit();
-            data->portCoor[indi].y1 = thisPort.getCoord()[1] / (this->settings).getLengthUnit();
-            data->portCoor[indi].z1 = thisPort.getCoord()[2] / (this->settings).getLengthUnit();
-            data->portCoor[indi].x2 = thisPort.getCoord()[3] / (this->settings).getLengthUnit();
-            data->portCoor[indi].y2 = thisPort.getCoord()[4] / (this->settings).getLengthUnit();
-            data->portCoor[indi].z2 = thisPort.getCoord()[5] / (this->settings).getLengthUnit();
+            // Save coordinates of the port (portCoor must have x1 < x2, y1 < y2, and z1 < z2)
+            data->portCoor[indi].x1 = min(thisPort.getCoord()[0], thisPort.getCoord()[3]);
+            data->portCoor[indi].y1 = min(thisPort.getCoord()[1], thisPort.getCoord()[4]);
+            data->portCoor[indi].z1 = min(thisPort.getCoord()[2], thisPort.getCoord()[5]);
+            data->portCoor[indi].x2 = max(thisPort.getCoord()[0], thisPort.getCoord()[3]);
+            data->portCoor[indi].y2 = max(thisPort.getCoord()[1], thisPort.getCoord()[4]);
+            data->portCoor[indi].z2 = max(thisPort.getCoord()[2], thisPort.getCoord()[5]);
+
+            // Save direction of the port (portCoor uses +1 to denote in direction of increasing coordinates)
+            data->portCoor[indi].portDirection = thisPort.positiveCoordFlow();
 
             // Add coordinates of port to unordered maps if need be
             if (thisPort.getCoord()[0] == thisPort.getCoord()[3])
             {
                 // Record this x-coordinate along the x-axis
-                portCoorx->insert(thisPort.getCoord()[0] / (this->settings).getLengthUnit());
+                portCoorx->insert(thisPort.getCoord()[0]);
             }
             if (thisPort.getCoord()[1] == thisPort.getCoord()[4])
             {
                 // Record this y-coordinate along the y-axis
-                portCoory->insert(thisPort.getCoord()[1] / (this->settings).getLengthUnit());
+                portCoory->insert(thisPort.getCoord()[1]);
             }
         }
     }

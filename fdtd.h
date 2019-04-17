@@ -51,6 +51,8 @@ typedef int myint;
 typedef int myint;
 #endif
 
+#define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
+
 
 
 // Deletion candidate:
@@ -113,9 +115,6 @@ public:
     double *x;
     double *y;
     double *z;
-    double xmin, xmax;
-    double ymin, ymax;
-    double zmin, zmax;
     double x1, x2;
     double y1, y2;
     double z1, z2;
@@ -123,6 +122,9 @@ public:
     int *node;
     int nodenum;
     int portCnd;
+
+    /* Print Function */
+    void print();
 } fdtdPort;
 
 typedef class{
@@ -134,8 +136,7 @@ public:
 
 class fdtdMesh {
     /* Mesh information */
-public: 
-    int markCondt;
+public:
     double lengthUnit;
 
     /* Frequency parameters */
@@ -145,9 +146,7 @@ public:
     int nfreq;
     int freqScale;
 
-    int ix;    // x direction number of periods
-    int iy;    // y direction number of periods
-
+    /* Discretization information*/
     myint nx, ny, nz;    // number of nodes along x, y, z
 
     double *xn, *yn, *zn;    // coordinates of the nodes along x, y, z
@@ -157,9 +156,6 @@ public:
     myint N_cell_y;
     myint N_cell_z;
 
-    double factor_x;
-    double factor_y;
-    double factor_z;
     double xlim1, xlim2;
     double ylim1, ylim2;
     double zlim1, zlim2;
@@ -222,17 +218,17 @@ public:
     fdtdBound *bound;
 
     /* V0c row, column, value */
-    vector<myint> v0cRowId;
-    vector<myint> v0cColId;
-    vector<myint> v0cColIdo;
-    vector<double> v0cval;
-    vector<double> v0cvalo;
+    myint *v0cRowId;
+    myint *v0cColId;
+    myint *v0cColIdo;
+    double *v0cval;
+    double *v0cvalo;
 
-    vector<myint> v0caRowId;
-    vector<myint> v0caColId;
-    vector<myint> v0caColIdo;
-    vector<double> v0caval;
-    vector<double> v0cavalo;
+    myint *v0caRowId;
+    myint *v0caColId;
+    myint *v0caColIdo;
+    double *v0caval;
+    double *v0cavalo;
 
     /* V0c2 and yc row, column, value */
     double *v0c2y0c2;
@@ -241,41 +237,41 @@ public:
     double *v0cy0c;
 
     /* V0c'*D_sig*V0c row, column, value */
-    vector<myint> AcRowId;
-    vector<myint> AcRowId1;
-    vector<myint> AcColId;
-    vector<double> Acval;
-    vector<myint> AdRowId;
-    vector<myint> AdRowId1;
-    vector<myint> AdColId;
-    vector<double> Adval;
+    myint *AcRowId;
+    myint *AcRowId1;
+    myint *AcColId;
+    double *Acval;
+    myint *AdRowId;
+    myint *AdRowId1;
+    myint *AdColId;
+    double *Adval;
 
     double *crhs;
 
     /* V0d row, column, value */
-    vector<myint> v0d1RowId;
-    vector<myint> v0d1ColId;
-    vector<myint> v0d1ColIdo;
-    vector<double> v0d1val;
-    vector<double> v0d1valo;
+    myint *v0d1RowId;
+    myint *v0d1ColId;
+    myint *v0d1ColIdo;
+    double *v0d1val;
+    double *v0d1valo;
 
-    vector<myint> v0d1aRowId;
-    vector<myint> v0d1aColId;
-    vector<myint> v0d1aColIdo;
-    vector<double> v0d1aval;
-    vector<double> v0d1avalo;
+    myint *v0d1aRowId;
+    myint *v0d1aColId;
+    myint *v0d1aColIdo;
+    double *v0d1aval;
+    double *v0d1avalo;
 
-    vector<myint> v0d2RowId;
-    vector<myint> v0d2ColId;
-    vector<myint> v0d2ColIdo;
-    vector<double> v0d2val;
-    vector<double> v0d2valo;
+    myint *v0d2RowId;
+    myint *v0d2ColId;
+    myint *v0d2ColIdo;
+    double *v0d2val;
+    double *v0d2valo;
 
-    vector<myint> v0d2aRowId;
-    vector<myint> v0d2aColId;
-    vector<myint> v0d2aColIdo;
-    vector<double> v0d2aval;
-    vector<double> v0d2avalo;
+    myint *v0d2aRowId;
+    myint *v0d2aColId;
+    myint *v0d2aColIdo;
+    double *v0d2aval;
+    double *v0d2avalo;
 
     double *yd;
 
