@@ -54,13 +54,6 @@ typedef int myint;
 #define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
 
 
-
-// Deletion candidate:
-/*typedef struct{
-    double re;
-    double i;
-}doublecomplex;*/
-
 class fdtdOneCondct {
 public:
     int cdtName;
