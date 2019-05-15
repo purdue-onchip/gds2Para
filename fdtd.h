@@ -30,23 +30,23 @@ using std::cerr;
 using std::cout;
 using std::endl;
 
-#define PI (3.1415926)
+#define PI (3.141592653589793)
 #define MU (4*PI*1.e-7)
 #define CSPED (299792458.)
 #define EPSILON0 (8.854e-12)
-#define SIGMA (5e+7)
+#define SIGMA (5.8e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 //#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDIS (1.e-9)
+#define MINDIS (1.e-7)
 #define DT (1.e-16)
 //#define HYPRE_BIGINT (1)
 //#define LARGE_SYSTEM (1)
 
 #ifdef LARGE_SYSTEM
-typedef int myint;
+typedef long long int myint;
 #else
 typedef int myint;
 #endif
@@ -209,8 +209,8 @@ public:
     myint *markNode;    // mark this node if it is inside the conductor
     vector<vector<int>> edgeCell;    // for each cell which edge is around it
     vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
-    int *acu_cnno;
-    int *cindex;
+    vector<int> acu_cnno;
+    vector<int> cindex;
     int *exciteCdtLayer;
     vector<unordered_set<int>> cond2condIn;
     int *markProSide;
@@ -279,6 +279,10 @@ public:
 
     double *yd;
 
+    /* Vh */
+    lapack_complex_double *Vh;
+    myint leng_Vh;
+
     /* Se and Sh */
     myint *SRowId, *SColId;
     double *Sval;
@@ -324,8 +328,6 @@ void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark);
-int matrixMulti(int *aRowId, int *aColId, double *aval, int anum, int *bRowId, int *bColId, double *bval, int bnum, fdtdMesh *sys, int &leng, int mark);
-int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int> &cRowId, vector<int> &cColId, vector<double> &cval);
 // The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
@@ -350,5 +352,8 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
 int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, fdtdMesh *sys);
 int generateStiff(fdtdMesh *sys);
 int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval);
-int find_Vh(fdtdMesh *sys, double *u0d, double *u0c, int sourcePort);
+int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort);
+int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint acol, lapack_complex_double *b, myint brow, myint bcol, lapack_complex_double *tmp3);
+int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val);
+int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 #endif

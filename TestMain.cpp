@@ -234,6 +234,7 @@ int main(int argc, char** argv)
 
             // Set the number of input conductors
             sys.numCdtRow = adb.getNumCdtIn();
+            //sys.numCdtRow = 100;
 
             clock_t t2 = clock();
             // Read the input file

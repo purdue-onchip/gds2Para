@@ -61,8 +61,8 @@ $(OBJDIR)/%.d: %.cpp
 LimboInterface: $(OBJS) $(LIBDIR)/lib$(LIB_PREFIX)parser.a
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LIB) -l$(LIB_PREFIX)parser $(INCLUDE)
 
-LayoutAnalyzer: TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o
-	mpicxx $(CXXFLAGS) -o $@ TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o $(LIB) $(INCLUDE) $(MKLFLAGS) $(LFLAGS)
+LayoutAnalyzer: TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o findVh.o
+	mpicxx $(CXXFLAGS) -o $@ TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o findVh.o $(LIB) $(INCLUDE) $(MKLFLAGS) $(LFLAGS)
 
 explicit: TestMain.o mesh.o matrixCon.o
 	g++ -std=c++17 -g -lstdc++fs -o Test_$@ TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I$(MKL_ROOT_DIR)/include -Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_lp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group  -lm -pthread -ldl -L $(HYPRE_DIR)/lib
@@ -81,6 +81,9 @@ hypreSolve.o: hypreSolve.cpp fdtd.h hypreSolverh.h
 
 generateStiff.o: generateStiff.cpp fdtd.h
 	g++ -c -g generateStiff.cpp -I $(MKL_ROOT_DIR)/include
+
+findVh.o: findVh.cpp fdtd.h
+	g++ -c -g findVh.cpp -I $(MKL_ROOT_DIR)/include
 
 
 .PHONY: clean
