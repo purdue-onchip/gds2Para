@@ -97,17 +97,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int status;
     int count;
     int xcol;
-    ofstream outfile1;
     vector<int> rowId;
     vector<int> colId;
     vector<double> val;
     vector<int> temp2;
     int inx, iny, inz;
-
-    cout << "Number of edges in one layer: " << sys->N_edge_s << endl;
-    cout << "Number of edges: " << sys->N_edge << endl;
-    cout << "Number of nodes in one layer: " << sys->N_node_s << endl;
-    cout << "Number of nodes: " << sys->N_node << endl;
 
     /* Construct V0d with row id, col id and its val */
     myint leng_v0d1 = 0, v0d1num = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
@@ -133,13 +127,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     clock_t ts = t1;
     status = merge_v0d1(sys, block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
     cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    
-    /*outfile1.open("map.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_node; i++){
-        outfile1 << map[i] << endl;
-    }
-    outfile1.close();*/
-    
+
     for (i = 0; i < v0d1anum; i++){    // the upper and lower planes are PEC
         if (map[sys->edgelink[sys->v0d1aRowId[i] * 2]] != sys->v0d1aColId[i] + 1 && map[sys->edgelink[sys->v0d1aRowId[i] * 2]] != 0){
             Ad1[sys->v0d1aColId[i]][map[sys->edgelink[sys->v0d1aRowId[i] * 2]] - 1] += sys->v0d1aval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3], 2)
@@ -168,14 +156,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
 
     sys->v0d1valo = (double*)malloc(v0d1num * sizeof(double));
-    for (i = 0; i < v0d1num; i++)
+    for (i = 0; i < v0d1num; i++){
         sys->v0d1valo[i] = sys->v0d1val[i];
+    }
     for (i = 0; i < v0d1num; i++){    // compute sqrt(D_eps)*V0d1
         sys->v0d1val[i] = sys->v0d1val[i] * sqrt(sys->eps[sys->v0d1RowId[i]]);
     }
     sys->v0d1avalo = (double*)malloc(v0d1anum * sizeof(double));
-    for (i = 0; i < v0d1anum; i++)
+    for (i = 0; i < v0d1anum; i++) {
         sys->v0d1avalo[i] = sys->v0d1aval[i];
+    }
     for (i = 0; i < v0d1anum; i++){
         sys->v0d1aval[i] = sys->v0d1aval[i] * sqrt(sys->eps[sys->v0d1aRowId[i]]);
     }
@@ -254,12 +244,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //    return status;
 
     //cout << "The number of nonzeros in Ad is " << leng_Ad << endl;
-    /*outfile1.open("Ad.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < leng_Ad; i++){
-        outfile1 << sys->AdRowId[i] << " " << sys->AdColId[i] << " " << sys->Adval[i] << endl;
-    }
-    outfile1.close();
-    cout << "Ad's output is done!\n";*/
 
     /* Construct V0c with row id, col id and its val */
     myint leng_v0c = 0, v0cnum = 0;
@@ -352,8 +336,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //HYPRE_ParCSRMatrix parcsr_ac;
     //status = setHYPREMatrix(sys->AcRowId, sys->AcColId, sys->Acval, leng_v0c, ac, parcsr_ac);
     /* End */
-
-    
     
     
     sys->v0cvalo = (double*)malloc(v0cnum * sizeof(double));
@@ -398,56 +380,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         cout << sys->cindex[i] << " ";
     }
     cout << endl;*/
-    
-    
-   /* outfile1.open("Ac2.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < leng_Ac; i++){
-        outfile1 << sys->AcRowId[i] + 1 << " " << sys->AcColId[i] + 1 << " " << sys->Acval[i] << endl;
-    }
-    outfile1.close();*/
-
-
-    /*outfile1.open("v0c.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < v0cnum; i++){
-    outfile1 << sys->v0cRowId[i] + 1 << " " << sys->v0cColIdo[i] + 1 << " " << sys->v0cvalo[i] << endl;
-    }
-    outfile1.close();
-    outfile1.open("v0ca.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < v0canum; i++){
-    outfile1 << sys->v0caRowId[i] + 1 << " " << sys->v0caColIdo[i] + 1 << " " << sys->v0cavalo[i] << endl;
-    }
-    outfile1.close();*/
 
     /* Compute the matrix V0c'*D_sig*V0c */
     /*status = matrixMulti(sys->v0caColId, sys->v0caRowId, sys->v0caval, sys->v0cRowId, sys->v0cColId, sys->v0cval, sys->AcRowId, sys->AcColId, sys->Acval);
     if (status != 0)
     return status;*/
-
-
-    /*outfile1.open("v0d1.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < v0d1num; i++){
-        outfile1 << sys->v0d1RowId[i] + 1 << " " << sys->v0d1ColIdo[i] + 1 << " " << sys->v0d1valo[i] << endl;
-    }
-    outfile1.close();
-    outfile1.open("v0d1a.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < v0d1anum; i++){
-        outfile1 << sys->v0d1aRowId[i] + 1 << " " << sys->v0d1aColIdo[i] + 1 << " " << sys->v0d1avalo[i] << endl;
-    }
-    outfile1.close();
-    cout << "S and [V0d,V0c] have been generated!\n";*/
-    /*outfile1.open("v0d2.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < v0d2num; i++){
-        outfile1 << sys->v0d2RowId[i] + 1 << " " << sys->v0d2ColId[i] + 1 << " " << sys->v0d2val[i] << endl;
-    }
-    outfile1.close();
-    outfile1.open("v0d2a.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < v0d2anum; i++){
-        outfile1 << sys->v0d2aRowId[i] + 1 << " " << sys->v0d2aColId[i] + 1 << " " << sys->v0d2aval[i] << endl;
-    }
-    outfile1.close();*/
-    
-
-    
 
    /* double *d = &(sys->Adval[0]);
     int *id = &(sys->AdRowId1[0]);
@@ -459,7 +396,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
    
     /* Pick up a y0c2 cooresponding to one source port */
-    ofstream outfile;
     complex<double> Zresult;
     double *bd1, *bd2;
     double *bdc1, *bdc2;
@@ -503,7 +439,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double alpha = 1, beta = 0;
     char matdescra[6];
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << "Begin!\n";
+    cout << "Begin the iterative solve for network parameters!\n";
     double *ydcp;
     double *y0c, *y0cs;
     double *yc, *yca;
@@ -563,12 +499,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, dRhs, beta, v0daJ);
-        /*
-        outfile.open("rhs.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < leng_v0d1; i++){
-            outfile << v0daJ[i] << endl;
-        }
-        outfile.close();*/
 
         /* solve V0d system */
 
@@ -582,11 +512,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         /*t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
         cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;*/
-        /*outfile1.open("y0d.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < leng_v0d1; i++){
-            outfile1 << y0d[i] << " ";
-        }
-        outfile1.close();*/
 
         for (i = 0; i < leng_v0d1; i++){
             y0d[i] = y0d[i] / (2 * PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
@@ -716,12 +641,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, y0c, beta, yc);
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0cat, descr, y0c, beta, yca);
 
-        /*outfile1.open("yc.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < leng_v0c; i++){
-            outfile1 << y0c[i] << endl;
-        }
-        outfile1.close();*/
-
         for (i = 0; i < sys->N_edge; i++){
             yccp[i] = -yc[i] * sys->eps[i];
 
@@ -737,12 +656,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
-
-        /*outfile1.open("y0d.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < leng_v0d1; i++){
-            outfile1 << sqrt(pow(y0d[i], 2) + pow(y0d2[i], 2)) << endl;
-        }
-        outfile1.close();*/
 
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
         yd2a = (double*)calloc(sys->N_edge, sizeof(double));
@@ -779,12 +692,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (i = 0; i < sys->N_edge; i++){
             sys->y[i] = yd[i].real() + yc[i] + (1i) * yd[i].imag();
         }
-        /*outfile1.open("y0.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-            outfile1 << sys->y[i].real() << " " << sys->y[i].imag() << endl;
-        }
-        outfile1.close();
-        cout << "y0 is generated!\n";*/
+
         for (i = 0; i < sys->numPorts; i++){
             for (j = 0; j < sys->portEdge[i].size(); j++){
                 leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3]), 2);
@@ -3810,15 +3718,6 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     free(v0d1aRowId); v0d1aRowId = NULL;
     free(v0d1aColId); v0d1aColId = NULL;
     free(v0d1aval); v0d1aval = NULL;
-
-    
-
-    /*ofstream outfile;
-    outfile.open("color.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_node; i++){
-        outfile << coloring[i] << endl;
-    }
-    outfile.close();*/
 
     return 1;
 }

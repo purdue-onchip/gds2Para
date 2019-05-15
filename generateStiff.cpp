@@ -501,7 +501,7 @@ int generateStiff(fdtdMesh *sys){
     free(Seval); Seval = NULL;
     free(SeColId); SeColId = (myint*)malloc((leng_Se + 1) * sizeof(myint));
     status = COO2CSR_malloc(SeColIdo, SeRowIdn, Sevaln, Senum, leng_Se, SeColId);
-    
+
 
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));
@@ -515,21 +515,13 @@ int generateStiff(fdtdMesh *sys){
     free(Shval); Shval = NULL;
     free(ShColId); ShColId = (myint*)malloc((leng_Sh + 1) * sizeof(myint));
     status = COO2CSR_malloc(ShColIdo, ShRowIdn, Shvaln, Shnum, leng_Sh, ShColId);
-    
-    
-    
+
+
     /* generate the matrix (-w^2*D_eps+iw*D_sig+S) */
     status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln);    // matrix multiplication first matrix keep the same second matrix transpose
-    cout << "Length of S is " << sys->leng_S << endl;
-    /*ofstream outfile;
-    outfile.open("S.txt", std::ofstream::out | std::ofstream::trunc);
-    for (ind = 0; ind < sys->leng_S; ind++){
-        outfile << sys->SRowId[ind] + 1 << " " << sys->SColId[ind] + 1 << " " << sys->Sval[ind] << endl;
-    }
-    outfile.close();
-    cout << "S generation is done!\n";*/
-    /*  */
-
+  
+    //cout << "Length of S is " << sys->leng_S << endl;
+    //cout << "S generation is done!\n";
 
     /* use pardiso to solve (-w^2*D_eps+iw*D_sig+S)\(-1i*w*J) */
     //int sourcePort = 0;
@@ -558,13 +550,6 @@ int generateStiff(fdtdMesh *sys){
     //        }
     //        cout << Yr[i + sys->numPorts * sourcePort] << endl;
     //    }
-    //    
-    //    /*ofstream outfile;
-    //    outfile.open("xr.txt", std::ofstream::out | std::ofstream::trunc);
-    //    for (int i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-    //        outfile << xr[i].re << " " << xr[i].i << endl;
-    //    }
-    //    outfile.close();*/
 
     //    sourcePort++;
     //    free(J); J = NULL;

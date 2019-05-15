@@ -51,13 +51,8 @@ typedef long long int myint;
 typedef int myint;
 #endif
 
+#define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
 
-
-
-typedef struct{
-    double re;
-    double i;
-}doublecomplex;
 
 class fdtdOneCondct {
 public:
@@ -113,9 +108,6 @@ public:
     double *x;
     double *y;
     double *z;
-    double xmin, xmax;
-    double ymin, ymax;
-    double zmin, zmax;
     double x1, x2;
     double y1, y2;
     double z1, z2;
@@ -123,6 +115,9 @@ public:
     int *node;
     int nodenum;
     int portCnd;
+
+    /* Print Function */
+    void print();
 } fdtdPort;
 
 typedef class{
@@ -134,8 +129,7 @@ public:
 
 class fdtdMesh {
     /* Mesh information */
-public: 
-    int markCondt;
+public:
     double lengthUnit;
 
     /* Frequency parameters */
@@ -145,9 +139,7 @@ public:
     int nfreq;
     int freqScale;
 
-    int ix;    // x direction number of periods
-    int iy;    // y direction number of periods
-
+    /* Discretization information*/
     myint nx, ny, nz;    // number of nodes along x, y, z
 
     double *xn, *yn, *zn;    // coordinates of the nodes along x, y, z
@@ -157,9 +149,6 @@ public:
     myint N_cell_y;
     myint N_cell_z;
 
-    double factor_x;
-    double factor_y;
-    double factor_z;
     double xlim1, xlim2;
     double ylim1, ylim2;
     double zlim1, zlim2;
@@ -234,6 +223,7 @@ public:
     double *v0caval;
     double *v0cavalo;
 
+    /* V0c2 and yc row, column, value */
     double *v0c2y0c2;
     double *v0c2y0c2o;
     double *yc;
@@ -248,7 +238,6 @@ public:
     myint *AdRowId1;
     myint *AdColId;
     double *Adval;
-    
 
     double *crhs;
 
@@ -306,9 +295,15 @@ public:
     complex<double> *v0csJ;
     complex<double> *Y;
 
+    /* Default Constructor */
     fdtdMesh(){
         numCdtRow = 0;
     }
+
+    /* Print Function */
+    void print();
+
+    /* Destructor */
     ~fdtdMesh(){
         numCdtRow = 0;
     }
@@ -317,7 +312,7 @@ public:
 
 
 
-int readInput(const char* stackFile, fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi);
+int meshAndMark(fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
 int fdtdStringWord(char*, char *word[]);

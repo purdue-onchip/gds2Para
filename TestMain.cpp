@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <ctime>
+#include <unordered_set>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
@@ -206,99 +207,122 @@ int main(int argc, char** argv)
     {
         if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0))
         {
+            // Initialize SolverDataBase, mesh, and set variables for performance tracking
+            SolverDataBase sdb;
+            fdtdMesh sys;
+            int status;
+            bool adbIsGood, sdbIsGood, sdbCouldDump;
+            clock_t t1 = clock();
+
             // Get file names
             string inGDSIIFile = argv[2];
             string inSimFile = argv[3];
             size_t indExtension = inGDSIIFile.find(".", 1);
-            string inStackFile = inGDSIIFile.substr(0, indExtension) + "_stack.txt";
-            //string inStackFile = inGDSIIFile; // Use stack information contained within sim_input file
-
-            // Initialize SolverDataBase, mesh, and other useful variables
-            SolverDataBase sdb;
-            fdtdMesh sys;
-            int status;
-            clock_t t1 = clock();
 
             // Read GDSII file
             AsciiDataBase adb;
             adb.setFileName(inGDSIIFile);
             GdsParser::GdsReader adbReader(adb);
-            bool adbIsGood = adbReader(inGDSIIFile.c_str());
-            vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
-            adb.print(indCellPrint, &sys);
-            cout << "GDSII file read" << endl;
-
-            // Read simulation input file
-            bool sdbIsGood = sdb.readSimInput(inSimFile);
-            cout << "Simulation input file read" << endl;
-
-            // Set the number of input conductors
-            sys.numCdtRow = adb.getNumCdtIn();
-            //sys.numCdtRow = 100;
-
-            clock_t t2 = clock();
-            // Read the input file
-            unordered_map<double, int> xi, yi, zi;
-            status = readInput(inStackFile.c_str(), &sys, xi, yi, zi);
-            if (status == 0){
-                cout << "readInput Success!" << endl;
-                cout << "readInput time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+            adbIsGood = adbReader(inGDSIIFile.c_str());
+            if (adbIsGood)
+            {
+                vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
+                adb.print(indCellPrint, &sys);
+                cout << "GDSII file read" << endl;
             }
-            else {
-                cout << "readInput Fail!" << endl;
+            else
+            {
+                cerr << "Unable to read in GDSII file" << endl;
                 return status;
             }
+
+            // Read simulation input file
+            sdbIsGood = sdb.readSimInput(inSimFile);
+            if (sdbIsGood)
+            {
+                cout << "Simulation input file read" << endl;
+            }
+            else
+            {
+                cerr << "Unable to read in simulation input file" << endl;
+                return status;
+            }
+
+            // Append information so far to fdtdMesh
+            unordered_set<double> portCoorx, portCoory;
+            sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory);
+
+            // Mesh the domain and mark conductors
+            unordered_map<double, int> xi, yi, zi;
+            clock_t t2 = clock();
+            status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+            if (status == 0)
+            {
+                cout << "meshAndMark Success!" << endl;
+                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+            }
+            else
+            {
+                cerr << "meshAndMark Fail!" << endl;
+                return status;
+            }
+            sys.print();
 
             // Set D_eps and D_sig
             clock_t t3 = clock();
             status = matrixConstruction(&sys);
-            if (status == 0) {
+            if (status == 0)
+            {
                 cout << "matrixConstruction Success!" << endl;
                 cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else {
-                cout << "matrixConstruction Fail!" << endl;
+                cerr << "matrixConstruction Fail!" << endl;
                 return status;
             }
 
             // Set port
             clock_t t4 = clock();
             status = portSet(&sys, xi, yi, zi);
-            if (status == 0){
-                cout << "portSet Success!\n";
+            if (status == 0)
+            {
+                cout << "portSet Success!" << endl;
                 cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
             }
-            else {
-                cout << "portSet Fail!\n";
+            else
+            {
+                cerr << "portSet Fail!" << endl;
                 return status;
             }
+            sys.print();
 
             // Generate Stiffness Matrix
             clock_t t5 = clock();
             status = generateStiff(&sys);
-            if (status == 0){
-            cout << "generateStiff Success!" << endl;
-            cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+            if (status == 0)
+            {
+                cout << "generateStiff Success!" << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
             }
-            else {
-            cout << "generateStiff Fail!" << endl;
-            return status;
+            else
+            {
+                cerr << "generateStiff Fail!" << endl;
+                return status;
             }
 
             // Parameter generation
             t5 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
-            if (status == 0){
+            if (status == 0)
+            {
                 cout << "paraGenerator Success!" << endl;
                 cout << "paraGenerator time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
             }
-            else {
-                cout << "paraGenerator Fail!" << endl;
+            else
+            {
+                cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-
-            
-
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
@@ -351,7 +375,7 @@ int main(int argc, char** argv)
             string outXyceFile = argv[4];
             sdb.setDesignName(adb.findNames().back());
             sdb.setOutXyce(outXyceFile);
-            bool sdbCouldDump = sdb.printDumpXyce();
+            sdbCouldDump = sdb.printDumpXyce();
             cout << "File ready at " << outXyceFile << endl;
         }
         else

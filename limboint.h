@@ -1840,6 +1840,7 @@ public:
         // Analyze design and print to terminal
         int numCell = getNumCell();
 
+        cout << "------" << endl;
         cout << "ASCII Database of IC Design:" << endl;
         cout << " File Name: " << this->fileName << endl;
         cout << " Version: " << this->getVersion() << endl;
@@ -1861,7 +1862,7 @@ public:
             std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
             cout << cellName << endl;
             this->saveToMesh(cellName, 0., 0., sys);   // the origin is the (0,0) point
-            //(this->cells)[indCellPrint[indi]].printAlt();
+            (this->cells)[indCellPrint[indi]].printAlt();
         }
         cout << "------" << endl;
     }
@@ -1875,6 +1876,7 @@ public:
         // Analyze design and print to terminal
         int numCell = getNumCell();
 
+        cout << "------" << endl;
         cout << "ASCII Database of IC Design:" << endl;
         cout << " File Name: " << this->fileName << endl;
         cout << " Version: " << this->getVersion() << endl;

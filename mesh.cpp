@@ -3,233 +3,27 @@
 
 
 
-int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi){
-    FILE *fp, *cfp;
-    char fbase[FDTD_MAXC];
-    char s[FDTD_MAXC];
-    char *word[FDTD_MAXC];
+int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
+{
     int lyr;
-    myint i;
-    myint j, k, m;
+    myint i, j, k, m;
     double upper, lower;
     int status;
     int count;
     int mark;
     double xmin, xmax, ymin, ymax, xwid, ywid;
-    unordered_set<double> portCoorx, portCoory;
 
-
-    xmin = DOUBLEMAX;    // whole structure xmin
-    xmax = DOUBLEMIN;    // whole structure xmax
-    ymin = DOUBLEMAX;    // whole structure ymin
-    ymax = DOUBLEMIN;    // whole structure ymax
-
-    /*sys->ix = 2;
-    sys->iy = 4;*/
-
-    /*strcpy(fbase, argv[1]);
-    strcat(fbase, ".sim_input");*/   //cause segmentation fault
-
-
-    /*read polygon file*/
-    lyr = 0;
-
-    fp = fopen(stackFile, "r");
-    /*cfp = fopen(polyFile, "r");*/
-
-    if (fp == NULL){
-        perror("Failed: ");
-        return -2;
-    }
-    /*if (cfp == NULL){
-        perror("Failed: ");
-        return -2;
-        }*/
-
-    cout << "Begin reading the stack file!" << endl;
-    while (fgets(s, FDTD_MAXC, fp) != NULL){
-        fdtdStringWord(s, word);
-        if (!strncmp(word[0], "LENGTHUNIT", 10)){
-            sys->lengthUnit = fdtdGetValue(word[2]);
-            break;
-        }
-    }
-
-    while (fgets(s, FDTD_MAXC, fp) != NULL){
-        fdtdStringWord(s, word);
-        if (!strncmp(word[0], "FREQUENCY", 9)){
-            if (fgets(s, FDTD_MAXC, fp) != NULL){
-                fdtdStringWord(s, word);
-                sys->freqUnit = fdtdGetValue(word[2]);
-            }
-            if (fgets(s, FDTD_MAXC, fp) != NULL){
-                fdtdStringWord(s, word);
-                sys->freqStart = fdtdGetValue(word[2]);
-            }
-            if (fgets(s, FDTD_MAXC, fp) != NULL){
-                fdtdStringWord(s, word);
-                sys->freqEnd = fdtdGetValue(word[2]);
-            }
-            if (fgets(s, FDTD_MAXC, fp) != NULL){
-                fdtdStringWord(s, word);
-                sys->nfreq = fdtdGetValue(word[2]);
-            }
-            break;
-        }
-    }
-
-    while (fgets(s, FDTD_MAXC, fp) != NULL){
-        fdtdStringWord(s, word);
-        if (!strncmp(word[0], "NUMSTACK", 8)){
-            sys->numStack = (int)fdtdGetValue(word[2]);
-            break;
-        }
-    }
-
-    lyr = 0;
-    int lyr1 = 0;
-    sys->stackEps = (double*)calloc(sys->numStack, sizeof(double));
-    sys->stackBegCoor = (double*)calloc(sys->numStack, sizeof(double));
-    sys->stackEndCoor = (double*)calloc(sys->numStack, sizeof(double));
-    sys->stackCdtMark = (double*)calloc(sys->numStack, sizeof(double));
-    //cout << sys->numStack << endl;
-    while (fgets(s, FDTD_MAXC, fp) != NULL){
-        fdtdStringWord(s, word);
-        if (lyr >= sys->numStack){    //blank
-            break;
-        }
-        if (fdtdGetValue(word[6]) == 0){
-            lyr++;
-            continue;
-        }
-        sys->stackEps[lyr1] = fdtdGetValue(word[9]);   // get the stack eps
-
-        sys->stackBegCoor[lyr1] = fdtdGetValue(word[3]) * sys->lengthUnit;
-
-        sys->stackEndCoor[lyr1] = sys->stackBegCoor[lyr1] + fdtdGetValue(word[6]) * sys->lengthUnit;
-        sys->stackName.push_back(word[0]);
-        //cout << sys->stackName.back() << " " << sys->stackBegCoor[lyr1] << " " << sys->stackEndCoor[lyr1] << endl;
-        lyr1++;
-        lyr++;
-    }
-    sys->numStack = lyr1;
-    /*for (i = 0; i < sys->numStack; i++){
-        cout << sys->stackBegCoor[i] << " " << sys->stackEndCoor[i] << " " << sys->stackEps[i] << endl;
-        }*/
-
-    while (fgets(s, FDTD_MAXC, fp) != NULL){
-        fdtdStringWord(s, word);
-        if (!strncmp(word[0], "NUMPORT", 7)){
-            sys->numPorts = (int)fdtdGetValue(word[2]);
-            break;
-        }
-    }
-
-    double temp;
-    lyr = 0;
-    sys->portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * sys->numPorts);
-    while (fgets(s, FDTD_MAXC, fp) != NULL){
-        fdtdStringWord(s, word);
-        if (lyr >= sys->numPorts)
-            break;
-        sys->portCoor[lyr].x1 = fdtdGetValue(word[0])*sys->lengthUnit;
-        sys->portCoor[lyr].y1 = fdtdGetValue(word[1])*sys->lengthUnit;
-        sys->portCoor[lyr].x2 = fdtdGetValue(word[3])*sys->lengthUnit;
-        sys->portCoor[lyr].y2 = fdtdGetValue(word[4])*sys->lengthUnit;
-        sys->portCoor[lyr].z1 = fdtdGetValue(word[2])*sys->lengthUnit;
-        sys->portCoor[lyr].z2 = fdtdGetValue(word[5])*sys->lengthUnit;
-        
-
-        if (sys->portCoor[lyr].x1 == sys->portCoor[lyr].x2){
-            portCoorx.insert(sys->portCoor[lyr].x1);    // the x coordinates on the yz plane is recorded
-        }
-        if (sys->portCoor[lyr].y1 == sys->portCoor[lyr].y2){
-            portCoory.insert(sys->portCoor[lyr].y1);    // the y coordinates on the xz plane is recorded
-        }
-        if (sys->portCoor[lyr].x1 > sys->portCoor[lyr].x2){
-            temp = sys->portCoor[lyr].x1;
-            sys->portCoor[lyr].x1 = sys->portCoor[lyr].x2;
-            sys->portCoor[lyr].x2 = temp;
-        }
-        if (sys->portCoor[lyr].y1 > sys->portCoor[lyr].y2){
-            temp = sys->portCoor[lyr].y1;
-            sys->portCoor[lyr].y1 = sys->portCoor[lyr].y2;
-            sys->portCoor[lyr].y2 = temp;
-        }
-        if (sys->portCoor[lyr].z1 > sys->portCoor[lyr].z2){
-            temp = sys->portCoor[lyr].z1;
-            sys->portCoor[lyr].z1 = sys->portCoor[lyr].z2;
-            sys->portCoor[lyr].z2 = temp;
-        }
-        sys->portCoor[lyr].portDirection = (int)fdtdGetValue(word[6]);
-        lyr++;
-    }
-
-
-    cout << "Begin reading the conductor information!" << endl;
-    //sys->conductorIn = (fdtdOneCondct*)malloc(sizeof(fdtdOneCondct)*sys->numCdtRow);
-    i = 0;
-    //k = 0;
-    
-    while (true){    //get one line and put each word in word arr
-        /*count = 0;
-        while (strPoints[k] != '\n'){
-        s[count] = strPoints[k];
-        count++;
-        k++;
-        }
-        s[count] = strPoints[k];
-        /*for (m = 0; m <= count; m++)
-        cout << s[m];*/
-        /*k++;*/
-        //fdtdStringWord(s, word);
-        if (i >= sys->numCdtRow)    //if on this line there is nothing
-            break;
-        else{
-            /*sys->conductorIn[i].numVert = (int)fdtdGetValue(word[0]);
-            sys->conductorIn[i].xmax = DOUBLEMIN;
-            sys->conductorIn[i].xmin = DOUBLEMAX;
-            sys->conductorIn[i].ymax = DOUBLEMIN;
-            sys->conductorIn[i].ymin = DOUBLEMAX;
-            sys->conductorIn[i].x = (double*)calloc(sys->conductorIn[i].numVert, sizeof(double));
-            sys->conductorIn[i].y = (double*)calloc(sys->conductorIn[i].numVert, sizeof(double));
-            for (j = 0; j < sys->conductorIn[i].numVert; j++){
-            if (fdtdGetValue(word[j * 2 + 2]) > sys->conductorIn[i].xmax){
-            sys->conductorIn[i].xmax = fdtdGetValue(word[j * 2 + 2]);
-            }
-            if (fdtdGetValue(word[j * 2 + 2]) < sys->conductorIn[i].xmin){
-            sys->conductorIn[i].xmin = fdtdGetValue(word[j * 2 + 2]);
-            }
-            if (fdtdGetValue(word[j * 2 + 3]) > sys->conductorIn[i].ymax){
-            sys->conductorIn[i].ymax = fdtdGetValue(word[j * 2 + 3]);
-            }
-            if (fdtdGetValue(word[j * 2 + 3]) < sys->conductorIn[i].ymin){
-            sys->conductorIn[i].ymin = fdtdGetValue(word[j * 2 + 3]);
-            }
-            sys->conductorIn[i].x[j] = fdtdGetValue(word[j * 2 + 2]);
-            sys->conductorIn[i].y[j] = fdtdGetValue(word[j * 2 + 3]);
-            }*/
-            //lyr = (int)fdtdGetValue(word[1]);
-            
-            for (j = 0; j < sys->numStack; j++){
-                if (to_string(sys->conductorIn[i].layer) == sys->stackName[j]){
-                    sys->conductorIn[i].zmin = sys->stackBegCoor[j];
-                    sys->conductorIn[i].zmax = sys->stackEndCoor[j];
-                    sys->stackCdtMark[j] = 1;
-                }
-            }
-            //cout << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].zmin << " " << sys->conductorIn[i].zmax << endl;
-        }
-        i++;
-    }
-    
+    /*cout << " Print the conductor information: " << endl;
+    for (i = 0; i < sys->numCdtRow; i++){
+        cout << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].zmin << " " << sys->conductorIn[i].zmax << endl;
+    }*/
 
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
     double disMin = MINDIS;
     double disMaxx, disMaxy;   // the max discretization in x, y, z directions
-    for (i = 0; i < sys->numCdtRow; i++){
+    for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }
     //cout << numNode << endl;
@@ -238,15 +32,15 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     zOrigOld = (double*)calloc(2 * sys->numStack + 2 * sys->numPorts, sizeof(double));
 
     j = 0;
-    for (i = 0; i < sys->numCdtRow; i++){
-        for (k = 0; k < sys->conductorIn[i].numVert; k++){
+    for (i = 0; i < sys->numCdtRow; i++) {
+        for (k = 0; k < sys->conductorIn[i].numVert; k++) {
             xOrigOld[j] = sys->conductorIn[i].x[k];
             yOrigOld[j] = sys->conductorIn[i].y[k];
             j++;
         }
     }
 
-    for (i = 0; i < sys->numPorts; i++){
+    for (i = 0; i < sys->numPorts; i++) {
         xOrigOld[j] = sys->portCoor[i].x1;
         yOrigOld[j] = sys->portCoor[i].y1;
         j++;
@@ -255,13 +49,13 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
         j++;
     }
     j = 0;
-    for (i = 0; i < sys->numStack; i++){
+    for (i = 0; i < sys->numStack; i++) {
         zOrigOld[j] = sys->stackBegCoor[i];
         j++;
         zOrigOld[j] = sys->stackEndCoor[i];
         j++;
     }
-    for (i = 0; i < sys->numPorts; i++){
+    for (i = 0; i < sys->numPorts; i++) {
         zOrigOld[j] = sys->portCoor[i].z1;
         j++;
         zOrigOld[j] = sys->portCoor[i].z2;
@@ -308,7 +102,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             j++;
             xn[j] = xOrigOld[i];
         }
-        else{
+        else {
             j++;
             xn[j] = xOrigOld[i];
         }
@@ -331,7 +125,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             //sys->xnu[j] = xn[i];
             //xi[sys->xnu[j]] = j;
         }
-        else{
+        else {
             //xi[xn[i]] = j;
         }
     }
@@ -362,7 +156,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     sys->ny = 1;
     
     temp = yn[0];
-
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
         if (abs(yOrigOld[i] - temp) > disMin && abs(yOrigOld[i] - temp) <= disMaxy){
             j++;
@@ -388,7 +181,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
             //cout << yn[j] << " ";
         }
-        else{
+        else {
             j++;
             yn[j] = yOrigOld[i];
             //cout << yn[j] << " ";
@@ -415,11 +208,10 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             //yi[sys->ynu[j]] = j;
             
         }
-        else{
+        else {
             //yi[yn[i]] = j;
         }
     }
-    cout << endl;
 
     sys->ny = j + 1;
 
@@ -437,7 +229,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     }
 
     double *zn = (double*)calloc(2 * sys->numStack + 6 * sys->numPorts, sizeof(double));
-    for (i = 0; i < 2 * sys->numStack + 2 * sys->numPorts; i++){
+    for (i = 0; i < 2 * sys->numStack + 2 * sys->numPorts; i++) {
         zn[i] = zOrigOld[i];
     }
     int countz = 2 * sys->numStack + 2 * sys->numPorts - 1;
@@ -461,7 +253,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             temp = sys->xn[j];
             xi[sys->xn[j]] = j;
         }
-        else{
+        else {
             xi[xn[i]] = j;
         }
     }
@@ -483,7 +275,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             temp = sys->yn[j];
             yi[sys->yn[j]] = j;
         }
-        else{
+        else {
             yi[yn[i]] = j;
         }
     }
@@ -502,7 +294,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             sys->zn[j] = zn[i];
             zi[sys->zn[j]] = j;
         }
-        else{
+        else {
             zi[zn[i]] = j;
         }
     }
@@ -515,24 +307,24 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
     if (sys->stackBegCoor[0] == 0){
         j = 0;
-        while (i < sys->nz - 1){
-            if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]){
+        while (i < sys->nz - 1) {
+            if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]) {
                 sys->stackEpsn[i] = sys->stackEps[j];
                 i++;
             }
-            else{
+            else {
                 j++;
             }
         }
     }
-    else{
+    else {
         j = sys->numStack - 1;
-        while (i < sys->nz - 1){
-            if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]){
+        while (i < sys->nz - 1) {
+            if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]) {
                 sys->stackEpsn[i] = sys->stackEps[j];
                 i++;
             }
-            else{
+            else {
                 j--;
             }
         }
@@ -540,7 +332,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     /*for (i = 0; i < sys->nz - 1; i++){
         cout << sys->stackEpsn[i] << endl;
         }*/
-
     /*for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
@@ -556,12 +347,6 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
     /***********************************************************************************************/
 
-    sys->xlim1 = sys->xn[0];
-    sys->xlim2 = sys->xn[sys->nx - 1];
-    sys->ylim1 = sys->yn[0];
-    sys->ylim2 = sys->yn[sys->ny - 1];
-    sys->zlim1 = sys->zn[0];
-    sys->zlim2 = sys->zn[sys->nz - 1];
     sys->N_cell_x = sys->nx - (myint)1;
     sys->N_cell_y = sys->ny - (myint)1;
     sys->N_cell_z = sys->nz - (myint)1;
@@ -580,6 +365,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
     sys->markEdge = (myint*)calloc(sys->N_edge, sizeof(myint));   // mark which edge is inside the conductor
     sys->markNode = (myint*)calloc(sys->N_node, sizeof(myint));   // mark which node is inside the conductor
+
     cout << "N_edge = " << sys->N_edge << endl;
     cout << "N_node = " << sys->N_node << endl;
     cout << "N_cell_x = " << sys->N_cell_x << endl;
@@ -595,6 +381,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     myint y1, y2;
     myint l;
     clock_t tt = clock();
+    // Fast algorithm to find nodes inside conductors
     for (i = 0; i < sys->numCdtRow; i++){
         for (j = 0; j < sys->conductorIn[i].numVert; j++){
             xcoor.insert(xi[sys->conductorIn[i].x[j]]);
@@ -817,39 +604,21 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     for (i = sys->N_node - sys->N_node_s; i < sys->N_node; i++){
         sys->markNode[i] = 1;
     }
-    
-    /*ofstream out;
-    out.open("markNode1.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_node; i++){
-        out << sys->markNode[i] << endl;
-    }
-    out.close();
 
-    out.open("markEdge1.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge; i++){
-        out << sys->markEdge[i] << endl;
-    }
-    out.close();*/
-
-    /*fclose(cfp);*/
-    cout << "Trying to close file" << endl;
-    fclose(fp);
-    cout << "File closed" << endl;
-    
     /* construct edgelink */
     myint eno;
     sys->edgelink = (myint*)malloc(2 * sizeof(myint)*sys->N_edge);
-    for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++){
-        for (i = 1; i <= sys->N_cell_x + 1; i++){    //edge along y axis
-            for (j = 1; j <= sys->N_cell_y; j++){
+    for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++) {
+        for (i = 1; i <= sys->N_cell_x + 1; i++) {    //edge along y axis
+            for (j = 1; j <= sys->N_cell_y; j++) {
                 eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + (i - 1)*sys->N_cell_y + j;
                 sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
                 sys->edgelink[(eno - 1) * 2 + 2 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j;
 
             }
         }
-        for (i = 1; i <= sys->N_cell_x; i++){    //edge along x axis
-            for (j = 1; j <= sys->N_cell_y + 1; j++){
+        for (i = 1; i <= sys->N_cell_x; i++) {    //edge along x axis
+            for (j = 1; j <= sys->N_cell_y + 1; j++) {
                 eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1)*sys->N_cell_y + (i - 1)*(sys->N_cell_y + 1) + j;
                 sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
                 sys->edgelink[(eno - 1) * 2 + 2 - 1] = (lyr - 1)*sys->N_node_s + i*(sys->N_cell_y + 1) + j - 1;
@@ -857,29 +626,23 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
     }
-    for (lyr = 1; lyr <= sys->N_cell_z; lyr++){    // edge along z axis
-        for (i = 1; i <= sys->N_cell_x + 1; i++){
-            for (j = 1; j <= sys->N_cell_y + 1; j++){
+    for (lyr = 1; lyr <= sys->N_cell_z; lyr++) {    // edge along z axis
+        for (i = 1; i <= sys->N_cell_x + 1; i++) {
+            for (j = 1; j <= sys->N_cell_y + 1; j++) {
                 eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (i - 1)*(sys->N_cell_y + 1) + j;
                 sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
                 sys->edgelink[(eno - 1) * 2 + 2 - 1] = lyr*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
             }
         }
     }
-    /*ofstream outfile;
-    outfile.open("edgelink.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge; i++){
-        outfile << sys->edgelink[i * 2] << " " << sys->edgelink[i * 2 + 1] << endl;
-    }
-    outfile.close();*/
 
     /* construct nodepos */
     myint nno;
 
     sys->nodepos = (double*)malloc(sizeof(double)*sys->N_node * 3);   //N_node rows and 3 columns, input row by row
-    for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++){
-        for (i = 1; i <= sys->N_cell_x + 1; i++){
-            for (j = 1; j <= sys->N_cell_y + 1; j++){
+    for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++) {
+        for (i = 1; i <= sys->N_cell_x + 1; i++) {
+            for (j = 1; j <= sys->N_cell_y + 1; j++) {
                 nno = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j;
                 sys->nodepos[(nno - 1) * 3 + 1 - 1] = sys->xn[i - 1];
                 sys->nodepos[(nno - 1) * 3 + 2 - 1] = sys->yn[j - 1];
@@ -887,22 +650,15 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
     }
-    
-    /*outfile.open("nodepos.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_node; i++){
-        outfile << sys->nodepos[i * 3] << " " << sys->nodepos[i * 3 + 1] << " " << sys->nodepos[i * 3 + 2] << endl;
-    }
-    outfile.close();*/
-    cout << "nodepos is done!\n";
 
     /* construct nodeEdge */
     double leng;
     vector<pair<myint, double> > a;
-    for (i = 0; i < sys->N_node; i++){
+    for (i = 0; i < sys->N_node; i++) {
         sys->nodeEdge.push_back(a);
         sys->nodeEdgea.push_back(a);
     }
-    for (i = 0; i < sys->N_edge; i++){
+    for (i = 0; i < sys->N_edge; i++) {
         leng = pow((sys->nodepos[sys->edgelink[i * 2] * 3] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3]), 2);
         leng = leng + pow((sys->nodepos[sys->edgelink[i * 2] * 3 + 1] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3 + 1]), 2);
         leng = leng + pow((sys->nodepos[sys->edgelink[i * 2] * 3 + 2] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3 + 2]), 2);
@@ -913,65 +669,66 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     cout << "nodeEdge is done\n";
     int ix, iy, iz;
     iz = sys->N_cell_z;
-    for (ix = 0; ix < sys->nx; ix++){
-        for (iy = 0; iy < sys->ny; iy++){
+    for (ix = 0; ix < sys->nx; ix++) {
+        for (iy = 0; iy < sys->ny; iy++) {
             sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, -1 / (sys->zn[iz] - sys->zn[iz - 1])));
         }
     }
     iz = 0;
-    for (ix = 0; ix < sys->nx; ix++){
-        for (iy = 0; iy < sys->ny; iy++){
+    for (ix = 0; ix < sys->nx; ix++) {
+        for (iy = 0; iy < sys->ny; iy++) {
             sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, 1 / (sys->zn[iz + 1] - sys->zn[iz])));
         }
     }
-    for (iz = 1; iz < sys->N_cell_z; iz++){
-        for (ix = 0; ix < sys->nx; ix++){
-            for (iy = 0; iy < sys->ny; iy++){
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy , -2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
+    for (iz = 1; iz < sys->N_cell_z; iz++) {
+        for (ix = 0; ix < sys->nx; ix++) {
+            for (iy = 0; iy < sys->ny; iy++) {
+                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, -2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
                 sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, 2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
             }
         }
     }
     ix = sys->N_cell_x;
-    for (iz = 0; iz < sys->nz; iz++){
-        for (iy = 0; iy < sys->ny; iy++){
+    for (iz = 0; iz < sys->nz; iz++) {
+        for (iy = 0; iy < sys->ny; iy++) {
             sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (ix - 1) * (sys->N_cell_y + 1) + iy, -1 / (sys->xn[ix] - sys->xn[ix - 1])));
         }
     }
     ix = 0;
-    for (iz = 0; iz < sys->nz; iz++){
-        for (iy = 0; iy < sys->ny; iy++){
+    for (iz = 0; iz < sys->nz; iz++) {
+        for (iy = 0; iy < sys->ny; iy++) {
             sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + ix * (sys->N_cell_y + 1) + iy, 1 / (sys->xn[ix + 1] - sys->xn[ix])));
         }
     }
-    for (ix = 1; ix < sys->N_cell_x; ix++){
-        for (iz = 0; iz < sys->nz; iz++){
-            for (iy = 0; iy < sys->ny; iy++){
+    for (ix = 1; ix < sys->N_cell_x; ix++) {
+        for (iz = 0; iz < sys->nz; iz++) {
+            for (iy = 0; iy < sys->ny; iy++) {
                 sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (ix - 1) * (sys->N_cell_y + 1) + iy, -2 / (sys->xn[ix + 1] - sys->xn[ix - 1])));
                 sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + ix * (sys->N_cell_y + 1) + iy, 2 / (sys->xn[ix + 1] - sys->xn[ix - 1])));
             }
         }
     }
     iy = sys->N_cell_y;
-    for (iz = 0; iz < sys->nz; iz++){
-        for (ix = 0; ix < sys->nx; ix++){
+    for (iz = 0; iz < sys->nz; iz++) {
+        for (ix = 0; ix < sys->nx; ix++) {
             sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1, -1 / (sys->yn[iy] - sys->yn[iy - 1])));
         }
     }
     iy = 0;
-    for (iz = 0; iz < sys->nz; iz++){
-        for (ix = 0; ix < sys->nx; ix++){
+    for (iz = 0; iz < sys->nz; iz++) {
+        for (ix = 0; ix < sys->nx; ix++) {
             sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy, 1 / (sys->yn[iy + 1] - sys->yn[iy])));
         }
     }
-    for (iy = 1; iy < sys->N_cell_y; iy++){
-        for (iz = 0; iz < sys->nz; iz++){
-            for (ix = 0; ix < sys->nx; ix++){
+    for (iy = 1; iy < sys->N_cell_y; iy++) {
+        for (iz = 0; iz < sys->nz; iz++) {
+            for (ix = 0; ix < sys->nx; ix++) {
                 sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1, -2 / (sys->yn[iy + 1] - sys->yn[iy - 1])));
                 sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy, 2 / (sys->yn[iy + 1] - sys->yn[iy - 1])));
             }
         }
     }
+
     /* implement dfs */
     //cout <<"Number of nodes: " << sys->N_node << endl;
     myint *visited;
@@ -979,46 +736,46 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     unordered_set<int> base;
     visited = (myint*)calloc(sys->N_node, sizeof(myint));
     count = 0;
-    
-    for (i = 0; i < sys->N_node; i++){
-        if (sys->markNode[i] == 0){
+
+    for (i = 0; i < sys->N_node; i++) {
+        if (sys->markNode[i] == 0) {
             continue;
         }
-        else{
-            if (visited[i] != 0){
+        else {
+            if (visited[i] != 0) {
                 continue;
             }
-            else{
+            else {
                 st.clear();
                 st.push_back(i);
                 count++;
                 visited[i] = count;
                 sys->cond2condIn.push_back(base);
-                while (!st.empty()){ 
+                while (!st.empty()) {
                     mark = 0;
-                    for (j = 0; j < sys->nodeEdge[st.back()].size(); j++){
-                        if (sys->markEdge[sys->nodeEdge[st.back()][j].first] != 0){
-                            if (sys->cond2condIn[count - 1].find(sys->markEdge[sys->nodeEdge[st.back()][j].first]) == sys->cond2condIn[count - 1].end()){
+                    for (j = 0; j < sys->nodeEdge[st.back()].size(); j++) {
+                        if (sys->markEdge[sys->nodeEdge[st.back()][j].first] != 0) {
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[sys->nodeEdge[st.back()][j].first]) == sys->cond2condIn[count - 1].end()) {
                                 sys->cond2condIn[count - 1].insert(sys->markEdge[sys->nodeEdge[st.back()][j].first]);
                             }
-                            if ((sys->edgelink[sys->nodeEdge[st.back()][j].first * 2] != st.back() && visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]] == 0)){
+                            if ((sys->edgelink[sys->nodeEdge[st.back()][j].first * 2] != st.back() && visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]] == 0)) {
                                 visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]] = count;
                                 st.push_back(sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]);
                                 mark = 1;
-                                
+
                                 break;
                             }
-                            else if ((sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1] != st.back() && visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]] == 0)){
+                            else if ((sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1] != st.back() && visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]] == 0)) {
                                 visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]] = count;
                                 st.push_back(sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]);
                                 mark = 1;
-                                
+
                                 break;
                             }
-                            
+
                         }
                     }
-                    if (mark == 0){
+                    if (mark == 0) {
                         st.pop_back();
                     }
                 }
@@ -1036,8 +793,8 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
             }
         }
     }*/
-    
-   
+
+
     for (i = 0; i < sys->N_edge; i++){
         if (sys->markEdge[i] != 0 && visited[sys->edgelink[i * 2]] == visited[sys->edgelink[i * 2 + 1]] && visited[sys->edgelink[i * 2]] != 0){
             sys->markEdge[i] = visited[sys->edgelink[i * 2 + 1]];    // Mark the edge with each color for different conductors
@@ -1053,6 +810,13 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
     
     /* Construct each conductor */
     sys->numCdt = count;
+    /*for (i = 0; i < sys->numCdt; i++) {
+        cout << "Cnt " << i << " has condIn as: ";
+        for (auto ci : sys->cond2condIn[i]) {
+            cout << ci << " ";
+        }
+        cout << endl;
+    }*/
     sys->conductor = (fdtdCdt*)malloc(sys->numCdt * sizeof(fdtdCdt));
     sys->cdtNumNode = (myint*)calloc(sys->numCdt, sizeof(myint));
     for (i = 0; i < sys->N_node; i++){
@@ -1194,8 +958,7 @@ int readInput(const char *stackFile, fdtdMesh *sys, unordered_map<double, int> &
 
 int matrixConstruction(fdtdMesh *sys){
     int i, j;
-    ofstream outfile;
-    
+
     /* construct D_eps */
     sys->eps = (double*)malloc(sizeof(double)*sys->N_edge);
     for (i = 0; i < sys->N_edge; i++){
@@ -1207,11 +970,6 @@ int matrixConstruction(fdtdMesh *sys){
             sys->eps[i] = sys->stackEpsn[(i - sys->N_edge_s) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
     }
-    /*outfile.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-        outfile << sys->eps[i] << endl;
-    }
-    outfile.close();*/
 
     /* construct D_sig */
     sys->sig = (double*)calloc(sys->N_edge, sizeof(double));
@@ -1228,12 +986,6 @@ int matrixConstruction(fdtdMesh *sys){
         }
     }
 
-    /*outfile.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-        outfile << sys->sig[i] << endl;
-    }
-    outfile.close();*/
-
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
     //free(sys->markCell); sys->markCell = NULL;
@@ -1242,16 +994,14 @@ int matrixConstruction(fdtdMesh *sys){
 }
 
 int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi){
-    ofstream outfile;
     char s[FDTD_MAXC];
     char *word[FDTD_MAXC];
     int j, i, mark, l, m, k;
     int node;
     vector<int> edge;
     double a;
-    double sideLen = 0;
-    
-   
+    double sideLen = 0.;
+
     for (i = 0; i < sys->numPorts; i++)
     {
         
@@ -1282,22 +1032,22 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             }
             a = 1;
             if (yi[sys->portCoor[i].y1] == 0){
-                a = a * (sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1);
+                a *= (sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1);
             }
             else if (yi[sys->portCoor[i].y1] == sys->N_cell_y){
-                a = a * (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]);
+                a *= (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]);
             }
             else{
-                a = a * ((sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1) / 2 + (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]) / 2);
+                a *= ((sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1) / 2 + (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]) / 2);
             }
             if (zi[sys->portCoor[i].z1] == 0){
-                a = a *(sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1);
+                a *=(sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1);
             }
             else if (zi[sys->portCoor[i].z1] == sys->N_cell_z){
-                a = a * (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]);
+                a *= (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]);
             }
             else{
-                a = a * ((sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1) / 2 + (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]) / 2);
+                a *= ((sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1) / 2 + (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]) / 2);
             }
             sys->portArea.push_back(a);
         }
@@ -1314,22 +1064,22 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             }
             a = 1;
             if (xi[sys->portCoor[i].x1] == 0){
-                a = a * (sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1);
+                a *= (sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1);
             }
             else if (xi[sys->portCoor[i].x1] == sys->N_cell_x){
-                a = a * (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]);
+                a *= (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]);
             }
             else{
-                a = a * ((sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1) / 2 + (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]) / 2);
+                a *= ((sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1) / 2 + (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]) / 2);
             }
             if (zi[sys->portCoor[i].z1] == 0){
-                a = a *(sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1);
+                a *=(sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1);
             }
             else if (zi[sys->portCoor[i].z1] == sys->N_cell_z){
-                a = a * (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]);
+                a *= (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]);
             }
             else{
-                a = a * ((sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1) / 2 + (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]) / 2);
+                a *= ((sys->zn[zi[sys->portCoor[i].z1] + 1] - sys->portCoor[i].z1) / 2 + (sys->portCoor[i].z1 - sys->zn[zi[sys->portCoor[i].z1] - 1]) / 2);
             }
             sys->portArea.push_back(a);
         }
@@ -1346,22 +1096,22 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             }
             a = 1;
             if (xi[sys->portCoor[i].x1] == 0){
-                a = a * (sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1);
+                a *= (sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1);
             }
             else if (xi[sys->portCoor[i].x1] == sys->N_cell_x){
-                a = a * (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]);
+                a *= (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]);
             }
             else{
-                a = a * ((sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1) / 2 + (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]) / 2);
+                a *= ((sys->xn[xi[sys->portCoor[i].x1] + 1] - sys->portCoor[i].x1) / 2 + (sys->portCoor[i].x1 - sys->xn[xi[sys->portCoor[i].x1] - 1]) / 2);
             }
             if (yi[sys->portCoor[i].y1] == 0){
-                a = a *(sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1);
+                a *=(sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1);
             }
             else if (yi[sys->portCoor[i].y1] == sys->N_cell_y){
-                a = a * (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]);
+                a *= (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]);
             }
             else{
-                a = a * ((sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1) / 2 + (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]) / 2);
+                a *= ((sys->yn[yi[sys->portCoor[i].y1] + 1] - sys->portCoor[i].y1) / 2 + (sys->portCoor[i].y1 - sys->yn[yi[sys->portCoor[i].y1] - 1]) / 2);
             }
             sys->portArea.push_back(a);
 
@@ -1369,16 +1119,18 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
         sys->portEdge.push_back(edge);
 
     }
-    
+
     clock_t t1 = clock();
     sys->markProSide = (int*)calloc(sys->N_node, sizeof(int));
     double x1, x2, y1, y2;
     myint x1_ind, x2_ind, y1_ind, y2_ind, z1_ind, z2_ind;
+
     for (i = 0; i < sys->numPorts; i++){
+        /*cout << "Value of sys->portCoor[i].portCnd - 1: " << sys->portCoor[i].portCnd - 1 << endl;
+        cout << "Size of the sys->cond2condIn[sys->portCoor[i].portCnd - 1] unordered_set: " << sys->cond2condIn[sys->portCoor[i].portCnd - 1].size() << endl; */
         for (auto ci : sys->cond2condIn[sys->portCoor[i].portCnd - 1]){
             for (l = 0; l < sys->conductorIn[ci - 1].numVert - 1; l++){
                 if (sys->conductorIn[ci - 1].x[l] == sys->conductorIn[ci - 1].x[l + 1]){
-                    
                     x1 = sys->conductorIn[ci - 1].x[l];
                     x2 = x1;
                     if (sys->conductorIn[ci - 1].y[l] < sys->conductorIn[ci - 1].y[l + 1]){
@@ -1421,7 +1173,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                     }
                 }
                 else{
-                   
                     y1 = sys->conductorIn[ci - 1].y[l];
                     y2 = y1;
                     if (sys->conductorIn[ci - 1].x[l] < sys->conductorIn[ci - 1].x[l + 1]){
@@ -1466,7 +1217,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                 
             }
             if (sys->conductorIn[ci - 1].x[l] == sys->conductorIn[ci - 1].x[0]){
-                
                 x1 = sys->conductorIn[ci - 1].x[l];
                 x2 = x1;
                 if (sys->conductorIn[ci - 1].y[l] < sys->conductorIn[ci - 1].y[0]){
@@ -1509,7 +1259,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
                 }
             }
             else{
-                
                 y1 = sys->conductorIn[ci - 1].y[l];
                 y2 = y1;
                 if (sys->conductorIn[ci - 1].x[l] < sys->conductorIn[ci - 1].x[0]){
@@ -1556,11 +1305,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
     sys->conductorIn.clear();
-    /*outfile.open("markProside.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_node_s; i++){
-        outfile << sys->markProSide[i] << " ";
-    }
-    outfile.close();*/
     return 0;
 }
 
@@ -1644,4 +1388,330 @@ int compareString(char *a, char *b)
     else{
         return 0;
     }
+}
+
+// Print fdtdPort information
+void fdtdPort::print()
+{
+    // Print
+    cout << " ------" << endl;
+    cout << " Contents of fdtdPort" << endl;
+    if (this->x == nullptr)
+    {
+        cout << "  x array exists (" << (this->x != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  x array has size " << NELEMENT(this->x) << endl;
+    }
+    if (this->y == nullptr)
+    {
+        cout << "  y array exists (" << (this->y != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  y array has size " << NELEMENT(this->y) << endl;
+    }
+    if (this->z == nullptr)
+    {
+        cout << "  z array exists (" << (this->z != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  z array has size " << NELEMENT(this->z) << endl;
+    }
+    cout << "  Coordinates of two points for the source:" << endl;
+    cout << "   x-coordinates: " << this->x1 << " m and " << this->x2 << " m" << endl;
+    cout << "   y-coordinates: " << this->y1 << " m and " << this->y2 << " m" << endl;
+    cout << "   z-coordinates: " << this->z1 << " m and " << this->z2 << " m" << endl;
+    cout << "  Port direction: " << this->portDirection << endl;
+    if (this->node == nullptr)
+    {
+        cout << "  Node array exists (" << (this->node != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  Node array has size " << NELEMENT(this->node) << endl;
+    }
+    cout << "  Number of nodes: " << this->nodenum << endl;
+    cout << "  portCnd: " << this->portCnd << endl;
+    cout << " ------" << endl;
+}
+
+// Print fdtdMesh information
+void fdtdMesh::print()
+{
+    // Print
+    cout << "------" << endl;
+    cout << "Contents of fdtdMesh" << endl;
+    cout << " Length unit: " << this->lengthUnit << " m" << endl;
+    cout << " Frequency sweep parameters: " << endl;
+    cout << "  Frequency unit: " << this->freqUnit << " Hz" << endl;
+    cout << "  Starting frequency: " << this->freqStart << " * " << this->freqUnit << " Hz" << endl;
+    cout << "  Ending frequency: " << this->freqEnd << " * " << this->freqUnit << " Hz" << endl;
+    cout << "  Number of frequencies: " << this->nfreq << endl;
+    cout << "  Frequency scaling: " << this->freqScale << endl;
+    cout << " Node coordinate information:" << endl;
+    cout << "  Number of nodes along direction: " << this->nx << " in x-dir, " << this->ny << " in y-dir, and " << this->nz << " in z-dir" << endl;
+    cout << "  Node arrays: xn exists (" << (this->xn != nullptr) << "), yn exists (" << (this->yn != nullptr) << "), and zn exists (" << (this->zn != nullptr) << ")" << endl;
+    cout << "  Node arrays: xnu exists (" << (this->xnu != nullptr) << "), ynu exists (" << (this->ynu != nullptr) << "), and znu exists (" << (this->znu != nullptr) << ")" << endl;
+    cout << " Mesh cell information:" << endl;
+    cout << "  Number in each direction: " << this->N_cell_x << " in x-dir, " << this->N_cell_y << " in y-dir, and " << this->N_cell_z << " in z-dir" << endl;
+    cout << "  Limits in x-direction: " << this->xlim1 << " * " << this->lengthUnit << " m to " << this->xlim2 << " * " << this->lengthUnit << " m" << endl;
+    cout << "  Limits in y-direction: " << this->ylim1 << " * " << this->lengthUnit << " m to " << this->ylim2 << " * " << this->lengthUnit << " m" << endl;
+    cout << "  Limits in z-direction: " << this->zlim1 << " * " << this->lengthUnit << " m to " << this->zlim2 << " * " << this->lengthUnit << " m" << endl;
+    cout << " Mesh edge information:" << endl;
+    cout << "  Number of edges: " << this->N_edge << endl;
+    cout << "  Number of edges_s: " << this->N_edge_s << endl;
+    cout << "  Number of edges_v: " << this->N_edge_v << endl;
+    cout << " Mesh node information:" << endl;
+    cout << "  Number of nodes: " << this->N_node << endl;
+    cout << "  Number of nodes_s: " << this->N_node_s << endl;
+    cout << " Mesh patch information:" << endl;
+    cout << "  Number of patches: " << this->N_patch << endl;
+    cout << "  Number of patches_s: " << this->N_patch_s << endl;
+    cout << "  Number of patches_v: " << this->N_patch_v << endl;
+    cout << " Mesh field location information:" << endl;
+    cout << "  nodepos array exists (" << (this->nodepos != nullptr) << ")" << endl;
+    cout << "  Epoints array exists (" << (this->Epoints != nullptr) << ")" << endl;
+    cout << "  edgelink array exists (" << (this->edgelink != nullptr) << ")" << endl;
+    cout << "  Hpoints array exists (" << (this->Hpoints != nullptr) << ")" << endl;
+    cout << "  nodeEdge vector has size " << this->nodeEdge.size() << endl;
+    cout << "  nodeEdgea vector has size " << this->nodeEdgea.size() << endl;
+    cout << " PEC information:" << endl;
+    cout << "  Boundary node 1 array exists (" << (this->bd_node1 != nullptr) << ")" << endl;
+    cout << "  Boundary node 2 array exists (" << (this->bd_node2 != nullptr) << ")" << endl;
+    cout << "  Boundary edge array exists (" << (this->bd_edge != nullptr) << ")" << endl;
+    cout << " Layer stack material parameters:" << endl;
+    cout << "  Number of layers in stack: " << this->numStack << endl;
+    cout << "  Permittivity array exists (" << (this->stackEps != nullptr) << ")" << endl;
+    cout << "  Beginning coordinate array exists (" << (this->stackBegCoor != nullptr) << ")" << endl;
+    cout << "  Ending coordinate array exists (" << (this->stackEndCoor != nullptr) << ")" << endl;
+    cout << "  Layer name vector has size " << this->stackName.size() << endl;
+    cout << "  Other permittivity array eps exists (" << (this->eps != nullptr) << ")" << endl;
+    cout << "  stackEpsn array exists (" << (this->stackEpsn != nullptr) << ")" << endl;
+    cout << "  Stack conductor marker array exists (" << (this->stackCdtMark != nullptr) << ")" << endl;
+    cout << " Conductor parameter information:" << endl;
+    cout << "  conductorIn vector has size " << this->conductorIn.size() << endl;
+    cout << "  Number of conductor rows: " << this->numCdtRow << endl;
+    cout << "  Number of isolated conductors: " << this->numCdt << endl;
+    if (this->patch == nullptr)
+    {
+        cout << "  Edge marker array exists (" << (this->markEdge != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  Edge marker array has size " << NELEMENT(this->markEdge) << endl;
+    }
+    cout << "  Cell marker array exists (" << (this->markCell != nullptr) << ")" << endl;
+    cout << "  cdtNumNode array exists (" << (this->cdtNumNode != nullptr) << ")" << endl;
+    cout << "  sig array exist (" << (this->sig != nullptr) << ")" << endl;
+    cout << "  conductor array exists (" << (this->conductor != nullptr) << ")" << endl;
+    cout << "  Node marker array exists (" << (this->markNode != nullptr) << ")" << endl;
+    cout << "  edgeCell vector has size " << this->edgeCell.size() << endl;
+    cout << "  edgeCellArea vector has size " << this->edgeCellArea.size() << endl;
+    cout << "  acu_cnno array exists (" << (this->acu_cnno != nullptr) << ")" << endl;
+    cout << "  cindex array exists (" << (this->cindex != nullptr) << ")" << endl;
+    cout << "  exciteCdtLayer array exists (" << (this->exciteCdtLayer != nullptr) << ")" << endl;
+    cout << "  cond2condIn vector has size " << this->cond2condIn.size() << endl;
+    cout << "  markProSide array exists (" << (this->markProSide != nullptr) << ")" << endl;
+    if (this->patch == nullptr)
+    {
+        cout << " Patch information exists (" << (this->patch != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << " Patch information has size " << NELEMENT(this->patch) << endl;
+    }
+    if (this->bound == nullptr)
+    {
+        cout << " Boundary information exists (" << (this->bound != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << " Boundary information has size " << NELEMENT(this->bound) << endl;
+    }
+    cout << " V0c information:" << endl;
+    if (this->v0cval == nullptr)
+    {
+        cout << "  v0cRowId array exists (" << (this->v0cRowId != nullptr) << ")" << endl;
+        cout << "  v0cColId array exists (" << (this->v0cColId != nullptr) << ")" << endl;
+        cout << "  v0cColIdo array exists (" << (this->v0cColIdo != nullptr) << ")" << endl;
+        cout << "  v0cval array exists (" << (this->v0cval != nullptr) << ")" << endl;
+        cout << "  v0cvalo array exists (" << (this->v0cvalo != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  v0cRowId array has size " << NELEMENT(this->v0cRowId) << endl;
+        cout << "  v0cColId array has size " << NELEMENT(this->v0cColId) << endl;
+        cout << "  v0cColIdo array has size " << NELEMENT(this->v0cColIdo) << endl;
+        cout << "  v0cval array has size " << NELEMENT(this->v0cval) << endl;
+        cout << "  v0cvalo array has size " << NELEMENT(this->v0cvalo) << endl;
+    }
+    if (this->v0caval == nullptr)
+    {
+        cout << "  v0caRowId array exists (" << (this->v0caRowId != nullptr) << ")" << endl;
+        cout << "  v0caColId array exists (" << (this->v0caColId != nullptr) << ")" << endl;
+        cout << "  v0caColIdo array exists (" << (this->v0caColIdo != nullptr) << ")" << endl;
+        cout << "  v0caval array exists (" << (this->v0caval != nullptr) << ")" << endl;
+        cout << "  v0cavalo array exists (" << (this->v0cavalo != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  v0caRowId array has size " << NELEMENT(this->v0caRowId) << endl;
+        cout << "  v0caColId array has size " << NELEMENT(this->v0caColId) << endl;
+        cout << "  v0caColIdo array has size " << NELEMENT(this->v0caColIdo) << endl;
+        cout << "  v0caval array has size " << NELEMENT(this->v0caval) << endl;
+        cout << "  v0cavalo array has size " << NELEMENT(this->v0cavalo) << endl;
+    }
+    cout << " Arrays from technical paper information:" << endl;
+    cout << "  v0c2y0c2 array exists (" << (this->v0c2y0c2 != nullptr) << ")" << endl;
+    cout << "  v0c2y0c2o array exists (" << (this->v0c2y0c2o != nullptr) << ")" << endl;
+    cout << "  yc array exists (" << (this->yc != nullptr) << ")" << endl;
+    cout << "  v0cy0c array exists (" << (this->v0cy0c != nullptr) << ")" << endl;
+    cout << " V0c' * D_sig * V0c information:" << endl;
+    if (this->Acval == nullptr)
+    {
+        cout << "  AcRowId array exists (" << (this->AcRowId != nullptr) << ")" << endl;
+        cout << "  AcRowId1 array exists (" << (this->AcRowId1 != nullptr) << ")" << endl;
+        cout << "  AcColId array exists (" << (this->AcColId != nullptr) << ")" << endl;
+        cout << "  Acval array exists (" << (this->Acval != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  AcRowId array has size " << NELEMENT(this->AcRowId) << endl;
+        cout << "  AcRowId1 array has size " << NELEMENT(this->AcRowId1) << endl;
+        cout << "  AcColId array has size " << NELEMENT(this->AcColId) << endl;
+        cout << "  Acval array has size " << NELEMENT(this->Acval) << endl;
+    }
+    if (this->Adval == nullptr)
+    {
+        cout << "  AdRowId array exists (" << (this->AdRowId != nullptr) << ")" << endl;
+        cout << "  AdRowId1 array exists (" << (this->AdRowId1 != nullptr) << ")" << endl;
+        cout << "  AdColId array exists (" << (this->AdColId != nullptr) << ")" << endl;
+        cout << "  Adval array exists (" << (this->Adval != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  AdRowId array has size " << NELEMENT(this->AdRowId) << endl;
+        cout << "  AdRowId1 array has size " << NELEMENT(this->AdRowId1) << endl;
+        cout << "  AdColId array has size " << NELEMENT(this->AdColId) << endl;
+        cout << "  Adval array has size " << NELEMENT(this->Adval) << endl;
+    }
+    cout << "  crhs array exists (" << (this->crhs != nullptr) << ")" << endl;
+    cout << " V0d_ information:" << endl;
+    if (this->v0d1val == nullptr)
+    {
+        cout << "  v0d1RowId array exists (" << (this->v0d1RowId != nullptr) << ")" << endl;
+        cout << "  v0d1ColId array exists (" << (this->v0d1ColId != nullptr) << ")" << endl;
+        cout << "  v0d1ColIdo array exists (" << (this->v0d1ColIdo != nullptr) << ")" << endl;
+        cout << "  v0d1val array exists (" << (this->v0d1val != nullptr) << ")" << endl;
+        cout << "  v0d1valo array exists (" << (this->v0d1valo != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  v0d1RowId array has size " << NELEMENT(this->v0d1RowId) << endl;
+        cout << "  v0d1ColId array has size " << NELEMENT(this->v0d1ColId) << endl;
+        cout << "  v0d1ColIdo array has size " << NELEMENT(this->v0d1ColIdo) << endl;
+        cout << "  v0d1val array has size " << NELEMENT(this->v0d1val) << endl;
+        cout << "  v0d1valo array has size " << NELEMENT(this->v0d1valo) << endl;
+    }
+    if (this->v0d1aval == nullptr)
+    {
+        cout << "  v0d1aRowId array exists (" << (this->v0d1aRowId != nullptr) << ")" << endl;
+        cout << "  v0d1aColId array exists (" << (this->v0d1aColId != nullptr) << ")" << endl;
+        cout << "  v0d1aColIdo array exists (" << (this->v0d1aColIdo != nullptr) << ")" << endl;
+        cout << "  v0d1aval array exists (" << (this->v0d1aval != nullptr) << ")" << endl;
+        cout << "  v0d1avalo array exists (" << (this->v0d1avalo != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  v0d1aRowId array has size " << NELEMENT(this->v0d1aRowId) << endl;
+        cout << "  v0d1aColId array has size " << NELEMENT(this->v0d1aColId) << endl;
+        cout << "  v0d1aColIdo array has size " << NELEMENT(this->v0d1aColIdo) << endl;
+        cout << "  v0d1aval array has size " << NELEMENT(this->v0d1aval) << endl;
+        cout << "  v0d1avalo array has size " << NELEMENT(this->v0d1avalo) << endl;
+    }
+    if (this->v0d2val == nullptr)
+    {
+        cout << "  v0d2RowId array exists (" << (this->v0d2RowId != nullptr) << ")" << endl;
+        cout << "  v0d2ColId array exists (" << (this->v0d2ColId != nullptr) << ")" << endl;
+        cout << "  v0d2ColIdo array exists (" << (this->v0d2ColIdo != nullptr) << ")" << endl;
+        cout << "  v0d2val array exists (" << (this->v0d2val != nullptr) << ")" << endl;
+        cout << "  v0d2valo array exists (" << (this->v0d2valo != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  v0d2RowId array has size " << NELEMENT(this->v0d2RowId) << endl;
+        cout << "  v0d2ColId array has size " << NELEMENT(this->v0d2ColId) << endl;
+        cout << "  v0d2ColIdo array has size " << NELEMENT(this->v0d2ColIdo) << endl;
+        cout << "  v0d2val array has size " << NELEMENT(this->v0d2val) << endl;
+        cout << "  v0d2valo array has size " << NELEMENT(this->v0d2valo) << endl;
+    }
+    if (this->v0d2aval == nullptr)
+    {
+        cout << "  v0d2aRowId array exists (" << (this->v0d2aRowId != nullptr) << ")" << endl;
+        cout << "  v0d2aColId array exists (" << (this->v0d2aColId != nullptr) << ")" << endl;
+        cout << "  v0d2aColIdo array exists (" << (this->v0d2aColIdo != nullptr) << ")" << endl;
+        cout << "  v0d2aval array exists (" << (this->v0d2aval != nullptr) << ")" << endl;
+        cout << "  v0d2avalo array exists (" << (this->v0d2avalo != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  v0d2aRowId array has size " << NELEMENT(this->v0d2aRowId) << endl;
+        cout << "  v0d2aColId array has size " << NELEMENT(this->v0d2aColId) << endl;
+        cout << "  v0d2aColIdo array has size " << NELEMENT(this->v0d2aColIdo) << endl;
+        cout << "  v0d2aval array has size " << NELEMENT(this->v0d2aval) << endl;
+        cout << "  v0d2avalo array has size " << NELEMENT(this->v0d2avalo) << endl;
+    }
+    cout << "  yd array exists (" << (this->yd != nullptr) << ")" << endl;
+    cout << " S matrix information:" << endl;
+    cout << "  SRowId array exists (" << (this->SRowId != nullptr) << ")" << endl;
+    cout << "  SColId array exists (" << (this->SColId != nullptr) << ")" << endl;
+    cout << "  Sval array exists (" << (this->Sval != nullptr) << ")" << endl;
+    cout << "  Value array for S matrix has length " << this->leng_S << endl;
+    cout << " Solution storage information:" << endl;
+    if (this->y == nullptr)
+    {
+        cout << "  y array exists (" << (this->y != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  y array has size " << NELEMENT(this->y) << endl;
+    }
+    if (this->x == nullptr)
+    {
+        cout << "  x array exists (" << (this->x != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  x array has size " << NELEMENT(this->x) << endl;
+    }
+    cout << " Port information:" << endl;
+    cout << "  Number of ports: " << this->numPorts << endl;
+    if (this->portCoor == nullptr)
+    {
+        cout << "  portCoor array exists (" << (this->portCoor != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << "  portCoor array has size " << NELEMENT(this->portCoor) << endl;
+        cout << "   Showing information about first port   vvvvvv" << endl;
+        this->portCoor[0].print();
+    }
+    cout << "  portEdge vector has size " << this->portEdge.size() << endl;
+    cout << "  portArea vector has size " << this->portArea.size() << endl;
+    cout << "  portNno unordered set has values stored (" << (!(this->portNno.empty())) << ")" << endl;
+    if (this->J == nullptr)
+    {
+        cout << " Current source array exists (" << (this->J != nullptr) << ")" << endl;
+    }
+    else
+    {
+        cout << " Current source array has size " << NELEMENT(this->J) << endl;
+    }
+    cout << " Current V0c,s^T*I information:" << endl;
+    cout << "  v0csJ array exists (" << (this->v0csJ != nullptr) << ")" << endl;
+    cout << "  Y array exists (" << (this->Y != nullptr) << ")" << endl;
+    cout << "------" << endl;
 }
