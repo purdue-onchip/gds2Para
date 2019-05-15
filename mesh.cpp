@@ -68,7 +68,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     xmin = xOrigOld[0];
     xmax = xOrigOld[numNode + 2 * sys->numPorts - 1];
     int xMaxInd = 2;
-    disMaxx = 1e-5;// (xmax - xmin) / xMaxInd;
+    disMaxx = 5e-6;// (xmax - xmin) / xMaxInd;
     xMaxInd = (xmax - xmin) / disMaxx;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -78,7 +78,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     double *xn = (double*)calloc(numNode + 6 * sys->numPorts + xMaxInd, sizeof(double));
     xn[0] = xOrigOld[0];
-    temp = xn[0];
+    double temp = xn[0];
     j = 0;
     sys->nx = 1;
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -141,7 +141,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
     int yMaxInd = 2;    // the max discretization of y is total / 120
-    disMaxy = 1e-5;// (ymax - ymin) / yMaxInd;
+    disMaxy = 5e-6;// (ymax - ymin) / yMaxInd;
     yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -336,10 +336,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         cout << sys->xn[i] << " ";
     }
     cout << "\n" << endl;*/
-    for (i = 0; i < sys->ny; i++){
+    /*for (i = 0; i < sys->ny; i++){
         cout << sys->yn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << "\n" << endl;*/
     /*for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
@@ -829,14 +829,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         sys->conductor[i].cdtNodeind = 0;
         sys->conductor[i].markPort = 0;
     }
-    sys->markCondt = 0;
     int portground_count = 0;
     for (i = 0; i < sys->N_node; i++){
         if (visited[i] != 0){
             sys->conductor[visited[i] - 1].node[sys->conductor[visited[i] - 1].cdtNodeind] = i;
-            /*if (sys->markCondt == 0 && sys->nodepos[i * 3] >= 0.0022562 && sys->nodepos[i * 3] <= 0.00240265 && sys->nodepos[i * 3 + 1] >= 0.0037381 && sys->nodepos[i * 3 + 1] <= 0.00386135){
-                sys->markCondt = visited[i];
-            }*/
             if ((i < sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -1){
                 /*portground_count++;
                 if (portground_count <= 1)*/
@@ -848,7 +844,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             sys->conductor[visited[i] - 1].cdtNodeind++;
         }
     }
-    //cout << "The added conductor is " << sys->markCondt << endl;
     free(visited);
     visited = NULL;
     
@@ -1510,8 +1505,8 @@ void fdtdMesh::print()
     cout << "  Node marker array exists (" << (this->markNode != nullptr) << ")" << endl;
     cout << "  edgeCell vector has size " << this->edgeCell.size() << endl;
     cout << "  edgeCellArea vector has size " << this->edgeCellArea.size() << endl;
-    cout << "  acu_cnno array exists (" << (this->acu_cnno != nullptr) << ")" << endl;
-    cout << "  cindex array exists (" << (this->cindex != nullptr) << ")" << endl;
+    cout << "  acu_cnno vector has size " << this->acu_cnno.size() << endl;
+    cout << "  cindex vector has size " << this->cindex.size() << endl;
     cout << "  exciteCdtLayer array exists (" << (this->exciteCdtLayer != nullptr) << ")" << endl;
     cout << "  cond2condIn vector has size " << this->cond2condIn.size() << endl;
     cout << "  markProSide array exists (" << (this->markProSide != nullptr) << ")" << endl;

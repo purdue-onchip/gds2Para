@@ -239,10 +239,10 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         double final_res_norm;
         HYPRE_Int    restart = 10;
         HYPRE_Int    modify = 1;
-        cout << "h\n";
+        
         /* Create solver */
         HYPRE_ParCSRFlexGMRESCreate(MPI_COMM_WORLD, &solver);
-        cout << "h\n";
+        
         /* Set some parameters (See Reference Manual for more parameters) */
         HYPRE_FlexGMRESSetKDim(solver, restart);
         HYPRE_FlexGMRESSetMaxIter(solver, 100); /* max iterations */
@@ -250,7 +250,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_FlexGMRESSetPrintLevel(solver, 0); /* print solve info */
         HYPRE_FlexGMRESSetLogging(solver, 1); /* needed to get run info later */
         
-        cout << "h\n";
+        
         /* Now set up the AMG preconditioner and specify any parameters */
         HYPRE_BoomerAMGCreate(&precond);
         HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print amg solution info */
@@ -260,12 +260,12 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_BoomerAMGSetNumSweeps(precond, 1);
         HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero */
         HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
-        cout << "h\n";
+        
         /* Set the FlexGMRES preconditioner */
         HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
 
-        cout << "h\n";
+        
         if (modify)
             /* this is an optional call  - if you don't call it, hypre_FlexGMRESModifyPCDefault
             is used - which does nothing.  Otherwise, you can define your own, similar to
@@ -273,15 +273,14 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
             HYPRE_FlexGMRESSetModifyPC(solver,
             (HYPRE_PtrToModifyPCFcn)hypre_FlexGMRESModifyPCAMGExample);
 
-        cout << "h\n";
         /* Now setup and solve! */
         HYPRE_ParCSRFlexGMRESSetup(solver, parcsr_A, par_b, par_x);
         HYPRE_ParCSRFlexGMRESSolve(solver, parcsr_A, par_b, par_x);
-        cout << "h\n";
+
         /* Run info - needed logging turned on */
         HYPRE_FlexGMRESGetNumIterations(solver, &num_iterations);
         HYPRE_FlexGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
-        cout << "h\n";
+
         if (myid == 0)
         {
             printf("\n");

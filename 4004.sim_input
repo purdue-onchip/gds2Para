@@ -1,5 +1,5 @@
 TOTAL SIZE
-0.00 0.00 0.00 2.81445e-3 3.86425e-3 5.09e-4
+0.00 2.81445e-3 0.00 3.86425e-3 0.00 2.8e-4
 lengthUnit = 1
 
 FREQUENCY
@@ -10,15 +10,18 @@ nfreq = 1
 freqScale = 0
 
 DIELECTRIC STACK
-numStack = 5
-1 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-3 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-5 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-6 h = 4.0e-5 e = 3.9
+numStack = 7
+0 z = 0.0000 h = 4.0e-5 e = 3.9 # Li added PEC
+1 z = 4.0e-5 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
+3 z = 8.0e-5 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
+4 z = 1.2e-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
+5 z = 1.6e-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
+6 z = 2.0e-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
+7 z = 2.4e-4 h = 4.0e-5 e = 3.9 # Li added PEC
 
 PORT
-numPorts = 3
-1.16e-3 3.80e-3 4.70e-4 1.16e-3 3.80e-3 0.00 +1 # d0; pin 1
-2.76e-3 8.86e-4 4.70e-4 2.76e-3 8.86e-4 0.00 +1 # GND!; pin 5
-2.76e-3 4.55e-4 4.70e-4 2.76e-3 4.55e-4 0.00 +1 # clk1; pin 6
+numPorts = 1
+2.76e-3 4.55e-4 0 2.76e-3 4.55e-4 2e-4 1
+#1.16e-3 3.80e-3 4.70e-4 1.16e-3 3.80e-3 0.00 +1 # d0; pin 1
+#2.76e-3 8.86e-4 4.70e-4 2.76e-3 8.86e-4 0.00 +1 # GND!; pin 5
+#2.76e-3 4.55e-4 4.70e-4 2.76e-3 4.55e-4 0.00 +1 # clk1; pin 6

@@ -705,81 +705,81 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
 
         /* calculate the Vh part */
-        status = find_Vh(sys, u0, u0a, sourcePort);
-        
+        //status = find_Vh(sys, u0, u0a, sourcePort);
+        //
 
-        // V_re1'*(A+C)*V_re1
-        tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
-        for (j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
-            i = 0;
-            while (i < sys->leng_S){
-                start = sys->SRowId[i];
-                while (i < sys->leng_S && sys->SRowId[i] == start){
-                    
-                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].real += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].real;
-                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].imag += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].imag;
-                    
-                    
-                    i++;
-                }
-            }
-            
-            for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-                tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
-                    - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
-                tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
-                    + sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
-            }
-        }
+        //// V_re1'*(A+C)*V_re1
+        //tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
+        //for (j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
+        //    i = 0;
+        //    while (i < sys->leng_S){
+        //        start = sys->SRowId[i];
+        //        while (i < sys->leng_S && sys->SRowId[i] == start){
+        //            
+        //            tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].real += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].real;
+        //            tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].imag += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].imag;
+        //            
+        //            
+        //            i++;
+        //        }
+        //    }
+        //    
+        //    for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
+        //            - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
+        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
+        //            + sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
+        //    }
+        //}
        
 
-        m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
-        status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, tmp, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
+        //m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
+        //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, tmp, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
        
        
-        rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
-        J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
-        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-            J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
-        }
-        status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
-        
-        /* V_re1'*A*u */
-        free(tmp);
-        tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-            tmp[i].real = -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
-            tmp[i].imag = sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
-        }
-        rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
-        status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
-        for (i = 0; i < sys->leng_Vh; i++){
-            rhs_h[i].real = rhs_h[i].real - rhs_h0[i].real;
-            rhs_h[i].imag = rhs_h[i].imag - rhs_h0[i].imag;
-        }
+        //rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
+        //J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
+        //for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
+        //    J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
+        //}
+        //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
+        //
+        ///* V_re1'*A*u */
+        //free(tmp);
+        //tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
+        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+        //    tmp[i].real = -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
+        //    tmp[i].imag = sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
+        //}
+        //rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
+        //status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
+        //for (i = 0; i < sys->leng_Vh; i++){
+        //    rhs_h[i].real = rhs_h[i].real - rhs_h0[i].real;
+        //    rhs_h[i].imag = rhs_h[i].imag - rhs_h0[i].imag;
+        //}
 
-        ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
-        info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
-        
-        y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-        status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-        final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-            final_x[i].real = sys->y[i + sys->N_edge_s].real() +y_h[i].real;
-            final_x[i].imag = sys->y[i + sys->N_edge_s].imag() +y_h[i].imag;
-        }
+        //ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
+        //info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
+        //
+        //y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
+        //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
+        //final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
+        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+        //    final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
+        //    final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
+        //}
         ///*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
         //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
         //    outfile << final_x[i].real << " " << final_x[i].imag << endl;
         //}
         //outfile.close();*/
 
-        free(tmp); tmp = NULL;
+        /*free(tmp); tmp = NULL;
         free(m_h); m_h = NULL;
         free(rhs_h); rhs_h = NULL;
         free(y_h); y_h = NULL;
         free(ipiv); ipiv = NULL;
-        free(J); J = NULL;
+        free(J); J = NULL;*/
         free(crhs); crhs = NULL;
         free(dRhs); dRhs = NULL;
         free(ydt); ydt = NULL;
@@ -791,8 +791,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(yccp); yccp = NULL;
         free(v0caJ); v0caJ = NULL;
 
-
-        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
+        // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
+        //status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
         //status = plotTime(sys, sourcePort, u0d, u0c);
 
         free(sys->J); sys->J = NULL;

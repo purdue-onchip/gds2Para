@@ -1493,7 +1493,7 @@ public:
         int numSRef = cell.getNumSRef();
 
         // Print cell information
-        /*cout << "  List of " << numBound << " boundaries:" << endl;*/
+        cout << "  List of " << numBound << " boundaries:" << endl;
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
 
@@ -1861,7 +1861,7 @@ public:
         {
             std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
             cout << cellName << endl;
-            this->saveToMesh(cellName, 0., 0., sys);   // the origin is the (0,0) point
+            //this->saveToMesh(cellName, 0., 0., sys);   // the origin is the (0,0) point
             (this->cells)[indCellPrint[indi]].printAlt();
         }
         cout << "------" << endl;

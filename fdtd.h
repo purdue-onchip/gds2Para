@@ -40,7 +40,7 @@ using std::endl;
 //#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDIS (1.e-7)
+#define MINDIS (1.e-8)
 #define DT (1.e-16)
 //#define HYPRE_BIGINT (1)
 //#define LARGE_SYSTEM (1)
@@ -198,7 +198,7 @@ public:
     myint *markNode;    // mark this node if it is inside the conductor
     vector<vector<int>> edgeCell;    // for each cell which edge is around it
     vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
-    vector<int> acu_cnno;
+    vector<int> acu_cnno; // accumulated conductor number of nodes
     vector<int> cindex;
     int *exciteCdtLayer;
     vector<unordered_set<int>> cond2condIn;

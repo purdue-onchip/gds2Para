@@ -226,8 +226,10 @@ int main(int argc, char** argv)
             adbIsGood = adbReader(inGDSIIFile.c_str());
             if (adbIsGood)
             {
-                vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
-                adb.print(indCellPrint, &sys);
+                string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
+                vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
+                adb.saveToMesh(topCellName, 0., 0., &sys); // Recursively save GDSII conductor information to sys
+                adb.print(indCellPrint);
                 cout << "GDSII file read" << endl;
             }
             else

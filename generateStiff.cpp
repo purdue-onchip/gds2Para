@@ -1,5 +1,6 @@
 /* Generate the stiffness matrix */
 #include "fdtd.h"
+using namespace std::complex_literals;
 
 
 int generateStiff(fdtdMesh *sys){
@@ -581,15 +582,16 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     myint size = sys->N_edge - 2 * sys->N_edge_s;
     myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
     int count = 0;
-    int i = 0;
+    int indi = 0;
     int k = 0;
-    doublecomplex *valc;
-    valc = (doublecomplex*)calloc(sys->leng_S, sizeof(doublecomplex));
-    doublecomplex *J;
-    J = (doublecomplex*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(doublecomplex));
-    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-        J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
-        J[i - sys->N_edge_s].re = 0;
+    complex<double> *valc;
+    valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
+    complex<double> *J;
+    J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
+    for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
+        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqEnd * sys->freqUnit * 2 * PI;
+        //J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
+        //J[i - sys->N_edge_s].re = 0;
     }
     
     RowId1[k] = 0;
@@ -597,17 +599,21 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     myint start;
     myint nnz = sys->leng_S;
     cout << "Start to generate CSR form for S!\n";
-    i = 0;
-    while (i < nnz){
-        start = RowId[i];
-        while (i < nnz && RowId[i] == start) {
-            valc[i].re += val[i];
-            if (RowId[i] == ColId[i]){
-                valc[i].re += - pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
-                valc[i].i += (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
+    indi = 0;
+    while (indi < nnz){
+        start = RowId[indi];
+        while (indi < nnz && RowId[indi] == start) {
+            valc[indi] += val[indi]; // val[indi] is real
+            if (RowId[indi] == ColId[indi]){
+                // valc[indi] needs omega * (-omega * epsilon  + j * sigma) added to it
+                complex<double> addedPart(-(2 * PI * sys->freqEnd * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
+                valc[indi] += (2 * PI * sys->freqEnd * sys->freqUnit) * addedPart;
+                //valc[indi] += -std::complex::pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[indi] + sys->N_edge_s] + (1i) * (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[indi] + sys->N_edge_s];
+                //valc[i].re += - pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
+                //valc[i].i += (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
             }
             count++;
-            i++;
+            indi++;
         }
         RowId1[k] = (count);
         k++;
@@ -644,8 +650,8 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
     
     cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
-    doublecomplex *xr;
-    xr = (doublecomplex*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(doublecomplex));
+    complex<double> *xr;
+    xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
     if (error != 0){
@@ -654,11 +660,13 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     }
 
     cout << "Solving (-w^2*D_eps+iwD_sig+S)x=-iwJ is complete!\n";
-    double nn = 0;
-    double nnn = 0;
-    for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        nn += pow((xr[i].re - x[i].real), 2) + pow((xr[i].i - x[i].imag), 2);
-        nnn += pow(xr[i].re, 2) + pow(xr[i].i, 2);
+    double nn = 0.;
+    double nnn = 0.;
+    for (indi = 0; indi < sys->N_edge - 2 * sys->N_edge_s; indi++){
+        nn += pow((xr[indi].real() - x[indi].real), 2) + pow((xr[indi].imag() - x[indi].imag), 2);
+        nnn += pow(xr[indi].real(), 2) + pow(xr[indi].imag(), 2);
+        //nn += pow((xr[i].re - x[i].real), 2) + pow((xr[i].i - x[i].imag), 2);
+        //nnn += pow(xr[i].re, 2) + pow(xr[i].i, 2);
     }
     ofstream out;
     /* out.open("x.txt", std::ofstream::out | std::ofstream::trunc);
