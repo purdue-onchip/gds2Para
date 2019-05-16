@@ -40,7 +40,7 @@ using std::endl;
 //#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDIS (1.e-8)
+#define MINDIS (1.e-7)
 #define DT (1.e-16)
 //#define HYPRE_BIGINT (1)
 //#define LARGE_SYSTEM (1)

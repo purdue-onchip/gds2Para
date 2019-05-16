@@ -1,5 +1,5 @@
 TOTAL SIZE
-0.0000 +4.2600e-3 0.0000 +3.5600e-3 0.0000 +2.9920e-3
+-0.0019497 1.08185 -0.0019497 0.900306 0.0000 0.00301436
 lengthUnit = 1
 
 FREQUENCY
@@ -15,7 +15,7 @@ numStack = 45
 1  z = 0.00293807 h = 6.629e-5 e = 3.57 # Top layer 1, TU-883 composite dielectric, z = 2.92532e-3, TanD = 0.0046
 2  z = 0.00284003 h = 9.804e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.82727e-3
 3  z = 0.00277903 h = 6.100e-5 e = 3.57 # GND layer 2, TU-883 composite dielectric, z = 2.76631e-3
-4  z = 0.00272283 h = 5.080e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.71551e-3
+4  z = 0.00272823 h = 5.080e-5 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.71551e-3
 5  z = 0.00266723 h = 6.100e-5 e = 3.57 # PWR layer 3, TU-883 composite dielectric, z = 2.65455e-3
 6  z = 0.00248223 h = 1.850e-4 e = 3.57 # Via layer, TU-883 composite dielectric, z = 2.46913e-3
 7  z = 0.00242123 h = 6.100e-5 e = 3.57 # PWR layer 4, TU-883 composite dielectric, z = 2.40817e-3

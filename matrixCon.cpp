@@ -214,6 +214,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sys->AdColId = (myint*)calloc(leng_Ad, sizeof(myint));
     sys->Adval = (double*)calloc(leng_Ad, sizeof(double));
     j = 0;
+    
     for (i = 0; i < leng_v0d1; i++){
         vector<pair<myint, double>> v(Ad1[i].begin(), Ad1[i].end());
         sort(v.begin(), v.end());
@@ -228,7 +229,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         v.clear();
     }
     Ad1.clear();
-
+    
     int *argc;
     char ***argv;
     /*  trial of first set HYPRE matrix Ad */
@@ -478,7 +479,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *ferr, *berr;
     
     while (sourcePort < sys->numPorts){
-
+        
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (i = 0; i < sys->portEdge[sourcePort].size(); i++){
             sys->J[sys->portEdge[sourcePort][i]] = sys->portCoor[sourcePort].portDirection;
@@ -491,7 +492,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (i = 0; i < sys->N_edge; i++){
             dRhs[i] = -sys->J[i];
         }
-
+        
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
         y0d = (double*)calloc(leng_v0d1, sizeof(double));
         
@@ -499,7 +500,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, dRhs, beta, v0daJ);
-
+        
         /* solve V0d system */
 
         t1 = clock();
@@ -763,23 +764,23 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //
         //y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-        //final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
-        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //    final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
-        //    final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
-        //}
-        ///*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
-        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //    outfile << final_x[i].real << " " << final_x[i].imag << endl;
-        //}
-        //outfile.close();*/
+        final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
+        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+            final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
+            final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
+        }
+        /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
+        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+            outfile << final_x[i].real << " " << final_x[i].imag << endl;
+        }
+        outfile.close();*/
 
-        /*free(tmp); tmp = NULL;
+        free(tmp); tmp = NULL;
         free(m_h); m_h = NULL;
         free(rhs_h); rhs_h = NULL;
         free(y_h); y_h = NULL;
         free(ipiv); ipiv = NULL;
-        free(J); J = NULL;*/
+        free(J); J = NULL;
         free(crhs); crhs = NULL;
         free(dRhs); dRhs = NULL;
         free(ydt); ydt = NULL;
@@ -792,7 +793,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(v0caJ); v0caJ = NULL;
 
         // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
-        //status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
+        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
         //status = plotTime(sys, sourcePort, u0d, u0c);
 
         free(sys->J); sys->J = NULL;

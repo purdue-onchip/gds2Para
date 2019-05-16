@@ -124,6 +124,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         free(rhs_values);
         free(rows);
     }
+    
     HYPRE_IJVectorAssemble(b);
     HYPRE_IJVectorGetObject(b, (void **)&par_b);
 
@@ -264,7 +265,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Set the FlexGMRES preconditioner */
         HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
-
+        
         
         if (modify)
             /* this is an optional call  - if you don't call it, hypre_FlexGMRESModifyPCDefault
@@ -272,11 +273,11 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
             the one used here */
             HYPRE_FlexGMRESSetModifyPC(solver,
             (HYPRE_PtrToModifyPCFcn)hypre_FlexGMRESModifyPCAMGExample);
-
+       
         /* Now setup and solve! */
         HYPRE_ParCSRFlexGMRESSetup(solver, parcsr_A, par_b, par_x);
         HYPRE_ParCSRFlexGMRESSolve(solver, parcsr_A, par_b, par_x);
-
+        
         /* Run info - needed logging turned on */
         HYPRE_FlexGMRESGetNumIterations(solver, &num_iterations);
         HYPRE_FlexGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
@@ -286,6 +287,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
             printf("\n");
             printf("Iterations = %d\n", num_iterations);
             printf("Final Relative Residual Norm = %e\n", final_res_norm);
+            
         }
 
         /* Output the final solution */

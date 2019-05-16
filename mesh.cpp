@@ -68,7 +68,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     xmin = xOrigOld[0];
     xmax = xOrigOld[numNode + 2 * sys->numPorts - 1];
     int xMaxInd = 2;
-    disMaxx = 5e-6;// (xmax - xmin) / xMaxInd;
+    disMaxx = 1e-5;// (xmax - xmin) / xMaxInd;
     xMaxInd = (xmax - xmin) / disMaxx;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -141,7 +141,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
     int yMaxInd = 2;    // the max discretization of y is total / 120
-    disMaxy = 5e-6;// (ymax - ymin) / yMaxInd;
+    disMaxy = 1e-5;// (ymax - ymin) / yMaxInd;
     yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
@@ -332,18 +332,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /*for (i = 0; i < sys->nz - 1; i++){
         cout << sys->stackEpsn[i] << endl;
         }*/
-    /*for (i = 0; i < sys->nx; i++){
+    for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
-    cout << "\n" << endl;*/
-    /*for (i = 0; i < sys->ny; i++){
+    cout << "\n" << endl;
+    for (i = 0; i < sys->ny; i++){
         cout << sys->yn[i] << " ";
     }
-    cout << "\n" << endl;*/
-    /*for (i = 0; i < sys->nz; i++){
+    cout << "\n" << endl;
+    for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;*/
+    cout << "\n" << endl;
 
     /***********************************************************************************************/
 
@@ -381,8 +381,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     myint y1, y2;
     myint l;
     clock_t tt = clock();
+    int mark1;
     // Fast algorithm to find nodes inside conductors
     for (i = 0; i < sys->numCdtRow; i++){
+        mark1 = 0;
+        //cout << "Number of CdtRow is " << i << endl;
         for (j = 0; j < sys->conductorIn[i].numVert; j++){
             xcoor.insert(xi[sys->conductorIn[i].x[j]]);
         }
@@ -394,7 +397,9 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         
 
         for (j = 0; j < xcoorv.size() - 1; j++){
+            mark1 = 1;    // the x coordinates are more than 1
             xrange[xcoorv[j]] = xcoorv[j + 1];
+            
         }
         if (xcoorv.size() == 1){    // If it has only one value
             xrange[xcoorv[0]] = xcoorv[0];
@@ -406,12 +411,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[j + 1]){
                     ss = xi[sys->conductorIn[i].x[j]];
                     ee = xi[sys->conductorIn[i].x[j + 1]];
-                    if (ss == ee && xrange.size() != 1){
+                    if (ss == ee && mark1 == 1){
                         continue;
                     }
                     while (xrange[ss] <= ee){
                         xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-                        if (xrange.find(xrange[ss]) == xrange.end() || xrange.size() == 1){
+                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
                             break;
                         }
                         ss = xrange[ss];
@@ -420,12 +425,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[j + 1]){
                     ss = xi[sys->conductorIn[i].x[j + 1]];
                     ee = xi[sys->conductorIn[i].x[j]];
-                    if (ss == ee && xrange.size() != 1){
+                    if (ss == ee && mark1 == 1){
                         continue;
                     }
                     while (xrange[ss] <= ee){
                         xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-                        if (xrange.find(xrange[ss]) == xrange.end() || xrange.size() == 1){
+                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
                             break;
                         }
                         ss = xrange[ss];
@@ -437,12 +442,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[0]){
                 ss = xi[sys->conductorIn[i].x[j]];
                 ee = xi[sys->conductorIn[i].x[0]];
-                if (ss == ee && xrange.size() != 1){
+                if (ss == ee && mark1 == 1){
                     continue;
                 }
                 while (xrange[ss] <= ee){
                     xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-                    if (xrange.find(xrange[ss]) == xrange.end() || xrange.size() == 1){
+                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
                         break;
                     }
                     ss = xrange[ss];
@@ -451,12 +456,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[0]){
                 ss = xi[sys->conductorIn[i].x[0]];
                 ee = xi[sys->conductorIn[i].x[j]];
-                if (ss == ee && xrange.size() != 1){
+                if (ss == ee && mark1 == 1){
                     continue;
                 }
                 while (xrange[ss] <= ee){
                     xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-                    if (xrange.find(xrange[ss]) == xrange.end() || xrange.size() == 1){
+                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
                         break;
                     }
                     ss = xrange[ss];
