@@ -187,7 +187,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             //cout << yn[j] << " ";
         }
     }
-    cout << endl;
+    //cout << endl;
 
     int county = j;
     //sort(yn, yn + county + 1);
@@ -332,18 +332,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /*for (i = 0; i < sys->nz - 1; i++){
         cout << sys->stackEpsn[i] << endl;
         }*/
-    for (i = 0; i < sys->nx; i++){
+    /*for (i = 0; i < sys->nx; i++){
         cout << sys->xn[i] << " ";
     }
-    cout << "\n" << endl;
-    for (i = 0; i < sys->ny; i++){
+    cout << "\n" << endl;*/
+    /*for (i = 0; i < sys->ny; i++){
         cout << sys->yn[i] << " ";
     }
-    cout << "\n" << endl;
-    for (i = 0; i < sys->nz; i++){
+    cout << "\n" << endl;*/
+    /*for (i = 0; i < sys->nz; i++){
         cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << "\n" << endl;*/
 
     /***********************************************************************************************/
 
@@ -366,11 +366,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->markEdge = (myint*)calloc(sys->N_edge, sizeof(myint));   // mark which edge is inside the conductor
     sys->markNode = (myint*)calloc(sys->N_node, sizeof(myint));   // mark which node is inside the conductor
 
-    cout << "N_edge = " << sys->N_edge << endl;
+    /*cout << "N_edge = " << sys->N_edge << endl;
     cout << "N_node = " << sys->N_node << endl;
     cout << "N_cell_x = " << sys->N_cell_x << endl;
     cout << "N_cell_y = " << sys->N_cell_y << endl;
-    cout << "N_cell_z = " << sys->N_cell_z << endl;
+    cout << "N_cell_z = " << sys->N_cell_z << endl;*/
     double xc, yc;
     
     unordered_map<myint, myint> xrange;
@@ -1017,7 +1017,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
         /*for (j = 0; j < sys->cdtNumNode[sys->portCoor[i].portCnd - 1]; j++){
             sys->exciteCdtLayer[sys->conductor[sys->portCoor[i].portCnd - 1].node[j] / sys->N_node_s] = 1;
         }*/
-        cout << sys->portCoor[i].portCnd << endl;
+        //cout << sys->portCoor[i].portCnd << endl;
         edge.clear();
         if (sys->portCoor[i].x1 != sys->portCoor[i].x2){
             if (sys->portCoor[i].x1 < sys->portCoor[i].x2){

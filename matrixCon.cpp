@@ -93,7 +93,7 @@ int setHYPREMatrix(myint *ARowId, myint *AColId, double *Aval, myint leng_v0, HY
 }
 
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi){
-    myint i, j, mark, k, l, n;
+    myint indi, j, mark, k, l, n;
     int status;
     int count;
     int xcol;
@@ -128,60 +128,60 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     status = merge_v0d1(sys, block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
     cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
-    for (i = 0; i < v0d1anum; i++){    // the upper and lower planes are PEC
-        if (map[sys->edgelink[sys->v0d1aRowId[i] * 2]] != sys->v0d1aColId[i] + 1 && map[sys->edgelink[sys->v0d1aRowId[i] * 2]] != 0){
-            Ad1[sys->v0d1aColId[i]][map[sys->edgelink[sys->v0d1aRowId[i] * 2]] - 1] += sys->v0d1aval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[i]];
-            Ad1[sys->v0d1aColId[i]][sys->v0d1aColId[i]] += sys->v0d1aval[i] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[i]];
+    for (indi = 0; indi < v0d1anum; indi++){    // the upper and lower planes are PEC
+        if (map[sys->edgelink[sys->v0d1aRowId[indi] * 2]] != sys->v0d1aColId[indi] + 1 && map[sys->edgelink[sys->v0d1aRowId[indi] * 2]] != 0){
+            Ad1[sys->v0d1aColId[indi]][map[sys->edgelink[sys->v0d1aRowId[indi] * 2]] - 1] += sys->v0d1aval[indi] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[indi]];
+            Ad1[sys->v0d1aColId[indi]][sys->v0d1aColId[indi]] += sys->v0d1aval[indi] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[indi]];
         }
-        else if (map[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1]] != sys->v0d1aColId[i] + 1 && map[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1]] != 0){
-            Ad1[sys->v0d1aColId[i]][map[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1]] - 1] += sys->v0d1aval[i] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[i]];
-            Ad1[sys->v0d1aColId[i]][sys->v0d1aColId[i]] += sys->v0d1aval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[i]];
+        else if (map[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1]] != sys->v0d1aColId[indi] + 1 && map[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1]] != 0){
+            Ad1[sys->v0d1aColId[indi]][map[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1]] - 1] += sys->v0d1aval[indi] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[indi]];
+            Ad1[sys->v0d1aColId[indi]][sys->v0d1aColId[indi]] += sys->v0d1aval[indi] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[indi]];
         }
         else {//if (map[sys->edgelink[sys->v0d1aRowId[i] * 2]] == 0 || map[sys->edgelink[sys->v0d1aRowId[i] * 2] + 1] == 0){
-            Ad1[sys->v0d1aColId[i]][sys->v0d1aColId[i]] += abs(sys->v0d1aval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[i]]);
+            Ad1[sys->v0d1aColId[indi]][sys->v0d1aColId[indi]] += abs(sys->v0d1aval[indi] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0d1aRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->eps[sys->v0d1aRowId[indi]]);
         }
     }
-    for (i = 0; i < leng_v0d1; i++){
-        leng_Ad += Ad1[i].size();
+    for (indi = 0; indi < leng_v0d1; indi++){
+        leng_Ad += Ad1[indi].size();
     }
 
     sys->v0d1valo = (double*)malloc(v0d1num * sizeof(double));
-    for (i = 0; i < v0d1num; i++){
-        sys->v0d1valo[i] = sys->v0d1val[i];
+    for (indi = 0; indi < v0d1num; indi++){
+        sys->v0d1valo[indi] = sys->v0d1val[indi];
     }
-    for (i = 0; i < v0d1num; i++){    // compute sqrt(D_eps)*V0d1
-        sys->v0d1val[i] = sys->v0d1val[i] * sqrt(sys->eps[sys->v0d1RowId[i]]);
+    for (indi = 0; indi < v0d1num; indi++){    // compute sqrt(D_eps)*V0d1
+        sys->v0d1val[indi] = sys->v0d1val[indi] * sqrt(sys->eps[sys->v0d1RowId[indi]]);
     }
     sys->v0d1avalo = (double*)malloc(v0d1anum * sizeof(double));
-    for (i = 0; i < v0d1anum; i++) {
-        sys->v0d1avalo[i] = sys->v0d1aval[i];
+    for (indi = 0; indi < v0d1anum; indi++) {
+        sys->v0d1avalo[indi] = sys->v0d1aval[indi];
     }
-    for (i = 0; i < v0d1anum; i++){
-        sys->v0d1aval[i] = sys->v0d1aval[i] * sqrt(sys->eps[sys->v0d1aRowId[i]]);
+    for (indi = 0; indi < v0d1anum; indi++){
+        sys->v0d1aval[indi] = sys->v0d1aval[indi] * sqrt(sys->eps[sys->v0d1aRowId[indi]]);
     }
     
 
     myint leng_v0d = leng_v0d1;
     sys->v0d1ColIdo = (myint*)malloc(v0d1num * sizeof(myint));
-    for (i = 0; i < v0d1num; i++)
-        sys->v0d1ColIdo[i] = sys->v0d1ColId[i];
+    for (indi = 0; indi < v0d1num; indi++)
+        sys->v0d1ColIdo[indi] = sys->v0d1ColId[indi];
     free(sys->v0d1ColId); sys->v0d1ColId = (myint*)malloc((leng_v0d1 + 1) * sizeof(myint));
     status = COO2CSR_malloc(sys->v0d1ColIdo, sys->v0d1RowId, sys->v0d1val, v0d1num, leng_v0d1, sys->v0d1ColId);
     if (status != 0)
         return status;
     sys->v0d1aColIdo = (myint*)malloc(v0d1anum * sizeof(myint));
-    for (i = 0; i < v0d1anum; i++)
-        sys->v0d1aColIdo[i] = sys->v0d1aColId[i];
+    for (indi = 0; indi < v0d1anum; indi++)
+        sys->v0d1aColIdo[indi] = sys->v0d1aColId[indi];
     free(sys->v0d1aColId); sys->v0d1aColId = (myint*)malloc((leng_v0d1a + 1) * sizeof(myint));
     status = COO2CSR_malloc(sys->v0d1aColIdo, sys->v0d1aRowId, sys->v0d1aval, v0d1anum, leng_v0d1a, sys->v0d1aColId);
     if (status != 0)
@@ -215,12 +215,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sys->Adval = (double*)calloc(leng_Ad, sizeof(double));
     j = 0;
     
-    for (i = 0; i < leng_v0d1; i++){
-        vector<pair<myint, double>> v(Ad1[i].begin(), Ad1[i].end());
+    for (indi = 0; indi < leng_v0d1; indi++){
+        vector<pair<myint, double>> v(Ad1[indi].begin(), Ad1[indi].end());
         sort(v.begin(), v.end());
         for (auto adi : v){
             if (abs(adi.second) > 1e-8){
-                sys->AdRowId[j] = i;
+                sys->AdRowId[j] = indi;
                 sys->AdColId[j] = adi.first;
                 sys->Adval[j] = adi.second;
                 j++;
@@ -277,32 +277,32 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
     cout << endl;*/
 
-    for (i = 0; i < v0canum; i++){    // the upper and lower planes are PEC
-        if (map[sys->edgelink[sys->v0caRowId[i] * 2]] != sys->v0caColId[i] + 1 && map[sys->edgelink[sys->v0caRowId[i] * 2]] != 0){
-            Ac[sys->v0caColId[i]][map[sys->edgelink[sys->v0caRowId[i] * 2]] - 1] += sys->v0caval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[i]];
-            Ac[sys->v0caColId[i]][sys->v0caColId[i]] += sys->v0caval[i] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[i]];
+    for (indi = 0; indi < v0canum; indi++){    // the upper and lower planes are PEC
+        if (map[sys->edgelink[sys->v0caRowId[indi] * 2]] != sys->v0caColId[indi] + 1 && map[sys->edgelink[sys->v0caRowId[indi] * 2]] != 0){
+            Ac[sys->v0caColId[indi]][map[sys->edgelink[sys->v0caRowId[indi] * 2]] - 1] += sys->v0caval[indi] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[indi]];
+            Ac[sys->v0caColId[indi]][sys->v0caColId[indi]] += sys->v0caval[indi] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[indi]];
         }
-        else if (map[sys->edgelink[sys->v0caRowId[i] * 2 + 1]] != sys->v0caColId[i] + 1 && map[sys->edgelink[sys->v0caRowId[i] * 2 + 1]] != 0){
-            Ac[sys->v0caColId[i]][map[sys->edgelink[sys->v0caRowId[i] * 2 + 1]] - 1] += sys->v0caval[i] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[i]];
-            Ac[sys->v0caColId[i]][sys->v0caColId[i]] += sys->v0caval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[i]];
+        else if (map[sys->edgelink[sys->v0caRowId[indi] * 2 + 1]] != sys->v0caColId[indi] + 1 && map[sys->edgelink[sys->v0caRowId[indi] * 2 + 1]] != 0){
+            Ac[sys->v0caColId[indi]][map[sys->edgelink[sys->v0caRowId[indi] * 2 + 1]] - 1] += sys->v0caval[indi] * (-1) / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[indi]];
+            Ac[sys->v0caColId[indi]][sys->v0caColId[indi]] += sys->v0caval[indi] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[indi]];
         }
         else {
-            Ac[sys->v0caColId[i]][sys->v0caColId[i]] += abs(sys->v0caval[i] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 1], 2)
-                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[i] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[i]]);
+            Ac[sys->v0caColId[indi]][sys->v0caColId[indi]] += abs(sys->v0caval[indi] * 1 / sqrt(pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 1], 2)
+                + pow(sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->v0caRowId[indi] * 2 + 1] * 3 + 2], 2)) * sys->sig[sys->v0caRowId[indi]]);
         }
     }
     
-    for (i = 0; i < leng_v0c; i++){
-        leng_Ac += Ac[i].size();
+    for (indi = 0; indi < leng_v0c; indi++){
+        leng_Ac += Ac[indi].size();
     }
     sys->AcRowId = (myint*)calloc(leng_Ac, sizeof(myint));
     sys->AcColId = (myint*)calloc(leng_Ac, sizeof(myint));
@@ -310,12 +310,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     j = 0;
     k = 1;
     myint collar = 0;
-    for (i = 0; i < leng_v0c; i++){
-        vector<pair<myint, double>> v(Ac[i].begin(), Ac[i].end());
+    for (indi = 0; indi < leng_v0c; indi++){
+        vector<pair<myint, double>> v(Ac[indi].begin(), Ac[indi].end());
         sort(v.begin(), v.end());
         for (auto aci : v){
             if (abs(aci.second) > 1e5){
-                sys->AcRowId[j] = i;
+                sys->AcRowId[j] = indi;
                 sys->AcColId[j] = aci.first;
                 sys->Acval[j] = aci.second;
                 if (sys->AcRowId[j] >= sys->acu_cnno[k]){
@@ -340,29 +340,29 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     
     
     sys->v0cvalo = (double*)malloc(v0cnum * sizeof(double));
-    for (i = 0; i < v0cnum; i++)
-        sys->v0cvalo[i] = sys->v0cval[i];    // v0cvalo is the v0c values without D_sig
-    for (i = 0; i < v0cnum; i++){
-        sys->v0cval[i] = sys->v0cval[i] * sqrt(sys->sig[sys->v0cRowId[i]]);       // Compute the sparse form of D_sig*V0c
+    for (indi = 0; indi < v0cnum; indi++)
+        sys->v0cvalo[indi] = sys->v0cval[indi];    // v0cvalo is the v0c values without D_sig
+    for (indi = 0; indi < v0cnum; indi++){
+        sys->v0cval[indi] = sys->v0cval[indi] * sqrt(sys->sig[sys->v0cRowId[indi]]);       // Compute the sparse form of D_sig*V0c
     }
     sys->v0cavalo = (double*)malloc(v0canum * sizeof(double));
-    for (i = 0; i < v0canum; i++)
-        sys->v0cavalo[i] = sys->v0caval[i];
-    for (i = 0; i < v0canum; i++){
-        sys->v0caval[i] = sys->v0caval[i] * sqrt(sys->sig[sys->v0caRowId[i]]);
+    for (indi = 0; indi < v0canum; indi++)
+        sys->v0cavalo[indi] = sys->v0caval[indi];
+    for (indi = 0; indi < v0canum; indi++){
+        sys->v0caval[indi] = sys->v0caval[indi] * sqrt(sys->sig[sys->v0caRowId[indi]]);
     }
 
 
     sys->v0cColIdo = (myint*)malloc(v0cnum * sizeof(myint));
-    for (i = 0; i < v0cnum; i++)
-        sys->v0cColIdo[i] = sys->v0cColId[i];
+    for (indi = 0; indi < v0cnum; indi++)
+        sys->v0cColIdo[indi] = sys->v0cColId[indi];
     free(sys->v0cColId); sys->v0cColId = (myint*)malloc((leng_v0c + 1) * sizeof(myint));
     status = COO2CSR_malloc(sys->v0cColIdo, sys->v0cRowId, sys->v0cval, v0cnum, leng_v0c, sys->v0cColId);
     if (status != 0)
         return status;
     sys->v0caColIdo = (myint*)malloc(v0canum * sizeof(myint));
-    for (i = 0; i < v0canum; i++)
-        sys->v0caColIdo[i] = sys->v0caColId[i];
+    for (indi = 0; indi < v0canum; indi++)
+        sys->v0caColIdo[indi] = sys->v0caColId[indi];
     free(sys->v0caColId); sys->v0caColId = (myint*)malloc((leng_v0ca + 1)*sizeof(myint));
     status = COO2CSR_malloc(sys->v0caColIdo, sys->v0caRowId, sys->v0caval, v0canum, leng_v0ca, sys->v0caColId);
     if (status != 0)
@@ -412,8 +412,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     startCol = 0;
     sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
     sys->x = (complex<double>*) calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
-    for (i = 0; i < sys->numPorts*sys->numPorts; i++){
-        sys->x[i] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
+    for (indi = 0; indi < sys->numPorts*sys->numPorts; indi++){
+        sys->x[indi] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
     }
     
     
@@ -481,16 +481,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     while (sourcePort < sys->numPorts){
         
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
-        for (i = 0; i < sys->portEdge[sourcePort].size(); i++){
-            sys->J[sys->portEdge[sourcePort][i]] = sys->portCoor[sourcePort].portDirection;
+        for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
+            sys->J[sys->portEdge[sourcePort][indi]] = sys->portCoor[sourcePort].portDirection;
             //cout << sys->portEdge[sourcePort][i] << " ";
         }
         //cout << endl;
         
 
         dRhs = (double*)malloc(sys->N_edge*sizeof(double));
-        for (i = 0; i < sys->N_edge; i++){
-            dRhs[i] = -sys->J[i];
+        for (indi = 0; indi < sys->N_edge; indi++){
+            dRhs[indi] = -sys->J[indi];
         }
         
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
@@ -514,8 +514,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
         cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;*/
 
-        for (i = 0; i < leng_v0d1; i++){
-            y0d[i] = y0d[i] / (2 * PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
+        for (indi = 0; indi < leng_v0d1; indi++){
+            y0d[indi] = y0d[indi] / (2 * PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
         }
         ydt = (double*)calloc(sys->N_edge, sizeof(double));
         ydat = (double*)calloc(sys->N_edge, sizeof(double));
@@ -532,16 +532,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         u0d = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
         nn = 0;
         nna = 0;
-        for (i = 0; i < sys->N_edge; i++){
-            nn += ydt[i] * ydt[i];
-            nna += ydat[i] * ydat[i];
+        for (indi = 0; indi < sys->N_edge; indi++){
+            nn += ydt[indi] * ydt[indi];
+            nna += ydat[indi] * ydat[indi];
         }
         nn = sqrt(nn);
         nna = sqrt(nna);
-        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-            u0[i - sys->N_edge_s].real = ydt[i] / nn;    // u0d is one vector in V0
-            u0a[i - sys->N_edge_s].real = ydat[i] / nna;    // u0da
-            u0d[i - sys->N_edge_s] = ydt[i];
+        for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
+            u0[indi - sys->N_edge_s].real = ydt[indi] / nn;    // u0d is one vector in V0
+            u0a[indi - sys->N_edge_s].real = ydat[indi] / nna;    // u0da
+            u0d[indi - sys->N_edge_s] = ydt[indi];
         }
 
         /* Compute C right hand side */
@@ -552,13 +552,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sys->J, beta, v0caJ);
-        for (i = 0; i < leng_v0c; i++){
-            v0caJ[i] = -v0caJ[i];
+        for (indi = 0; indi < leng_v0c; indi++){
+            v0caJ[indi] = -v0caJ[indi];
         }
         crhs = (double*)calloc(leng_v0c, sizeof(double));
-        for (i = 0; i < sys->N_edge; i++){
-            yd1[i] = ydt[i];
-            ydt[i] = -ydt[i] * (2 * PI*sys->freqStart * sys->freqUnit)*sys->eps[i];
+        for (indi = 0; indi < sys->N_edge; indi++){
+            yd1[indi] = ydt[indi];
+            ydt[indi] = -ydt[indi] * (2 * PI*sys->freqStart * sys->freqUnit)*sys->eps[indi];
         }
 
         
@@ -569,10 +569,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         double v0caJn, crhsn;
         v0caJn = 0;
         crhsn = 0;
-        for (i = 0; i < leng_v0c; i++){
-            v0caJ[i] = (v0caJ[i] + crhs[i]);
-            v0caJn += v0caJ[i] * v0caJ[i];
-            crhsn += crhs[i] * crhs[i];
+        for (indi = 0; indi < leng_v0c; indi++){
+            v0caJ[indi] = (v0caJ[indi] + crhs[indi]);
+            v0caJn += v0caJ[indi] * v0caJ[indi];
+            crhsn += crhs[indi] * crhs[indi];
         }
         v0caJn = sqrt(v0caJn);
         crhsn = sqrt(crhsn);
@@ -583,7 +583,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         /*solve c system block by block*/
         t1 = clock();
-        for (i = 1; i <= 1; i++){
+        for (indi = 1; indi <= 1; indi++){
 
             //pardisoSolve_c(sys, &v0caJ[sys->acu_cnno[i - 1]], &y0c[sys->acu_cnno[i - 1]], sys->acu_cnno[i - 1], sys->acu_cnno[i] - 1, sys->cindex[i - 1] + 1, sys->cindex[i]);
 
@@ -642,8 +642,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, y0c, beta, yc);
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0cat, descr, y0c, beta, yca);
 
-        for (i = 0; i < sys->N_edge; i++){
-            yccp[i] = -yc[i] * sys->eps[i];
+        for (indi = 0; indi < sys->N_edge; indi++){
+            yccp[indi] = -yc[indi] * sys->eps[indi];
 
         }
         
@@ -670,16 +670,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         u0c = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
         nn = 0;
         nna = 0;
-        for (i = 0; i < sys->N_edge; i++){
-            nn += (yd2[i] + yc[i]) * (yd2[i] + yc[i]);
-            nna += (yd2a[i] + yca[i]) * (yd2a[i] + yca[i]);
+        for (indi = 0; indi < sys->N_edge; indi++){
+            nn += (yd2[indi] + yc[indi]) * (yd2[indi] + yc[indi]);
+            nna += (yd2a[indi] + yca[indi]) * (yd2a[indi] + yca[indi]);
         }
         nn = sqrt(nn);
         nna = sqrt(nna);
-        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-            u0[sys->N_edge - 2 * sys->N_edge_s + i - sys->N_edge_s].real = (yd2[i] + yc[i]) / nn;    // u0c is the other vector in u0
-            u0a[sys->N_edge - 2 * sys->N_edge_s + i - sys->N_edge_s].real = (yd2a[i] + yca[i]) / nna;    // u0ca
-            u0c[i - sys->N_edge_s] = yd2[i] + yc[i];
+        for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
+            u0[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2[indi] + yc[indi]) / nn;    // u0c is the other vector in u0
+            u0a[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2a[indi] + yca[indi]) / nna;    // u0ca
+            u0c[indi - sys->N_edge_s] = yd2[indi] + yc[indi];
         }
 
         cout << "Time to generate u0d and u0c is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << endl;
@@ -690,17 +690,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
 
         sys->y = (complex<double>*)malloc(sys->N_edge*sizeof(complex<double>));
-        for (i = 0; i < sys->N_edge; i++){
-            sys->y[i] = yd[i].real() + yc[i] + (1i) * yd[i].imag();
+        for (indi = 0; indi < sys->N_edge; indi++){
+            sys->y[indi] = yd[indi].real() + yc[indi] + (1i) * yd[indi].imag();
         }
 
-        for (i = 0; i < sys->numPorts; i++){
-            for (j = 0; j < sys->portEdge[i].size(); j++){
-                leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3]), 2);
-                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 1]), 2);
-                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 2]), 2);
+        for (indi = 0; indi < sys->numPorts; indi++){
+            for (j = 0; j < sys->portEdge[indi].size(); j++){
+                leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3]), 2);
+                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 1]), 2);
+                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 2]), 2);
                 leng = sqrt(leng);
-                sys->x[i + sys->numPorts*xcol] = (sys->x[i + sys->numPorts*xcol].real() + sys->y[sys->portEdge[i][j]].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))) + (1i)*(sys->y[sys->portEdge[i][j]].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + sys->x[i + sys->numPorts*xcol].imag());
+                sys->x[indi + sys->numPorts*xcol] = (sys->x[indi + sys->numPorts*xcol].real() + sys->y[sys->portEdge[indi][j]].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))) + (1i)*(sys->y[sys->portEdge[indi][j]].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + sys->x[indi + sys->numPorts*xcol].imag());
 
             }
         }
@@ -764,11 +764,15 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //
         //y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-        final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-            final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
-            final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
-        }
+
+        // [comment out below to save matrix solve time vvvvvv]
+        //final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
+        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+        //    final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
+        //    final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
+        //}
+        // [comment out above to save matrix solve time ^^^^^^]
+
         /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
             outfile << final_x[i].real << " " << final_x[i].imag << endl;
@@ -793,7 +797,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(v0caJ); v0caJ = NULL;
 
         // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
-        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
+        //status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval); // [comment out reference() to save time]
         //status = plotTime(sys, sourcePort, u0d, u0c);
 
         free(sys->J); sys->J = NULL;
@@ -810,9 +814,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     if (sys->nfreq > 1){
         for (int id = 0; id < sys->nfreq; id++){
             cout << "Z parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " is " << endl;
-            for (i = 0; i < sys->numPorts; i++){
+            for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
-                    Zresult = sys->x[j + i*sys->numPorts].real() + (1i) * sys->x[j + i*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
+                    Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
                     cout << Zresult << "\n";
                 }
             }
@@ -820,9 +824,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
     else{
         cout << "Z parameter at frequency " << (sys->freqStart) * sys->freqUnit << " is " << endl;
-        for (i = 0; i < sys->numPorts; i++){
+        for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
-                Zresult = sys->x[j + i*sys->numPorts].real() + (1i) * sys->x[j + i*sys->numPorts].imag();
+                Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
                 cout << Zresult << "\n";
             }
         }
@@ -830,7 +834,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     sys->cindex.clear();
     sys->acu_cnno.clear();
-    free(sys->x); sys->x = NULL;
+    //free(sys->x); sys->x = NULL; // Cannot free if result is to be saved
 
     free(sys->AdColId); sys->AdColId = NULL;
     free(sys->Adval); sys->Adval = NULL;

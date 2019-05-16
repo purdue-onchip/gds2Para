@@ -32,8 +32,8 @@ int main(int argc, char** argv)
     {
         if (strcmp(argv[1], "--help") == 0)
         {
-            cout << "Help for Test Limbo Interface binary" << endl;
-            cout << "Usage: Test_$@ [options] file1 [file2..file3]" << endl;
+            cout << "Help for LayoutAnalyzer binary (with main testing features)" << endl;
+            cout << "Usage: LayoutAnalyzer [options] file1 [file2..file3]" << endl;
             cout << "Options:" << endl;
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
@@ -41,20 +41,21 @@ int main(int argc, char** argv)
             cout << "  -p, --parrot          Immediately output given GDSII file after reading." << endl;
             cout << "  -w, --write           Write database in memory to given SPEF file." << endl;
             cout << "  -i, --imp             Read given interconnect modeling platform file and write GDSII file with name also given." << endl;
-            //cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
             cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to Xyce (SPICE) subcircuit file." << endl;
+            cout << "  -sx, --xyce           Identical to \"-s\"." << endl;
+            cout << "  -sp, --spef           Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
             cout << endl << "Comments:" << endl;
             cout << "The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
-            //cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
-            cout << " The first file passed after -s or --simulate must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
+            cout << " The first file passed after -s or --simulate (or -sx or --xyce) must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
+            cout << " The first file passed after -sp or --spef must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
         }
         else if (strcmp(argv[1], "--version") == 0)
         {
-            cout << "Version Number for Test Limbo Interface binary: " << "1.0" << endl;
+            cout << "Version Number for LayoutAnalyzer binary (beta with main testing features): " << "0.1" << endl;
         }
         else
         {
@@ -205,12 +206,12 @@ int main(int argc, char** argv)
     }
     else if (argc == 5)
     {
-        if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0))
+        if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0) || (strcmp(argv[1], "-sx") == 0) || (strcmp(argv[1], "--xyce") == 0) || (strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
         {
             // Initialize SolverDataBase, mesh, and set variables for performance tracking
             SolverDataBase sdb;
             fdtdMesh sys;
-            int status;
+            int status = 0; // Initialize as able to return successfully
             bool adbIsGood, sdbIsGood, sdbCouldDump;
             clock_t t1 = clock();
 
@@ -235,6 +236,7 @@ int main(int argc, char** argv)
             else
             {
                 cerr << "Unable to read in GDSII file" << endl;
+                status = 1;
                 return status;
             }
 
@@ -247,6 +249,7 @@ int main(int argc, char** argv)
             else
             {
                 cerr << "Unable to read in simulation input file" << endl;
+                status = 1;
                 return status;
             }
 
@@ -268,7 +271,7 @@ int main(int argc, char** argv)
                 cerr << "meshAndMark Fail!" << endl;
                 return status;
             }
-            sys.print();
+            //sys.print();
 
             // Set D_eps and D_sig
             clock_t t3 = clock();
@@ -341,18 +344,26 @@ int main(int argc, char** argv)
                 double sumC = 0.;
                 for (size_t indj = 0; indj < sys.numPorts; indj++) // Loop over response ports
                 {
-                    // Symmetrize diagonal components before saving entry
-                    double symgij = 0.5 * (sys.Y[indi * sys.numPorts + indj].real() + sys.Y[indj * sys.numPorts + indi].real());
-                    double symcij = 0.5 * (sys.Y[indi * sys.numPorts + indj].imag() + sys.Y[indj * sys.numPorts + indi].imag()) / (2 * M_PI * sys.freqStart * sys.freqUnit);
+                    // Find Y-parameters from Z-parameters (temporary measure)]
+                    double gij = sys.x[indi * sys.numPorts + indj].real() / norm(sys.x[indi * sys.numPorts + indj]); // Re(Z^-1) = Re(Z) / |Z|^2
+                    double gji = sys.x[indj * sys.numPorts + indi].real() / norm(sys.x[indj * sys.numPorts + indi]);
+                    double bij = -sys.x[indi * sys.numPorts + indj].imag() / norm(sys.x[indi * sys.numPorts + indj]); // Im(Z^-1) = -Im(Z) / |Z|^2
+                    double bji = -sys.x[indj * sys.numPorts + indi].imag() / norm(sys.x[indj * sys.numPorts + indi]);
+
+                    // Symmetrize diagonal components of admittance matrix before saving entry
+                    double symgij = 0.5 * (gij + gji);
+                    double symcij = 0.5 * (bij + bji) / (2. * M_PI * sys.freqStart * sys.freqUnit);
+                    //double symgij = 0.5 * (sys.Y[indi * sys.numPorts + indj].real() + sys.Y[indj * sys.numPorts + indi].real());
+                    //double symcij = 0.5 * (sys.Y[indi * sys.numPorts + indj].imag() + sys.Y[indj * sys.numPorts + indi].imag()) / (2. * M_PI * sys.freqStart * sys.freqUnit);
                     listG.push_back(dTriplet(indj, indi, symgij));
                     listC.push_back(dTriplet(indj, indi, symcij));
                     /*if (indi != indj) // Off-diagonal entries are negated node-to-node admittances
                     {
                         listG.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].real()));
-                        listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag() / (2 * M_PI* sys.freqStart * sys.freqUnit)));
+                        listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag() / (2. * M_PI* sys.freqStart * sys.freqUnit)));
                     }
                     
-                    // Diagonal entries need to have sum of all attached admittances, so note them
+                    // Diagonal entries of bus matrix need to have sum of all attached admittances, so note them
                     sumG += sys.Y[indi * sys.numPorts + indj].real();
                     sumC += sys.Y[indi * sys.numPorts + indj].imag() / (2 * M_PI* sys.freqStart * sys.freqUnit);*/
                 }
@@ -366,24 +377,31 @@ int main(int argc, char** argv)
             Parasitics oldPara = sdb.getParasitics(); // Get outdated parastics structure to update
             sdb.setParasitics(Parasitics(oldPara.getPorts(), matG, matC));
 
-            /*// Output SPEF file
-            string outSPEFFile = argv[4];
-            sdb.setDesignName(adb.findNames().back());
-            sdb.setOutSPEF(outSPEFFile);
-            bool sdbCouldDump = sdb.printDumpSPEF();
-            cout << "File ready at " << outSPEFFile << endl; */
-
-            // Output Xyce subcircuit file
-            string outXyceFile = argv[4];
-            sdb.setDesignName(adb.findNames().back());
-            sdb.setOutXyce(outXyceFile);
-            sdbCouldDump = sdb.printDumpXyce();
-            cout << "File ready at " << outXyceFile << endl;
+            // Select Output File Based on Control Mode
+            if ((strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
+            {
+                // Output SPEF file
+                string outSPEFFile = argv[4];
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutSPEF(outSPEFFile);
+                bool sdbCouldDump = sdb.printDumpSPEF();
+                cout << "File ready at " << outSPEFFile << endl;
+            }
+            else
+            {
+                // Output Xyce subcircuit file
+                string outXyceFile = argv[4];
+                vector<size_t> indCellPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutXyce(outXyceFile);
+                sdbCouldDump = sdb.printDumpXyce(indCellPrint);
+                cout << "File ready at " << outXyceFile << endl;
+            }
         }
         else
         {
-            //cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
-            cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" flag, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" or \"-sx\" flag, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-sp\" flag, rerun with \"--help\" flag for details" << endl;
         }
     }
     else

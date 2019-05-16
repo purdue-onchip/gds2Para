@@ -318,18 +318,17 @@ class Layer
     // Print the layer information
     void print() const
     {
-        cout << " ------" << endl;
-        cout << " Details for layer " << this->layerName << ":" << endl;
+        cout << "  Details for layer " << this->layerName << ":" << endl;
         if (this->gdsiiNum != -1)
         {
-            cout << "  GDSII layer number: " << this->gdsiiNum << endl;
+            cout << "   GDSII layer number: " << this->gdsiiNum << endl;
         }
-        cout << "  Bottom z-coordinate: " << this->zStart << " m" << endl;
-        cout << "  Layer height: " << this->zHeight << " m" << endl;
-        cout << "  Relative permittivity: " << this->epsilon_r << endl;
-        cout << "  Loss tangent: " << this->lossTan << endl;
-        cout << "  Conductivity: " << this->sigma << " S/m" << endl;
-        cout << " ------" << endl;
+        cout << "   Bottom z-coordinate: " << this->zStart << " m" << endl;
+        cout << "   Layer height: " << this->zHeight << " m" << endl;
+        cout << "   Relative permittivity: " << this->epsilon_r << endl;
+        cout << "   Loss tangent: " << this->lossTan << endl;
+        cout << "   Conductivity: " << this->sigma << " S/m" << endl;
+        cout << "  ------" << endl;
     }
 
     // Destructor
@@ -517,9 +516,9 @@ class Port
     // Print the layer information
     void print() const
     {
-        cout << "  ------" << endl;
-        cout << "  Details for port " << this->portName << ":" << endl;
-        cout << "   Port direction: ";
+        cout << "   ------" << endl;
+        cout << "   Details for port " << this->portName << ":" << endl;
+        cout << "    Port direction: ";
         switch (this->portDir)
         {
         case 'O':
@@ -534,11 +533,11 @@ class Port
         default:
             cout << "Bidirectional" << endl; // Treat as bidirectional if direction unclear
         }
-        cout << "   Attached source impedance: " << this->Z_source << " ohm" << endl;
-        cout << "   Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
-        cout << "   Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
-        cout << "   GDSII layer number: " << this->gdsiiNum << endl;
-        cout << "  ------" << endl;
+        cout << "    Attached source impedance: " << this->Z_source << " ohm" << endl;
+        cout << "    Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
+        cout << "    Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
+        cout << "    GDSII layer number: " << this->gdsiiNum << endl;
+        cout << "   ------" << endl;
     }
 
     // Destructor
@@ -572,7 +571,7 @@ class Waveforms
     void print() const
     {
         cout << " ------" << endl;
-        cout << " No Waveform Information" << endl;
+        cout << "  No Waveform Information" << endl;
         cout << " ------" << endl;
     }
 
@@ -742,7 +741,6 @@ class Parasitics
     {
         int numPort = getNPort();
         cout << " ------" << endl;
-        cout << " Parasitics Details:" << endl;
         cout << "  List of " << numPort << " ports:" << endl;
         for (size_t indi = 0; indi < numPort; indi++) // Handle each port name
         {
@@ -1957,6 +1955,7 @@ struct SolverDataBase
         cout << " Settings for the simulation:" << endl;
         (this->settings).print(); // Print the simulation settings
         cout << " Details of the " << numLayer << " layers:" << endl;
+        cout << "  ------" << endl;
         for (size_t indi = 0; indi < numLayer; indi++)
         {
             (this->layers)[indi].print();
@@ -1989,21 +1988,22 @@ struct SolverDataBase
     }
 
     // Print the solver database and dump to Xyce (SPICE) subcircuit file
-    bool printDumpXyce()
+    bool printDumpXyce(vector<size_t> indLayerPrint)
     {
         // Print
         int numLayer = this->getNumLayer();
         cout << "Solver Database of IC Design, " << this->designName << ":" << endl;
         cout << " Settings for the simulation:" << endl;
         (this->settings).print(); // Print the simulation settings
-        cout << " Details of the " << numLayer << " layers:" << endl;
-        for (size_t indi = 0; indi < numLayer; indi++)
+        cout << " Details of " << indLayerPrint.size() << " of the " << numLayer << " layers:" << endl;
+        cout << "  ------" << endl;
+        for (size_t indi = 0; indi < indLayerPrint.size(); indi++)
         {
-            (this->layers)[indi].print();
+            (this->layers)[indLayerPrint[indi]].print(); // Print layer details by index number, not GDSII number
         }
         cout << " Waveforms:" << endl;
         (this->wf).print(); // Print the waveforms
-        cout << " Parasitics in file " << this->outSPEF << ":" << endl;
+        cout << " Parasitics in file " << this->outXyce << ":" << endl;
         (this->para).print(); // Print the parasitics
         cout << "------" << endl;
 
