@@ -1492,8 +1492,8 @@ public:
         int numText = cell.getNumText();
         int numSRef = cell.getNumSRef();
 
-        // Print cell information
-        cout << "  List of " << numBound << " boundaries:" << endl;
+        // Set conductor information from all elements in this geometric cell
+        //cout << "  List of " << numBound << " boundaries:" << endl;
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
 
@@ -1688,13 +1688,13 @@ public:
         }
         //cout << "  List of " << numText << " text boxes:" << endl;
         //cout << "  List of " << numSRef << " structure references:" << endl;
-        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference
+        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference recursively
         {
             saveToMesh((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo, sys);
         }
     }
 
-    // Print details of the conductor information (no fdtdMesh)
+    // Print details of the conductor information (no saving to fdtdMesh)
     void printDetails(std::string name, double xo, double yo)
     {
         // Get information about this cell in ASCII database
@@ -1829,45 +1829,7 @@ public:
         }
     }
 
-    // Print the ASCII database while setting mesh information (fdtdMesh style)
-    void print(vector<size_t> indCellPrint, fdtdMesh *sys)
-    {
-        // Delete existing file
-        size_t indExtension = this->getFileName().find(".", 1);
-        /*std::string polyFileName = this->getFileName().substr(0, indExtension) + "_polygon.txt";
-        remove(polyFileName.c_str());*/
-
-        // Analyze design and print to terminal
-        int numCell = getNumCell();
-
-        cout << "------" << endl;
-        cout << "ASCII Database of IC Design:" << endl;
-        cout << " File Name: " << this->fileName << endl;
-        cout << " Version: " << this->getVersion() << endl;
-        cout << " Date of last modification: " << this->getDateMod() << endl;
-        cout << " Date of last access: " << this->getDateAccess() << endl;
-        cout << " Name of this library: " << this->getLibName() << endl;
-        cout << " Database units: " << this->getdbUnits() << " m" << endl;
-        cout << " Database units: " << this->getdbUserUnits() << " user units" << endl;
-        cout << " List of " << numCell << " cells:" << endl;
-        vector<double> pathCoord;
-        for (size_t indi = 0; indi < numCell; indi++)
-        {
-            cout << "  " << indi + 1 << ". " << ((this->cells)[indi]).getCellName() << endl;
-            cout << "   Counts: " << (this->cells)[indi].getNumBound() << " boundaries, " << (this->cells)[indi].getNumPath() << " paths, " << (this->cells)[indi].getNumNode() << " nodes, " << (this->cells)[indi].getNumBox() << " boxes," << endl << "     " << (this->cells)[indi].getNumText() << " text boxes, and " << (this->cells)[indi].getNumSRef() << " structure references" << endl;
-        }
-
-        for (size_t indi = 0; indi < indCellPrint.size(); indi++)
-        {
-            std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
-            cout << cellName << endl;
-            //this->saveToMesh(cellName, 0., 0., sys);   // the origin is the (0,0) point
-            (this->cells)[indCellPrint[indi]].printAlt();
-        }
-        cout << "------" << endl;
-    }
-
-    // Print the ASCII database with the design geometry (no fdtdMesh)
+    // Print the ASCII database with the design geometry
     void print(vector<size_t> indCellPrint)
     {
         // Delete existing file

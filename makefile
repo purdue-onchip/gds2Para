@@ -1,7 +1,7 @@
 # Custom makefile for LimboInterface
 # Directories and Names
 LIB_PREFIX = gds
-LIMBO_ROOT_DIR = $(realpath ../Limbo/)
+LIMBO_ROOT_DIR = ${LIMBO_DIR}
 PARSER_SPEF_ROOT_DIR = $(realpath ../Parser-SPEF/)
 EIGEN_ROOT_DIR = $(realpath ../eigen-git-mirror/)
 MKL_ROOT_DIR = ${MKL_DIR}
