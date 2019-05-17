@@ -343,7 +343,7 @@ class Port
   private:
     std::string portName; // Name of port
     char portDir;         // Direction of port
-    double Z_source;      // Impedance of sourced attached to port (ohm)
+    double Z_source;      // Impedance of source attached to port (ohm)
     vector<double> coord; // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m)
     int gdsiiNum;         // Layer number in GDSII file on which port exists
   public:
