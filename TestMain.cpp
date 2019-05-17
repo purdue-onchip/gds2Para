@@ -303,7 +303,7 @@ int main(int argc, char** argv)
 
             // Generate Stiffness Matrix
             clock_t t5 = clock();
-            status = generateStiff(&sys);
+            /*status = generateStiff(&sys);
             if (status == 0)
             {
                 cout << "generateStiff Success!" << endl;
@@ -314,7 +314,7 @@ int main(int argc, char** argv)
                 cerr << "generateStiff Fail!" << endl;
                 return status;
             }
-
+*/
             // Parameter generation
             t5 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
