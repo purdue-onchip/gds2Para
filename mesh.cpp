@@ -67,9 +67,9 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->nx = 1;
     xmin = xOrigOld[0];
     xmax = xOrigOld[numNode + 2 * sys->numPorts - 1];
-    int xMaxInd = 2;
-    disMaxx = 1e-5;// (xmax - xmin) / xMaxInd;
-    xMaxInd = (xmax - xmin) / disMaxx;
+    int xMaxInd = 10;
+    disMaxx =  (xmax - xmin) / xMaxInd;
+    //xMaxInd = (xmax - xmin) / disMaxx;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
         if (abs(xOrigOld[i] - xOrigOld[i - 1]) > disMin){
@@ -140,9 +140,9 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->ny = 1;
     ymin = yOrigOld[0];
     ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
-    int yMaxInd = 2;    // the max discretization of y is total / 120
-    disMaxy = 1e-5;// (ymax - ymin) / yMaxInd;
-    yMaxInd = (ymax - ymin) / disMaxy;
+    int yMaxInd = 10;    // the max discretization of y is total / 120
+    disMaxy =  (ymax - ymin) / yMaxInd;
+    //yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < numNode + 2 * sys->numPorts; i++){
         if (abs(yOrigOld[i] - yOrigOld[i - 1]) > disMin){
@@ -970,6 +970,12 @@ int matrixConstruction(fdtdMesh *sys){
             sys->eps[i] = sys->stackEpsn[(i - sys->N_edge_s) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
     }
+    ofstream out;
+    /*out.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
+        out << sys->eps[i] << endl;
+    }
+    out.close();*/
 
     /* construct D_sig */
     sys->sig = (double*)calloc(sys->N_edge, sizeof(double));
@@ -985,6 +991,11 @@ int matrixConstruction(fdtdMesh *sys){
             sys->sig[i] = SIGMA;/*(a / b) * SIGMA;*/
         }
     }
+    /*out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
+        out << sys->sig[i] << endl;
+    }
+    out.close();*/
 
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
@@ -1014,10 +1025,8 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             sys->portCoor[i].portCnd = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
             sys->conductor[sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]] - 1].markPort = i + 1;    // markPort start from 1
         }
-        /*for (j = 0; j < sys->cdtNumNode[sys->portCoor[i].portCnd - 1]; j++){
-            sys->exciteCdtLayer[sys->conductor[sys->portCoor[i].portCnd - 1].node[j] / sys->N_node_s] = 1;
-        }*/
-        cout << sys->portCoor[i].portCnd << endl;
+        
+        //cout << sys->portCoor[i].portCnd << endl;
         edge.clear();
         if (sys->portCoor[i].x1 != sys->portCoor[i].x2){
             if (sys->portCoor[i].x1 < sys->portCoor[i].x2){
@@ -1117,7 +1126,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 
         }
         sys->portEdge.push_back(edge);
-
+        
     }
 
     clock_t t1 = clock();

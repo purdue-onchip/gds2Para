@@ -268,7 +268,7 @@ int main(int argc, char** argv)
                 cerr << "meshAndMark Fail!" << endl;
                 return status;
             }
-            sys.print();
+            //sys.print();
 
             // Set D_eps and D_sig
             clock_t t3 = clock();
@@ -296,7 +296,7 @@ int main(int argc, char** argv)
                 cerr << "portSet Fail!" << endl;
                 return status;
             }
-            sys.print();
+            //sys.print();
 
             // Generate Stiffness Matrix
             clock_t t5 = clock();

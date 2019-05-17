@@ -589,7 +589,7 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     complex<double> *J;
     J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
     for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
-        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqEnd * sys->freqUnit * 2 * PI;
+        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2 * PI;
         //J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
         //J[i - sys->N_edge_s].re = 0;
     }
@@ -606,8 +606,8 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
                 // valc[indi] needs omega * (-omega * epsilon  + j * sigma) added to it
-                complex<double> addedPart(-(2 * PI * sys->freqEnd * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
-                valc[indi] += (2 * PI * sys->freqEnd * sys->freqUnit) * addedPart;
+                complex<double> addedPart(-(2 * PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
+                valc[indi] += (2 * PI * sys->freqStart * sys->freqUnit) * addedPart;
                 //valc[indi] += -std::complex::pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[indi] + sys->N_edge_s] + (1i) * (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[indi] + sys->N_edge_s];
                 //valc[i].re += - pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
                 //valc[i].i += (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
@@ -662,9 +662,11 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     cout << "Solving (-w^2*D_eps+iwD_sig+S)x=-iwJ is complete!\n";
     double nn = 0.;
     double nnn = 0.;
+    double nn0 = 0.;    // the norm of y0-xr
     for (indi = 0; indi < sys->N_edge - 2 * sys->N_edge_s; indi++){
         nn += pow((xr[indi].real() - x[indi].real), 2) + pow((xr[indi].imag() - x[indi].imag), 2);
         nnn += pow(xr[indi].real(), 2) + pow(xr[indi].imag(), 2);
+        nn0 += pow((sys->y[indi + sys->N_edge_s].real() - xr[indi].real()), 2) + pow((sys->y[indi + sys->N_edge_s].imag() - xr[indi].imag()), 2);
         //nn += pow((xr[i].re - x[i].real), 2) + pow((xr[i].i - x[i].imag), 2);
         //nnn += pow(xr[i].re, 2) + pow(xr[i].i, 2);
     }
@@ -683,8 +685,10 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
 
     nn = sqrt(nn);
     nnn = sqrt(nnn);
+    nn0 = sqrt(nn0);
     /*cout << "Relative residual of xr is " << numeratorr / denominator << endl;*/
     cout << "Relative residual  is " << nn / nnn << endl;
+    cout << "y0 relative residual is " << nn0 / nnn << endl;
 
     free(RowId1); RowId1 = NULL;
     free(valc); valc = NULL;

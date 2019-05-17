@@ -393,8 +393,28 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     double *a;
     int *ia, *ja;
-    
+    /*ofstream outfile1;
+    outfile1.open("v0c.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < v0cnum; i++){
+    outfile1 << sys->v0cRowId[i] + 1 << " " << sys->v0cColIdo[i] + 1 << " " << sys->v0cvalo[i] << endl;
+    }
+    outfile1.close();
+    outfile1.open("v0ca.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < v0canum; i++){
+    outfile1 << sys->v0caRowId[i] + 1 << " " << sys->v0caColIdo[i] + 1 << " " << sys->v0cavalo[i] << endl;
+    }
+    outfile1.close();
 
+    outfile1.open("v0d1.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < v0d1num; i++){
+    outfile1 << sys->v0d1RowId[i] + 1 << " " << sys->v0d1ColIdo[i] + 1 << " " << sys->v0d1valo[i] << endl;
+    }
+    outfile1.close();
+    outfile1.open("v0d1a.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < v0d1anum; i++){
+    outfile1 << sys->v0d1aRowId[i] + 1 << " " << sys->v0d1aColIdo[i] + 1 << " " << sys->v0d1avalo[i] << endl;
+    }
+    outfile1.close();*/
    
     /* Pick up a y0c2 cooresponding to one source port */
     complex<double> Zresult;
@@ -726,10 +746,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //    }
         //    
         //    for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
-        //            - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
-        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
-        //            + sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
+        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqStart * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
+        //            - sys->freqStart * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
+        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqStart * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
+        //            + sys->freqStart * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
         //    }
         //}
        
@@ -741,7 +761,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
         //J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
         //for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-        //    J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
+        //    J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqStart * sys->freqUnit * 2 * PI;
         //}
         //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
         //
@@ -749,8 +769,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //free(tmp);
         //tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
         //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //    tmp[i].real = -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
-        //    tmp[i].imag = sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
+        //    tmp[i].real = -pow(sys->freqStart * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - sys->freqStart * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
+        //    tmp[i].imag = sys->freqStart * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - pow(sys->freqStart * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
         //}
         //rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
         //status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
@@ -764,23 +784,23 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //
         //y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-        final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-            final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
-            final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
-        }
+        //final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
+        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+        //    final_x[i].real = sys->y[i + sys->N_edge_s].real() +y_h[i].real;
+        //    final_x[i].imag = sys->y[i + sys->N_edge_s].imag() +y_h[i].imag;
+        //}
         /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
             outfile << final_x[i].real << " " << final_x[i].imag << endl;
         }
         outfile.close();*/
 
-        free(tmp); tmp = NULL;
+        /*free(tmp); tmp = NULL;
         free(m_h); m_h = NULL;
         free(rhs_h); rhs_h = NULL;
         free(y_h); y_h = NULL;
         free(ipiv); ipiv = NULL;
-        free(J); J = NULL;
+        free(J); J = NULL;*/
         free(crhs); crhs = NULL;
         free(dRhs); dRhs = NULL;
         free(ydt); ydt = NULL;
@@ -793,7 +813,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(v0caJ); v0caJ = NULL;
 
         // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
-        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
+        //status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
         //status = plotTime(sys, sourcePort, u0d, u0c);
 
         free(sys->J); sys->J = NULL;
