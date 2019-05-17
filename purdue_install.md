@@ -42,6 +42,8 @@ Please direct all questions, bug reports, and issues relating to installing or r
 6. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
 7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
     * For "bash", edit the file ".bashrc" in your home directory by appending the following:
+
+
 ```bash
 # Skip rest of file if not interactive
 if [ -z "$PS1" ]; then
@@ -73,6 +75,8 @@ export FLEX_DIR="/usr/bin/flex"
 export LIMBO_DIR="<absolute path to Limbo directory>"
 export MKL_DIR="/opt/intel/current/mkl"
 ```
+
+
     * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
 ```tcsh
 # Skip Rest of File if Not Interactive

@@ -1,7 +1,7 @@
 # gds2Para
 Complete Integrated Circuit (IC) Layout Analysis from GDSII Design File to Parasitics Extraction
 
-This layout analyzer is written in C++ as part of a wider API for the electromagnetic design validation of VLSI IC, package, and board designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits, packages, and boards. Design information from the Graphic Database Stream II (GDSII) file is parsed and stored alongside simulation input information. Once a design is loaded, the information can be written to another GDSII file or analyzed with a full-wave simulation to extract parasitics between ports. An alternate mode of operation allows an interconnect modeling platform (IMP) file to be translated to a GDSII file design. Parasitics are preferably reported through a [Xyce](https://xyce.sandia.gov/) subcircuit file (SPICE derivative from Sandia National Laboratories), though a Standard Parasitics Exchange Format (SPEF) file may be output alternatively. Please carefully read this **README.md** file for an overview, dependencies, and usage instructions.
+This layout analyzer is written in C++ as part of a wider API for the electromagnetic design validation of VLSI IC, package, and board designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits, packages, and boards. Design information from the Graphic Database Stream II (GDSII) file is parsed and stored alongside simulation input information. Once a design is loaded, the information can be written to another GDSII file or analyzed with a full-wave simulation to extract parasitics between ports. An alternate mode of operation allows an interconnect modeling platform (IMP) file to be translated to a GDSII file design. Parasitics are preferably reported through a [Xyce](https://xyce.sandia.gov/) subcircuit file (SPICE derivative from Sandia National Laboratories), though a [Standard Parasitic Exchange Format (SPEF)](https://ieeexplore.ieee.org/document/5430852) file may be output alternatively. Please carefully read this **README.md** file for an overview, dependencies, and usage instructions.
 
 ## Overview
 ### Simulate (-s) Mode Top-level Flowchart
@@ -17,10 +17,12 @@ This layout analyzer is written in C++ as part of a wider API for the electromag
 | C++ Standard Library: Numerics   | C++              | Complex                                | Complex floating point number arithmetic                          |
 | C++ Standard Library: Strings    | C++              | String                                 | Utilities for easy string handling                                |
 | C++ Standard Library: Utilities  | C++              | Utility                                | General C++ utilities such as pairs and swapping                  |
-| Eigen                            | C++              | Sparse                                 | API for sparse matrix storage                                     |
+| [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)                                                             | C++              | Sparse                                 | API for sparse matrix storage                                     |
+| [HYPRE](https://computation.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)                            | Fortran/C/C++    | HYPRE, HYPRE_krylov, HYPRE_parcsr_ls   | LLNL library of preconditioners and multigrid solvers             |
 | Limbo                            | C/C++            | GdsReader, GdsWriter                   | API for GDSII file parsing and writing                            |
-| MakeUtils                        | Makefile         | n/a                                    | Makefile utilities that help find build dependencies              |
-| MKL                              | Fortran/C/C++    | MKL, Mkl_spblas                        | Intel libraries for parallel mathematics                          |
+| [MakeUtils](https://www.gnu.org/software/make/)                                                                           | Makefile         | n/a                                    | Makefile utilities that help find build dependencies              |
+| [Math Kernel Library](https://software.intel.com/en-us/mkl)                                                               | Fortran/C/C++    | MKL, Mkl\_spblas                        | Intel libraries for parallel mathematics                          |
+| [Open Message Passing Interface](https://www.open-mpi.org/)                                                               | Fortran/C        | n/a                                    | Open MPI compilation and runtime tools for parallel computing     |
 | Parser-SPEF                      | C++              | parser-spef                            | API for SPEF file processing                                      |
 | Preprocessor                     | C/C++            | n/a                                    | Inclusion, definitions, and macros such as assertion with message |
 
@@ -68,7 +70,7 @@ Follow the instructions given in **INSTALL.md** to install this software and run
 * Example Files
     * [Purdue On-Chip Electromagnetics Laboratory](https://engineering.purdue.edu/~djiao/) for **singleStrip.imp** (single stripline)
     * [Yuan Ze University Design Automation library](http://yzuda.org/download/_GDSII_examples.html) for **inv.gds** (inverter logic gate), **nand2.gds** (2-input NAND gate), and **xor.gds** (XOR gate)
-    * [NanGate Open Cell Library FreePDK45](https://www.cs.upc.edu/%7Ejpetit/CellRouting/nangate/Front_End/Doc/Databook/Cells/SDFFRS_X2_NangateOpenCellLibrary_typical_typical.html) for **SDFFRS_X2.gds** (scan D flip-flop with reset/set)
+    * [NanGate Open Cell Library FreePDK45](https://www.cs.upc.edu/%7Ejpetit/CellRouting/nangate/Front_End/Doc/Databook/Cells/SDFFRS_X2_NangateOpenCellLibrary_typical_typical.html) for **SDFFRS\_X2.gds** (scan D flip-flop with reset/set)
     * [Peter Monta](https://github.com/pmonta/FPGA-netlist-tools/tree/master/masks/4004) and the [Tuva Design Intel 4004 Anniversary Project](http://4004.com/) for **4004.gds** (Intel 4004 processor from 1971)
     * [Open Compute Project](https://www.opencompute.org/wiki/Networking/SpecsAndDesigns#Facebook_Wedge_100_-_32x100G) for original Gerber files for Facebook Wedge 100 that led to **WEDGE100_REV01.gds** (100G Ethernet Switch board)
 * Prof. Dan Jiao of the Purdue On-Chip Electromagnetics Library for her guidance of the project

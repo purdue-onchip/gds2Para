@@ -38,6 +38,8 @@ Please follow these instructions for a general deployment on Linux machines. The
 6. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
 7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to C compiler> for a valid path to a C language compiler, \<absolute path to C++ compiler>, for a valid path to a C++ compiler, and \<absolute path to Fortran compiler> for a valid path to a Fortran compiler, \<absolute path to Limbo directory> for a valid path to the Limbo directory, and \<absolute path to MKL directory> for a valid path to the Intel Math Kernal Library (MKL) directory when it appears
     * For "bash", edit the file ".bashrc" in your home directory by appending the following:
+
+
 ```bash
 # Skip rest of file if not interactive
 if [ -z "$PS1" ]; then
@@ -58,6 +60,8 @@ export OMPI_FC=<absolute path to Fortran compiler>
 export LIMBO_DIR="<absolute path to Limbo directory>"
 export MKL_DIR="<absolute path to MKL directory>"
 ```
+
+
     * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
 ```tcsh
 # Skip Rest of File if Not Interactive
@@ -79,6 +83,8 @@ setenv OMPI_FC <absolute path to Fortran compiler>
 setenv LIMBO_DIR <absolute path to Limbo directory>
 setenv MKL_DIR <absolute path to MKL directory>
 ```
+
+
     * Ensure that the compiler versions support the following standards: C99 for C language, C++17 for C++, and GNU Fortran (superset of F95) for Fortran
     * It appears that Intel MKL-DNN for deep neural networks is **not** compatible with installation, only Intel MKL is
 8. Exit the shell and terminate the connection before logging back in
