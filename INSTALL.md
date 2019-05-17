@@ -38,54 +38,48 @@ Please follow these instructions for a general deployment on Linux machines. The
 6. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
 7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to C compiler> for a valid path to a C language compiler, \<absolute path to C++ compiler>, for a valid path to a C++ compiler, and \<absolute path to Fortran compiler> for a valid path to a Fortran compiler, \<absolute path to Limbo directory> for a valid path to the Limbo directory, and \<absolute path to MKL directory> for a valid path to the Intel Math Kernal Library (MKL) directory when it appears
     * For "bash", edit the file ".bashrc" in your home directory by appending the following:
+    ```bash
+    # Skip rest of file if not interactive
+    if [ -z "$PS1" ]; then
+        return
+    fi
 
+    # Environment Variables for Compilers
+    export CC=<absolute path to C compiler>
+    export CXX=<absolute path to C++ compiler>
+    export FC=<absolute path to Fortran compiler>
 
-```bash
-# Skip rest of file if not interactive
-if [ -z "$PS1" ]; then
-    return
-fi
+    # Environment Variables for OpenMPI
+    export OMPI_CC=<absolute path to C compiler>
+    export OMPI_CXX=<absolute path to C++ compiler>
+    export OMPI_FC=<absolute path to Fortran compiler>
 
-# Environment Variables for Compilers
-export CC=<absolute path to C compiler>
-export CXX=<absolute path to C++ compiler>
-export FC=<absolute path to Fortran compiler>
-
-# Environment Variables for OpenMPI
-export OMPI_CC=<absolute path to C compiler>
-export OMPI_CXX=<absolute path to C++ compiler>
-export OMPI_FC=<absolute path to Fortran compiler>
-
-# Environment Variables for GDSII File Handling
-export LIMBO_DIR="<absolute path to Limbo directory>"
-export MKL_DIR="<absolute path to MKL directory>"
-```
-
-
+    # Environment Variables for GDSII File Handling
+    export LIMBO_DIR="<absolute path to Limbo directory>"
+    export MKL_DIR="<absolute path to MKL directory>"
+    ```
     * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
-```tcsh
-# Skip Rest of File if Not Interactive
-if (! $?prompt) then
-    exit 0
-endif
+    ```tcsh
+    # Skip Rest of File if Not Interactive
+    if (! $?prompt) then
+        exit 0
+    endif
 
-# Environment Variables for Compilers
-setenv CC <absolute path to C compiler>
-setenv CXX <absolute path to C++ compiler>
-setenv FC <absolute path to Fortran compiler>
+    # Environment Variables for Compilers
+    setenv CC <absolute path to C compiler>
+    setenv CXX <absolute path to C++ compiler>
+    setenv FC <absolute path to Fortran compiler>
 
-# Environment Variables for OpenMPI
-setenv OMPI_CC <absolute path to C compiler>
-setenv OMPI_CXX <absolute path to C++ compiler>
-setenv OMPI_FC <absolute path to Fortran compiler>
+    # Environment Variables for OpenMPI
+    setenv OMPI_CC <absolute path to C compiler>
+    setenv OMPI_CXX <absolute path to C++ compiler>
+    setenv OMPI_FC <absolute path to Fortran compiler>
 
-# Environment Variables for GDSII File Handling
-setenv LIMBO_DIR <absolute path to Limbo directory>
-setenv MKL_DIR <absolute path to MKL directory>
-```
-
-
-    * Ensure that the compiler versions support the following standards: C99 for C language, C++17 for C++, and GNU Fortran (superset of F95) for Fortran
+    # Environment Variables for GDSII File Handling
+    setenv LIMBO_DIR <absolute path to Limbo directory>
+    setenv MKL_DIR <absolute path to MKL directory>
+    ```
+    * Ensure that the compiler versions support the following standards: GNU Fortran (superset of F95) for Fortran, C99 for C language, and C++17 for C++.
     * It appears that Intel MKL-DNN for deep neural networks is **not** compatible with installation, only Intel MKL is
 8. Exit the shell and terminate the connection before logging back in
 9. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`

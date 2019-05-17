@@ -42,73 +42,69 @@ Please direct all questions, bug reports, and issues relating to installing or r
 6. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
 7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
     * For "bash", edit the file ".bashrc" in your home directory by appending the following:
+    ```bash
+    # Skip rest of file if not interactive
+    if [ -z "$PS1" ]; then
+        return
+    fi
 
+    # Improve Compilers
+    alias cc="gcc"
+    export CC=/opt/gcc/7.1.0/bin/gcc
+    export CXX=/opt/gcc/7.1.0/bin/gcc
+    export FC=/opt/gcc/7.1.0/bin/gfortran
+    export PATH=/opt/gcc/7.1.0/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
 
-```bash
-# Skip rest of file if not interactive
-if [ -z "$PS1" ]; then
-    return
-fi
+    # Improve OpenMPI Version
+    export PATH=/opt/mpich2-gcc/1.4.1p1/bin:${PATH}
+    export LD_LIBRARY_PATH=/opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
+    export OMPI_CC=/opt/gcc/7.1.0/bin/gcc
+    export OMPI_CXX=/opt/gcc/7.1.0/bin/gcc
+    export OMPI_FC=/opt/gcc/7.1.0/bin/gfortran
 
-# Improve Compilers
-alias cc="gcc"
-export CC=/opt/gcc/7.1.0/bin/gcc
-export CXX=/opt/gcc/7.1.0/bin/gcc
-export FC=/opt/gcc/7.1.0/bin/gfortran
-export PATH=/opt/gcc/7.1.0/bin:$PATH
-export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
+    # Improve git Version
+    export PATH=/opt/git/2.18.0/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:$LD_LIBRARY_PATH
 
-# Improve OpenMPI Version
-export PATH=/opt/mpich2-gcc/1.4.1p1/bin:${PATH}
-export LD_LIBRARY_PATH=/opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
-export OMPI_CC=/opt/gcc/7.1.0/bin/gcc
-export OMPI_CXX=/opt/gcc/7.1.0/bin/gcc
-export OMPI_FC=/opt/gcc/7.1.0/bin/gfortran
-
-# Improve git Version
-export PATH=/opt/git/2.18.0/bin:$PATH
-export LD_LIBRARY_PATH=/opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:$LD_LIBRARY_PATH
-
-# Environment Variables for GDSII File Handling
-export BOOST_DIR="/opt/boost/1.57.0"
-export FLEX_DIR="/usr/bin/flex"
-export LIMBO_DIR="<absolute path to Limbo directory>"
-export MKL_DIR="/opt/intel/current/mkl"
-```
-
-
+    # Environment Variables for GDSII File Handling
+    export BOOST_DIR="/opt/boost/1.57.0"
+    export FLEX_DIR="/usr/bin/flex"
+    export LIMBO_DIR="<absolute path to Limbo directory>"
+    export MKL_DIR="/opt/intel/current/mkl"
+    ```
     * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
-```tcsh
-# Skip Rest of File if Not Interactive
-if (! $?prompt) then
-    exit 0
-endif
+    ```tcsh
+    # Skip Rest of File if Not Interactive
+    if (! $?prompt) then
+        exit 0
+    endif
 
-# Improve gcc Version
-alias cc 'gcc'
-setenv CC /opt/gcc/7.1.0/bin/gcc
-setenv CXX /opt/gcc/7.1.0/bin/gcc
-setenv FC /opt/gcc/7.1.0/bin/gfortran
-setenv PATH /opt/gcc/7.1.0/bin:${PATH}
-setenv LD_LIBRARY_PATH /opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:${LD_LIBRARY_PATH}
+    # Improve gcc Version
+    alias cc 'gcc'
+    setenv CC /opt/gcc/7.1.0/bin/gcc
+    setenv CXX /opt/gcc/7.1.0/bin/gcc
+    setenv FC /opt/gcc/7.1.0/bin/gfortran
+    setenv PATH /opt/gcc/7.1.0/bin:${PATH}
+    setenv LD_LIBRARY_PATH /opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:${LD_LIBRARY_PATH}
 
-# Improve OpenMPI Version
-setenv PATH /opt/mpich2-gcc/1.4.1p1/bin:${PATH}
-setenv LD_LIBRARY_PATH /opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
-setenv OMPI_CC /opt/gcc/7.1.0/bin/gcc
-setenv OMPI_CXX /opt/gcc/7.1.0/bin/gcc
-setenv OMPI_FC /opt/gcc/7.1.0/bin/gfortran
+    # Improve OpenMPI Version
+    setenv PATH /opt/mpich2-gcc/1.4.1p1/bin:${PATH}
+    setenv LD_LIBRARY_PATH /opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
+    setenv OMPI_CC /opt/gcc/7.1.0/bin/gcc
+    setenv OMPI_CXX /opt/gcc/7.1.0/bin/gcc
+    setenv OMPI_FC /opt/gcc/7.1.0/bin/gfortran
 
-# Improve git Version
-setenv PATH /opt/git/2.18.0/bin:${PATH}
-setenv LD_LIBRARY_PATH /opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:${LD_LIBRARY_PATH}
+    # Improve git Version
+    setenv PATH /opt/git/2.18.0/bin:${PATH}
+    setenv LD_LIBRARY_PATH /opt/git/2.18.0/lib64:/opt/git/2.18.0/libexec:${LD_LIBRARY_PATH}
 
-# Environment Variables for GDSII File Handling
-setenv BOOST_DIR /opt/boost/1.57.0
-setenv FLEX_DIR /usr/bin/flex
-setenv LIMBO_DIR <absolute path to Limbo directory>
-setenv MKL_DIR /opt/intel/current/mkl
-```
+    # Environment Variables for GDSII File Handling
+    setenv BOOST_DIR /opt/boost/1.57.0
+    setenv FLEX_DIR /usr/bin/flex
+    setenv LIMBO_DIR <absolute path to Limbo directory>
+    setenv MKL_DIR /opt/intel/current/mkl
+    ```
 8. Exit the shell and terminate the connection before logging back in
 9. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`
     * If nothing shows up for "bash" users, run `cp .bashrc .bash_profile` in the home directory, exit the shell, log back in, and try again
