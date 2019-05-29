@@ -58,7 +58,7 @@ class SimSettings
     double lengthUnit;     // Units for lengths (m)
     vector<double> limits; // xmin, xmax, ymin, ymax, zmin, zmax (m)
     double freqUnit;       // Units for frequency (Hz)
-    double freqScale;      // Frequency scaling?
+    double freqScale;      // Frequency scaling (0. for logarithmic [preferred], 1. for linear, otherwise undefined)
     size_t nFreq;          // Number of frequencies in simulation
     vector<double> freqs;  // List of frequencies (linear or logarithmic [preferred] spacing)
   public:
@@ -1560,8 +1560,12 @@ struct SolverDataBase
                 // Handle total size
                 if (fileLine.compare(0, 10, "TOTAL SIZE") == 0)
                 {
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain limits of IC design size
                     double xmin, xmax, ymin, ymax, zmin, zmax;
@@ -1581,10 +1585,15 @@ struct SolverDataBase
                     indCoordEnd = fileLine.find(" ", indCoordStart);
                     zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
                     indCoordStart = indCoordEnd + 1;
-                    zmax = stod(fileLine.substr(indCoordStart));
+                    indCoordEnd = fileLine.find(" ", indCoordStart);
+                    zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain length unit
                     double lengthUnit = stod(fileLine.substr(fileLine.find("lengthUnit = ") + 13, fileLine.find(" #")));
@@ -1595,32 +1604,52 @@ struct SolverDataBase
                 // Handle frequency sweep parameters
                 else if (fileLine.compare(0, 9, "FREQUENCY") == 0)
                 {
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain frequency unit
                     double freqUnit = stod(fileLine.substr(fileLine.find("freqUnit = ") + 11, fileLine.find(" #")));
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain first frequency
                     double freqStart = stod(fileLine.substr(fileLine.find("freqStart = ") + 12, fileLine.find(" #")));
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain last frequency
                     double freqEnd = stod(fileLine.substr(fileLine.find("freqEnd = ") + 10, fileLine.find(" #")));
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain number of frequencies
                     size_t nFreq = stoi(fileLine.substr(fileLine.find("nfreq = ") + 8, fileLine.find(" #")));
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain frequency scaling
                     double freqScale = stod(fileLine.substr(fileLine.find("freqScale = ") + 12, fileLine.find(" #")));
@@ -1636,7 +1665,17 @@ struct SolverDataBase
                         freqList.push_back(freqStart);
                         freqList.push_back(freqEnd);
                     }
-                    else
+                    else if ((nFreq > 2) && (freqScale == 1.)) // Linear interpolation of frequency sweep
+                    {
+                        double linStep = (freqEnd - freqStart) / (nFreq - 1);
+                        freqList.push_back(freqStart);
+                        for (size_t indi = 1; indi < nFreq - 1; indi++)
+                        {
+                            freqList.push_back(freqList.back() + linStep);
+                        }
+                        freqList.push_back(freqEnd); // Ensure last frequency is exact
+                    }
+                    else // Logarithmic interpolation of frequency sweep
                     {
                         double exp10Step = log10(freqEnd / freqStart) / (nFreq - 1);
                         freqList.push_back(freqStart);
@@ -1655,14 +1694,30 @@ struct SolverDataBase
                 // Handle dielectric stack-up
                 else if (fileLine.compare(0, 16, "DIELECTRIC STACK") == 0)
                 {
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain number of dieletric layers in stack-up
-                    size_t numStack = stoi(fileLine.substr(fileLine.find("numStack = ") + 11, fileLine.find(" #")));
+                    size_t numStack = 0;
+                    if (fileLine.find("numStack = ") < string::npos)
+                    {
+                        numStack = stoi(fileLine.substr(fileLine.find("numStack = ") + 11, fileLine.find(" #")));
+                    }
+                    else if (fileLine.find("numLayer = ") < string::npos)
+                    {
+                        numStack = stoi(fileLine.substr(fileLine.find("numLayer = ") + 11, fileLine.find(" #")));
+                    }
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Read each line in dielectric stack
                     for (size_t indStack = 0; indStack < numStack; indStack++)
@@ -1735,15 +1790,23 @@ struct SolverDataBase
                         // Register a new layer in layers field
                         (this->layers).emplace_back(Layer(layerName, layerNumGDSII, layerZStart, layerHeight, layerEpsilonR, layerLossTan, layerSigma));
 
-                        // Keep moving down the dielectric stack
+                        // Keep moving down the dielectric stack, skipping comments
                         getline(inputFile, fileLine);
+                        while (fileLine.compare(0, 1, "#") == 0)
+                        {
+                            getline(inputFile, fileLine);
+                        }
                     }
                 }
                 // Handle port list if not already populated by GDSII file
                 else if ((fileLine.compare(0, 4, "PORT") == 0) && ((this->para).getPorts().size() == 0))
                 {
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Obtain number of ports in list
                     size_t numPort = 0;
@@ -1756,8 +1819,12 @@ struct SolverDataBase
                         numPort = stoi(fileLine.substr(fileLine.find("numPort = ") + 10, fileLine.find(" #")));
                     }
 
-                    // Move down one line
+                    // Move down one line, skipping comments
                     getline(inputFile, fileLine);
+                    while (fileLine.compare(0, 1, "#") == 0)
+                    {
+                        getline(inputFile, fileLine);
+                    }
 
                     // Read each line in the port list
                     vector<Port> ports;
@@ -1837,8 +1904,12 @@ struct SolverDataBase
                         }
                         ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., {xsup, ysup, zsup, xret, yret, zret}, portLayer));
 
-                        // Move down one line
+                        // Move down one line in port list, skipping comments
                         getline(inputFile, fileLine);
+                        while (fileLine.compare(0, 1, "#") == 0)
+                        {
+                            getline(inputFile, fileLine);
+                        }
                     }
 
                     // Propagate port list to parasitics data structure now

@@ -68,6 +68,60 @@ Many thanks are owed to the project sponsors for making the development of this 
 ## Installation and Usage
 Follow the instructions given in **INSTALL.md** to install this software and run it from the command line. Users from Purdue University should read **purdue\_install.md** instead for specific steps unique to their environment.
 
+## Simulation Input File (.sim_input) Syntax
+Every GDSII file needs to have a simulation input file with the .sim\_input extension created for it. The custom syntax of the simulation input file is given at the bottom of this section. It is important that the information in the blocks underneath the headers in all capital letters appear in the order given. Comments start with `#` and continue for the rest of the line. Comments may appear almost anywhere in the file so long as in-line comments are preceded by a space. The following are placeholders, angle brackets and words in between, which must populated depending on the design:
+* \<six design extents>: The six coordinates for the smallest rectangular prism enclosing the design with implied units in the order of xmin (the smallest x-coordinate in the design), xmax, ymin, ymax, zmin, and zmax (the largest z-coordinate in the design).
+    * A lowercase 'e' may be used for scientific notation.
+    * For example, `30.00 +149. -47.0 +120. 0.00 +7.53`.
+* \<lengthUnit>: The unit by which all given and reported lengths (e.g., total size of design, layer coordinates and heights, and port coordinates) must be multiplied in order to convert to meters. A lowercase 'e' may be used for scientific notation. For example, `1e-6`.
+* \<freqUnit>: The unit by which all given and reported temporal frequencies must be multiplied in order to convert to hertz. A lowercase 'e' may be used for scientific notation. For example, `1.0e+6`.
+* \<freqStart>: The smallest frequency in the frequency sweep with implied units. For example, `1000.0`.
+* \<freqEnd>: The largest frequency in the frequency sweep with implied units. For example, `3000.0`.
+* \<nfreq>: The total number of frequencies to include in the sweep. A value of `1` means that \<freqEnd> must equal \<freqStart>. A value of `2` means that only \<freqStart> and \<freqEnd> are included. Any larger integer requires interpolation.
+* \<freqScale>: Integer representing frequency interpolation. The recommended value is `0` for logarithmic spacing. The value `1` is for linear spacing.
+* \<numLayer>: The total number of layers in this design. The integer here must match the number of active \<layer entry> lines following this line in the file.
+* \<layer entry>: An entire line representing a single layer.
+    * The four pieces of information that must be included in order are the layer name at the start of the line, the z-coordinate of the bottom of the layer (designated with `z = ` before a length with implied units), the height of the layer (designated with `h = ` before a length with implied units), and the relative permittivity of the dielectric making up that insulating parts of that layer (designated with `e = ` before a unitless floating-point number greater than or equal to unity).
+    * A lowercase 'e' may be used for scientific notation.
+    * In order to maintain correspondence with the layer numbers used in a GDSII file, the layer names must be a plain integer or be an alphanumeric string with a capital 'M' before the layer number.
+    * It is strongly recommended to add one layer below the bottommost GDSII layer and a second layer above the topmost GDSII layer to serve as planes of perfect electrical conductor (PEC) representing how the design would behave in a testing environment.
+    * For example, `ILDM2 z = 1.316 h = 0.12 e = 8.0`.
+* \<numPorts>: The total number of ports in this design. The integer here must match the number of active \<port entry> lines following this line in the file.
+* \<port entry>: An entire line representing a single port.
+    * The seven pieces of information that must be included in order are the x-coordinate of the supply point of the port, the y-coordinate of the supply point of the port, the z-coordinate of the supply point of the port, the x-coordinate of the return point of the port, the y-coordinate of the return point of the port, the z-coordinate of the return point of the port, and the directionality of the port.
+    * A lowercase 'e' may be used for scientific notation.
+    * The directionality of the port is either `+1` for input ports, `-1` for output ports, or `0` for bidirectional ports or ports with uncertain power flow.
+    * A port should be added for each input/output pin of the device. Additional ports are needed for every transistor or other active device in the design. For printed circuit boards (PCBs), at least one port is needed for each component on the populated layout.
+    * For example, `+146. -16.0 4.53 +146. +6.00 4.53 -1`.
+
+```
+TOTAL SIZE
+<six design extents>
+lengthUnit = <lengthUnit>
+
+FREQUENCY
+freqUnit = <freqUnit>
+freqStart = <freqStart>
+freqEnd = <freqEnd>
+\# Block-interrupting comment
+nfreq = <nfreq>
+freqScale = <freqScale>
+
+DIELECTRIC STACK
+numStack = <numLayer>
+<layer entry> # In-line comment
+<...>
+<layer entry> # In-line comment
+\# Post-block comment
+
+PORT
+numPorts = <numPorts>
+<port entry> # In-line comment
+<...>
+<port entry> # In-line comment
+\# Post-block comment
+```
+
 ## Credits and Acknowledgements
 * Example Files
     * [Purdue On-Chip Electromagnetics Laboratory](https://engineering.purdue.edu/~djiao/) for **singleStrip.imp** (single stripline)
