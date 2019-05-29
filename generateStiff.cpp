@@ -524,38 +524,40 @@ int generateStiff(fdtdMesh *sys){
     //cout << "Length of S is " << sys->leng_S << endl;
     //cout << "S generation is done!\n";
 
+#ifndef SKIP_PARDISO
     /* use pardiso to solve (-w^2*D_eps+iw*D_sig+S)\(-1i*w*J) */
-    //int sourcePort = 0;
-    //double leng;
-    //complex<double> *J;
-    //complex<double> *Yr = (complex<double>*)malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
-    //while (sourcePort < sys->numPorts){
-    //    J = (complex<double>*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(complex<double>));
-    //    complex<double> *xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
-    //    for (int i = 0; i < sys->portEdge[sourcePort].size(); i++){
-    //        J[sys->portEdge[sourcePort][i] - sys->N_edge_s] = -1i * (2 * PI*sys->freqStart * sys->freqUnit) * sys->portCoor[sourcePort].portDirection;
-    //    }
-    //    
-    //    status = pardisoSolve_r(sys, J, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sys->N_edge - 2 * sys->N_edge_s, xr);
-    //    
+    int sourcePort = 0;
+    double leng;
+    complex<double> *J;
+    complex<double> *Yr = (complex<double>*)malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
+    while (sourcePort < sys->numPorts){
+        J = (complex<double>*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(complex<double>));
+        complex<double> *xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
+        for (int i = 0; i < sys->portEdge[sourcePort].size(); i++){
+            J[sys->portEdge[sourcePort][i] - sys->N_edge_s] = -1i * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->portCoor[sourcePort].portDirection;
+        }
+        
+        status = pardisoSolve_r(sys, J, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sys->N_edge - 2 * sys->N_edge_s, xr);
+        
 
-    //    for (int i = 0; i < sys->numPorts; i++){
-    //        Yr[i + sys->numPorts * sourcePort] = 0 + 1i * 0;
-    //        for (int j = 0; j < sys->portEdge[i].size(); j++){
-    //            leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3]), 2);
-    //            leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 1]), 2);
-    //            leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 2]), 2);
-    //            leng = sqrt(leng);
-    //            Yr[i + sys->numPorts * sourcePort] = Yr[i + sys->numPorts * sourcePort].real() + xr[sys->portEdge[i][j] - sys->N_edge_s].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + 1i * (xr[sys->portEdge[i][j] - sys->N_edge_s].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + Yr[i + sys->numPorts * sourcePort].imag());
+        for (int i = 0; i < sys->numPorts; i++){
+            Yr[i + sys->numPorts * sourcePort] = 0 + 1i * 0;
+            for (int j = 0; j < sys->portEdge[i].size(); j++){
+                leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3]), 2);
+                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 1]), 2);
+                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 2]), 2);
+                leng = sqrt(leng);
+                Yr[i + sys->numPorts * sourcePort] = Yr[i + sys->numPorts * sourcePort].real() + xr[sys->portEdge[i][j] - sys->N_edge_s].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + 1i * (xr[sys->portEdge[i][j] - sys->N_edge_s].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + Yr[i + sys->numPorts * sourcePort].imag());
 
-    //        }
-    //        cout << Yr[i + sys->numPorts * sourcePort] << endl;
-    //    }
+            }
+            cout << Yr[i + sys->numPorts * sourcePort] << endl;
+        }
 
-    //    sourcePort++;
-    //    free(J); J = NULL;
-    //    free(xr); xr = NULL;
-    //}
+        sourcePort++;
+        free(J); J = NULL;
+        free(xr); xr = NULL;
+    }
+#endif
 
     free(dxa); dxa = NULL;
     free(dya); dya = NULL;
@@ -589,8 +591,8 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     complex<double> *J;
     J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
     for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
-        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2 * PI;
-        //J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
+        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2 * M_PI;
+        //J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * M_PI;
         //J[i - sys->N_edge_s].re = 0;
     }
     
@@ -606,11 +608,11 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
                 // valc[indi] needs omega * (-omega * epsilon  + j * sigma) added to it
-                complex<double> addedPart(-(2 * PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
-                valc[indi] += (2 * PI * sys->freqStart * sys->freqUnit) * addedPart;
-                //valc[indi] += -std::complex::pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[indi] + sys->N_edge_s] + (1i) * (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[indi] + sys->N_edge_s];
-                //valc[i].re += - pow((2 * PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
-                //valc[i].i += (2 * PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
+                complex<double> addedPart(-(2 * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
+                valc[indi] += (2 * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
+                //valc[indi] += -std::complex::pow((2 * M_PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[indi] + sys->N_edge_s] + (1i) * (2 * M_PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[indi] + sys->N_edge_s];
+                //valc[i].re += - pow((2 * M_PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
+                //valc[i].i += (2 * M_PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
             }
             count++;
             indi++;
@@ -914,7 +916,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SColId[j] = v[count].first - sys->N_edge_s;
             sys->Sval[j] = v[count].second / MU;
             //if (sys->SRowId[j] == sys->SColId[j]){
-            //    sys->Sval[j] = sys->Sval[j].real();// -pow((2 * PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[i + sys->N_edge_s] + 1i * ((2 * PI*sys->freqStart * sys->freqUnit) * sys->sig[i + sys->N_edge_s] + sys->Sval[j].imag());
+            //    sys->Sval[j] = sys->Sval[j].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[i + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[i + sys->N_edge_s] + sys->Sval[j].imag());
             //}
             j++;
             count++;

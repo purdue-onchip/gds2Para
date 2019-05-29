@@ -1,6 +1,7 @@
 #ifndef _FDTD_H
 #define _FDTD_H
 //#include "stdafx.h"
+#define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
 #include <cstdio>
 #include <cstdlib>
 #include <cctype>
@@ -9,48 +10,62 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <set>
 #include <complex>
 #include <vector>
 #include <queue>
+#include <stack>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
-#include <algorithm>
 #include <string>
+#include <algorithm>
 #include <utility>
-//#define MKL_ILP64 (1)
+
+// HYPRE and MKL data type control
+//#define LARGE_SYSTEM (1)
+#ifdef LARGE_SYSTEM
+#define MKL_ILP64 (1) // Must define before including mkl.h if using long long int 
+#define HYPRE_BIGINT (1)
+typedef long long int myint;
+#else
+typedef int myint;
+#endif
 #include <mkl.h>
 #include <mkl_spblas.h>
-#include <stack>
 
-
-
+// Manipulate namespace
 using namespace std;
-using std::cerr;
-using std::cout;
-using std::endl;
 
-#define PI (3.141592653589793)
-#define MU (4*PI*1.e-7)
+// Fundamental physical constant macros
+#define MU (4*M_PI*1.e-7)
 #define CSPED (299792458.)
-#define EPSILON0 (8.854e-12)
+#define EPSILON0 (1./(CSPED*CSPED*MU))
+
+// Solver discretization control macros
 #define SIGMA (5.8e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 //#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDIS (1.e-3)
+#define MINDISFRACXY (1.0e-6) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
+#define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
+#define MAXDISFRACX (0.02) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
+#define MAXDISLAYERZ (1.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16)
-//#define HYPRE_BIGINT (1)
-//#define LARGE_SYSTEM (1)
 
-#ifdef LARGE_SYSTEM
-typedef long long int myint;
-#else
-typedef int myint;
-#endif
+// Debug testing macros (comment out if not necessary)
+//#define PRINT_NODE_COORD
+//#define PRINT_DIS_COUNT
+#define SKIP_MARK_CELL
+//#define PRINT_PORT_SET
+//#define PRINT_V0D_BLOCKS
+#define SKIP_PARDISO // Remove PARDISO solver code
+#define SKIP_VH // Turn on to save a lot of time
+#define SKIP_STIFF_REFERENCE // Turn on to save time
 
+// Function-like macros
 #define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
 
 
@@ -74,16 +89,16 @@ public:
     int layer;
 };
 
-typedef class {
+class fdtdCdt {
 public:
     myint *node;
     int markPort;
     int *portNode;
     int portind;
     int cdtNodeind;
-} fdtdCdt;
+};
 
-typedef class {
+class fdtdBound {
 public:
     int numBound;
     int numPeri; /*number of open surrounding boundaries */
@@ -101,9 +116,10 @@ public:
     double **norm;/*bound norm direction*/
     int *numPort;
     int **port;
-} fdtdBound;
+};
 
-typedef class {
+class fdtdPort{
+    /* Port information */
 public:
     double *x;
     double *y;
@@ -113,19 +129,33 @@ public:
     double z1, z2;
     int portDirection;
     int *node;
-    int nodenum;
     int portCnd;
+
+    /* Default Constructor */
+    fdtdPort(){
+        x = NULL;
+        y = NULL;
+        z = NULL;
+        portDirection = 0;
+        node = NULL;
+        portCnd = 0;
+    }
 
     /* Print Function */
     void print();
-} fdtdPort;
 
-typedef class{
+    /* Destructor */
+    ~fdtdPort(){
+        portDirection = 0;
+        portCnd = 0;
+    }
+};
+
+class fdtdPatch {
 public:
     double patchArea;
     int *node;
-}fdtdPatch;
-
+};
 
 class fdtdMesh {
     /* Mesh information */
@@ -176,21 +206,21 @@ public:
     int *bd_node2;   //upper PEC
     int *bd_edge;
 
-    /* Material parameters */
+    /* Layer stack up parameters */
     int numStack;
-    double *stackEps;
-    double *stackBegCoor;
-    double *stackEndCoor;
+    vector<double> stackEps;
+    vector<double> stackBegCoor;
+    vector<double> stackEndCoor;
     vector<string> stackName;
     double *eps;
-    double *stackEpsn;
+    vector<double> stackEpsn;
     double *stackCdtMark;
 
     /* Conductor parameters */
     vector<fdtdOneCondct> conductorIn;
-    myint numCdtRow;   //how many input rows
-    myint numCdt;
-    myint *markEdge;    //mark if this edge is inside a conductor
+    myint numCdtRow;    // how many input rows
+    myint numCdt;       // number of isolated conductors in design
+    myint *markEdge;    // mark if this edge is inside a conductor
     int *markCell;
     myint *cdtNumNode;
     double *sig;
@@ -286,7 +316,6 @@ public:
     fdtdPort *portCoor;
     vector<vector<int>> portEdge;
     vector<double> portArea;
-    unordered_set<int> portNno;
 
     /* Current sources */
     double *J;
@@ -297,7 +326,89 @@ public:
 
     /* Default Constructor */
     fdtdMesh(){
-        numCdtRow = 0;
+        numCdtRow = (myint)0;
+        leng_S = (myint)0;
+
+        // Set all pointers to NULL for safety
+        xn = NULL;
+        yn = NULL;
+        zn = NULL;
+        xnu = NULL;
+        ynu = NULL;
+        znu = NULL;
+        nodepos = NULL;
+        Epoints = NULL;
+        edgelink = NULL;
+        Hpoints = NULL;
+        bd_node1 = NULL;
+        bd_node2 = NULL;
+        bd_edge = NULL;
+        eps = NULL;
+        stackCdtMark = NULL;
+        markEdge = NULL;
+        markCell = NULL;
+        cdtNumNode = NULL;
+        sig = NULL;
+        conductor = NULL;
+        markNode = NULL;
+        exciteCdtLayer = NULL;
+        markProSide = NULL;
+        patch = NULL;
+        bound = NULL;
+        v0cRowId = NULL;
+        v0cColId = NULL;
+        v0cColIdo = NULL;
+        v0cval = NULL;
+        v0cvalo = NULL;
+        v0caRowId = NULL;
+        v0caColId = NULL;
+        v0caColIdo = NULL;
+        v0caval = NULL;
+        v0cavalo = NULL;
+        v0c2y0c2 = NULL;
+        v0c2y0c2o = NULL;
+        yc = NULL;
+        v0cy0c = NULL;
+        AcRowId = NULL;
+        AcRowId1 = NULL;
+        AcColId = NULL;
+        Acval = NULL;
+        AdRowId = NULL;
+        AdRowId1 = NULL;
+        AdColId = NULL;
+        Adval = NULL;
+        crhs = NULL;
+        v0d1RowId = NULL;
+        v0d1ColId = NULL;
+        v0d1ColIdo = NULL;
+        v0d1val = NULL;
+        v0d1valo = NULL;
+        v0d1aRowId = NULL;
+        v0d1aColId = NULL;
+        v0d1aColIdo = NULL;
+        v0d1aval = NULL;
+        v0d1avalo = NULL;
+        v0d2RowId = NULL;
+        v0d2ColId = NULL;
+        v0d2ColIdo = NULL;
+        v0d2val = NULL;
+        v0d2valo = NULL;
+        v0d2aRowId = NULL;
+        v0d2aColId = NULL;
+        v0d2aColIdo = NULL;
+        v0d2aval = NULL;
+        v0d2avalo = NULL;
+        yd = NULL;
+        Vh = NULL;
+        SRowId = NULL;
+        SColId = NULL;
+        Sval = NULL;
+        y = NULL;
+        x = NULL;
+        portCoor = NULL;
+        J = NULL;
+        v0csJ = NULL;
+        Y = NULL;
     }
 
     /* Print Function */
@@ -305,7 +416,8 @@ public:
 
     /* Destructor */
     ~fdtdMesh(){
-        numCdtRow = 0;
+        numCdtRow = (myint)0;
+        leng_S = (myint)0;
     }
 };
 

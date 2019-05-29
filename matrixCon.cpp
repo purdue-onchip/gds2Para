@@ -117,9 +117,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     block2_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 50;
     block3_x = 0;
     block3_y = 0;
-    /*cout << "V0d's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
+#ifdef PRINT_V0D_BLOCKS
+    cout << "V0d's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
     cout << "V0d's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
-    cout << "V0d's block3_x and block3_y are " << block3_x << " " << block3_y << endl;*/
+    cout << "V0d's block3_x and block3_y are " << block3_x << " " << block3_y << endl;
+#endif
     sideLen = 0;    // around the conductor 10um is considered with rapid potential change
 
 
@@ -267,8 +269,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     block1_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
     block2_x = 0;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 300;
     block2_y = 0;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 300;
-    //cout << "V0c's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
-    //cout << "V0c's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
+#ifdef PRINT_V0D_BLOCKS
+    cout << "V0c's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
+    cout << "V0c's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
+#endif
     status = merge_v0c(sys, block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
     j = 0;
 
@@ -395,7 +399,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int *ia, *ja;
 
 
-
     /* Pick up a y0c2 cooresponding to one source port */
     complex<double> Zresult;
     double *bd1, *bd2;
@@ -431,8 +434,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int port_N_node_s;
     double *crhs;
     double *yc_eps;
-
-
 
 
     char transa;
@@ -510,12 +511,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
         /* End of solving */
 
-        /*t1 = clock();
+#ifndef SKIP_PARDISO
+        t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
-        cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;*/
+        cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+#endif
 
         for (indi = 0; indi < leng_v0d1; indi++){
-            y0d[indi] = y0d[indi] / (2 * PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
+            y0d[indi] = y0d[indi] / (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
         }
         ydt = (double*)calloc(sys->N_edge, sizeof(double));
         ydat = (double*)calloc(sys->N_edge, sizeof(double));
@@ -558,9 +561,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         crhs = (double*)calloc(leng_v0c, sizeof(double));
         for (indi = 0; indi < sys->N_edge; indi++){
             yd1[indi] = ydt[indi];
-            ydt[indi] = -ydt[indi] * (2 * PI*sys->freqStart * sys->freqUnit)*sys->eps[indi];
+            ydt[indi] = -ydt[indi] * (2 * M_PI*sys->freqStart * sys->freqUnit)*sys->eps[indi];
         }
-
 
         alpha = 1;
         beta = 0;
@@ -580,12 +582,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         cout << sys->Acval[0] << endl;*/
 
 
-
         /*solve c system block by block*/
         t1 = clock();
         for (indi = 1; indi <= 1; indi++){
-
+#ifndef SKIP_PARDISO
             //pardisoSolve_c(sys, &v0caJ[sys->acu_cnno[i - 1]], &y0c[sys->acu_cnno[i - 1]], sys->acu_cnno[i - 1], sys->acu_cnno[i] - 1, sys->cindex[i - 1] + 1, sys->cindex[i]);
+#endif
 
             //a = (double*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(double));
             //ia = (int*)malloc((sys->cindex[i] - sys->cindex[i - 1]) * sizeof(int));
@@ -706,78 +708,80 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
 
         /* calculate the Vh part */
-        //status = find_Vh(sys, u0, u0a, sourcePort);
-        //
+#ifndef SKIP_VH
+        status = find_Vh(sys, u0, u0a, sourcePort);
+        
 
-        //// V_re1'*(A+C)*V_re1
-        //tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
-        //for (j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
-        //    i = 0;
-        //    while (i < sys->leng_S){
-        //        start = sys->SRowId[i];
-        //        while (i < sys->leng_S && sys->SRowId[i] == start){
-        //            
-        //            tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].real += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].real;
-        //            tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].imag += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].imag;
-        //            
-        //            
-        //            i++;
-        //        }
-        //    }
-        //    
-        //    for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
-        //            - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
-        //        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
-        //            + sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
-        //    }
-        //}
-
-
-        //m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
-        //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, tmp, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
+        // V_re1'*(A+C)*V_re1
+        tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
+        for (j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
+            i = 0;
+            while (i < sys->leng_S){
+                start = sys->SRowId[i];
+                while (i < sys->leng_S && sys->SRowId[i] == start){
+                    
+                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].real += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].real;
+                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].imag += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].imag;
+                    
+                    
+                    i++;
+                }
+            }
+            
+            for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+                tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
+                    - sys->freqEnd * sys->freqUnit * 2 * M_PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
+                tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->eps[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
+                    + sys->freqEnd * sys->freqUnit * 2 * M_PI * sys->sig[i + sys->N_edge_s] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
+            }
+        }
 
 
-        //rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
-        //J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
-        //for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-        //    J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * PI;
-        //}
-        //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
-        //
-        ///* V_re1'*A*u */
-        //free(tmp);
-        //tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //    tmp[i].real = -pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
-        //    tmp[i].imag = sys->freqEnd * sys->freqUnit * 2 * PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - pow(sys->freqEnd * sys->freqUnit * 2 * PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
-        //}
-        //rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
-        //status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
-        //for (i = 0; i < sys->leng_Vh; i++){
-        //    rhs_h[i].real = rhs_h[i].real - rhs_h0[i].real;
-        //    rhs_h[i].imag = rhs_h[i].imag - rhs_h0[i].imag;
-        //}
+        m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
+        status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, tmp, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
 
-        //ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
-        //info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
-        //
-        //y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-        //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
 
-        // [comment out below to save matrix solve time vvvvvv]
-        //final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
-        //for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        //    final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
-        //    final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
-        //}
-        // [comment out above to save matrix solve time ^^^^^^]
+        rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
+        J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
+        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
+            J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * M_PI;
+        }
+        status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
+        
+        /* V_re1'*A*u */
+        free(tmp);
+        tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
+        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+            tmp[i].real = -pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - sys->freqEnd * sys->freqUnit * 2 * M_PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
+            tmp[i].imag = sys->freqEnd * sys->freqUnit * 2 * M_PI * sys->sig[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].real() - pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->eps[i + sys->N_edge_s] * sys->y[i + sys->N_edge_s].imag();
+        }
+        rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
+        status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
+        for (i = 0; i < sys->leng_Vh; i++){
+            rhs_h[i].real = rhs_h[i].real - rhs_h0[i].real;
+            rhs_h[i].imag = rhs_h[i].imag - rhs_h0[i].imag;
+        }
+
+        ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
+        info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
+        
+        y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
+        status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
+
+         [comment out below to save matrix solve time vvvvvv]
+        final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
+        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+            final_x[i].real = sys->y[i + sys->N_edge_s].real();// +y_h[i].real;
+            final_x[i].imag = sys->y[i + sys->N_edge_s].imag();// +y_h[i].imag;
+        }
+         [comment out above to save matrix solve time ^^^^^^]
 
         /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
         outfile << final_x[i].real << " " << final_x[i].imag << endl;
         }
         outfile.close();*/
+#endif
 
         free(tmp); tmp = NULL;
         free(m_h); m_h = NULL;
@@ -797,8 +801,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(v0caJ); v0caJ = NULL;
 
         // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
-        //status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval); // [comment out reference() to save time]
-        //status = plotTime(sys, sourcePort, u0d, u0c);
+#ifndef SKIP_STIFF_REFERENCE
+        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
+        status = plotTime(sys, sourcePort, u0d, u0c);
+#endif
 
         free(sys->J); sys->J = NULL;
         free(u0); u0 = NULL;
@@ -874,85 +880,87 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     return 0;
 }
-//int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend){
-//
-//    /*solve Ac system block by block*/
-//    int leng = nodeend - nodestart + 1;
-//    int status;
-//    double *a = (double*)malloc((indend - indstart + 1) * sizeof(double));
-//    int *ia = (int*)malloc((indend - indstart + 1) * sizeof(int));
-//    int *ja = (int*)malloc((indend - indstart + 1) * sizeof(int));
-//
-//    for (int i = 0; i < (indend - indstart + 1); i++){
-//        a[i] = sys->Acval[indstart + i];
-//        ia[i] = sys->AcRowId[indstart + i] - sys->AcRowId[indstart];
-//        ja[i] = sys->AcColId[indstart + i] - sys->AcColId[indstart];
-//    }
-//
-//    /* use pardiso to solve */
-//    {
-//         int *ia1 = (int*)malloc((leng + 1) * sizeof(int));
-//        /* status = COO2CSR_malloc(ia, ja, a, indstart - indend + 1, leng, ia1);
-//         if (status != 0)
-//             return status;*/
-//         int count = 0;
-//         int i = 0;
-//         int k = 0;
-//         int start;
-//         ia1[k] = 0;
-//         k++;
-//         while (i < (indend - indstart + 1)){
-//             start = ia[i];
-//             while (i < (indend - indstart + 1) && ia[i] == start) {
-//                 count++;
-//                 i++;
-//             }
-//             ia1[k] = (count);
-//             k++;
-//         }
-//
-//         void *pt[64];
-//         int mtype;
-//         int iparm[64];
-//         double dparm[64];
-//         int maxfct, mnum, phase, error, solver;
-//         int num_process;   //number of processors
-//         int v0csin;
-//         int perm;
-//         int nrhs = 1;
-//         int msglvl = 0;    //print statistical information
-//
-//         mtype = 11;    // real and not symmetric
-//         solver = 0;
-//         error = 0;
-//         maxfct = 1;    //maximum number of numerical factorizations
-//         mnum = 1;    //which factorization to use
-//         phase = 13;    //analysis
-//
-//         pardisoinit(pt, &mtype, iparm);
-//         nrhs = 1;
-//         iparm[38] = 1;
-//         iparm[34] = 1;    //0-based indexing
-//         
-//         pardiso(pt, &maxfct, &mnum, &mtype, &phase, &leng, a, ia1, ja, &perm, &nrhs, iparm, &msglvl, rhs, solution, &error);
-//         free(ia1); ia1 = NULL;
-//    }
-//
-//    /* use HYPRE to solve */
-//    /*{
-//        status = hypreSolve(sys, ia, ja, a, indend - indstart + 1, rhs, leng, solution);
-//    }*/
-//    
-//    
-//    free(a); a = NULL;
-//    free(ia); ia = NULL;
-//    free(ja); ja = NULL;
-//    
-//    
-//
-//    return 0;
-//}
 
+#ifndef SKIP_PARDISO
+int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend){
+
+    /*solve Ac system block by block*/
+    int leng = nodeend - nodestart + 1;
+    int status;
+    double *a = (double*)malloc((indend - indstart + 1) * sizeof(double));
+    int *ia = (int*)malloc((indend - indstart + 1) * sizeof(int));
+    int *ja = (int*)malloc((indend - indstart + 1) * sizeof(int));
+
+    for (int i = 0; i < (indend - indstart + 1); i++){
+        a[i] = sys->Acval[indstart + i];
+        ia[i] = sys->AcRowId[indstart + i] - sys->AcRowId[indstart];
+        ja[i] = sys->AcColId[indstart + i] - sys->AcColId[indstart];
+    }
+
+    /* use pardiso to solve */
+    {
+         int *ia1 = (int*)malloc((leng + 1) * sizeof(int));
+        /* status = COO2CSR_malloc(ia, ja, a, indstart - indend + 1, leng, ia1);
+         if (status != 0)
+             return status;*/
+         int count = 0;
+         int i = 0;
+         int k = 0;
+         int start;
+         ia1[k] = 0;
+         k++;
+         while (i < (indend - indstart + 1)){
+             start = ia[i];
+             while (i < (indend - indstart + 1) && ia[i] == start) {
+                 count++;
+                 i++;
+             }
+             ia1[k] = (count);
+             k++;
+         }
+
+         void *pt[64];
+         int mtype;
+         int iparm[64];
+         double dparm[64];
+         int maxfct, mnum, phase, error, solver;
+         int num_process;   //number of processors
+         int v0csin;
+         int perm;
+         int nrhs = 1;
+         int msglvl = 0;    //print statistical information
+
+         mtype = 11;    // real and not symmetric
+         solver = 0;
+         error = 0;
+         maxfct = 1;    //maximum number of numerical factorizations
+         mnum = 1;    //which factorization to use
+         phase = 13;    //analysis
+
+         pardisoinit(pt, &mtype, iparm);
+         nrhs = 1;
+         iparm[38] = 1;
+         iparm[34] = 1;    //0-based indexing
+         
+         pardiso(pt, &maxfct, &mnum, &mtype, &phase, &leng, a, ia1, ja, &perm, &nrhs, iparm, &msglvl, rhs, solution, &error);
+         free(ia1); ia1 = NULL;
+    }
+
+    /* use HYPRE to solve */
+    /*{
+        status = hypreSolve(sys, ia, ja, a, indend - indstart + 1, rhs, leng, solution);
+    }*/
+    
+    
+    free(a); a = NULL;
+    free(ia); ia = NULL;
+    free(ja); ja = NULL;
+    
+    
+
+    return 0;
+}
+#endif
 
 
 //int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys){
@@ -2835,7 +2843,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
 
 }
 
-
+#ifndef SKIP_PARDISO
 //int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1){
 //    
 //    clock_t t1 = clock();
@@ -2867,12 +2875,12 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
 //    iparmd[38] = 1;
 //    iparmd[34] = 1;    //0-based indexing
 //    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
-//    
 //    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 //
 //    return 0;
 //
 //}
+#endif
 
 int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
     int *visited;
@@ -2936,7 +2944,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     leng_v0d1a = 0;
     v0d1num = 0;
     v0d1anum = 0;
-    /* first asign a larger number of storage, don't need to calculate the entries twice */
+    /* First assign a larger number of storage, don't need to calculate the entries twice */
     myint *v0d1RowId = (myint*)malloc(sys->N_edge * 2 * sizeof(myint));
     myint *v0d1ColId = (myint*)malloc(sys->N_edge * 2 * sizeof(myint));
     double *v0d1val = (double*)malloc(sys->N_edge * 2 * sizeof(double));
