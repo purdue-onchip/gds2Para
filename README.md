@@ -1,7 +1,11 @@
 # gds2Para
 Complete Integrated Circuit (IC) Layout Analysis from GDSII Design File to Parasitics Extraction
 
-This layout analyzer is written in C++ as part of a wider API for the electromagnetic design validation of VLSI IC, package, and board designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits, packages, and boards. Design information from the Graphic Database Stream II (GDSII) file is parsed and stored alongside simulation input information. Once a design is loaded, the information can be written to another GDSII file or analyzed with a full-wave simulation to extract parasitics between ports. An alternate mode of operation allows an interconnect modeling platform (IMP) file to be translated to a GDSII file design. Parasitics are preferably reported through a [Xyce](https://xyce.sandia.gov/) subcircuit file (SPICE derivative from Sandia National Laboratories), though a [Standard Parasitic Exchange Format (SPEF)](https://ieeexplore.ieee.org/document/5430852) file may be output alternatively. Please carefully read this **README.md** file for an overview, dependencies, and usage instructions.
+This layout analyzer is written in C++ as part of a wider API for the electromagnetic design validation of VLSI IC, package, and board designs. The code design follows a philosophy intended to have the most extensibility and highest level of automation possible for increasingly complex integrated circuits, packages, and boards. Design information from the Graphic Database Stream II (GDSII) file is parsed and stored alongside simulation input information.
+
+A nonstandard mode of operation allows an interconnect modeling platform (IMP) file to be translated to a GDSII file design. Another nonstandard control mode translates a GDSII file design into a [Planar Straight Line Graph](http://mathworld.wolfram.com/PlanarStraightLineDrawing.html) which may be used as input to Delaunay triangulation software.
+
+Once a design is loaded, the information can be written to another GDSII file or analyzed with a full-wave simulation to extract parasitics between user-specified ports. Parasitics are preferably reported through a [Xyce](https://xyce.sandia.gov/) subcircuit file (SPICE derivative from Sandia National Laboratories), though a [Standard Parasitic Exchange Format (SPEF)](https://ieeexplore.ieee.org/document/5430852) file may be output alternatively. Please carefully read this **README.md** file for an overview, dependencies, and usage instructions.
 
 ## Overview
 ### Simulate (-s) Mode Top-level Flowchart
@@ -69,7 +73,7 @@ Many thanks are owed to the project sponsors for making the development of this 
 Follow the instructions given in **INSTALL.md** to install this software and run it from the command line. Users from Purdue University should read **purdue\_install.md** instead for specific steps unique to their environment.
 
 ## Simulation Input File (.sim_input) Syntax
-Every GDSII file needs to have a simulation input file with the .sim\_input extension created for it. The custom syntax of the simulation input file is given at the bottom of this section. It is important that the information in the blocks underneath the headers in all capital letters appear in the order given. Comments start with `#` and continue for the rest of the line. Comments may appear almost anywhere in the file so long as in-line comments are preceded by a space. The following are placeholders, angle brackets and words in between, which must populated depending on the design:
+Every GDSII file needs to have a simulation input file with the .sim\_input extension created for it. The custom syntax of the simulation input file is given at the bottom of this section. It is important that the information in the blocks underneath the headers in all capital letters appear in the order given. Comments start with '#' and continue for the rest of the line. Comments may appear almost anywhere in the file so long as in-line comments are preceded by a space. The following are placeholders, angle brackets and words in between, which must populated depending on the design:
 * \<six design extents>: The six coordinates for the smallest rectangular prism enclosing the design with implied units in the order of xmin (the smallest x-coordinate in the design), xmax, ymin, ymax, zmin, and zmax (the largest z-coordinate in the design).
     * A lowercase 'e' may be used for scientific notation.
     * For example, `30.00 +149. -47.0 +120. 0.00 +7.53`.
@@ -81,7 +85,7 @@ Every GDSII file needs to have a simulation input file with the .sim\_input exte
 * \<freqScale>: Integer representing frequency interpolation. The recommended value is `0` for logarithmic spacing. The value `1` is for linear spacing.
 * \<numLayer>: The total number of layers in this design. The integer here must match the number of active \<layer entry> lines following this line in the file.
 * \<layer entry>: An entire line representing a single layer.
-    * The four pieces of information that must be included in order are the layer name at the start of the line, the z-coordinate of the bottom of the layer (designated with `z = ` before a length with implied units), the height of the layer (designated with `h = ` before a length with implied units), and the relative permittivity of the dielectric making up that insulating parts of that layer (designated with `e = ` before a unitless floating-point number greater than or equal to unity).
+    * The four pieces of information that must be included in order are the layer name at the start of the line, the z-coordinate of the bottom of the layer (designated with 'z = ' before a length with implied units), the height of the layer (designated with 'h = ' before a length with implied units), and the relative permittivity of the dielectric making up that insulating parts of that layer (designated with 'e = ' before a unitless floating-point number greater than or equal to unity).
     * A lowercase 'e' may be used for scientific notation.
     * In order to maintain correspondence with the layer numbers used in a GDSII file, the layer names must be a plain integer or be an alphanumeric string with a capital 'M' before the layer number.
     * It is strongly recommended to add one layer below the bottommost GDSII layer and a second layer above the topmost GDSII layer to serve as planes of perfect electrical conductor (PEC) representing how the design would behave in a testing environment.
@@ -90,7 +94,7 @@ Every GDSII file needs to have a simulation input file with the .sim\_input exte
 * \<port entry>: An entire line representing a single port.
     * The seven pieces of information that must be included in order are the x-coordinate of the supply point of the port, the y-coordinate of the supply point of the port, the z-coordinate of the supply point of the port, the x-coordinate of the return point of the port, the y-coordinate of the return point of the port, the z-coordinate of the return point of the port, and the directionality of the port.
     * A lowercase 'e' may be used for scientific notation.
-    * The directionality of the port is either `+1` for input ports, `-1` for output ports, or `0` for bidirectional ports or ports with uncertain power flow.
+    * The directionality of the port is either '+1' for input ports, '-1' for output ports, or '0' for bidirectional ports or ports with uncertain power flow.
     * A port should be added for each input/output pin of the device. Additional ports are needed for every transistor or other active device in the design. For printed circuit boards (PCBs), at least one port is needed for each component on the populated layout.
     * For example, `+146. -16.0 4.53 +146. +6.00 4.53 -1`.
 
@@ -103,7 +107,7 @@ FREQUENCY
 freqUnit = <freqUnit>
 freqStart = <freqStart>
 freqEnd = <freqEnd>
-\# Block-interrupting comment
+# Block-interrupting comment
 nfreq = <nfreq>
 freqScale = <freqScale>
 
@@ -112,14 +116,14 @@ numStack = <numLayer>
 <layer entry> # In-line comment
 <...>
 <layer entry> # In-line comment
-\# Post-block comment
+# Post-block comment
 
 PORT
 numPorts = <numPorts>
 <port entry> # In-line comment
 <...>
 <port entry> # In-line comment
-\# Post-block comment
+# Post-block comment
 ```
 
 ## Credits and Acknowledgements
