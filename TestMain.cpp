@@ -49,7 +49,7 @@ int main(int argc, char** argv)
             cout << "  -sx, --xyce           Identical to \"-s\"." << endl;
             cout << "  -sp, --spef           Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
             cout << endl << "Comments:" << endl;
-            cout << "The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
+            cout << " The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
             cout << " The first file passed after -s or --simulate (or -sx or --xyce) must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
@@ -303,7 +303,7 @@ int main(int argc, char** argv)
                 cerr << "portSet Fail!" << endl;
                 return status;
             }
-            sys.print();
+            //sys.print();
 
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
