@@ -21,6 +21,42 @@
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
 #include "fdtd.h"
 
+// Structure for convex hull comparison
+struct compareObj {
+    complex<double> p0; // Reference point
+
+    // Binary compare function for convex hull (complex numbers by orientation then by distance)
+    bool operator()(complex<double> p1, complex<double> p2)
+    {
+        // Find orientation angle with cross product of displacements
+        double crossProd = (p1.imag() - this->p0.imag()) * (p2.real() - p1.real()) - (p1.real() - this->p0.real()) * (p2.imag() - p1.imag());
+        int orientation = 0; // Assume collinear points
+        if (crossProd > 0.)
+        {
+            orientation = 1; // Clockwise turn, so first point should NOT be ahead of second point
+            return false;
+        }
+        else if (crossProd < 0.)
+        {
+            orientation = 2; // Counterclockwise turn, so first point should be ahead of second point
+            return true;
+        }
+        else
+        {
+            // Must use square distance of displacements as tie-breaker for collinear points
+            complex<double> disp1 = p1 - this->p0; // Displacement to first point
+            complex<double> disp2 = p2 - this->p0; // Displacement to second point
+            if (norm(disp2) >= norm(disp1))
+            {
+                return true; // Second point is further, so order is good
+            }
+            else
+            {
+                return false; // First point is further, so order needs swapping
+            }
+        }
+    }
+} convexCompare;
 
 class boundary
 {
@@ -1475,6 +1511,148 @@ public:
             }
         }
         return viaList;
+    }
+
+    // Compute the convex hull of points in geometric cell with Graham scan
+    vector<complex<double>> convexHull(std::string name, double xo, double yo)
+    {
+        // Create vector of all physical points in named cell for all layers
+        const GeoCell cell = this->cells[this->locateCell(name)];
+        vector<complex<double>> allPt; // Using complex numbers to represent ordered pairs
+        for (size_t indi = 0; indi < cell.getNumBound(); indi++) // Handle each boundary
+        {
+            vector<double> boundCoord = (cell.boundaries[indi]).getBounds();
+            for (size_t indj = 0; indj < boundCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising boundary except repeated point
+            {
+                complex<double> zBound(boundCoord[2 * indj] + xo, boundCoord[2 * indj + 1] + yo);
+                allPt.push_back(zBound); // Complex number with x- and y-coordinates
+            }
+        }
+        for (size_t indi = 0; indi < cell.getNumPath(); indi++) // Handle each path
+        {
+            vector<double> pathCoord = (cell.paths[indi]).getPaths();
+            for (size_t indj = 0; indj < pathCoord.size(); indj++) // Handle each coordinate comprising path
+            {
+                complex<double> zPath(pathCoord[2 * indj] + xo, pathCoord[2 * indj + 1] + yo);
+                allPt.push_back(zPath); // Complex number with x- and y-coordinates
+            }
+        }
+        for (size_t indi = 0; indi < cell.getNumBox(); indi++) // Handle each box outline
+        {
+            vector<double> boxCoord = (cell.boxes[indi]).getBoxes();
+            for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) // Handle each coordinate comprising box outline except repeated point
+            {
+                complex<double> zBox(boxCoord[2 * indj] + xo, boxCoord[2 * indj + 1] + yo);
+                allPt.push_back(zBox); // Complex number with x- and y-coordinates
+            }
+        }
+        for (size_t indi = 0; indi < cell.getNumSRef(); indi++) // Handle each structure reference recursively
+        {
+            vector<complex<double>> newCoord = this->convexHull((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
+            allPt.insert(allPt.end(), newCoord.begin(), newCoord.end());
+        }
+
+        // Stop here if in recursion step for gathering points
+        if ((xo != 0.0) || (yo != 0.0))
+        {
+            return allPt;
+        }
+
+        // Find bottommost point and put at front
+        size_t indPtMin = 0;
+        double yMin = allPt[0].imag(); // Initialize to y-coordinate of first point
+        for (size_t indi = 1; indi < allPt.size(); indi++)
+        {
+            // Tie breaker is leftmost point if compared points have same y-coordinate
+            if ((allPt[indi].imag() < yMin) || ((allPt[indi].imag() == yMin) && (allPt[indi].real() < allPt[indPtMin].real())))
+            {
+                indPtMin = indi;
+                yMin = allPt[indi].imag();
+            }
+        }
+        iter_swap(allPt.begin(), allPt.begin() + indPtMin); // Bottommost point moved to front
+
+        // Sort points relative to first point using custom structure
+        convexCompare.p0 = allPt[0];
+        sort(allPt.begin() + 1, allPt.end(), convexCompare);
+
+        // Prepare vector of convex hull point candidates while removing those at same angle to first point
+        vector<complex<double>> candPt;
+        candPt.push_back(allPt[0]); // Include bottommost point
+        for (size_t indi = 1; indi < allPt.size(); indi++)
+        {
+            int orientation = 0; // Assume collinear points
+
+            // Points with same orientation angle are not added as candidates
+            while ((indi < allPt.size() - 1) && (orientation == 0))
+            {
+                // Find orientation angle with cross product of displacements
+                double crossProd = (allPt[indi].imag() - allPt[0].imag()) * (allPt[indi + 1].real() - allPt[indi].real()) - (allPt[indi].real() - allPt[0].real()) * (allPt[indi + 1].imag() - allPt[indi].imag());
+                if (crossProd > 0.)
+                {
+                    orientation = 1; // Clockwise turn
+                    break;
+                }
+                else if (crossProd < 0.)
+                {
+                    orientation = 2; // Counterclockwise turn
+                    break;
+                }
+                else
+                {
+                    orientation = 0; // Still collinear
+                }
+                indi++;
+            }
+
+            // All remaining points added as candidates
+            candPt.push_back(allPt[indi]);
+        }
+
+        // Convex hull not possible if fewer than 3 points are candidates
+        if (candPt.size() < 3)
+        {
+            cerr << "Not enough points remain to construct a convex hull of PCB outline" << endl;
+            return { };
+        }
+
+        // Convex hull will start with first three candidate points
+        vector<complex<double>> hullPt = {candPt[0], candPt[1], candPt[2]};
+
+        // Convex hull points change based on orientation angle of remaining candidates
+        for (size_t indi = 3; indi < candPt.size(); indi++)
+        {
+            int orientation = 0; // Assume collinear
+
+            // Points with that make a non-left turn need to be removed
+            while (orientation != 2)
+            {
+                // Find orientation angle with cross product of displacements of next-to-last, last, and next candidate points
+                double crossProd = (hullPt[hullPt.size() - 1].imag() - hullPt[hullPt.size() - 2].imag()) * (candPt[indi].real() - hullPt[hullPt.size() - 1].real()) - (hullPt[hullPt.size() - 1].real() - hullPt[hullPt.size() - 2].real()) * (candPt[indi].imag() - hullPt[hullPt.size() - 1].imag());
+                if (crossProd > 0.)
+                {
+                    orientation = 1; // Clockwise turn
+                    hullPt.pop_back();
+                }
+                else if (crossProd < 0.)
+                {
+                    orientation = 2; // Counterclockwise turn
+                    break;
+                }
+                else
+                {
+                    orientation = 0; // Collinear points
+                    hullPt.pop_back();
+                }
+            }
+
+            // Add the current point as the last convex hull point for now
+            hullPt.push_back(candPt[indi]);
+        }
+
+        // Return the valid list of convex hull points as a complex vector
+        cout << "Convex hull of PCB outline is ready" << endl;
+        return hullPt;
     }
 
     // Save to fdtdMesh conductor information

@@ -1486,7 +1486,7 @@ struct SolverDataBase
     }
 
     // Read outline (or unmarked dimension) Gerber file (extension must be included)
-    bool readGerberOutline(std::string outlineGerberName)
+    vector<double> readGerberOutline(std::string outlineGerberName)
     {
         // Attempt to open Gerber file with outline
         ifstream outlineFile(outlineGerberName.c_str());
@@ -1498,7 +1498,7 @@ struct SolverDataBase
 
             // Build ASCII database from limboint.h (forget about timestamps)
             AsciiDataBase adbGerb;
-            adbGerb.setFileName(outlineGerberName);
+            adbGerb.setFileName(outlineGerberName.substr(0, outlineGerberName.find_last_of(".")) + ".gds");
 
             // Gerber file is barely readable line-by-line
             std::string fileLine;
@@ -1510,21 +1510,21 @@ struct SolverDataBase
                 getline(outlineFile, fileLine);
             }
 
+            // Initialize file-scope variables
+            int intPartX = 2; // Should be <= 6
+            int fracPartX = 4; // Should be 4, 5, or 6
+            int intPartY = 2; // Should be <= 6
+            int fracPartY = 4; // Should be 4, 5, or 6
+            int graphicsMode = 0; // Active modes are "G01" (linear interpolation), "G02" (CW circular interp.), "G03" (CCW circular interp.), "G04" (comment), "G36"/"G37" (set region mode on/off), "G74"/"G75" (set single/multi quadrant)
+            bool regionMode = false; // Is region mode on?
+            bool singleQuadMode = true; // true = single quadrant mode (angle between 0 and pi/2 rad), false = multi quadrant mode (angle greater than 0 and up to 2*pi rad)
+            vector<double> currentPt = { 0., 0. }; // Coordinates of current point
+            vector<Aperture> customAper = {}; // Custom apertures
+            Aperture currentAper = Aperture(); // Current aperture in use
+
             // Read rest of file line-by-line with very rough parser
             while (!outlineFile.eof())
             {
-                // Initialize file-scope variables
-                int intPartX = 2; // Should be <= 6
-                int fracPartX = 4; // Should be 4, 5, or 6
-                int intPartY = 2; // Should be <= 6
-                int fracPartY = 4; // Should be 4, 5, or 6
-                int graphicsMode = 0; // Active modes are "G01" (linear interpolation), "G02" (CW circular interp.), "G03" (CCW circular interp.), "G04" (comment), "G36"/"G37" (set region mode on/off), "G74"/"G75" (set single/multi quadrant)
-                bool regionMode = false; // Is region mode on?
-                bool singleQuadMode = true; // true = single quadrant mode (angle between 0 and pi/2 rad), false = multi quadrant mode (angle greater than 0 and up to 2*pi rad)
-                vector<double> currentPt = { 0., 0. }; // Coordinates of current point
-                vector<Aperture> customAper = { }; // Custom apertures
-                Aperture currentAper = Aperture(); // Current aperture in use
-
                 // Handle format specification (starting with configuration parameter "%FS" in RS-274X)
                 if (fileLine.compare(0, 3, "%FS") == 0)
                 {
@@ -1787,7 +1787,7 @@ struct SolverDataBase
                             }
                             double width = currentAper.getCircumDia(); // Worst case scenario used
 
-                                                                       // Push new path to the geometric cell
+                            // Push new path to the geometric cell
                             cellGerb.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width));
 
                             // Update current point
@@ -1959,8 +1959,8 @@ struct SolverDataBase
                             paths.push_back(yStart); // y-coordinate of current point
                             for (size_t indi = 1; indi < nArcPt; indi++)
                             {
-                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / nArcPt + startAngle)); // x-coordinate CW
-                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / nArcPt + startAngle)); // y-coordinate CW
+                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
                             paths.push_back(yEnd); // y-coordinate of end point
@@ -2135,18 +2135,23 @@ struct SolverDataBase
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
+                            //cout << "startPt: (" << xStart << ", " << yStart << ")" << endl;
+                            //cout << " path points: ";
                             for (size_t indi = 1; indi < nArcPt; indi++)
                             {
-                                paths.push_back(xCent + arcRad * cos(2.0 * M_PI * indi / nArcPt + startAngle)); // x-coordinate CCW
-                                paths.push_back(yCent + arcRad * sin(2.0 * M_PI * indi / nArcPt + startAngle)); // y-coordinate CCW
+                                paths.push_back(xCent + arcRad * cos(2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                paths.push_back(yCent + arcRad * sin(2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                //cout << "(" << xCent + arcRad * cos(2.0 * M_PI * indi / 24 + startAngle) << ", " << yCent + arcRad * sin(2.0 * M_PI * indi / 24 + startAngle) << ") ";
                             }
+                            //cout << endl;
                             paths.push_back(xEnd); // x-coordinate of end point
                             paths.push_back(yEnd); // y-coordinate of end point
 
-                                                   // Push new path to the geometric cell
+                            // Push new path to the geometric cell
                             cellGerb.paths.emplace_back(path(paths, 1, {}, pathType, width));
 
                             // Update current point
+                            //cout << "currentPt: (" << xEnd << ", " << yEnd << ")" << endl;
                             currentPt = { xEnd, yEnd };
                             break;
                         }
@@ -2378,16 +2383,16 @@ struct SolverDataBase
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / nArcPt + startAngle)); // x-coordinate CW
-                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / nArcPt + startAngle)); // y-coordinate CW
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
                                 }
                             }
                             else
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / nArcPt + startAngle)); // x-coordinate CCW
-                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / nArcPt + startAngle)); // y-coordinate CCW
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
                                 }
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -2591,16 +2596,16 @@ struct SolverDataBase
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / nArcPt + startAngle)); // x-coordinate CW
-                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / nArcPt + startAngle)); // y-coordinate CW
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
                                 }
                             }
                             else
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / nArcPt + startAngle)); // x-coordinate CCW
-                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / nArcPt + startAngle)); // y-coordinate CCW
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
                                 }
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -2648,22 +2653,44 @@ struct SolverDataBase
             // Close file
             outlineFile.close();
 
-            // Update ASCII database
+            // Update ASCII database of Gerber outline
             adbGerb.setLibName("outline");
             adbGerb.appendCell(cellGerb);
-            //adbGerb.setdbUnits(adbGerb.getdbUnits() * 1.e-3); // Rescale .imp file units 0.001x to allow integer representation in GDSII
+            adbGerb.setdbUnits(adbGerb.getdbUnits() * 1.e-3); // Rescale Gerber file units 0.001x to allow integer representation in GDSII
+            vector<complex<double>> hullPt = adbGerb.convexHull(cellGerb.cellName, 0., 0.);
 
-            // Print the ASCII database
-            adbGerb.print({ 0 });
-            (this->settings).print();
+            // Print and dump the ASCII database of Gerber outline
+            //adbGerb.print({ 0 });
+            //adbGerb.dump();
 
-            // Process was successful
-            return true;
+            // Extract coordinates from successful Graham scan convex hull process after Gerber outline file read
+            cout << "Gerber outline file produced a convex hull for the design limits" << endl;
+            vector<double> hullCoord;
+            for (size_t indi = 0; indi < hullPt.size(); indi++)
+            {
+                hullCoord.push_back(hullPt[indi].real()); // Real part is x-coordinate of a point
+                hullCoord.push_back(hullPt[indi].imag()); // Imaginary part is y-coordinate of a point
+            }
+
+            // Optionally create new ASCII database of convex hull
+            /*GeoCell cellHull;
+            cellHull.boundaries.emplace_back(boundary(hullCoord, 1, { })); // Single boundary of convex hull
+            cellHull.boundaries.back().reorder();
+            AsciiDataBase adbHull;
+            adbHull.setFileName(outlineGerberName.substr(0, outlineGerberName.find_last_of(".")) + "_HULL.gds");
+            adbHull.setLibName("convexHull");
+            adbHull.appendCell(cellHull);
+            adbHull.setdbUnits(adbGerb.getdbUnits());
+            adbHull.dump();*/
+
+            // Return the convex hull coordinates
+            return hullCoord;
         }
         else
         {
             // File could not be opened
-            return false;
+            cerr << "Unable to open Gerber outline file" << endl;
+            return { };
         }
     }
 
@@ -2703,15 +2730,15 @@ struct SolverDataBase
                 std::string version = fileLine.substr(7, fileLine.length() - 7); // 7 characters in header syntax
             }
 
+            // Initialize file-scope varialbes
+            static double stripLength = 0;       // Initialize the strip length
+            static int maxGDSIILayer = 0;        // Maximum GDSII layer number encountered
+            static int numFreqPts = 0;           // Number of points in frequency sweep
+            static vector<double> freqList = {}; // List of frequencies in sweep
+
             // Read rest of file line-by-line
             while (!impFile.eof())
             {
-                // Initialize file-scope varialbes
-                static double stripLength = 0;       // Initialize the strip length
-                static int maxGDSIILayer = 0;        // Maximum GDSII layer number encountered
-                static int numFreqPts = 0;           // Number of points in frequency sweep
-                static vector<double> freqList = {}; // List of frequencies in sweep
-
                 // Handle units
                 if (fileLine.compare(0, 12, "LINEARUNITS ") == 0)
                 {
@@ -3089,26 +3116,54 @@ struct SolverDataBase
                         getline(inputFile, fileLine);
                     }
 
+                    // Design limits information recorded differently based on how many numbers appear
+                    std::string noComment = fileLine.substr(0, fileLine.find(" #"));
+                    size_t nSpace = count(noComment.begin(), noComment.end(), ' ');
+
                     // Obtain limits of IC design size
                     double xmin, xmax, ymin, ymax, zmin, zmax;
-                    size_t indCoordStart = 0;
-                    size_t indCoordEnd = fileLine.find(" ", indCoordStart);
-                    xmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    xmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    ymin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    ymax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    if (nSpace >= 5)
+                    {
+                        // Conventional specification has six numbers separated by spaces
+                        size_t indCoordStart = 0;
+                        size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        ymin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        ymax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    }
+                    else
+                    {
+                        // Alternative specification has Gerber outline file name followed by two numbers
+                        size_t indCoordStart = 0;
+                        size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xmin = NAN;
+                        xmax = NAN;
+                        ymin = NAN;
+                        ymax = NAN;
+                        std::string outlineFile = fileLine.substr(indCoordStart, indCoordEnd - indCoordStart);
+                        std::string outlinePath = inputFileName.substr(0, inputFileName.find_last_of("/") + 1) + outlineFile; // Get path up to simulation input file for outline file path
+                        vector<double> hullCoord = this->readGerberOutline(outlinePath); // Not doing anything with this data right now
+                        //cout << "Number of convex hull coordinates: " << hullCoord.size() << endl;
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    }
 
                     // Move down one line, skipping comments
                     getline(inputFile, fileLine);
