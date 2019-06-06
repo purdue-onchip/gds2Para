@@ -1882,16 +1882,13 @@ struct SolverDataBase
 
         // Use layer stack-up information to set fields
         data->numStack = this->getNumLayer();
-        data->stackEps = (double*)malloc(sizeof(double) * data->numStack);
-        data->stackBegCoor = (double*)malloc(sizeof(double) * data->numStack);
-        data->stackEndCoor = (double*)malloc(sizeof(double) * data->numStack);
-        //data->stackEpsn; // Is this needed from SolverDataBase?
+        //data->stackEpsn; // Is this needed from SolverDataBase since it relies on z-coordinates of nodes?
         for (size_t indi = 0; indi < data->numStack; indi++)
         {
             Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
-            data->stackEps[indi] = thisLayer.getEpsilonR(); // See if relative or absolute permittivity!!!
-            data->stackBegCoor[indi] = thisLayer.getZStart();
-            data->stackEndCoor[indi] = thisLayer.getZStart() + thisLayer.getZHeight();
+            data->stackEps.push_back(thisLayer.getEpsilonR()); // Relative permittivity of the layers
+            data->stackBegCoor.push_back(thisLayer.getZStart());
+            data->stackEndCoor.push_back(thisLayer.getZStart() + thisLayer.getZHeight());
             data->stackName.push_back(thisLayer.getLayerName());
         }
 
@@ -1914,9 +1911,8 @@ struct SolverDataBase
         // Use port information in parasitics data member to set fields
         data->numPorts = (this->para).getNPort();
         data->portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data->numPorts);
-        //data->portArea; // Is this needed at all?
-        //data->portEdge; // Is this needed from SolverDataBase?
-        //data->portNno; // Is this needed at all?
+        //data->portArea; // Is this needed from SolverDataBase to set current from current density?
+        //data->portEdge; // Is this needed from SolverDataBase since it depends on edges in the discretization?
         for (size_t indi = 0; indi < data->numPorts; indi++)
         {
             Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation

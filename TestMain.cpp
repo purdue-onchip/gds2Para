@@ -18,6 +18,10 @@
 #include "limboint.h"
 #include "solnoutclass.h"
 
+// Debug testing macros (comment out if not necessary)
+#define SKIP_GENERATE_STIFF
+
+// Manipulate namespace
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -209,11 +213,11 @@ int main(int argc, char** argv)
         if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0) || (strcmp(argv[1], "-sx") == 0) || (strcmp(argv[1], "--xyce") == 0) || (strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
         {
             // Initialize SolverDataBase, mesh, and set variables for performance tracking
+            clock_t t1 = clock();
             SolverDataBase sdb;
             fdtdMesh sys;
             int status = 0; // Initialize as able to return successfully
             bool adbIsGood, sdbIsGood, sdbCouldDump;
-            clock_t t1 = clock();
 
             // Get file names
             string inGDSIIFile = argv[2];
@@ -302,8 +306,9 @@ int main(int argc, char** argv)
             //sys.print();
 
             // Generate Stiffness Matrix
+#ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
-            /*status = generateStiff(&sys);
+            status = generateStiff(&sys);
             if (status == 0)
             {
                 cout << "generateStiff Success!" << endl;
@@ -314,14 +319,15 @@ int main(int argc, char** argv)
                 cerr << "generateStiff Fail!" << endl;
                 return status;
             }
-*/
+#endif
+
             // Parameter generation
-            t5 = clock();
+            clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;
-                cout << "paraGenerator time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << endl;
             }
             else
             {
@@ -344,7 +350,7 @@ int main(int argc, char** argv)
                 double sumC = 0.;
                 for (size_t indj = 0; indj < sys.numPorts; indj++) // Loop over response ports
                 {
-                    // Find Y-parameters from Z-parameters (temporary measure)]
+                    // Find Y-parameters from Z-parameters (temporary measure for diagonal elements only)]
                     double gij = sys.x[indi * sys.numPorts + indj].real() / norm(sys.x[indi * sys.numPorts + indj]); // Re(Z^-1) = Re(Z) / |Z|^2
                     double gji = sys.x[indj * sys.numPorts + indi].real() / norm(sys.x[indj * sys.numPorts + indi]);
                     double bij = -sys.x[indi * sys.numPorts + indj].imag() / norm(sys.x[indi * sys.numPorts + indj]); // Im(Z^-1) = -Im(Z) / |Z|^2
