@@ -216,7 +216,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (i = 1; i < 2 * sys->numStack + 2 * sys->numPorts; i++){
         if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMinz){
             sys->nz++;
-            
         }
         zn[i] = zOrigOld[i];
     }
@@ -1853,4 +1852,3 @@ void fdtdMesh::print()
     cout << "  Y array exists (" << (this->Y != nullptr) << ")" << endl;
     cout << "------" << endl;
 }
-

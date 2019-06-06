@@ -64,7 +64,6 @@ using namespace std;
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
 #define SKIP_STIFF_REFERENCE // Turn on to save time
-#define MINDIS (1.e-9)
 
 // Function-like macros
 #define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
