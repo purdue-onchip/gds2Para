@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <cctype>
 #include <cmath>
+#include <complex>
 #include <ctime>
 #include <algorithm>
 #include <parser-spef/parser-spef.hpp>
@@ -1758,15 +1759,15 @@ struct SolverDataBase
                         double yEnd = currentPt[1];
                         if ((indXEnd != string::npos) && (indYEnd != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX); // Length is index difference minus included characters with fractional part correction
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
                         }
                         else if ((indXEnd != string::npos) && (indYEnd == string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         if (indYEnd != string::npos)
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
 
@@ -1835,43 +1836,43 @@ struct SolverDataBase
                         double jOff = 0.;
                         if ((indXEnd != string::npos) && (indYEnd != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX); // Length is index difference minus included characters with fractional part correction
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
                         }
                         else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         else
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         if ((indYEnd != string::npos) && (indIOff != string::npos))
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         else
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         if ((indIOff != string::npos) && (indJOff != string::npos))
                         {
-                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX);
+                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         else
                         {
-                            iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX);
+                            iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         if (indJOff != string::npos)
                         {
-                            jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY);
+                            jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
 
@@ -2013,43 +2014,43 @@ struct SolverDataBase
                         double jOff = 0.;
                         if ((indXEnd != string::npos) && (indYEnd != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX); // Length is index difference minus included characters with fractional part correction
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
                         }
                         else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         else
                         {
-                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX);
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         if ((indYEnd != string::npos) && (indIOff != string::npos))
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         else
                         {
-                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY);
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         if ((indIOff != string::npos) && (indJOff != string::npos))
                         {
-                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX);
+                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         else
                         {
-                            iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX);
+                            iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                         }
                         if (indJOff != string::npos)
                         {
-                            jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY);
+                            jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                         }
                         int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
 
@@ -2211,43 +2212,43 @@ struct SolverDataBase
                     double jOff = 0.;
                     if ((indXEnd != string::npos) && (indYEnd != string::npos))
                     {
-                        xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX); // Length is index difference minus included characters with fractional part correction
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
                     }
                     else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
                     {
-                        xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX);
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                     {
-                        xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX);
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     else
                     {
-                        xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX);
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     if ((indYEnd != string::npos) && (indIOff != string::npos))
                     {
-                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                     {
-                        yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     else
                     {
-                        yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY);
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     if ((indIOff != string::npos) && (indJOff != string::npos))
                     {
-                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX);
+                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     else
                     {
-                        iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX);
+                        iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     if (indJOff != string::npos)
                     {
-                        jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY);
+                        jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
 
@@ -2440,27 +2441,27 @@ struct SolverDataBase
                     double jOff = 0.;
                     if ((indYEnd != string::npos) && (indIOff != string::npos))
                     {
-                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
                     {
-                        yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY);
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     else
                     {
-                        yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY);
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     if ((indIOff != string::npos) && (indJOff != string::npos))
                     {
-                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX);
+                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     else
                     {
-                        iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX);
+                        iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
                     }
                     if (indJOff != string::npos)
                     {
-                        jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY);
+                        jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
                     }
                     int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
 
@@ -2660,11 +2661,11 @@ struct SolverDataBase
             vector<complex<double>> hullPt = adbGerb.convexHull(cellGerb.cellName, 0., 0.);
 
             // Print and dump the ASCII database of Gerber outline
-            //adbGerb.print({ 0 });
-            //adbGerb.dump();
+            //adbGerb.print({ });
+            adbGerb.dump();
 
             // Extract coordinates from successful Graham scan convex hull process after Gerber outline file read
-            cout << "Gerber outline file produced a convex hull for the design limits" << endl;
+            cout << "Gerber outline file produced a convex hull of " << hullPt.size() << " points for the design limits" << endl;
             vector<double> hullCoord;
             for (size_t indi = 0; indi < hullPt.size(); indi++)
             {
@@ -2673,7 +2674,7 @@ struct SolverDataBase
             }
 
             // Optionally create new ASCII database of convex hull
-            /*GeoCell cellHull;
+            GeoCell cellHull;
             cellHull.boundaries.emplace_back(boundary(hullCoord, 1, { })); // Single boundary of convex hull
             cellHull.boundaries.back().reorder();
             AsciiDataBase adbHull;
@@ -2681,7 +2682,7 @@ struct SolverDataBase
             adbHull.setLibName("convexHull");
             adbHull.appendCell(cellHull);
             adbHull.setdbUnits(adbGerb.getdbUnits());
-            adbHull.dump();*/
+            adbHull.dump();
 
             // Return the convex hull coordinates
             return hullCoord;
@@ -2709,7 +2710,20 @@ struct SolverDataBase
 
             // Build single geometric cell from limboint.h to store information
             GeoCell cellIMP;
-            cellIMP.cellName = impFileName.substr(0, impFileName.find(".", 1));
+            size_t indPathSlash = impFileName.find_last_of("/");
+            size_t indPathExten = impFileName.find_last_of(".");
+            std::string cellName;
+            if (indPathSlash == string::npos)
+            {
+                // No slashes found in impFileName
+                cellName = impFileName.substr(0, indPathExten);
+            }
+            else
+            {
+                // Path for impFileName contains directories
+                cellName = impFileName.substr(indPathSlash + 1, indPathExten - indPathSlash - 1);
+            }
+            cellIMP.cellName = cellName;
             cellIMP.dateCreate = time;
             cellIMP.dateMod = time;
 
@@ -2730,7 +2744,7 @@ struct SolverDataBase
                 std::string version = fileLine.substr(7, fileLine.length() - 7); // 7 characters in header syntax
             }
 
-            // Initialize file-scope varialbes
+            // Initialize file-scope variables
             static double stripLength = 0;       // Initialize the strip length
             static int maxGDSIILayer = 0;        // Maximum GDSII layer number encountered
             static int numFreqPts = 0;           // Number of points in frequency sweep

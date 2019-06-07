@@ -87,18 +87,35 @@ int main(int argc, char** argv)
         }
         else if ((strcmp(argv[1], "-p") == 0) || (strcmp(argv[1], "--parrot") == 0))
         {
-            // Read and print existing file
+            // Read and print existing GDSII file
             AsciiDataBase adb;
             string fName = argv[2];
-            size_t indExtension = fName.find(".", 1);
+            size_t indExtension = fName.find_last_of(".");
             adb.setFileName(fName.substr(0, indExtension) + "_parrot" + fName.substr(indExtension, string::npos));
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            adb.print({ adb.getNumCell() - 1 });
+            adb.print({ });
 
             // Dump to parroted file immediately
             adb.dump();
             cout << "Dumped parroted file" << endl;
+
+            // Read GDSII file of outline for PSLG purposes
+            AsciiDataBase adbOutline;
+            adbOutline.setFileName(fName.substr(0, indExtension) + "_BACK_DRILL.gds"); // Taking specific file name (to be changed later)
+            std::ifstream outlineFile(adbOutline.getFileName().c_str());
+            GdsParser::GdsReader adbOutlineReader(adbOutline);
+            bool adbOutlineGood = adbOutlineReader(outlineFile);
+            vector<complex<double>> outlinePt = adbOutline.findPoints(adbOutline.getCell(0).getCellName(), 0., 0.);
+            //vector<complex<double>> outlinePt = { complex<double>(+12.77e-6, -0.230e-6), complex<double>(+12.77e-6, +3.03e-6), complex<double>(-0.230e-6, +3.03e-6), complex<double>(-0.230e-6, -0.230e-6) }; // SDFFRS_X2 outline
+
+            // Convert to planar straight-line graph (PSLG) file for external meshing
+            vector<int> layers = adb.findLayers();
+            for (size_t indLayer = 0; indLayer < layers.size(); indLayer++)
+            {
+                adb.convertPSLG(adb.getCell(adb.getNumCell() - 1).getCellName(), layers[indLayer], outlinePt);
+            }
+            cout << "Created PSLG file for each layer" << endl;
         }
         else if ((strcmp(argv[1], "-w") == 0) || (strcmp(argv[1], "--write") == 0))
         {
@@ -222,7 +239,7 @@ int main(int argc, char** argv)
             // Get file names
             string inGDSIIFile = argv[2];
             string inSimFile = argv[3];
-            size_t indExtension = inGDSIIFile.find(".", 1);
+            size_t indExtension = inGDSIIFile.find_last_of(".");
 
             // Read GDSII file
             AsciiDataBase adb;
@@ -397,10 +414,10 @@ int main(int argc, char** argv)
             {
                 // Output Xyce subcircuit file
                 string outXyceFile = argv[4];
-                vector<size_t> indCellPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
+                vector<size_t> indLayerPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
                 sdb.setDesignName(adb.findNames().back());
                 sdb.setOutXyce(outXyceFile);
-                sdbCouldDump = sdb.printDumpXyce(indCellPrint);
+                sdbCouldDump = sdb.printDumpXyce(indLayerPrint);
                 cout << "File ready at " << outXyceFile << endl;
             }
         }

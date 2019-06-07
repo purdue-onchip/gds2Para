@@ -11,12 +11,16 @@
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <vector>
 #include <cstring>
 #include <string>
 #include <algorithm>
 #include <stack>
+#include <map>
 #include <tr1/unordered_map>
+#include <cmath>
+#include <complex>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
 #include "fdtd.h"
@@ -57,6 +61,37 @@ struct compareObj {
         }
     }
 } convexCompare;
+
+// Structure for planar straight-line graphs
+struct pslg
+{
+public:
+    vector<complex<double>> vertices;      // Vector of all (unique) vertex coordinates (m, x + iy format)
+    vector<pair<size_t, size_t>> segments; // Vector of all segments as pairs connecting vertex indices
+    vector<complex<double>> regions;       // Vector of all conductor region coordinates (m, x + iy format)
+public:
+    // Default constructor
+    pslg()
+    {
+        this->vertices = { };
+        this->segments = { };
+        this->regions = { };
+    }
+
+    // Parametrized constructor
+    pslg(vector<complex<double>> vertices, vector<pair<size_t, size_t>> segments, vector<complex<double>> regions)
+    {
+        this->vertices = vertices;
+        this->segments = segments;
+        this->regions = regions;
+    }
+
+    // Destructor
+    ~pslg()
+    {
+        // Nothing
+    }
+};
 
 class boundary
 {
@@ -130,6 +165,47 @@ public:
             cerr << "Should be an even number of coordinates stored for boundary points" << endl;
             return 0;
         }
+    }
+
+    // Return perimeter of boundary
+    double findPerimeter() const
+    {
+        double polyPeri = 0.;
+        for (size_t indj = 0; indj < this->getNBoundPt() - 1; indj++)
+        {
+            polyPeri += hypot(this->bounds[2 * indj + 2] - this->bounds[2 * indj], this->bounds[2 * indj + 3] - this->bounds[2 * indj + 1]); // Running calculation of perimeter
+        }
+        return polyPeri; // Polygon perimeter (m)
+    }
+
+    // Return area of boundary
+    double findArea() const
+    {
+        double polyArea = 0.;
+        for (size_t indj = 0; indj < this->getNBoundPt() - 1; indj++)
+        {
+            polyArea += (this->bounds[2 * indj] * this->bounds[2 * indj + 3]) - (this->bounds[2 * indj + 2] * this->bounds[2 * indj + 1]); // Running calculation of closed polygon area
+        }
+        polyArea /= 2.0; // Closed polygon area (m^2)
+        return fabs(polyArea);
+    }
+
+    // Return centroid of boundary
+    vector<double> findCentroid(double xo, double yo) const
+    {
+        double centroidX = 0.;
+        double centroidY = 0.;
+        double polyArea = 0.;
+        for (size_t indj = 0; indj < this->getNBoundPt() - 1; indj++) // Handle each coordinate comprising boundary except repeated point
+        {
+            centroidX += (this->bounds[2 * indj] + this->bounds[2 * indj + 2] + 2 * xo) * ((this->bounds[2 * indj] + xo) * (this->bounds[2 * indj + 3] + yo) - (this->bounds[2 * indj + 2] + xo) * (this->bounds[2 * indj + 1] + yo)); // Running calculation of polygon centroid x-coordinate
+            centroidY += (this->bounds[2 * indj + 1] + this->bounds[2 * indj + 3] + 2 * yo) * ((this->bounds[2 * indj] + xo) * (this->bounds[2 * indj + 3] + yo) - (this->bounds[2 * indj + 2] + xo) * (this->bounds[2 * indj + 1] + yo)); // Running calculation of polygon centroid y-coordinate
+            polyArea += (this->bounds[2 * indj] + xo) * (this->bounds[2 * indj + 3] + yo) - (this->bounds[2 * indj + 2] + xo) * (this->bounds[2 * indj + 1] + yo); // Running calculation of closed polygon area
+        }
+        polyArea /= 2.0; // Closed polygon area (m^2)
+        centroidX /= (6.0 * polyArea); // Polygon centroid x-coordinate (m)
+        centroidY /= (6.0 * polyArea); // Polygon centroid y-coordinate (m)
+        return {centroidX, centroidY};
     }
 
     // Reorder points with lower-right first, going counterclockwise
@@ -312,6 +388,17 @@ public:
         }
     }
 
+    // Return path length
+    double findLength() const
+    {
+        double pathLength = 0.;
+        for (size_t indj = 0; indj < this->getNPathPt() - 1; indj++)
+        {
+            pathLength += hypot(this->paths[2 * indj + 2] - this->paths[2 * indj], this->paths[2 * indj + 3] - this->paths[2 * indj + 1]); // Running calculation of path length
+        }
+        return pathLength; // Path length (m)
+    }
+
     // Destructor
     ~path()
     {
@@ -409,6 +496,47 @@ public:
             cerr << "Should be an even number of coordinates stored for node points" << endl;
             return 0;
         }
+    }
+
+    // Return perimeter of node
+    double findPerimeter() const
+    {
+        double nodePeri = 0.;
+        for (size_t indj = 0; indj < this->getNNodePt() - 1; indj++)
+        {
+            nodePeri += hypot(this->nodes[2 * indj + 2] - this->nodes[2 * indj], this->nodes[2 * indj + 3] - this->nodes[2 * indj + 1]); // Running calculation of perimeter
+        }
+        return nodePeri; // Node perimeter (m)
+    }
+
+    // Return area of node
+    double findArea() const
+    {
+        double nodeArea = 0.;
+        for (size_t indj = 0; indj < this->getNNodePt() - 1; indj++)
+        {
+            nodeArea += (this->nodes[2 * indj] * this->nodes[2 * indj + 3]) - (this->nodes[2 * indj + 2] * this->nodes[2 * indj + 1]); // Running calculation of closed node area
+        }
+        nodeArea /= 2.0; // Closed node area (m^2)
+        return fabs(nodeArea);
+    }
+
+    // Return centroid of node
+    vector<double> findCentroid(double xo, double yo) const
+    {
+        double centroidX = 0.;
+        double centroidY = 0.;
+        double nodeArea = 0.;
+        for (size_t indj = 0; indj < this->getNNodePt() - 1; indj++) // Handle each coordinate comprising node except repeated point
+        {
+            centroidX += (this->nodes[2 * indj] + this->nodes[2 * indj + 2] + 2 * xo) * ((this->nodes[2 * indj] + xo) * (this->nodes[2 * indj + 3] + yo) - (this->nodes[2 * indj + 2] + xo) * (this->nodes[2 * indj + 1] + yo)); // Running calculation of node centroid x-coordinate
+            centroidY += (this->nodes[2 * indj + 1] + this->nodes[2 * indj + 3] + 2 * yo) * ((this->nodes[2 * indj] + xo) * (this->nodes[2 * indj + 3] + yo) - (this->nodes[2 * indj + 2] + xo) * (this->nodes[2 * indj + 1] + yo)); // Running calculation of node centroid y-coordinate
+            nodeArea += (this->nodes[2 * indj] + xo) * (this->nodes[2 * indj + 3] + yo) - (this->nodes[2 * indj + 2] + xo) * (this->nodes[2 * indj + 1] + yo); // Running calculation of closed node area
+        }
+        nodeArea /= 2.0; // Closed node area (m^2)
+        centroidX /= (6.0 * nodeArea); // Node centroid x-coordinate (m)
+        centroidY /= (6.0 * nodeArea); // Node centroid y-coordinate (m)
+        return { centroidX, centroidY };
     }
 
     // Reorder points with lower-right first, going counterclockwise
@@ -553,6 +681,47 @@ public:
             cerr << "Should be an even number of coordinates stored for box outline points" << endl;
             return 0;
         }
+    }
+
+    // Return perimeter of box outline
+    double findPerimeter() const
+    {
+        double boxPeri = 0.;
+        for (size_t indj = 0; indj < this->getNBoxPt() - 1; indj++)
+        {
+            boxPeri += hypot(this->boxes[2 * indj + 2] - this->boxes[2 * indj], this->boxes[2 * indj + 3] - this->boxes[2 * indj + 1]); // Running calculation of perimeter
+        }
+        return boxPeri; // Box outline perimeter (m)
+    }
+
+    // Return area of box
+    double findArea() const
+    {
+        double boxArea = 0.;
+        for (size_t indj = 0; indj < this->getNBoxPt() - 1; indj++)
+        {
+            boxArea += (this->boxes[2 * indj] * this->boxes[2 * indj + 3]) - (this->boxes[2 * indj + 2] * this->boxes[2 * indj + 1]); // Running calculation of closed box area
+        }
+        boxArea /= 2.0; // Closed box area (m^2)
+        return fabs(boxArea);
+    }
+
+    // Return centroid of box outline
+    vector<double> findCentroid(double xo, double yo) const
+    {
+        double centroidX = 0.;
+        double centroidY = 0.;
+        double boxArea = 0.;
+        for (size_t indj = 0; indj < this->getNBoxPt() - 1; indj++) // Handle each coordinate comprising box outline except repeated point
+        {
+            centroidX += (this->boxes[2 * indj] + this->boxes[2 * indj + 2] + 2 * xo) * ((this->boxes[2 * indj] + xo) * (this->boxes[2 * indj + 3] + yo) - (this->boxes[2 * indj + 2] + xo) * (this->boxes[2 * indj + 1] + yo)); // Running calculation of box outline centroid x-coordinate
+            centroidY += (this->boxes[2 * indj + 1] + this->boxes[2 * indj + 3] + 2 * yo) * ((this->boxes[2 * indj] + xo) * (this->boxes[2 * indj + 3] + yo) - (this->boxes[2 * indj + 2] + xo) * (this->boxes[2 * indj + 1] + yo)); // Running calculation of box outline centroid y-coordinate
+            boxArea += (this->boxes[2 * indj] + xo) * (this->boxes[2 * indj + 3] + yo) - (this->boxes[2 * indj + 2] + xo) * (this->boxes[2 * indj + 1] + yo); // Running calculation of closed box area
+        }
+        boxArea /= 2.0; // Closed box area (m^2)
+        centroidX /= (6.0 * boxArea); // Box outline centroid x-coordinate (m)
+        centroidY /= (6.0 * boxArea); // Box outline centroid y-coordinate (m)
+        return { centroidX, centroidY };
     }
 
     // Reorder points with lower-right first, going counterclockwise
@@ -1261,8 +1430,6 @@ private:
     size_t numProp;                              // Present working property number
     vector<GeoCell> cells;                       // Vector of cells in design
     int numCdtIn;                                // Number of conductor rows
-    std::string strPoints;                       // Polygon output
-    fdtdOneCondct cond;                          // Template for the conductor vector
 public:
     /// @brief constructor
     AsciiDataBase()
@@ -1272,7 +1439,6 @@ public:
         double databaseUnits = 1.;
         char element;
         vector<GeoCell> cells;
-        fdtdOneCondct cond;
 
         this->fileName = fileName;
         this->version = version;
@@ -1286,8 +1452,6 @@ public:
         this->numProp = 0;
         this->cells = cells;
         this->numCdtIn = 0;
-        this->strPoints = "";
-        this->cond = cond;
     }
 
     // Get file name
@@ -1356,18 +1520,6 @@ public:
         return this->numCdtIn;
     }
 
-    // Get polygon output string
-    std::string getPolygon()
-    {
-        return this->strPoints;
-    }
-
-    // Get conductor vector template
-    fdtdOneCondct getCond() const
-    {
-        return this->cond;
-    }
-
     // Set file name
     void setFileName(std::string fileName)
     {
@@ -1410,12 +1562,6 @@ public:
         this->numCdtIn = numCdtIn;
     }
 
-    // Set the string for the polygon
-    void setPolygon(std::string strPoints)
-    {
-        this->strPoints = strPoints;
-    }
-
     // Find index of cell by name
     // Returns index past number of cells if not found
     size_t locateCell(std::string name) const
@@ -1438,9 +1584,9 @@ public:
     }
 
     // Return all cell names
-    vector<string> findNames() const
+    vector<std::string> findNames() const
     {
-        vector<string> names;
+        vector<std::string> names;
         for (size_t indi = 0; indi < this->getNumCell(); indi++)
         {
             GeoCell cell = this->getCell(indi);
@@ -1513,8 +1659,8 @@ public:
         return viaList;
     }
 
-    // Compute the convex hull of points in geometric cell with Graham scan
-    vector<complex<double>> convexHull(std::string name, double xo, double yo)
+    // Return all physical points for entire geometric cell
+    vector<complex<double>> findPoints(std::string name, double xo, double yo)
     {
         // Create vector of all physical points in named cell for all layers
         const GeoCell cell = this->cells[this->locateCell(name)];
@@ -1525,25 +1671,25 @@ public:
             for (size_t indj = 0; indj < boundCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising boundary except repeated point
             {
                 complex<double> zBound(boundCoord[2 * indj] + xo, boundCoord[2 * indj + 1] + yo);
-                allPt.push_back(zBound); // Complex number with x- and y-coordinates
+                allPt.push_back(zBound); // Complex number with x- and y-coordinates (m)
             }
         }
         for (size_t indi = 0; indi < cell.getNumPath(); indi++) // Handle each path
         {
             vector<double> pathCoord = (cell.paths[indi]).getPaths();
-            for (size_t indj = 0; indj < pathCoord.size(); indj++) // Handle each coordinate comprising path
+            for (size_t indj = 0; indj < pathCoord.size() / 2; indj++) // Handle each coordinate comprising path
             {
                 complex<double> zPath(pathCoord[2 * indj] + xo, pathCoord[2 * indj + 1] + yo);
-                allPt.push_back(zPath); // Complex number with x- and y-coordinates
+                allPt.push_back(zPath); // Complex number with x- and y-coordinates (m)
             }
         }
         for (size_t indi = 0; indi < cell.getNumBox(); indi++) // Handle each box outline
         {
             vector<double> boxCoord = (cell.boxes[indi]).getBoxes();
-            for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) // Handle each coordinate comprising box outline except repeated point
+            for (size_t indj = 0; indj < boxCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising box outline except repeated point
             {
                 complex<double> zBox(boxCoord[2 * indj] + xo, boxCoord[2 * indj + 1] + yo);
-                allPt.push_back(zBox); // Complex number with x- and y-coordinates
+                allPt.push_back(zBox); // Complex number with x- and y-coordinates (m)
             }
         }
         for (size_t indi = 0; indi < cell.getNumSRef(); indi++) // Handle each structure reference recursively
@@ -1552,11 +1698,126 @@ public:
             allPt.insert(allPt.end(), newCoord.begin(), newCoord.end());
         }
 
-        // Stop here if in recursion step for gathering points
-        if ((xo != 0.0) || (yo != 0.0))
+        // Return the points
+        allPt.erase(unique(allPt.begin(), allPt.end()), allPt.end()); // Removes only consecutive repeated points (those corresponding to zero-length changes)
+        return allPt;
+    }
+
+    // Return all physical points, connecting segments, and regions (PSLG information) on given layer within a geometric cell
+    pslg findPSLG(std::string name, int layer, double xo, double yo)
+    {
+        // Store all physical vertices for layer in vector of complex numbers
+        const GeoCell cell = this->cells[this->locateCell(name)];
+        vector<complex<double>> layerPt; // Using complex numbers to represent ordered pairs for vertices
+        vector<pair<size_t, size_t>> layerSeg; // Using pairs of indices to represent the points connected by segments
+        vector<complex<double>> layerReg; // Using complex numbers to represent an interior point of conductor regions
+        //unordered_map<complex<double>, long long int, hash<complex<double>>> backwards; // Backwards map to ensure unique points entered (fails because complex numbers have no hash)
+        //map<long long int, complex<double>> layerPt; // Forwards map has enumeration of unique points
+        //long long int indPt = 0;
+        for (size_t indi = 0; indi < cell.getNumBound(); indi++) // Handle each boundary
         {
-            return allPt;
+            if ((cell.boundaries[indi]).getLayer() == layer)
+            {
+                vector<double> boundCoord = (cell.boundaries[indi]).getBounds();
+                size_t numBoundPt = (cell.boundaries[indi]).getNBoundPt() - 1; // Number of unique points on boundary
+                size_t indBoundStart = layerPt.size(); // Index of first point on boundary
+                for (size_t indj = 0; indj < numBoundPt; indj++) // Handle each coordinate comprising boundary except repeated point
+                {
+                    complex<double> zBound(boundCoord[2 * indj] + xo, boundCoord[2 * indj + 1] + yo); // Complex number with x- and y-coordinates (m)
+                    layerPt.push_back(zBound);
+                    layerSeg.push_back(pair<size_t, size_t>(indBoundStart + indj, indBoundStart + ((indj + 1) % numBoundPt))); // Segment connects this point to next cyclically
+                    //bool couldInsert = backwards.insert(pair<complex<double>, long long int>(zBound, indPt)).second; // Check if point already exists
+                    //if (couldInsert)
+                    //{
+                    //    layerPt.insert(pair<long long int, complex<double>>(indPt, zBound)); // Enumerate the unique point
+                    //    indPt++;
+                    //}
+                }
+                vector<double> centroidCoord = (cell.boundaries[indi]).findCentroid(xo, yo);
+                complex<double> centroid(centroidCoord[0], centroidCoord[1]); // Boundary centroid (m, xcent + i*ycent)
+                layerReg.push_back(centroid); // New region for this polygon
+            }
         }
+        for (size_t indi = 0; indi < cell.getNumPath(); indi++) // Handle each path
+        {
+            if ((cell.paths[indi]).getLayer() == layer)
+            {
+                vector<double> pathCoord = (cell.paths[indi]).getPaths();
+                size_t numPathPt = (cell.paths[indi]).getNPathPt(); // Number of points along path (infinitesimal thickeness for now)
+                size_t indPathStart = layerPt.size();
+                for (size_t indj = 0; indj < numPathPt; indj++) // Handle each coordinate comprising path
+                {
+                    complex<double> zPath(pathCoord[2 * indj] + xo, pathCoord[2 * indj + 1] + yo); // Complex number with x- and y-coordinates (m)
+                    layerPt.push_back(zPath);
+                    if (indj > 0)
+                    {
+                        layerSeg.push_back(pair<size_t, size_t>(indPathStart + indj - 1, indPathStart + indj)); // Segment connects previous point to this one (infinitesimal thickness)
+                    }
+                    //bool couldInsert = backwards.insert(pair<complex<double>, long long int>(zPath, indPt)).second; // Check if point already exists
+                    //if (couldInsert)
+                    //{
+                    //    layerPt.insert(pair<long long int, complex<double>>(indPt, zPath)); // Enumerate the unique point
+                    //    indPt++;
+                    //}
+                }
+            }
+        }
+        for (size_t indi = 0; indi < cell.getNumBox(); indi++) // Handle each box outline
+        {
+            if ((cell.boxes[indi]).getLayer() == layer)
+            {
+                vector<double> boxCoord = (cell.boxes[indi]).getBoxes();
+                size_t numBoxPt = (cell.boxes[indi]).getNBoxPt() - 1; // Number of unique points on box outline
+                size_t indBoxStart = layerPt.size(); // Index of first point on box outline
+                for (size_t indj = 0; indj < numBoxPt; indj++) // Handle each coordinate comprising box outline except repeated point
+                {
+                    complex<double> zBox(boxCoord[2 * indj] + xo, boxCoord[2 * indj + 1] + yo); // Complex number with x- and y-coordinates (m)
+                    layerPt.push_back(zBox);
+                    layerSeg.push_back(pair<size_t, size_t>(indBoxStart + indj, indBoxStart + ((indj + 1) % numBoxPt))); // Segment connects this point to next cyclically
+                    //bool couldInsert = backwards.insert(pair<complex<double>, long long int>(zBox, indPt)).second; // Check if point already exists
+                    //if (couldInsert)
+                    //{
+                    //    layerPt.insert(pair<long long int, complex<double>>(indPt, zBox)); // Enumerate the unique point
+                    //    indPt++;
+                    //}
+                }
+                vector<double> centroidCoord = (cell.boxes[indi]).findCentroid(xo, yo);
+                complex<double> centroid(centroidCoord[0], centroidCoord[1]); // Box outline centroid (m, xcent + i*ycent)
+                layerReg.push_back(centroid); // New region for this box
+            }
+        }
+        for (size_t indi = 0; indi < cell.getNumSRef(); indi++) // Handle each structure reference recursively
+        {
+            pslg newPSLG = this->findPSLG((cell.sreferences)[indi].getSRefName(), layer, (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
+            vector<complex<double>> newVertices = newPSLG.vertices;
+            vector<pair<size_t, size_t>> newSegments = newPSLG.segments; // Segments have zero-referenced indices for referenced geometric cell
+            vector<complex<double>> newRegions = newPSLG.regions;
+            size_t refCellIndOffset = layerPt.size();
+            for (size_t indj = 0; indj < newSegments.size(); indj++)
+            {
+                newSegments[indj] = pair<size_t, size_t>(newSegments[indj].first + refCellIndOffset, newSegments[indj].second + refCellIndOffset); // Add offset to all values in segment pairs
+            }
+            layerPt.insert(layerPt.end(), newVertices.begin(), newVertices.end());
+            layerSeg.insert(layerSeg.end(), newSegments.begin(), newSegments.end());
+            layerReg.insert(layerReg.end(), newRegions.begin(), newRegions.end());
+            //map<long long int, complex<double>> newPt = this->findLayerPt((cell.sreferences)[indi].getSRefName(), layer, (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
+            //for (auto it = newPt.begin(); it != newPt.end(); ++it)
+            //{
+            //    layerPt.insert(pair<long long int, complex<double>>(indPt, it->second)); // Include the unique points from the structure reference
+            //    indPt++;
+            //}
+        }
+
+        // Return structure
+        return pslg(layerPt, layerSeg, layerReg);
+    }
+
+    // Compute the convex hull of points in geometric cell with Graham scan
+    vector<complex<double>> convexHull(std::string name, double xo, double yo)
+    {
+        // Retrieve vector of all physical points in named cell for all layers
+        vector<complex<double>> allPt = this->findPoints(name, xo, yo);
+        cout << "Identified " << allPt.size() << " points along PCB outline" << endl;
 
         // Find bottommost point and put at front
         size_t indPtMin = 0;
@@ -1655,6 +1916,88 @@ public:
         return hullPt;
     }
 
+    // Produce planar straight-line graph (PSLG) file for layer within geometric cell
+    bool convertPSLG(std::string name, int layer, vector<complex<double>> outlinePt)
+    {
+        // Attempt to open planar straight-line graph (PSLG) file for writing
+        std::string polyName = this->fileName.substr(0, this->fileName.find_last_of(".")) + "_" + to_string(layer) + ".poly";
+        ofstream polyFile(polyName.c_str());
+        if (polyFile.is_open())
+        {
+            // Retrieve list of points, segments, and regions on layer
+            pslg layerPSLG = this->findPSLG(name, layer, 0., 0.);
+            vector<complex<double>> layerPt = layerPSLG.vertices;
+            vector<pair<size_t, size_t>> layerSeg = layerPSLG.segments;
+            vector<complex<double>> layerReg = layerPSLG.regions;
+            size_t numOutlinePt = outlinePt.size();
+            size_t numLayerPt = layerPt.size();
+            size_t numLayerSeg = layerSeg.size();
+            size_t numLayerReg = layerReg.size();
+
+            // Create fictitious node of board outline to guess interior point (not robust)
+            vector<double> outlineCoord;
+            for (size_t indi = 0; indi < outlinePt.size(); indi++)
+            {
+                outlineCoord.push_back(outlinePt[indi].real()); // x-coordinate of an outline point
+                outlineCoord.push_back(outlinePt[indi].imag()); // y-coordinate of an outline point
+            }
+            node outlineNode = node(outlineCoord, 1, { }, 0);
+            outlineNode.reorder();
+            vector<double> outlineCentroid = outlineNode.findCentroid(0., 0.);
+            vector<double> outlineInterior = { 0.999 * outlineNode.getNodes()[0] + 0.001 * outlineCentroid[0], 0.999 * outlineNode.getNodes()[1] + 0.001 * outlineCentroid[1] }; // Point just left and above the bottom-right point (weighted average)
+
+            // Write comment to file
+            polyFile << "# File generated by limboint.h" << endl;
+
+            // Write vertices to file
+            polyFile << "# vertices (vert_num, x, y, bound)" << endl;
+            polyFile << numOutlinePt + numLayerPt << " 2 0 1" << endl; // Number of vertices (do not zero pad), 2 dimensions, 0 attributes, with boundary markers
+            for (size_t indi = 0; indi < numOutlinePt; indi++)
+            {
+                polyFile << std::right << std::setw(6) << indi + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << outlinePt[indi].real() << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << outlinePt[indi].imag() << " 1" << endl; // Vertex # (do not zero pad), x-coordinate, y-coordinate, boundary marker
+            }
+            for (size_t indi = 0; indi < numLayerPt; indi++)
+            {
+                polyFile << std::right << std::setw(6) << numOutlinePt + indi + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerPt[indi].real() << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerPt[indi].imag() << " 0" << endl; // Vertex #, x-coordinate, y-coordinate, boundary marker
+            }
+
+            // Write segments to file
+            polyFile << "# segments (seg_num, vert1, vert2, bound)" << endl;
+            polyFile << numOutlinePt + numLayerSeg << " 1" << endl; // Number of segments, with boundary markers
+            for (size_t indi = 0; indi < numOutlinePt; indi++)
+            {
+                polyFile << std::right << std::setw(6) << indi + 1 << " " << std::right << std::setw(6) << (indi % numOutlinePt) + 1 << " " << std::right << std::setw(6) << ((indi + 1) % numOutlinePt) + 1 << " 1" << endl; // Segment #, first vertex #, second vertex #, boundary marker
+            }
+            for (size_t indi = 0; indi < numLayerSeg; indi++)
+            {
+                polyFile << std::right << std::setw(6) << (numOutlinePt + indi + 1) << " " << std::right << std::setw(6) << (numOutlinePt + layerSeg[indi].first + 1) << " " << std::right << std::setw(6) << (numOutlinePt + layerSeg[indi].second + 1) << " 0" << endl; // Segment #, first vertex #, second vertex #, boundary marker
+            }
+
+            // Write holes to file
+            polyFile << "# holes (hole_num, x, y)" << endl;
+            polyFile << "0" << endl; // No holes in this design (future consideration)
+
+            // Write regions to file
+            polyFile << "# regional attributes (1 = conductor, 2 = dielectric)" << endl;
+            polyFile << numLayerReg + 1 << endl; // Number of regions
+            for (size_t indi = 0; indi < numLayerReg; indi++)
+            {
+                polyFile << std::right << std::setw(6) << indi + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerReg[indi].real() << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerReg[indi].imag() << " 1" << endl; // Region #, x-coordinate, y-coordinate, attribute number
+            }
+            polyFile << std::right << std::setw(6) << numLayerReg + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << outlineInterior[0] << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << outlineInterior[1] << " 2" << endl; // Region #, x-coordinate, y-coordinate, attribute number
+            polyFile << endl; // Blank line for good measure
+
+            // Close PSLG file
+            polyFile.close();
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
+    }
+
     // Save to fdtdMesh conductor information
     void saveToMesh(std::string name, double xo, double yo, fdtdMesh *sys)
     {
@@ -1677,7 +2020,7 @@ public:
 
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
             (this->numCdtIn)++;
-            sys->conductorIn.push_back(this->cond);
+            sys->conductorIn.push_back(fdtdOneCondct());
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = boundCoord.size() / 2 - 1;
             sys->conductorIn[si].xmax = DOUBLEMIN;
@@ -1715,7 +2058,7 @@ public:
             double width = ((cell.paths)[indi]).getWidth();
             for (size_t indj = 0; indj < pathCoord.size()-2; indj++) // C string for each ordered pair
             {
-                sys->conductorIn.push_back(this->cond);
+                sys->conductorIn.push_back(fdtdOneCondct());
                 si = sys->conductorIn.size() - 1;
                 sys->conductorIn[si].numVert = 4;
                 sys->conductorIn[si].xmax = DOUBLEMIN;
@@ -1832,7 +2175,7 @@ public:
         {
             this->numCdtIn++;
 
-            sys->conductorIn.push_back(this->cond);
+            sys->conductorIn.push_back(fdtdOneCondct());
             vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = ((cell.boxes)[indi]).getNBoxPt() - 1;
@@ -1872,147 +2215,9 @@ public:
         }
     }
 
-    // Print details of the conductor information (no saving to fdtdMesh)
-    void printDetails(std::string name, double xo, double yo)
-    {
-        // Get information about this cell in ASCII database
-        const GeoCell cell = this->cells[this->locateCell(name)];
-        int numBound = cell.getNumBound();
-        int numPath = cell.getNumPath();
-        int numNode = cell.getNumNode();
-        int numBox = cell.getNumBox();
-        int numText = cell.getNumText();
-        int numSRef = cell.getNumSRef();
-
-        // Print cell information
-        cout << "  List of " << numBound << " boundaries:" << endl;
-        for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
-        { 
-            char point[128];
-            vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
-            this->strPoints.append("    " + to_string(boundCoord.size() / 2 - 1) + " " + to_string(((cell.boundaries)[indi]).getLayer()) + " "); // Number of nodes, then layer number
-            int lay = ((cell.boundaries)[indi]).getLayer();
-            for (size_t indj = 0; indj < boundCoord.size() - 2; indj++) // C string for each ordered pair, -2 because the last point is the starting point
-            {
-                sprintf(point, "%1.4g, %1.4g ", boundCoord[indj++] + xo, boundCoord[indj + 1] + yo);
-                this->strPoints.append(point);
-            }
-            this->strPoints.append("\n");
-            (this->numCdtIn)++;
-        }
-        cout << "  List of " << numPath << " paths:" << endl;
-        for (size_t indi = 0; indi < numPath; indi++) // Handle each path
-        {
-            char point[128];
-            this->strPoints.append("    4" + to_string(((cell.paths)[indi]).getLayer()) + " ");
-            vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
-            double width = ((cell.paths)[indi]).getWidth();
-            for (size_t indj = 0; indj < pathCoord.size(); indj++) // C string for each ordered pair
-            {
-                if (indj < pathCoord.size() - 2)
-                {
-                    if (pathCoord[indj] == pathCoord[indj + 2]) // along y axis
-                    {
-                        if (pathCoord[indj + 1] > pathCoord[indj + 3]) // first point is on top of the second point
-                        {
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            this->strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            this->strPoints.append(point);
-                            indj++;
-                            indj++;
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            this->strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            this->strPoints.append(point);
-                            this->strPoints.append("\n");
-                            this->numCdtIn++;
-                            indj--;
-                        }
-                        else // second point is on the top of the first point
-                        {
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            this->strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            this->strPoints.append(point);
-                            indj++;
-                            indj++;
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            this->strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            this->strPoints.append(point);
-                            this->strPoints.append("\n");
-                            this->numCdtIn++;
-                            indj--;
-                        }
-                    }
-                    else // along x axis
-                    {
-                        if (pathCoord[indj] > pathCoord[indj + 2]) // first point is on the right of the second point
-                        {
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            this->strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            this->strPoints.append(point);
-                            indj++;
-                            indj++;
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            this->strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            this->strPoints.append(point);
-                            this->strPoints.append("\n");
-                            this->numCdtIn++;
-                            indj--;
-                        }
-                        else // second point is on the right of the first point
-                        {
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] - width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            strPoints.append(point);
-                            indj++;
-                            indj++;
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] - width / 2 + yo);
-                            strPoints.append(point);
-                            sprintf(point, "%1.4g %1.4g ", pathCoord[indj] + width / 2 + xo, pathCoord[indj + 1] + width / 2 + yo);
-                            strPoints.append(point);
-                            strPoints.append("\n");
-                            this->numCdtIn++;
-                            indj--;
-                        }
-                    }
-                }
-            }
-        }
-        cout << "  List of " << numNode << " nodes:" << endl;
-        cout << "  List of " << numBox << " box outlines:" << endl;
-        for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
-        {
-            char point[128];
-            this->strPoints.append("    " + to_string(((cell.boxes)[indi]).getNBoxPt() - 1) + " " + to_string(((cell.boxes)[indi]).getLayer()) + " ");
-            vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
-            for (size_t indj = 0; indj < boxCoord.size() - 2; indj++) {
-                //this->strPoints.append(to_string(boxCoord[indj++]) + " " + to_string(boxCoord[indj + 1]) + " ");
-                sprintf(point, "%1.4g %1.4g ", boxCoord[indj++] + xo, boxCoord[indj + 1] + yo);
-                this->strPoints.append(point);
-            }
-            this->strPoints.append("\n");
-            this->numCdtIn++;
-        }
-        cout << "  List of " << numText << " text boxes:" << endl;
-        cout << "  List of " << numSRef << " structure references:" << endl;
-        for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference recursively
-        {
-            this->printDetails((cell.sreferences)[indi].getSRefName(), (((cell.sreferences)[indi]).getSRefs())[0] + xo, (((cell.sreferences)[indi]).getSRefs())[1] + yo);
-        }
-    }
-
     // Print the ASCII database with the design geometry
     void print(vector<size_t> indCellPrint)
     {
-        // Delete existing file
-        size_t indExtension = this->getFileName().find(".", 1);
-
         // Analyze design and print to terminal
         int numCell = getNumCell();
 
@@ -2035,10 +2240,8 @@ public:
         {
             std::string cellName = ((this->cells)[indCellPrint[indi]]).getCellName();
             cout << cellName << endl;
-            this->printDetails(cellName, 0., 0.);   // the origin is the (0,0) point
-            //(this->cells)[indCellPrint[indi]].printAlt();
+            (this->cells)[indCellPrint[indi]].printAlt();
         }
-        //cout << this->strPoints << endl;
         cout << "------" << endl;
     }
 
