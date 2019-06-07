@@ -29,7 +29,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     xOrigOld = (double*)calloc(numNode + 2 * sys->numPorts, sizeof(double));
     yOrigOld = (double*)calloc(numNode + 2 * sys->numPorts, sizeof(double));
     zOrigOld = (double*)calloc(2 * sys->numStack + 2 * sys->numPorts, sizeof(double));
-    double minLayerDist = sys->zlim2 - sys->zlim1; // Initialize smallest distance between layers as entire domain height (units included)
+    double minLayerDist = sys->zlim2 - sys->zlim1;// Initialize smallest distance between layers as entire domain height (units included)
 
     j = 0;
     for (i = 0; i < sys->numCdtRow; i++) {
@@ -54,7 +54,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         j++;
         zOrigOld[j] = sys->stackEndCoor[i];
         j++;
-        minLayerDist = fmin(minLayerDist, sys->stackEndCoor[i] - sys->stackBegCoor[i]); // Update smallest distance between layers as each layer processed (units included)
+        if (sys->stackEndCoor[i] - sys->stackBegCoor[i] > 0)
+            minLayerDist = fmin(minLayerDist, sys->stackEndCoor[i] - sys->stackBegCoor[i]); // Update smallest distance between layers as each layer processed (units included)
     }
     for (i = 0; i < sys->numPorts; i++) {
         zOrigOld[j] = sys->portCoor[i].z1;
@@ -210,13 +211,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(zOrigOld, zOrigOld + 2 * sys->numStack + 2 * sys->numPorts);
     sys->nz = 1;
     double disMinz = minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
-    double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
+    //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
     double *zn = (double*)calloc(2 * sys->numStack + 6 * sys->numPorts, sizeof(double));
     for (i = 1; i < 2 * sys->numStack + 2 * sys->numPorts; i++){
         if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMinz){
             sys->nz++;
-            zn[i] = zOrigOld[i];
         }
+        zn[i] = zOrigOld[i];
     }
     int countz = 2 * sys->numStack + 2 * sys->numPorts - 1;
 
@@ -359,7 +360,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     cout << "disMinz  = " << disMinz << endl;
     cout << "disMaxx  = " << disMaxx << endl;
     cout << "disMaxy  = " << disMaxy << endl;
-    cout << "disMaxz  = " << disMaxz << endl;
+    //cout << "disMaxz  = " << disMaxz << endl;
     cout << endl;
     cout << "N_edge   = " << sys->N_edge << endl;
     cout << "N_node   = " << sys->N_node << endl;
@@ -535,6 +536,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         
     }
     cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
+    
     //for (i = 0; i < sys->numCdtRow; i++){
     //    //cout << polyIn((0 + 4.9e-7) / 2, -1.7e-7, sys, 2) << endl;
     //    numNode = (xi[sys->conductorIn[i].xmax] - xi[sys->conductorIn[i].xmin] + 1)
@@ -890,7 +892,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 if (portground_count <= 1)*/
                 sys->conductor[visited[i] - 1].markPort = -1;    // this conductor connects to the lower PEC
             }
-            else if ((i >= sys->N_node - sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -2){
+            else if ((i >= sys->N_node - sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -2 && sys->conductor[visited[i] - 1].markPort != -1){
                 sys->conductor[visited[i] - 1].markPort = -2;    // this conductor connects to the upper PEC
             }
             sys->conductor[visited[i] - 1].cdtNodeind++;
