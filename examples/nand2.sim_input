@@ -1,5 +1,5 @@
 TOTAL SIZE
-0.00 +149 -47.0 +120 0.00 +7.53
+-1.00 +150 -48.0 +121 0.00 +7.53
 lengthUnit = 1e-6
 
 FREQUENCY
@@ -11,9 +11,9 @@ freqScale = 0
 
 DIELECTRIC STACK
 numStack = 17
-1 z = 0.00 h = 1.0 e = 3.9
+1 z = 0.00 h = 1.0 e = 3.9 # Li added this
 2 z = 1.00 h = 1.50 e = 3.9
-3 z = 2.50 h = 0.60 e = 3.9 # Li added this
+3 z = 2.50 h = 0.60 e = 3.9
 41 z = 3.10 h = 0.22 e = 2.5
 42 z = 3.32 h = 0.22 e = 2.5
 43 z = 3.54 h = 0.22 e = 2.5

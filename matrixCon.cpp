@@ -480,7 +480,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *ferr, *berr;
 
     while (sourcePort < sys->numPorts){
-
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
             sys->J[sys->portEdge[sourcePort][indi]] = sys->portCoor[sourcePort].portDirection;
@@ -507,6 +506,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         t1 = clock();
 
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
+        cout << "Tried to call hypreSolve()" << endl;
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
         /* End of solving */

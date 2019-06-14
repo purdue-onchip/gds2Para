@@ -55,6 +55,11 @@ using namespace std;
 #define MAXDISLAYERZ (1.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16)
 
+// HYPRE control macros
+#define HYPRE_METHOD (3) // 1 = AMG, 2 = PCG with AMG Preconditioner, 3 = Flexible GMRES with AMG Preconditioner
+#define HYPRE_CONV_TOL (1.e-4) // Convergence relative tolerance for HYPRE
+#define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
+
 // Debug testing macros (comment out if not necessary)
 #define PRINT_NODE_COORD (1)
 #define PRINT_DIS_COUNT (1)
@@ -64,6 +69,7 @@ using namespace std;
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
 #define SKIP_STIFF_REFERENCE // Turn on to save time
+
 
 // Function-like macros
 #define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))

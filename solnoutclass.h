@@ -392,7 +392,7 @@ class Aperture
     }
 };
 
-// Custom classes for containing solution and output SPEF writer
+// Custom classes for containing solution and output Xyce/SPEF writer
 class SimSettings
 {
   private:
@@ -3497,7 +3497,7 @@ struct SolverDataBase
 
                         // Move down one line in port list, skipping comments
                         getline(inputFile, fileLine);
-                        while (fileLine.compare(0, 1, "#") == 0)
+                        while ((fileLine.compare(0, 1, "#") == 0) && !(inputFile.eof()))
                         {
                             getline(inputFile, fileLine);
                         }

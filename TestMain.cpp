@@ -78,12 +78,6 @@ int main(int argc, char** argv)
             bool adbIsGood = adbReader(inFile);
             vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
             adb.print(indCellPrint);
-
-            /*EnumDataBase edb;
-            GdsParser::GdsReader edbReader(edb);
-            bool edbIsGood = edbReader(inFile);
-            cout << "Test Enum API: " << edbIsGood << endl;
-            //cout << "Test Enum API: " << GdsParser::read(edb, argv[1]) << endl;*/
         }
         else if ((strcmp(argv[1], "-p") == 0) || (strcmp(argv[1], "--parrot") == 0))
         {
@@ -101,21 +95,24 @@ int main(int argc, char** argv)
             cout << "Dumped parroted file" << endl;
 
             // Read GDSII file of outline for PSLG purposes
-            AsciiDataBase adbOutline;
+            /*AsciiDataBase adbOutline;
             adbOutline.setFileName(fName.substr(0, indExtension) + "_BACK_DRILL.gds"); // Taking specific file name (to be changed later)
             std::ifstream outlineFile(adbOutline.getFileName().c_str());
             GdsParser::GdsReader adbOutlineReader(adbOutline);
             bool adbOutlineGood = adbOutlineReader(outlineFile);
-            vector<complex<double>> outlinePt = adbOutline.findPoints(adbOutline.getCell(0).getCellName(), 0., 0.);
+            vector<complex<double>> outlinePt = adbOutline.findPoints(adbOutline.getCell(0).getCellName(), 0., 0.);*/
+            //vector<complex<double>> outlinePt = { complex<double>(+150e-6, -48.0e-6), complex<double>(+150e-6, +121e-6), complex<double>(-1.00e-6, +121e-6), complex<double>(-1.00e-6, -48.0e-6) }; // nand2 outline
             //vector<complex<double>> outlinePt = { complex<double>(+12.77e-6, -0.230e-6), complex<double>(+12.77e-6, +3.03e-6), complex<double>(-0.230e-6, +3.03e-6), complex<double>(-0.230e-6, -0.230e-6) }; // SDFFRS_X2 outline
+            //vector<complex<double>> outlinePt = { complex<double>(+2.82e-3, +5.00e-5), complex<double>(+2.825e-3, +3.87e-3), complex<double>(+3.00e-5, +3.87e-3), complex<double>(+3.00e-5, +5.00e-5) }; // 4004 outline
 
             // Convert to planar straight-line graph (PSLG) file for external meshing
+            /*adb.setFileName("examples/4004.gds");
             vector<int> layers = adb.findLayers();
             for (size_t indLayer = 0; indLayer < layers.size(); indLayer++)
             {
                 adb.convertPSLG(adb.getCell(adb.getNumCell() - 1).getCellName(), layers[indLayer], outlinePt);
             }
-            cout << "Created PSLG file for each layer" << endl;
+            cout << "Created PSLG file for each layer" << endl;*/
         }
         else if ((strcmp(argv[1], "-w") == 0) || (strcmp(argv[1], "--write") == 0))
         {
@@ -320,7 +317,7 @@ int main(int argc, char** argv)
                 cerr << "portSet Fail!" << endl;
                 return status;
             }
-            //sys.print();
+            sys.print();
 
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
