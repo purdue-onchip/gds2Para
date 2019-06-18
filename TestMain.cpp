@@ -317,7 +317,7 @@ int main(int argc, char** argv)
                 cerr << "portSet Fail!" << endl;
                 return status;
             }
-            sys.print();
+            //sys.print();
 
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
@@ -341,15 +341,15 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;
-                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
-            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
             // Parameter storage
             spMat matG(sys.numPorts, sys.numPorts); // Initialize Eigen sparse conductance matrix (S)

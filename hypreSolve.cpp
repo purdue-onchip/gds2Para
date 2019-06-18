@@ -151,9 +151,9 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
         if (myid == 0)
         {
-            printf("\n");
-            printf("Iterations = %d\n", num_iterations);
-            printf("Final Relative Residual Norm = %e\n", final_res_norm);
+            cout << endl;
+            cout << "Iterations = " << num_iterations << endl;
+            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */
@@ -205,9 +205,9 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
         if (myid == 0)
         {
-            printf("\n");
-            printf("Iterations = %d\n", num_iterations);
-            printf("Final Relative Residual Norm = %e\n", final_res_norm);
+            cout << endl;
+            cout << "Iterations = " << num_iterations << endl;
+            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */
@@ -224,7 +224,6 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 #elif HYPRE_METHOD == 3
     /* Flexible GMRES with AMG Preconditioner */
     {
-        cout << "Entered Flexible GMRES scope" << endl;
         HYPRE_Int    num_iterations;
         double final_res_norm;
         HYPRE_Int    restart = 10;
@@ -242,17 +241,20 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         /* Now set up the AMG preconditioner and specify any parameters */
         HYPRE_BoomerAMGCreate(&precond);
-        HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
-        HYPRE_BoomerAMGSetCoarsenType(precond, 6);
-        HYPRE_BoomerAMGSetOldDefault(precond);
-        HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
-        HYPRE_BoomerAMGSetNumSweeps(precond, 1);
-        HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
-        HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
+        //HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
+        //HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+        //HYPRE_BoomerAMGSetOldDefault(precond);
+        //HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
+        //HYPRE_BoomerAMGSetNumSweeps(precond, 1);
+        //HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
+        //HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
+        //HYPRE_EuclidCreate(MPI_COMM_WORLD, &precond);
+        //HYPRE_EuclidSetMem(precond, 1);
 
         /* Set the FlexGMRES preconditioner */
         HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
+        //HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSolve, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSetup, precond);
 
         if (modify)
         {
@@ -264,25 +266,23 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         }
 
         /* Now setup and solve! */
-        cout << "Setup and solve in GMRES" << endl;
+        //cout << "Setup and solve in GMRES block" << endl;
         HYPRE_ParCSRFlexGMRESSetup(solver, parcsr_A, par_b, par_x);
-        cout << "GMRES is setup, awaiting solve" << endl;
+        //cout << "GMRES has been set up, awaiting solve" << endl;
         HYPRE_ParCSRFlexGMRESSolve(solver, parcsr_A, par_b, par_x);
 
         /* Run info - needed logging turned on */
         HYPRE_FlexGMRESGetNumIterations(solver, &num_iterations);
         HYPRE_FlexGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
-        cout << "Run info after logging" << endl;
 
         if (myid == 0)
         {
-            printf("\n");
-            printf("Iterations = %d\n", num_iterations);
-            printf("Final Relative Residual Norm = %e\n", final_res_norm);
+            cout << endl;
+            cout << "Iterations = " << num_iterations << endl;
+            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */
-        cout << "Trying to output final solution" << endl;
         HYPRE_Complex v;
         for (i = ilower; i <= iupper; i++){
             HYPRE_IJVectorGetValues(x, 1, &i, &v);
@@ -299,7 +299,6 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     HYPRE_IJMatrixDestroy(A);
     HYPRE_IJVectorDestroy(b);
     HYPRE_IJVectorDestroy(x);
-    cout << "Tried to clean up in hypreSolve()" << endl;
 
     return(0);
 }
