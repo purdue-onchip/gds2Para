@@ -282,7 +282,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "meshAndMark Success!" << endl;
-                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
@@ -297,7 +297,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "matrixConstruction Success!" << endl;
-                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else {
                 cerr << "matrixConstruction Fail!" << endl;
@@ -310,7 +310,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "portSet Success!" << endl;
-                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
@@ -326,7 +326,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "generateStiff Success!" << endl;
-                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {

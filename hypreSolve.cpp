@@ -241,13 +241,13 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         /* Now set up the AMG preconditioner and specify any parameters */
         HYPRE_BoomerAMGCreate(&precond);
-        //HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
-        //HYPRE_BoomerAMGSetCoarsenType(precond, 6);
-        //HYPRE_BoomerAMGSetOldDefault(precond);
-        //HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
-        //HYPRE_BoomerAMGSetNumSweeps(precond, 1);
-        //HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
-        //HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
+        HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
+        HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+        HYPRE_BoomerAMGSetOldDefault(precond);
+        HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
+        HYPRE_BoomerAMGSetNumSweeps(precond, 1);
+        HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
+        HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
         //HYPRE_EuclidCreate(MPI_COMM_WORLD, &precond);
         //HYPRE_EuclidSetMem(precond, 1);
 
