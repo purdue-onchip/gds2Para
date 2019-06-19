@@ -25,6 +25,9 @@
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
 #include "fdtd.h"
 
+// PSLG macro
+#define REL_INTERIOR_PRECISION (0.001) // Relative preceision to set interior points of a PSLG region
+
 // Structure for convex hull comparison
 struct compareObj {
     complex<double> p0; // Reference point
@@ -93,6 +96,7 @@ public:
     }
 };
 
+// Custom classes for containing GDSII file elements
 class boundary
 {
 private:
@@ -217,6 +221,7 @@ public:
         {
             (this->bounds).pop_back(); // Remove repeated y-coordinate
             (this->bounds).pop_back(); // Remove repeated x-coordinate
+            nBoundPt--; // Correct number of boundary points for this method
         }
 
         // Find lower-right most point
@@ -236,7 +241,7 @@ public:
         rotate((this->bounds).begin(), (this->bounds).begin() + 2 * ptLR, (this->bounds).end());
 
         // Correct direction if clockwise
-        if (((this->bounds)[2 * 0] > (this->bounds)[2 * 1]) && ((this->bounds)[2 * 0 + 1] < (this->bounds)[2 * 1 + 1]))
+        if (((this->bounds)[2 * 0] > (this->bounds)[2 * 1]) && ((this->bounds)[2 * 0 + 1] >= (this->bounds)[2 * 1 + 1]))
         {
             vector<double> revBound;
             revBound.push_back((this->bounds)[0]); // Same first x-coordinate
@@ -548,6 +553,7 @@ public:
         {
             (this->nodes).pop_back(); // Remove repeated y-coordinate
             (this->nodes).pop_back(); // Remove repeated x-coordinate
+            nNodePt--; // Correct number of node points for this method
         }
 
         // Find lower-right most point
@@ -567,7 +573,7 @@ public:
         rotate((this->nodes).begin(), (this->nodes).begin() + 2 * ptLR, (this->nodes).end());
 
         // Correct direction if clockwise
-        if (((this->nodes)[2 * 0] > (this->nodes)[2 * 1]) && ((this->nodes)[2 * 0 + 1] < (this->nodes)[2 * 1 + 1]))
+        if (((this->nodes)[2 * 0] > (this->nodes)[2 * 1]) && ((this->nodes)[2 * 0 + 1] >= (this->nodes)[2 * 1 + 1]))
         {
             vector<double> revNode;
             revNode.push_back((this->nodes)[0]); // Same first x-coordinate
@@ -728,11 +734,12 @@ public:
     void reorder()
     {
         // Remove last point if equal to first point
-        size_t nBoxPt = this->getNBoxPt(); // Number of node points (coordinate pairs)
+        size_t nBoxPt = this->getNBoxPt(); // Number of box points (coordinate pairs)
         if (((this->boxes)[2 * 0] == (this->boxes)[2 * (nBoxPt - 1)]) && ((this->boxes)[2 * 0 + 1] == (this->boxes)[2 * (nBoxPt - 1) + 1]))
         {
             (this->boxes).pop_back(); // Remove repeated y-coordinate
             (this->boxes).pop_back(); // Remove repeated x-coordinate
+            nBoxPt--; // Correct number of box points for this method
         }
 
         // Find lower-right most point
@@ -752,7 +759,7 @@ public:
         rotate((this->boxes).begin(), (this->boxes).begin() + 2 * ptLR, (this->boxes).end());
 
         // Correct direction if clockwise
-        if (((this->boxes)[2 * 0] > (this->boxes)[2 * 1]) && ((this->boxes)[2 * 0 + 1] < (this->boxes)[2 * 1 + 1]))
+        if (((this->boxes)[2 * 0] > (this->boxes)[2 * 1]) && ((this->boxes)[2 * 0 + 1] >= (this->boxes)[2 * 1 + 1]))
         {
             vector<double> revBox;
             revBox.push_back((this->boxes)[0]); // Same first x-coordinate
@@ -1341,9 +1348,9 @@ public:
         {
             cout << "   " << ((this->boundaries)[indi]).getLayer() << " ";
             vector<double> boundCoord = ((this->boundaries)[indi]).getBounds();
-            for (size_t indj = 0; indj < boundCoord.size(); indj++)
+            for (size_t indj = 0; indj < boundCoord.size(); indj += 2)
             {
-                cout << boundCoord[indj++] << " " << boundCoord[indj + 1] << " ";
+                cout << boundCoord[indj] << " " << boundCoord[indj + 1] << " ";
             }
             cout << ((this->boundaries)[indi]).getNBoundPt() << endl;
         }
@@ -1352,9 +1359,9 @@ public:
         {
             cout << "   " << ((this->paths)[indi]).getLayer() << " ";
             vector<double> pathCoord = ((this->paths)[indi]).getPaths();
-            for (size_t indj = 0; indj < pathCoord.size(); indj++)
+            for (size_t indj = 0; indj < pathCoord.size(); indj += 2)
             {
-                cout << pathCoord[indj++] << " " << pathCoord[indj + 1] << " ";
+                cout << pathCoord[indj] << " " << pathCoord[indj + 1] << " ";
             }
             cout << ((this->paths)[indi]).getNPathPt() << endl;
         }
@@ -1363,9 +1370,9 @@ public:
         {
             cout << "   " << ((this->nodes)[indi]).getLayer() << " ";
             vector<double> nodeCoord = ((this->nodes)[indi]).getNodes();
-            for (size_t indj = 0; indj < nodeCoord.size(); indj++) // C string for each ordered pair
+            for (size_t indj = 0; indj < nodeCoord.size(); indj += 2) // C string for each ordered pair
             {
-                cout << nodeCoord[indj++] << " " << nodeCoord[indj + 1] << " ";
+                cout << nodeCoord[indj] << " " << nodeCoord[indj + 1] << " ";
             }
             cout << ((this->nodes)[indi]).getNNodePt() << endl;
         }
@@ -1374,9 +1381,9 @@ public:
         {
             cout << "   " << ((this->boxes)[indi]).getLayer() << " ";
             vector<double> boxCoord = ((this->boxes)[indi]).getBoxes();
-            for (size_t indj = 0; indj < boxCoord.size(); indj++) // C string for each ordered pair (should be 5, sometimes 4)
+            for (size_t indj = 0; indj < boxCoord.size(); indj += 2) // C string for each ordered pair (should be 5, sometimes 4)
             {
-                cout << boxCoord[indj++] << " " << boxCoord[indj + 1] << " ";
+                cout << boxCoord[indj] << " " << boxCoord[indj + 1] << " ";
             }
             cout << ((this->boxes)[indi]).getNBoxPt() << endl;
         }
@@ -1714,7 +1721,7 @@ public:
         //unordered_map<complex<double>, long long int, hash<complex<double>>> backwards; // Backwards map to ensure unique points entered (fails because complex numbers have no hash)
         //map<long long int, complex<double>> layerPt; // Forwards map has enumeration of unique points
         //long long int indPt = 0;
-        for (size_t indi = 0; indi < cell.getNumBound(); indi++) // Handle each boundary
+        for (size_t indi = 0; indi < cell.getNumBound(); indi++) // Handle each boundary (limitation: no GDSII element may overlap)
         {
             if ((cell.boundaries[indi]).getLayer() == layer)
             {
@@ -1733,26 +1740,100 @@ public:
                     //    indPt++;
                     //}
                 }
-                vector<double> centroidCoord = (cell.boundaries[indi]).findCentroid(xo, yo);
-                complex<double> centroid(centroidCoord[0], centroidCoord[1]); // Boundary centroid (m, xcent + i*ycent)
-                layerReg.push_back(centroid); // New region for this polygon
+                //vector<double> centroidCoord = (cell.boundaries[indi]).findCentroid(xo, yo); // Boundary centroid as {xcent, ycent} (m)
+                complex<double> boundInterior = { boundCoord[0] - REL_INTERIOR_PRECISION * fabs(boundCoord[0] - boundCoord[2 * numBoundPt - 2]) + xo, boundCoord[1] + REL_INTERIOR_PRECISION * fabs(boundCoord[1] - boundCoord[3]) + yo }; // Point just left and above the bottom-right point (small offset based on nearest points)
+                layerReg.push_back(boundInterior); // New region for this polygon
             }
         }
-        for (size_t indi = 0; indi < cell.getNumPath(); indi++) // Handle each path
+        for (size_t indi = 0; indi < cell.getNumPath(); indi++) // Handle each path (does not work because implementation does not work around overlapping points)
         {
             if ((cell.paths[indi]).getLayer() == layer)
             {
                 vector<double> pathCoord = (cell.paths[indi]).getPaths();
-                size_t numPathPt = (cell.paths[indi]).getNPathPt(); // Number of points along path (infinitesimal thickeness for now)
+                double width = (cell.paths[indi]).getWidth();
+                int type = (cell.paths[indi]).getType();
+                size_t numPathPt = (cell.paths[indi]).getNPathPt(); // Number of points along path (these are the path points, not the points outlining a finite-width path)
                 size_t indPathStart = layerPt.size();
-                for (size_t indj = 0; indj < numPathPt; indj++) // Handle each coordinate comprising path
+                //vector<complex<double>> returnPt; // Vector of path points needed to close the figure
+
+                // Handle the points along a path of finite width
+                for (size_t indj = 0; indj < numPathPt - 1; indj++) // Handle each coordinate comprising path
                 {
-                    complex<double> zPath(pathCoord[2 * indj] + xo, pathCoord[2 * indj + 1] + yo); // Complex number with x- and y-coordinates (m)
-                    layerPt.push_back(zPath);
-                    if (indj > 0)
+                    double overshoot1 = 1.0; // Assume path has round ends (type = 1) approximated as square or square ends with overshoot (type = 2)
+                    double overshoot2 = 1.0; // Assume path has round ends (type = 1) approximated as square or square ends with overshoot (type = 2)
+                    if ((type == 0) && (indj == 0))
                     {
-                        layerSeg.push_back(pair<size_t, size_t>(indPathStart + indj - 1, indPathStart + indj)); // Segment connects previous point to this one (infinitesimal thickness)
+                        overshoot1 = 0.0; // Path actually has square ends at terminal vertices
                     }
+                    if ((type == 0) && (indj == numPathPt - 1))
+                    {
+                        overshoot2 = 0.0; // Path actually has square ends at terminal vertices
+                    }
+                    if (pathCoord[2 * indj] == pathCoord[2 * indj + 2]) // Path segment along y-axis
+                    {
+                        if (pathCoord[2 * indj + 1] > pathCoord[2 * indj + 3]) // First point is above the second point
+                        {
+                            complex<double> zPath(pathCoord[2 * indj] - width / 2. + xo, pathCoord[2 * indj + 1] + overshoot1 * width / 2. + yo); // Complex number of upper-left point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj] + width / 2. + xo, pathCoord[2 * indj + 1] + overshoot1 * width / 2. + yo); // Complex number of upper-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] + width / 2. + xo, pathCoord[2 * indj + 3] - overshoot2 * width / 2. + yo); // Complex number of lower-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] - width / 2. + xo, pathCoord[2 * indj + 3] - overshoot2 * width / 2. + yo); // Complex number of lower-left point of path segment
+                            layerPt.push_back(zPath);
+                            complex<double> centroidCoord(pathCoord[2 * indj] + xo, (pathCoord[2 * indj + 1] + pathCoord[2 * indj + 3]) / 2. + (+overshoot1 - overshoot2) * width / 4. + yo);
+                            layerReg.push_back(centroidCoord); // New region for this path segment
+                        }
+                        else // Second point is above the first point
+                        {
+                            complex<double> zPath(pathCoord[2 * indj] - width / 2. + xo, pathCoord[2 * indj + 1] - overshoot1 * width / 2. + yo); // Complex number of lower-left point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj] + width / 2. + xo, pathCoord[2 * indj + 1] - overshoot1 * width / 2. + yo); // Complex number of lower-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] + width / 2. + xo, pathCoord[2 * indj + 3] + overshoot2 * width / 2. + yo); // Complex number of upper-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] - width / 2. + xo, pathCoord[2 * indj + 3] + overshoot2 * width / 2. + yo); // Complex number of upper-left point of path segment
+                            layerPt.push_back(zPath);
+                            complex<double> centroidCoord(pathCoord[2 * indj] + xo, (pathCoord[2 * indj + 1] + pathCoord[2 * indj + 3]) / 2. + (-overshoot1 + overshoot2) * width / 4. + yo);
+                            layerReg.push_back(centroidCoord); // New region for this path segment
+                        }
+                    }
+                    else // Path segment along x-axis
+                    {
+                        if (pathCoord[indj] > pathCoord[indj + 2]) // First point is on the right of the second point
+                        {
+                            complex<double> zPath(pathCoord[2 * indj] + overshoot1 * width / 2. + xo, pathCoord[2 * indj + 1] + width / 2. + yo); // Complex number of upper-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj] + overshoot1 * width / 2. + xo, pathCoord[2 * indj + 1] - width / 2. + yo); // Complex number of lower-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] - overshoot2 * width / 2. + xo, pathCoord[2 * indj + 3] - width / 2. + yo); // Complex number of lower-left point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] - overshoot2 * width / 2. + xo, pathCoord[2 * indj + 3] + width / 2. + yo); // Complex number of upper-left point of path segment
+                            layerPt.push_back(zPath);
+                            complex<double> centroidCoord((pathCoord[2 * indj] + pathCoord[2 * indj + 2]) / 2. + (+overshoot1 - overshoot2) * width / 4. + xo, pathCoord[2 * indj + 1] + yo);
+                            layerReg.push_back(centroidCoord); // New region for this path segment
+                        }
+                        else // Second point is on the right of the first point
+                        {
+                            complex<double> zPath(pathCoord[2 * indj] - overshoot1 * width / 2. + xo, pathCoord[2 * indj + 1] + width / 2. + yo); // Complex number of upper-left point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj] - overshoot1 * width / 2. + xo, pathCoord[2 * indj + 1] - width / 2. + yo); // Complex number of lower-left point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] + overshoot2 * width / 2. + xo, pathCoord[2 * indj + 3] - width / 2. + yo); // Complex number of lower-right point of path segment
+                            layerPt.push_back(zPath);
+                            zPath = complex<double>(pathCoord[2 * indj + 2] + overshoot2 * width / 2. + xo, pathCoord[2 * indj + 3] + width / 2. + yo); // Complex number of upper-right point of path segment
+                            layerPt.push_back(zPath);
+                            complex<double> centroidCoord((pathCoord[2 * indj] + pathCoord[2 * indj + 2]) / 2. + (-overshoot1 + overshoot2) * width / 4. + xo, pathCoord[2 * indj + 1] + yo);
+                            layerReg.push_back(centroidCoord); // New region for this path segment
+                        }
+                    }
+
+                    // Handle the segments connecting the points on each path segment
+                    layerSeg.push_back(pair<size_t, size_t>(indPathStart + 4 * indj + 0, indPathStart + 4 * indj + 1)); // Connect first and second points in path segment
+                    layerSeg.push_back(pair<size_t, size_t>(indPathStart + 4 * indj + 1, indPathStart + 4 * indj + 2)); // Connect second and third points in path segment
+                    layerSeg.push_back(pair<size_t, size_t>(indPathStart + 4 * indj + 2, indPathStart + 4 * indj + 3)); // Connect third and fourth points in path segment
+                    layerSeg.push_back(pair<size_t, size_t>(indPathStart + 4 * indj + 3, indPathStart + 4 * indj + 0)); // Connect fourth and first points in path segment
+
                     //bool couldInsert = backwards.insert(pair<complex<double>, long long int>(zPath, indPt)).second; // Check if point already exists
                     //if (couldInsert)
                     //{
@@ -1944,10 +2025,11 @@ public:
             node outlineNode = node(outlineCoord, 1, { }, 0);
             outlineNode.reorder();
             vector<double> outlineCentroid = outlineNode.findCentroid(0., 0.);
-            vector<double> outlineInterior = { 0.999 * outlineNode.getNodes()[0] + 0.001 * outlineCentroid[0], 0.999 * outlineNode.getNodes()[1] + 0.001 * outlineCentroid[1] }; // Point just left and above the bottom-right point (weighted average)
+            size_t indUnusedOutline = 0;
 
             // Write comment to file
             polyFile << "# File generated by limboint.h" << endl;
+            polyFile << "# Layer " << layer << " has area of " << outlineNode.findArea() << " m^2" << endl;
 
             // Write vertices to file
             polyFile << "# vertices (vert_num, x, y, bound)" << endl;
@@ -1959,6 +2041,10 @@ public:
             for (size_t indi = 0; indi < numLayerPt; indi++)
             {
                 polyFile << std::right << std::setw(6) << numOutlinePt + indi + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerPt[indi].real() << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerPt[indi].imag() << " 0" << endl; // Vertex #, x-coordinate, y-coordinate, boundary marker
+                if ((fabs((layerPt[indi].real() - outlineCoord[2 * indUnusedOutline]) / outlineCoord[2 * indUnusedOutline]) <= REL_INTERIOR_PRECISION) && (fabs((layerPt[indi].imag() - outlineCoord[2 * indUnusedOutline + 1]) / outlineCoord[2 * indUnusedOutline + 1]) <= REL_INTERIOR_PRECISION))
+                {
+                    indUnusedOutline++; // Future layer points must be checked against the next outline point (not robust if next outline point was a previous layer point)
+                }
             }
 
             // Write segments to file
@@ -1984,6 +2070,7 @@ public:
             {
                 polyFile << std::right << std::setw(6) << indi + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerReg[indi].real() << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << layerReg[indi].imag() << " 1" << endl; // Region #, x-coordinate, y-coordinate, attribute number
             }
+            vector<double> outlineInterior = { (1. - REL_INTERIOR_PRECISION) * outlineNode.getNodes()[2 * indUnusedOutline] + REL_INTERIOR_PRECISION * outlineCentroid[2 * indUnusedOutline], (1. - REL_INTERIOR_PRECISION) * outlineNode.getNodes()[2 * indUnusedOutline + 1] + REL_INTERIOR_PRECISION * outlineCentroid[2 * indUnusedOutline + 1] }; // Point just left and above the unused outine point (weighted average, default from bottom-right point)
             polyFile << std::right << std::setw(6) << numLayerReg + 1 << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << outlineInterior[0] << " " << std::setfill(' ') << std::showpos << std::setw(13) << std::setprecision(7) << outlineInterior[1] << " 2" << endl; // Region #, x-coordinate, y-coordinate, attribute number
             polyFile << endl; // Blank line for good measure
 
