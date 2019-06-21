@@ -303,7 +303,7 @@ int main(int argc, char** argv)
                 cerr << "portSet Fail!" << endl;
                 return status;
             }
-            sys.print();
+            //sys.print();
 
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
@@ -320,7 +320,7 @@ int main(int argc, char** argv)
                 return status;
             }
 #endif
-
+            cout << "Start to generate parameter!\n";
             // Parameter generation
             clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);

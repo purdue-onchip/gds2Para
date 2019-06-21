@@ -4,8 +4,8 @@ lengthUnit = 1.e-6
 
 FREQUENCY
 freqUnit = 1.0e+6
-freqStart = 100000
-freqEnd = 100000
+freqStart = 1000
+freqEnd = 1000
 nfreq = 1
 freqScale = 0
 
@@ -21,5 +21,6 @@ ILD2 z = 1.436 h = 0.308 e = 4.1
 3 z = 1.744 h = 1.448 e = 4.1
 
 PORT
-numPort = 1
+numPort = 2
 149.999 0.049 0.296 149.999 0.049 0.416 1
+149.999 200.049 0.296 149.999 200.049 0.416 1

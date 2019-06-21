@@ -21,11 +21,11 @@
 #include <algorithm>
 #include <utility>
 
-// HYPRE and MKL data type control
-//#define LARGE_SYSTEM (1)
+ //HYPRE and MKL data type control
+#define LARGE_SYSTEM (1)
 #ifdef LARGE_SYSTEM
 #define MKL_ILP64 (1) // Must define before including mkl.h if using long long int 
-#define HYPRE_BIGINT (1)
+//#define HYPRE_BIGINT (1)    // not sure how to use this
 typedef long long int myint;
 #else
 typedef int myint;
@@ -63,7 +63,7 @@ using namespace std;
 //#define PRINT_V0D_BLOCKS
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
-#define SKIP_STIFF_REFERENCE // Turn on to save time
+#define SKIP_STIFF_REFERENCE 
 
 // Function-like macros
 #define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
@@ -220,12 +220,12 @@ public:
     vector<fdtdOneCondct> conductorIn;
     myint numCdtRow;    // how many input rows
     myint numCdt;       // number of isolated conductors in design
-    myint *markEdge;    // mark if this edge is inside a conductor
+    int *markEdge;    // mark if this edge is inside a conductor
     int *markCell;
     myint *cdtNumNode;
     double *sig;
     fdtdCdt *conductor;
-    myint *markNode;    // mark this node if it is inside the conductor
+    int *markNode;    // mark this node if it is inside the conductor
     vector<vector<int>> edgeCell;    // for each cell which edge is around it
     vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
     vector<int> acu_cnno; // accumulated conductor number of nodes
@@ -425,6 +425,7 @@ public:
 
 
 int meshAndMark(fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory);
+int compute_edgelink(fdtdMesh *sys, myint eno, myint &node1, myint &node2);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
 int fdtdStringWord(char*, char *word[]);
@@ -463,4 +464,5 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint acol, lapack_complex_double *b, myint brow, myint bcol, lapack_complex_double *tmp3);
 int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val);
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
+int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
 #endif

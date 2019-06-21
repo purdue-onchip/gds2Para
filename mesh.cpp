@@ -21,7 +21,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
-    double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = 3e-4;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }
@@ -313,10 +313,17 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             }
         }
     }
+    free(xOrigOld); xOrigOld = NULL;
+    free(yOrigOld); yOrigOld = NULL;
+    free(zOrigOld); zOrigOld = NULL;
+    sys->stackEndCoor.clear();
+    sys->stackBegCoor.clear();
+
 #ifdef PRINT_NODE_COORD
     /*for (i = 0; i < sys->nz - 1; i++){
     cout << sys->stackEpsn[i] << endl;
     }*/
+    
     for (i = 0; i < sys->nx; i++){
     cout << sys->xn[i] << " ";
     }
@@ -330,7 +337,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     cout << "\n" << endl;
 #endif
-
+    
     /***********************************************************************************************/
 
     sys->N_cell_x = sys->nx - (myint)1;
@@ -349,9 +356,9 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->N_patch_v = (sys->N_cell_x + 1)*sys->N_cell_y + (sys->N_cell_y + 1)*sys->N_cell_x;
     sys->N_patch = sys->N_patch_s*(sys->N_cell_z + 1) + sys->N_patch_v*sys->N_cell_z;
 
-    sys->markEdge = (myint*)calloc(sys->N_edge, sizeof(myint));   // mark which conductor index a given edge is inside
+    sys->markEdge = (int*)calloc(sys->N_edge, sizeof(int));   // mark which conductor index a given edge is inside
     //cout << "N_edge = " << sys->N_edge << ", sizeof(myint) = " << sizeof(myint) << ", their product is " << (size_t)(sys->N_edge * sizeof(myint)) << ", and sys->markEdge has size " << sizeof(sys->markEdge) << "/" << sizeof(sys->markEdge[0]) << endl;
-    sys->markNode = (myint*)calloc(sys->N_node, sizeof(myint));   // mark which conductor index a given node is inside
+    sys->markNode = (int*)calloc(sys->N_node, sizeof(int));   // mark which conductor index a given node is inside
     //cout << "N_node = " << sys->N_node << ", sizeof(myint) = " << sizeof(myint) << ", their product is " << sys->N_node * sizeof(myint) << ", and sys->markNode has size " << sizeof(sys->markNode) << "/" << sizeof(sys->markNode[0]) << endl;
 
 #ifdef PRINT_DIS_COUNT
@@ -646,129 +653,147 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->conductorIn.back().y = yOuter;
     sys->conductorIn.back().layer = layerMax;
 
-    /* construct edgelink */
+    /* construct edgelink, no need for edgelink */
     myint eno;
-    sys->edgelink = (myint*)malloc(2 * sizeof(myint)*sys->N_edge);
-    for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++) {
-        for (i = 1; i <= sys->N_cell_x + 1; i++) {    //edge along y axis
-            for (j = 1; j <= sys->N_cell_y; j++) {
-                eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + (i - 1)*sys->N_cell_y + j;
-                sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
-                sys->edgelink[(eno - 1) * 2 + 2 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j;
+    //sys->edgelink = (myint*)malloc(2 * sizeof(myint)*sys->N_edge);
+    //for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++) {
+    //    for (i = 1; i <= sys->N_cell_x + 1; i++) {    //edge along y axis
+    //        for (j = 1; j <= sys->N_cell_y; j++) {
+    //            eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + (i - 1)*sys->N_cell_y + j;
+    //            sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
+    //            sys->edgelink[(eno - 1) * 2 + 2 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j;
 
-            }
-        }
-        for (i = 1; i <= sys->N_cell_x; i++) {    //edge along x axis
-            for (j = 1; j <= sys->N_cell_y + 1; j++) {
-                eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1)*sys->N_cell_y + (i - 1)*(sys->N_cell_y + 1) + j;
-                sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
-                sys->edgelink[(eno - 1) * 2 + 2 - 1] = (lyr - 1)*sys->N_node_s + i*(sys->N_cell_y + 1) + j - 1;
+    //        }
+    //    }
+    //    for (i = 1; i <= sys->N_cell_x; i++) {    //edge along x axis
+    //        for (j = 1; j <= sys->N_cell_y + 1; j++) {
+    //            eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1)*sys->N_cell_y + (i - 1)*(sys->N_cell_y + 1) + j;
+    //            sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
+    //            sys->edgelink[(eno - 1) * 2 + 2 - 1] = (lyr - 1)*sys->N_node_s + i*(sys->N_cell_y + 1) + j - 1;
 
-            }
-        }
-    }
-    for (lyr = 1; lyr <= sys->N_cell_z; lyr++) {    // edge along z axis
-        for (i = 1; i <= sys->N_cell_x + 1; i++) {
-            for (j = 1; j <= sys->N_cell_y + 1; j++) {
-                eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (i - 1)*(sys->N_cell_y + 1) + j;
-                sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
-                sys->edgelink[(eno - 1) * 2 + 2 - 1] = lyr*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
-            }
-        }
-    }
+    //        }
+    //    }
+    //}
+    //for (lyr = 1; lyr <= sys->N_cell_z; lyr++) {    // edge along z axis
+    //    for (i = 1; i <= sys->N_cell_x + 1; i++) {
+    //        for (j = 1; j <= sys->N_cell_y + 1; j++) {
+    //            eno = (lyr - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (i - 1)*(sys->N_cell_y + 1) + j;
+    //            sys->edgelink[(eno - 1) * 2 + 1 - 1] = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
+    //            sys->edgelink[(eno - 1) * 2 + 2 - 1] = lyr*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j - 1;
+    //        }
+    //    }
+    //}
 
-    /* construct nodepos */
+    /* construct nodepos, no need for nodepos */
     myint nno;
 
-    sys->nodepos = (double*)malloc(sizeof(double)*sys->N_node * 3);   //N_node rows and 3 columns, input row by row
-    for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++) {
-        for (i = 1; i <= sys->N_cell_x + 1; i++) {
-            for (j = 1; j <= sys->N_cell_y + 1; j++) {
-                nno = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j;
-                sys->nodepos[(nno - 1) * 3 + 1 - 1] = sys->xn[i - 1];
-                sys->nodepos[(nno - 1) * 3 + 2 - 1] = sys->yn[j - 1];
-                sys->nodepos[(nno - 1) * 3 + 3 - 1] = sys->zn[lyr - 1];
-            }
-        }
-    }
+    //sys->nodepos = (double*)malloc(sizeof(double)*sys->N_node * 3);   //N_node rows and 3 columns, input row by row
+    //for (lyr = 1; lyr <= sys->N_cell_z + 1; lyr++) {
+    //    for (i = 1; i <= sys->N_cell_x + 1; i++) {
+    //        for (j = 1; j <= sys->N_cell_y + 1; j++) {
+    //            nno = (lyr - 1)*sys->N_node_s + (i - 1)*(sys->N_cell_y + 1) + j;
+    //            sys->nodepos[(nno - 1) * 3 + 1 - 1] = sys->xn[i - 1];
+    //            sys->nodepos[(nno - 1) * 3 + 2 - 1] = sys->yn[j - 1];
+    //            sys->nodepos[(nno - 1) * 3 + 3 - 1] = sys->zn[lyr - 1];
+    //        }
+    //    }
+    //}
 
     /* construct nodeEdge */
     double leng;
-    vector<pair<myint, double> > a;
-    for (i = 0; i < sys->N_node; i++) {
-        sys->nodeEdge.push_back(a);
-        sys->nodeEdgea.push_back(a);
-    }
-    for (i = 0; i < sys->N_edge; i++) {
-        leng = pow((sys->nodepos[sys->edgelink[i * 2] * 3] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3]), 2);
-        leng = leng + pow((sys->nodepos[sys->edgelink[i * 2] * 3 + 1] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3 + 1]), 2);
-        leng = leng + pow((sys->nodepos[sys->edgelink[i * 2] * 3 + 2] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3 + 2]), 2);
-        leng = sqrt(leng);
-        sys->nodeEdge[sys->edgelink[i * 2]].push_back(make_pair(i, 1 / leng));
-        sys->nodeEdge[sys->edgelink[i * 2 + 1]].push_back(make_pair(i, -1 / leng));
-    }
-    cout << "nodeEdge is done" << endl;
-    int ix, iy, iz;
-    iz = sys->N_cell_z;
-    for (ix = 0; ix < sys->nx; ix++) {
-        for (iy = 0; iy < sys->ny; iy++) {
-            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, -1 / (sys->zn[iz] - sys->zn[iz - 1])));
-        }
-    }
-    iz = 0;
-    for (ix = 0; ix < sys->nx; ix++) {
-        for (iy = 0; iy < sys->ny; iy++) {
-            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, 1 / (sys->zn[iz + 1] - sys->zn[iz])));
-        }
-    }
-    for (iz = 1; iz < sys->N_cell_z; iz++) {
-        for (ix = 0; ix < sys->nx; ix++) {
-            for (iy = 0; iy < sys->ny; iy++) {
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, -2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, 2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
-            }
-        }
-    }
-    ix = sys->N_cell_x;
-    for (iz = 0; iz < sys->nz; iz++) {
-        for (iy = 0; iy < sys->ny; iy++) {
-            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (ix - 1) * (sys->N_cell_y + 1) + iy, -1 / (sys->xn[ix] - sys->xn[ix - 1])));
-        }
-    }
-    ix = 0;
-    for (iz = 0; iz < sys->nz; iz++) {
-        for (iy = 0; iy < sys->ny; iy++) {
-            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + ix * (sys->N_cell_y + 1) + iy, 1 / (sys->xn[ix + 1] - sys->xn[ix])));
-        }
-    }
-    for (ix = 1; ix < sys->N_cell_x; ix++) {
-        for (iz = 0; iz < sys->nz; iz++) {
-            for (iy = 0; iy < sys->ny; iy++) {
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (ix - 1) * (sys->N_cell_y + 1) + iy, -2 / (sys->xn[ix + 1] - sys->xn[ix - 1])));
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + ix * (sys->N_cell_y + 1) + iy, 2 / (sys->xn[ix + 1] - sys->xn[ix - 1])));
-            }
-        }
-    }
-    iy = sys->N_cell_y;
-    for (iz = 0; iz < sys->nz; iz++) {
-        for (ix = 0; ix < sys->nx; ix++) {
-            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1, -1 / (sys->yn[iy] - sys->yn[iy - 1])));
-        }
-    }
-    iy = 0;
-    for (iz = 0; iz < sys->nz; iz++) {
-        for (ix = 0; ix < sys->nx; ix++) {
-            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy, 1 / (sys->yn[iy + 1] - sys->yn[iy])));
-        }
-    }
-    for (iy = 1; iy < sys->N_cell_y; iy++) {
-        for (iz = 0; iz < sys->nz; iz++) {
-            for (ix = 0; ix < sys->nx; ix++) {
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1, -2 / (sys->yn[iy + 1] - sys->yn[iy - 1])));
-                sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy, 2 / (sys->yn[iy + 1] - sys->yn[iy - 1])));
-            }
-        }
-    }
+    myint inz, inx, iny;
+    myint node1, node2;
+
+    /* no need for nodeEdge and nodeEdgea */
+    //vector<pair<myint, double> > a;
+    //for (i = 0; i < sys->N_node; i++) {
+    //    sys->nodeEdge.push_back(a);
+    //    sys->nodeEdgea.push_back(a);
+    //}
+    //for (i = 0; i < sys->N_edge; i++) {
+    //    status = compute_edgelink(sys, i, node1, node2);
+    //    if (i % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s){    // this edge is along z axis
+    //        inz = i / (sys->N_edge_s + sys->N_edge_v);
+    //        leng = sys->zn[inz + 1] - sys->zn[inz];
+    //    }
+    //    else if (i % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)){    // this edge is along x axis
+    //        inx = ((i % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
+    //        leng = sys->xn[inx + 1] - sys->xn[inx];
+    //    }
+    //    else{    // this edge is along y axis
+    //        iny = (i % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
+    //        leng = sys->yn[iny + 1] - sys->yn[iny];
+    //    }
+
+    //    /*leng = pow((sys->nodepos[sys->edgelink[i * 2] * 3] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3]), 2);
+    //    leng = leng + pow((sys->nodepos[sys->edgelink[i * 2] * 3 + 1] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3 + 1]), 2);
+    //    leng = leng + pow((sys->nodepos[sys->edgelink[i * 2] * 3 + 2] - sys->nodepos[sys->edgelink[i * 2 + 1] * 3 + 2]), 2);
+    //    leng = sqrt(leng);*/
+    //    sys->nodeEdge[node1].push_back(make_pair(i, 1 / leng));
+    //    sys->nodeEdge[node2].push_back(make_pair(i, -1 / leng));
+    //}
+    //cout << "nodeEdge is done" << endl;
+    //int ix, iy, iz;
+    //iz = sys->N_cell_z;
+    //for (ix = 0; ix < sys->nx; ix++) {
+    //    for (iy = 0; iy < sys->ny; iy++) {
+    //        sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, -1 / (sys->zn[iz] - sys->zn[iz - 1])));
+    //    }
+    //}
+    //iz = 0;
+    //for (ix = 0; ix < sys->nx; ix++) {
+    //    for (iy = 0; iy < sys->ny; iy++) {
+    //        sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, 1 / (sys->zn[iz + 1] - sys->zn[iz])));
+    //    }
+    //}
+    //for (iz = 1; iz < sys->N_cell_z; iz++) {
+    //    for (ix = 0; ix < sys->nx; ix++) {
+    //        for (iy = 0; iy < sys->ny; iy++) {
+    //            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair((iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, -2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
+    //            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy, 2 / (sys->zn[iz + 1] - sys->zn[iz - 1])));
+    //        }
+    //    }
+    //}
+    //ix = sys->N_cell_x;
+    //for (iz = 0; iz < sys->nz; iz++) {
+    //    for (iy = 0; iy < sys->ny; iy++) {
+    //        sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (ix - 1) * (sys->N_cell_y + 1) + iy, -1 / (sys->xn[ix] - sys->xn[ix - 1])));
+    //    }
+    //}
+    //ix = 0;
+    //for (iz = 0; iz < sys->nz; iz++) {
+    //    for (iy = 0; iy < sys->ny; iy++) {
+    //        sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + ix * (sys->N_cell_y + 1) + iy, 1 / (sys->xn[ix + 1] - sys->xn[ix])));
+    //    }
+    //}
+    //for (ix = 1; ix < sys->N_cell_x; ix++) {
+    //    for (iz = 0; iz < sys->nz; iz++) {
+    //        for (iy = 0; iy < sys->ny; iy++) {
+    //            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + (ix - 1) * (sys->N_cell_y + 1) + iy, -2 / (sys->xn[ix + 1] - sys->xn[ix - 1])));
+    //            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_x + 1) * sys->N_cell_y + ix * (sys->N_cell_y + 1) + iy, 2 / (sys->xn[ix + 1] - sys->xn[ix - 1])));
+    //        }
+    //    }
+    //}
+    //iy = sys->N_cell_y;
+    //for (iz = 0; iz < sys->nz; iz++) {
+    //    for (ix = 0; ix < sys->nx; ix++) {
+    //        sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1, -1 / (sys->yn[iy] - sys->yn[iy - 1])));
+    //    }
+    //}
+    //iy = 0;
+    //for (iz = 0; iz < sys->nz; iz++) {
+    //    for (ix = 0; ix < sys->nx; ix++) {
+    //        sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy, 1 / (sys->yn[iy + 1] - sys->yn[iy])));
+    //    }
+    //}
+    //for (iy = 1; iy < sys->N_cell_y; iy++) {
+    //    for (iz = 0; iz < sys->nz; iz++) {
+    //        for (ix = 0; ix < sys->nx; ix++) {
+    //            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1, -2 / (sys->yn[iy + 1] - sys->yn[iy - 1])));
+    //            sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].push_back(make_pair(iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy, 2 / (sys->yn[iy + 1] - sys->yn[iy - 1])));
+    //        }
+    //    }
+    //}
 
     /* implement dfs */
     myint *visited;
@@ -786,7 +811,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     //    }
     //}
     //cout << "The largest index stored in sys->markEdge is " << maxEdge << endl;
-
     for (i = 0; i < sys->N_node; i++) {
         if (sys->markNode[i] == 0) {
             continue;
@@ -803,33 +827,155 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 sys->cond2condIn.push_back(base);
                 while (!st.empty()) {
                     mark = 0;
-                    for (j = 0; j < sys->nodeEdge[st.back()].size(); j++) {
-                        if (sys->markEdge[sys->nodeEdge[st.back()][j].first] != 0) {
-                            if (sys->cond2condIn[count - 1].find(sys->markEdge[sys->nodeEdge[st.back()][j].first]) == sys->cond2condIn[count - 1].end()) {
-                                sys->cond2condIn[count - 1].insert(sys->markEdge[sys->nodeEdge[st.back()][j].first]);
-                                //if (sys->markEdge[sys->nodeEdge[st.back()][j].first] >= sys->numCdtRow) {
-                                //    cout << "Trying to index markEdge with " << sys->nodeEdge[st.back()][j].first << ", which is smaller than maximum value of " << sys->N_edge << endl;
-                                //    cout << "Just inserted " << sys->markEdge[sys->nodeEdge[st.back()][j].first] << " into cond2condIn" << endl;
-                                //}
+                    inz = st.back() / (sys->N_node_s);
+                    inx = (st.back() % sys->N_node_s) / (sys->N_cell_y + 1);
+                    iny = (st.back() % sys->N_node_s) % (sys->N_cell_y + 1);
+                    // how many edges this node connects to
+                    if (inz != 0){    // this node is not on the bottom plane
+                        eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
+                        if (sys->markEdge[eno] != 0){
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()){
+                                sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
                             }
-                            if ((sys->edgelink[sys->nodeEdge[st.back()][j].first * 2] != st.back() && visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]] == 0)) {
-                                visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]] = count;
-                                st.push_back(sys->edgelink[sys->nodeEdge[st.back()][j].first * 2]);
+
+                            status = compute_edgelink(sys, eno, node1, node2);    // compute_edgelink is used to get edge eno's two side's nodes node1, node2
+                            if ((node1 != st.back() && visited[node1] == 0)) {
+                                visited[node1] = count;
+                                st.push_back(node1);
                                 mark = 1;
 
-                                break;
+                                goto GOTO;
                             }
-                            else if ((sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1] != st.back() && visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]] == 0)) {
-                                visited[sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]] = count;
-                                st.push_back(sys->edgelink[sys->nodeEdge[st.back()][j].first * 2 + 1]);
+                            else if ((node2 != st.back() && visited[node2] == 0)) {
+                                visited[node2] = count;
+                                st.push_back(node2);
                                 mark = 1;
 
-                                break;
+                                goto GOTO;
+                            }
+                        }
+                    }
+                    if (inz != sys->nz - 1){    // this node is not on the upper plane
+                        eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
+                        if (sys->markEdge[eno] != 0) {
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
+                                sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
+                            }
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if ((node1 != st.back() && visited[node1] == 0)) {
+                                visited[node1] = count;
+                                st.push_back(node1);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+                            else if ((node2 != st.back() && visited[node2] == 0)) {
+                                visited[node2] = count;
+                                st.push_back(node2);
+                                mark = 1;
+
+                                goto GOTO;
                             }
 
                         }
                     }
-                    if (mark == 0) {
+                    if (inx != 0){    // this node is not on the left plane
+                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
+                        if (sys->markEdge[eno] != 0) {
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
+                                sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
+                            }
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if ((node1 != st.back() && visited[node1] == 0)) {
+                                visited[node1] = count;
+                                st.push_back(node1);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+                            else if ((node2 != st.back() && visited[node2] == 0)) {
+                                visited[node2] = count;
+                                st.push_back(node2);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+
+                        }
+                    }
+                    if (inx != sys->nx - 1){    // this node is not on the right plane
+                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
+                        if (sys->markEdge[eno] != 0) {
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
+                                sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
+                            }
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if ((node1 != st.back() && visited[node1] == 0)) {
+                                visited[node1] = count;
+                                st.push_back(node1);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+                            else if ((node2 != st.back() && visited[node2] == 0)) {
+                                visited[node2] = count;
+                                st.push_back(node2);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+
+                        }
+                    }
+                    if (iny != 0){    // this node is not on the front plane
+                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
+                        if (sys->markEdge[eno] != 0) {
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
+                                sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
+                            }
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if ((node1 != st.back() && visited[node1] == 0)) {
+                                visited[node1] = count;
+                                st.push_back(node1);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+                            else if ((node2 != st.back() && visited[node2] == 0)) {
+                                visited[node2] = count;
+                                st.push_back(node2);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+
+                        }
+                    }
+                    if (iny != sys->ny - 1){    // this node is not on the back plane
+                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
+                        if (sys->markEdge[eno] != 0) {
+                            if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
+                                sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
+                            }
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if ((node1 != st.back() && visited[node1] == 0)) {
+                                visited[node1] = count;
+                                st.push_back(node1);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+                            else if ((node2 != st.back() && visited[node2] == 0)) {
+                                visited[node2] = count;
+                                st.push_back(node2);
+                                mark = 1;
+
+                                goto GOTO;
+                            }
+
+                        }
+                    }
+               GOTO: if (mark == 0) {
                         st.pop_back();
                     }
                 }
@@ -850,8 +996,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 
     for (i = 0; i < sys->N_edge; i++){
-        if (sys->markEdge[i] != 0 && visited[sys->edgelink[i * 2]] == visited[sys->edgelink[i * 2 + 1]] && visited[sys->edgelink[i * 2]] != 0){
-            sys->markEdge[i] = visited[sys->edgelink[i * 2 + 1]];    // Mark the edge with each color for different conductors
+        // find edge i's two nodes
+        status = compute_edgelink(sys, i, node1, node2);
+        
+        if (sys->markEdge[i] != 0 && visited[node1] == visited[node2] && visited[node1] != 0){
+            sys->markEdge[i] = visited[node2];    // Mark the edge with each color for different conductors
         }
     }
 
@@ -900,6 +1049,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     free(visited);
     visited = NULL;
+    
 
     /* set markCell */
 #ifndef SKIP_MARK_CELL
@@ -1005,6 +1155,32 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     return 0;
 }
 
+int compute_edgelink(fdtdMesh *sys, myint eno, myint &node1, myint &node2){
+    int inz, inx, iny;
+    if (eno % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s){    // this edge is along z axis
+        inz = eno / (sys->N_edge_s + sys->N_edge_v);
+        inx = ((eno % (sys->N_edge_s + sys->N_edge_v)) - sys->N_edge_s) / (sys->N_cell_y + 1);
+        iny = ((eno % (sys->N_edge_s + sys->N_edge_v)) - sys->N_edge_s) % (sys->N_cell_y + 1);
+        node1 = inz * sys->N_node_s + (sys->N_cell_y + 1) * inx + iny;
+        node2 = (inz + 1) * sys->N_node_s + (sys->N_cell_y + 1) * inx + iny;
+    }
+    else if (eno % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)){    // this edge is along x axis
+        inz = eno / (sys->N_edge_s + sys->N_edge_v);
+        inx = ((eno % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
+        iny = ((eno % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) % (sys->N_cell_y + 1);
+        node1 = inz * sys->N_node_s + inx * (sys->N_cell_y + 1) + iny;
+        node2 = inz * sys->N_node_s + (inx + 1) * (sys->N_cell_y + 1) + iny;
+    }
+    else{    // this edge is along y axis
+        inz = eno / (sys->N_edge_s + sys->N_edge_v);
+        inx = (eno % (sys->N_edge_s + sys->N_edge_v)) / sys->N_cell_y;
+        iny = (eno % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
+        node1 = inz * sys->N_node_s + inx * (sys->N_cell_y + 1) + iny;
+        node2 = inz * sys->N_node_s + inx * (sys->N_cell_y + 1) + iny + 1;
+    }
+    return 0;
+}
+
 int matrixConstruction(fdtdMesh *sys){
     int i, j;
 
@@ -1042,7 +1218,16 @@ int matrixConstruction(fdtdMesh *sys){
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
     //free(sys->markCell); sys->markCell = NULL;
+    
+    /*ofstream out;
+    out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
+    for (i = 0; i < sys->N_edge; i++){
+        out << sys->sig[i] << endl;
+    }
+    out.close();*/
+    //cout << "sig's generation is done!\n";
 
+    sys->stackEpsn.clear();
     return 0;
 }
 
@@ -1067,11 +1252,16 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             sys->portCoor[i].portCnd = indMarkNode2;
             sys->conductor[indMarkNode2 - 1].markPort = i + 1;    // markPort start from 1
         }
-        else { // Port not attached to PEC, so use only first for portCnd but mark both conductors as port
-            sys->portCoor[i].portCnd = indMarkNode1;
+        else if (indMarkNode1 != 0 && indMarkNode2 != 0) {
+            if (sys->conductor[indMarkNode1 - 1].markPort == -2){    // the upper PEC conductor is excited
+                sys->portCoor[i].portCnd = indMarkNode1;
+            }
+            else if (sys->conductor[indMarkNode2 - 1].markPort == -2){
+                sys->portCoor[i].portCnd = indMarkNode2;
+            }
             //sys->portCoor[i].portCnd = indMarkNode2;
-            sys->conductor[indMarkNode1 - 1].markPort = i + 1;
-            sys->conductor[indMarkNode2 - 1].markPort = i + 1;
+            /*sys->conductor[indMarkNode1 - 1].markPort = i + 1;
+            sys->conductor[indMarkNode2 - 1].markPort = i + 1;*/
         }
         /*for (j = 0; j < sys->cdtNumNode[sys->portCoor[i].portCnd - 1]; j++){
         sys->exciteCdtLayer[sys->conductor[sys->portCoor[i].portCnd - 1].node[j] / sys->N_node_s] = 1;
@@ -1179,6 +1369,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 
         }
         sys->portEdge.push_back(edge);
+        
 
     }
 
@@ -1186,7 +1377,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     sys->markProSide = (int*)calloc(sys->N_node, sizeof(int));
     double x1, x2, y1, y2;
     myint x1_ind, x2_ind, y1_ind, y2_ind, z1_ind, z2_ind;
-
+    
     for (i = 0; i < sys->numPorts; i++){
 #ifdef PRINT_PORT_SET
         cout << "Value of sys->portCoor[i].portCnd - 1: " << sys->portCoor[i].portCnd - 1 << endl;
@@ -1561,11 +1752,11 @@ void fdtdMesh::print()
     cout << "  Number of patches_s: " << this->N_patch_s << endl;
     cout << "  Number of patches_v: " << this->N_patch_v << endl;
     cout << " Mesh field location information:" << endl;
-    cout << "  nodepos array exists (" << (this->nodepos != nullptr) << ")" << endl;
+    //cout << "  nodepos array exists (" << (this->nodepos != nullptr) << ")" << endl;
     cout << "  Epoints array exists (" << (this->Epoints != nullptr) << ")" << endl;
-    cout << "  edgelink array exists (" << (this->edgelink != nullptr) << ")" << endl;
+   //cout << "  edgelink array exists (" << (this->edgelink != nullptr) << ")" << endl;
     cout << "  Hpoints array exists (" << (this->Hpoints != nullptr) << ")" << endl;
-    cout << "  nodeEdge vector has size " << this->nodeEdge.size() << endl;
+    //cout << "  nodeEdge vector has size " << this->nodeEdge.size() << endl;
     cout << "  nodeEdgea vector has size " << this->nodeEdgea.size() << endl;
     cout << " PEC information:" << endl;
     cout << "  Boundary node 1 array exists (" << (this->bd_node1 != nullptr) << ")" << endl;

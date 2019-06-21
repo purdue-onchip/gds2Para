@@ -507,11 +507,15 @@ int generateStiff(fdtdMesh *sys){
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));
     Shvaln = (double*)malloc(Shnum * sizeof(double));
+    ofstream out;
+    out.open("Sh.txt", std::ofstream::out | std::ofstream::trunc);
     for (ind = 0; ind < Shnum; ind++){
         ShColIdo[ind] = ShColId[ind];
         ShRowIdn[ind] = ShRowId[ind];
         Shvaln[ind] = Shval[ind];
+        out << ShColId[ind] << " " << ShRowId[ind] << " " << Shval[ind] << endl;
     }
+    out.close();
     free(ShRowId); ShRowId = NULL;
     free(Shval); Shval = NULL;
     free(ShColId); ShColId = (myint*)malloc((leng_Sh + 1) * sizeof(myint));

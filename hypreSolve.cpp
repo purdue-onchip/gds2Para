@@ -13,13 +13,13 @@ int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
 int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution){
     HYPRE_Int i;
     int myid, num_procs;
-    HYPRE_Int N, n;
+    int N, n;
 
     HYPRE_Int ilower, iupper;
     HYPRE_Int local_size, extra;
 
-    HYPRE_Int solver_id;
-    HYPRE_Int vis, print_system;
+    int solver_id;
+    int vis, print_system;
 
     double h, h2;
 
@@ -85,7 +85,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
             values.clear();
         }
     }
-    
+    cout << endl;
     /* Assemble after setting the coefficients */
     HYPRE_IJMatrixAssemble(A);
     
@@ -247,7 +247,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Set some parameters (See Reference Manual for more parameters) */
         HYPRE_FlexGMRESSetKDim(solver, restart);
         HYPRE_FlexGMRESSetMaxIter(solver, 100); /* max iterations */
-        HYPRE_FlexGMRESSetTol(solver, 1e-4); /* conv. tolerance */
+        HYPRE_FlexGMRESSetTol(solver, 1e-7); /* conv. tolerance */
         HYPRE_FlexGMRESSetPrintLevel(solver, 0); /* print solve info */
         HYPRE_FlexGMRESSetLogging(solver, 1); /* needed to get run info later */
         
@@ -284,7 +284,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         if (myid == 0)
         {
-            printf("\n");
+            printf("h\n");
             printf("Iterations = %d\n", num_iterations);
             printf("Final Relative Residual Norm = %e\n", final_res_norm);
             
