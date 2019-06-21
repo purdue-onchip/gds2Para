@@ -49,13 +49,13 @@ int main(int argc, char** argv)
             cout << "  -sx, --xyce           Identical to \"-s\"." << endl;
             cout << "  -sp, --spef           Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
             cout << endl << "Comments:" << endl;
-            cout << "The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
+            cout << " The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
             cout << " The first file passed after -s or --simulate (or -sx or --xyce) must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << " The first file passed after -sp or --spef must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
             cout << endl << "Bug reporting:" << endl;
-            cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
+            cout << "Visit <https://github.com/purdue-onchip/gds2Para>" << endl;
         }
         else if (strcmp(argv[1], "--version") == 0)
         {
@@ -78,27 +78,41 @@ int main(int argc, char** argv)
             bool adbIsGood = adbReader(inFile);
             vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
             adb.print(indCellPrint);
-
-            /*EnumDataBase edb;
-            GdsParser::GdsReader edbReader(edb);
-            bool edbIsGood = edbReader(inFile);
-            cout << "Test Enum API: " << edbIsGood << endl;
-            //cout << "Test Enum API: " << GdsParser::read(edb, argv[1]) << endl;*/
         }
         else if ((strcmp(argv[1], "-p") == 0) || (strcmp(argv[1], "--parrot") == 0))
         {
-            // Read and print existing file
+            // Read and print existing GDSII file
             AsciiDataBase adb;
             string fName = argv[2];
-            size_t indExtension = fName.find(".", 1);
+            size_t indExtension = fName.find_last_of(".");
             adb.setFileName(fName.substr(0, indExtension) + "_parrot" + fName.substr(indExtension, string::npos));
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            adb.print({ adb.getNumCell() - 1 });
+            adb.print({ });
 
             // Dump to parroted file immediately
             adb.dump();
             cout << "Dumped parroted file" << endl;
+
+            // Read GDSII file of outline for PSLG purposes
+            /*AsciiDataBase adbOutline;
+            adbOutline.setFileName(fName.substr(0, indExtension) + "_BACK_DRILL.gds"); // Taking specific file name (to be changed later)
+            std::ifstream outlineFile(adbOutline.getFileName().c_str());
+            GdsParser::GdsReader adbOutlineReader(adbOutline);
+            bool adbOutlineGood = adbOutlineReader(outlineFile);
+            vector<complex<double>> outlinePt = adbOutline.findPoints(adbOutline.getCell(0).getCellName(), 0., 0.);*/
+            //vector<complex<double>> outlinePt = { complex<double>(+150e-6, -48.0e-6), complex<double>(+150e-6, +121e-6), complex<double>(-1.00e-6, +121e-6), complex<double>(-1.00e-6, -48.0e-6) }; // nand2 outline
+            //vector<complex<double>> outlinePt = { complex<double>(+12.77e-6, -0.230e-6), complex<double>(+12.77e-6, +3.03e-6), complex<double>(-0.230e-6, +3.03e-6), complex<double>(-0.230e-6, -0.230e-6) }; // SDFFRS_X2 outline
+            //vector<complex<double>> outlinePt = { complex<double>(+2.82e-3, +5.00e-5), complex<double>(+2.825e-3, +3.87e-3), complex<double>(+3.00e-5, +3.87e-3), complex<double>(+3.00e-5, +5.00e-5) }; // 4004 outline
+
+            // Convert to planar straight-line graph (PSLG) file for external meshing
+            /*adb.setFileName("examples/4004.gds");
+            vector<int> layers = adb.findLayers();
+            for (size_t indLayer = 0; indLayer < layers.size(); indLayer++)
+            {
+                adb.convertPSLG(adb.getCell(adb.getNumCell() - 1).getCellName(), layers[indLayer], outlinePt);
+            }
+            cout << "Created PSLG file for each layer" << endl;*/
         }
         else if ((strcmp(argv[1], "-w") == 0) || (strcmp(argv[1], "--write") == 0))
         {
@@ -222,7 +236,7 @@ int main(int argc, char** argv)
             // Get file names
             string inGDSIIFile = argv[2];
             string inSimFile = argv[3];
-            size_t indExtension = inGDSIIFile.find(".", 1);
+            size_t indExtension = inGDSIIFile.find_last_of(".");
 
             // Read GDSII file
             AsciiDataBase adb;
@@ -233,7 +247,7 @@ int main(int argc, char** argv)
             {
                 string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
                 vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
-                adb.saveToMesh(topCellName, 0., 0., &sys); // Recursively save GDSII conductor information to sys
+                adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys); // Recursively save GDSII conductor information to sys
                 adb.print(indCellPrint);
                 cout << "GDSII file read" << endl;
             }
@@ -268,7 +282,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "meshAndMark Success!" << endl;
-                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
@@ -283,12 +297,13 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "matrixConstruction Success!" << endl;
-                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else {
                 cerr << "matrixConstruction Fail!" << endl;
                 return status;
             }
+            //sys.print();
 
             // Set port
             clock_t t4 = clock();
@@ -296,7 +311,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "portSet Success!" << endl;
-                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
@@ -312,7 +327,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "generateStiff Success!" << endl;
-                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
@@ -327,15 +342,15 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;
-                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << endl;
+                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else
             {
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
-            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
             // Parameter storage
             spMat matG(sys.numPorts, sys.numPorts); // Initialize Eigen sparse conductance matrix (S)
@@ -397,10 +412,10 @@ int main(int argc, char** argv)
             {
                 // Output Xyce subcircuit file
                 string outXyceFile = argv[4];
-                vector<size_t> indCellPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
+                vector<size_t> indLayerPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
                 sdb.setDesignName(adb.findNames().back());
                 sdb.setOutXyce(outXyceFile);
-                sdbCouldDump = sdb.printDumpXyce(indCellPrint);
+                sdbCouldDump = sdb.printDumpXyce(indLayerPrint);
                 cout << "File ready at " << outXyceFile << endl;
             }
         }

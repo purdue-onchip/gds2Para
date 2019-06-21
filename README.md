@@ -23,11 +23,11 @@ Once a design is loaded, the information can be written to another GDSII file or
 | C++ Standard Library: Utilities  | C++              | Utility                                | General C++ utilities such as pairs and swapping                  |
 | [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)                                                             | C++              | Sparse                                 | API for sparse matrix storage                                     |
 | [HYPRE](https://computation.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods)                            | Fortran/C/C++    | HYPRE, HYPRE_krylov, HYPRE_parcsr_ls   | LLNL library of preconditioners and multigrid solvers             |
-| Limbo                            | C/C++            | GdsReader, GdsWriter                   | API for GDSII file parsing and writing                            |
+| [Limbo](https://github.com/limbo018/Limbo)                            | C/C++            | GdsReader, GdsWriter                   | API for GDSII file parsing and writing                            |
 | [MakeUtils](https://www.gnu.org/software/make/)                                                                           | Makefile         | n/a                                    | Makefile utilities that help find build dependencies              |
 | [Math Kernel Library](https://software.intel.com/en-us/mkl)                                                               | Fortran/C/C++    | MKL, Mkl\_spblas                        | Intel libraries for parallel mathematics                          |
 | [Open Message Passing Interface](https://www.open-mpi.org/)                                                               | Fortran/C        | n/a                                    | Open MPI compilation and runtime tools for parallel computing     |
-| Parser-SPEF                      | C++              | parser-spef                            | API for SPEF file processing                                      |
+| [Parser-SPEF](https://github.com/OpenTimer/Parser-SPEF/)                      | C++              | parser-spef                            | API for SPEF file processing                                      |
 | Preprocessor                     | C/C++            | n/a                                    | Inclusion, definitions, and macros such as assertion with message |
 
 Note that modern compilers that support the following language standards are needed to make the package dependencies: GNU Fortran (superset of F95) for Fortran, C99 for C language, and C++17 for C++.
@@ -43,12 +43,16 @@ Note that modern compilers that support the following language standards are nee
 | box                      | limboint                | GDSII element for a box outline                                   |
 | textbox                  | limboint                | GDSII element for a text box                                      |
 | sref                     | limboint                | GDSII element for a structure reference                           |
+| aref                     | limboint                | GDSII element for an array reference                              |
+| strans                   | limboint                | Linear transformation applied to some GDSII elements              |
+| pslg                     | limboint                | Lists of vertices, segment connections, and regions for a PSLG    |
 | SolverDataBase           | solnoutclass            | Design name, output files, information other than layout, and all results of the simulation necessary for parameter extraction   |
 | SimSettings              | solnoutclass            | Simulation settings including units, design limits, and frequency sweep parameters                                               |
 | Layer                    | solnoutclass            | Layer information from physical stack-up including name, GDSII layer number, z-coordinates, and material properties              |
 | Waveforms                | solnoutclass            | Needed information for time-domain plots (unimplemented)          |
 | Parasitics               | solnoutclass            | Collection of ports and sparse matrices for admittance parameters |
 | Port                     | solnoutclass            | Port information including name, reference direction, supply and return coordinates, and containing GDSII layer                  |
+| Aperture                 | solnoutclass            | Standard template details for a Gerber photoplotter aperture      |
 | fdtdMesh                 | fdtd                    | Master class for all discretization, conductor, and solver data   |
 | fdtdPatch                | fdtd                    | Information of a single discretized patch                         |
 | fdtdBound                | fdtd                    | Information of a single conductor or dielectric boundary region   |
@@ -133,8 +137,9 @@ numPorts = <numPorts>
     * [NanGate Open Cell Library FreePDK45](https://www.cs.upc.edu/%7Ejpetit/CellRouting/nangate/Front_End/Doc/Databook/Cells/SDFFRS_X2_NangateOpenCellLibrary_typical_typical.html) for **SDFFRS\_X2.gds** (scan D flip-flop with reset/set)
     * [Peter Monta](https://github.com/pmonta/FPGA-netlist-tools/tree/master/masks/4004) and the [Tuva Design Intel 4004 Anniversary Project](http://4004.com/) for **4004.gds** (Intel 4004 processor from 1971)
     * [Open Compute Project](https://www.opencompute.org/wiki/Networking/SpecsAndDesigns#Facebook_Wedge_100_-_32x100G) for original Gerber files for Facebook Wedge 100 that led to **WEDGE100_REV01.gds** (100G Ethernet Switch board)
-* Prof. Dan Jiao of the Purdue On-Chip Electromagnetics Library for her guidance of the project
+* Prof. Dan Jiao of the Purdue On-Chip Electromagnetics Laboratory for her guidance of the project
 * The staff of the Defense Advanced Research Projects Agency (DARPA) Microsystems Technology Office (MTO) for their sponsorship, feedback, and support of this endeavor
+* Prof. C.J. Richard Shi and the students of the [University of Washington RAIL](https://sites.google.com/uw.edu/ssrl/people?authuser=0) research group for [supplying designs](https://github.com/rail-posh) and validating solver results against commercial tools
 * The other contributors of the [Intelligent Design of Electronic Assets (IDEA)](https://github.com/aolofsson/IDEA) team and the [Posh Open Source Hardware (POSH)](https://github.com/aolofsson/POSH) team within the DARPA Electronics Resurgence Initiative (ERI)
 
 ## License

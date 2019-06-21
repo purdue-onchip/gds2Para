@@ -2,11 +2,7 @@
 #include <ctime>
 #include "fdtd.h"
 #include "hypreSolverh.h"
-
 #include "vis.c"
-
-int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
-    double rel_residual_norm);
 
 
 //int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution){
@@ -31,22 +27,22 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     HYPRE_ParVector par_x;
 
     HYPRE_Solver solver, precond;
-    
+
     /* Initialize MPI */
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    
+
     N = leng_v0;
-    local_size = N / num_procs;
+    local_size = N / num_procs; // Integer division
     extra = N - local_size * num_procs;
 
     ilower = local_size * myid;
     ilower += hypre_min(myid, extra);
-    
+
     iupper = local_size * (myid + 1);
     iupper += hypre_min(myid + 1, extra);
-    iupper = iupper - 1;
-    
+    iupper -= 1;
+
     /* How many rows do I have? */
     local_size = iupper - ilower + 1;
     
@@ -55,43 +51,39 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     size twice (since number of rows = number of cols) */
     HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
 
-    /* Choose a parallel csr format storage (see the User's Manual) */
+    /* Choose a parallel CSR format storage (see the User's Manual) */
     HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
 
     /* Initialize before setting coefficients */
     HYPRE_IJMatrixInitialize(A);
-    
+
+    HYPRE_Int nnz;
+    vector<double> values;
+    vector<HYPRE_Int> cols;
+    HYPRE_Int index = 0;
+
+    for (i = ilower; i <= iupper; i++)
     {
-        HYPRE_Int nnz;
-        vector<double> values;
-        vector<HYPRE_Int> cols;
-        HYPRE_Int index = 0;
-
-        for (i = ilower; i <= iupper; i++)
-        {
-            nnz = 0;   // Number of non-zeros on row i
-
-            while (index < leng_A && ARowId[index] == i){
-                cols.push_back(AColId[index]);
-                values.push_back(Aval[index]);
-                nnz++;
-                index++;
-            }
-            
-            /* Set the values for row i */
-            HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
-            
-            cols.clear();
-            values.clear();
+        nnz = 0;   // Number of non-zeros on row i
+        while (index < leng_A && ARowId[index] == i){
+            cols.push_back(AColId[index]);
+            values.push_back(Aval[index]);
+            nnz++;
+            index++;
         }
+
+        /* Set the values for row i */
+        HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
+        cols.clear();
+        values.clear();
     }
-    cout << endl;
+
     /* Assemble after setting the coefficients */
     HYPRE_IJMatrixAssemble(A);
-    
+
     /* Get the parcsr matrix object to use */
     HYPRE_IJMatrixGetObject(A, (void**)&parcsr_A);
-    
+
     /* Create the rhs and solution */
     HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &b);
     HYPRE_IJVectorSetObjectType(b, HYPRE_PARCSR);
@@ -130,164 +122,164 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
     HYPRE_IJVectorAssemble(x);
     HYPRE_IJVectorGetObject(x, (void **)&par_x);
+
+#if HYPRE_METHOD == 1
     /* AMG */
-    //{
-    //    int num_iterations;
-    //    double final_res_norm;
+    {
+        int num_iterations;
+        double final_res_norm;
 
-    //    /* Create solver */
-    //    HYPRE_BoomerAMGCreate(&solver);
+        /* Create solver */
+        HYPRE_BoomerAMGCreate(&solver);
 
-    //    /* Set some parameters (See Reference Manual for more parameters) */
-    //    HYPRE_BoomerAMGSetPrintLevel(solver, 0);  /* no printout */
-    //    HYPRE_BoomerAMGSetOldDefault(solver); /* Falgout coarsening with modified classical interpolaiton */
-    //    HYPRE_BoomerAMGSetRelaxType(solver, 4);   /* G-S/Jacobi hybrid relaxation */
-    //    HYPRE_BoomerAMGSetRelaxOrder(solver, 1);   /* uses C/F relaxation */
-    //    HYPRE_BoomerAMGSetNumSweeps(solver, 1);   /* Sweeps on each level */
-    //    HYPRE_BoomerAMGSetMaxLevels(solver, 20);  /* maximum number of levels */
-    //    HYPRE_BoomerAMGSetTol(solver, 1e-4);      /* conv. tolerance */
-    //    HYPRE_BoomerAMGSetMaxIter(solver, 50);    /* maximum number of iterations */
+        /* Set some parameters (See Reference Manual for more parameters) */
+        HYPRE_BoomerAMGSetPrintLevel(solver, 0);           /* no printout */
+        HYPRE_BoomerAMGSetOldDefault(solver);              /* Falgout coarsening with modified classical interpolaiton */
+        HYPRE_BoomerAMGSetRelaxType(solver, 4);            /* G-S/Jacobi hybrid relaxation */
+        HYPRE_BoomerAMGSetRelaxOrder(solver, 1);           /* uses C/F relaxation */
+        HYPRE_BoomerAMGSetNumSweeps(solver, 1);            /* Sweeps on each level */
+        HYPRE_BoomerAMGSetMaxLevels(solver, 20);           /* maximum number of levels */
+        HYPRE_BoomerAMGSetTol(solver, HYPRE_CONV_TOL);     /* conv. tolerance */
+        HYPRE_BoomerAMGSetMaxIter(solver, HYPRE_MAX_ITER); /* maximum number of iterations */
 
-    //    /* Now setup and solve! */
-    //    HYPRE_BoomerAMGSetup(solver, parcsr_A, par_b, par_x);
-    //    HYPRE_BoomerAMGSolve(solver, parcsr_A, par_b, par_x);
+        /* Now setup and solve! */
+        HYPRE_BoomerAMGSetup(solver, parcsr_A, par_b, par_x);
+        HYPRE_BoomerAMGSolve(solver, parcsr_A, par_b, par_x);
 
-    //    /* Run info - needed logging turned on */
-    //    HYPRE_BoomerAMGGetNumIterations(solver, &num_iterations);
-    //    HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
-    //    if (myid == 0)
-    //    {
-    //        printf("\n");
-    //        printf("Iterations = %d\n", num_iterations);
-    //        printf("Final Relative Residual Norm = %e\n", final_res_norm);
-    //        printf("\n");
-    //    }
+        /* Run info - needed logging turned on */
+        HYPRE_BoomerAMGGetNumIterations(solver, &num_iterations);
+        HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+        if (myid == 0)
+        {
+            cout << endl;
+            cout << "Iterations = " << num_iterations << endl;
+            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
+        }
 
-    //    /* Output the final solution */
-    //    HYPRE_Complex v;
-    //    for (i = ilower; i <= iupper; i++){
-    //        HYPRE_IJVectorGetValues(x, 1, &i, &v);
-    //        solution[i] = v;
-    //    }
+        /* Output the final solution */
+        HYPRE_Complex v;
+        for (i = ilower; i <= iupper; i++){
+            HYPRE_IJVectorGetValues(x, 1, &i, &v);
+            solution[i] = v;
+        }
 
-    //    /* Destroy solver */
-    //    HYPRE_BoomerAMGDestroy(solver);
-
-    //}
-
+        /* Destroy solver */
+        HYPRE_BoomerAMGDestroy(solver);
+    }
+#elif HYPRE_METHOD == 2
     /* PCG with AMG preconditioner */
-    //{
-    //    int num_iterations;
-    //    double final_res_norm;
+    {
+        int num_iterations;
+        double final_res_norm;
 
-    //    /* Create solver */
-    //    HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
+        /* Create solver */
+        HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
 
-    //    /* Set some parameters (See Reference Manual for more parameters) */
-    //    HYPRE_PCGSetMaxIter(solver, 1000); /* max iterations */
-    //    HYPRE_PCGSetTol(solver, 1e-4); /* conv. tolerance */
-    //    HYPRE_PCGSetTwoNorm(solver, 1); /* use the two norm as the stopping criteria */
-    //    HYPRE_PCGSetPrintLevel(solver, 0); /* print solve info */
-    //    HYPRE_PCGSetLogging(solver, 1); /* needed to get run info later */
+        /* Set some parameters (See Reference Manual for more parameters) */
+        HYPRE_PCGSetMaxIter(solver, HYPRE_MAX_ITER); /* max iterations */
+        HYPRE_PCGSetTol(solver, HYPRE_CONV_TOL);     /* conv. tolerance */
+        HYPRE_PCGSetTwoNorm(solver, 1);              /* use the 2-norm as the stopping criteria */
+        HYPRE_PCGSetPrintLevel(solver, 0);           /* print solve info */
+        HYPRE_PCGSetLogging(solver, 1);              /* needed to get run info later */
 
-    //    /* Now set up the AMG preconditioner and specify any parameters */
-    //    HYPRE_BoomerAMGCreate(&precond);
-    //    HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print amg solution info */
-    //    HYPRE_BoomerAMGSetCoarsenType(precond, 6);
-    //    HYPRE_BoomerAMGSetOldDefault(precond);
-    //    HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
-    //    HYPRE_BoomerAMGSetNumSweeps(precond, 1);
-    //    HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero */
-    //    HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
+        /* Now set up the AMG preconditioner and specify any parameters */
+        HYPRE_BoomerAMGCreate(&precond);
+        HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
+        HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+        HYPRE_BoomerAMGSetOldDefault(precond);
+        HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
+        HYPRE_BoomerAMGSetNumSweeps(precond, 1);
+        HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
+        HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
 
-    //    /* Set the PCG preconditioner */
-    //    HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
-    //        (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
+        /* Set the PCG preconditioner */
+        HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
+            (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
 
-    //    /* Now setup and solve! */
-    //    HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
-    //    HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
+        /* Now setup and solve! */
+        HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
+        HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
 
-    //    /* Run info - needed logging turned on */
-    //    HYPRE_PCGGetNumIterations(solver, &num_iterations);
-    //    HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
-    //    if (myid == 0)
-    //    {
-    //        printf("\n");
-    //        printf("Iterations = %d\n", num_iterations);
-    //        printf("Final Relative Residual Norm = %e\n", final_res_norm);
-    //        printf("\n");
-    //    }
+        /* Run info - needed logging turned on */
+        HYPRE_PCGGetNumIterations(solver, &num_iterations);
+        HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+        if (myid == 0)
+        {
+            cout << endl;
+            cout << "Iterations = " << num_iterations << endl;
+            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
+        }
 
-    //    /* Output the final solution */
-    //    HYPRE_Complex v;
-    //    for (i = ilower; i <= iupper; i++){
-    //        HYPRE_IJVectorGetValues(x, 1, &i, &v);
-    //        solution[i] = v;
-    //    }
+        /* Output the final solution */
+        HYPRE_Complex v;
+        for (i = ilower; i <= iupper; i++){
+            HYPRE_IJVectorGetValues(x, 1, &i, &v);
+            solution[i] = v;
+        }
 
-    //    /* Destroy solver and preconditioner */
-    //    HYPRE_ParCSRPCGDestroy(solver);
-    //    HYPRE_BoomerAMGDestroy(precond);
-    //}
-    
-
-    
-
+        /* Destroy solver and preconditioner */
+        HYPRE_ParCSRPCGDestroy(solver);
+        HYPRE_BoomerAMGDestroy(precond);
+    }
+#elif HYPRE_METHOD == 3
     /* Flexible GMRES with AMG Preconditioner */
     {
         HYPRE_Int    num_iterations;
         double final_res_norm;
         HYPRE_Int    restart = 10;
         HYPRE_Int    modify = 1;
-        
+
         /* Create solver */
         HYPRE_ParCSRFlexGMRESCreate(MPI_COMM_WORLD, &solver);
-        
+
         /* Set some parameters (See Reference Manual for more parameters) */
         HYPRE_FlexGMRESSetKDim(solver, restart);
-        HYPRE_FlexGMRESSetMaxIter(solver, 100); /* max iterations */
-        HYPRE_FlexGMRESSetTol(solver, 1e-7); /* conv. tolerance */
-        HYPRE_FlexGMRESSetPrintLevel(solver, 0); /* print solve info */
-        HYPRE_FlexGMRESSetLogging(solver, 1); /* needed to get run info later */
-        
-        
+        HYPRE_FlexGMRESSetMaxIter(solver, HYPRE_MAX_ITER); /* max iterations */
+        HYPRE_FlexGMRESSetTol(solver, HYPRE_CONV_TOL);     /* conv. tolerance */
+        HYPRE_FlexGMRESSetPrintLevel(solver, 0);           /* print solve info */
+        HYPRE_FlexGMRESSetLogging(solver, 1);              /* needed to get run info later */
+
         /* Now set up the AMG preconditioner and specify any parameters */
         HYPRE_BoomerAMGCreate(&precond);
-        HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print amg solution info */
+        HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
         HYPRE_BoomerAMGSetCoarsenType(precond, 6);
         HYPRE_BoomerAMGSetOldDefault(precond);
         HYPRE_BoomerAMGSetRelaxType(precond, 6); /* Sym G.S./Jacobi hybrid */
         HYPRE_BoomerAMGSetNumSweeps(precond, 1);
-        HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero */
+        HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
         HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
-        
+        //HYPRE_EuclidCreate(MPI_COMM_WORLD, &precond);
+        //HYPRE_EuclidSetMem(precond, 1);
+
         /* Set the FlexGMRES preconditioner */
         HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
-        
-        
+        //HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSolve, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSetup, precond);
+
         if (modify)
+        {
             /* this is an optional call  - if you don't call it, hypre_FlexGMRESModifyPCDefault
             is used - which does nothing.  Otherwise, you can define your own, similar to
             the one used here */
             HYPRE_FlexGMRESSetModifyPC(solver,
-            (HYPRE_PtrToModifyPCFcn)hypre_FlexGMRESModifyPCAMGExample);
-       
+                (HYPRE_PtrToModifyPCFcn)hypre_FlexGMRESModifyPCAMGExample);
+        }
+
         /* Now setup and solve! */
+        //cout << "Setup and solve in GMRES block" << endl;
         HYPRE_ParCSRFlexGMRESSetup(solver, parcsr_A, par_b, par_x);
+        //cout << "GMRES has been set up, awaiting solve" << endl;
         HYPRE_ParCSRFlexGMRESSolve(solver, parcsr_A, par_b, par_x);
-        
+
         /* Run info - needed logging turned on */
         HYPRE_FlexGMRESGetNumIterations(solver, &num_iterations);
         HYPRE_FlexGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
 
         if (myid == 0)
         {
-            printf("h\n");
-            printf("Iterations = %d\n", num_iterations);
-            printf("Final Relative Residual Norm = %e\n", final_res_norm);
-            
+            cout << endl;
+            cout << "Iterations = " << num_iterations << endl;
+            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */
@@ -300,25 +292,20 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Destory solver and preconditioner */
         HYPRE_ParCSRFlexGMRESDestroy(solver);
         HYPRE_BoomerAMGDestroy(precond);
-
     }
-    
+#endif
+
     /* Clean up */
     HYPRE_IJMatrixDestroy(A);
     HYPRE_IJVectorDestroy(b);
     HYPRE_IJVectorDestroy(x);
-    
 
     return(0);
-
-
 }
 
 int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
     double rel_residual_norm)
 {
-
-
     if (rel_residual_norm > .1)
     {
         HYPRE_BoomerAMGSetNumSweeps((HYPRE_Solver)precond_data, 10);
@@ -327,7 +314,6 @@ int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
     {
         HYPRE_BoomerAMGSetNumSweeps((HYPRE_Solver)precond_data, 1);
     }
-
 
     return 0;
 }

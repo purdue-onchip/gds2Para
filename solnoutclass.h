@@ -9,6 +9,7 @@
 #ifndef solnoutclass_h
 #define solnoutclass_h
 
+#define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -16,6 +17,7 @@
 #include <unordered_map>
 #include <cctype>
 #include <cmath>
+#include <complex>
 #include <ctime>
 #include <algorithm>
 #include <parser-spef/parser-spef.hpp>
@@ -51,7 +53,346 @@ struct myPruneFunctor
     }
 };
 
-// Custom classes for containing solution and output SPEF writer
+// Custom class for apertures in Gerber files (RS-274X specification)
+class Aperture
+{
+  public:
+    int aperNum;      // D-code aperture number
+    char stanTemp;    // Standard aperture template (aperture macros disallowed)
+    double circumDia; // Circumdiameter (m, twice radius of circumcircle)
+    double xSize;     // Maximum extent in x-direction (m)
+    double ySize;     // Maximum extent in y-direction (m)
+    double holeDia;   // Diameter of center hole (m)
+    int numVert;      // Number of vertices (for regular polygon template only)
+    double rotation;  // Rotation angle (rad, for regular polygon template)
+  public:
+    // Default constructor
+    Aperture()
+    {
+        this->aperNum = 0;
+        this->stanTemp = 'C'; // Assume circle by default
+        this->circumDia = 0.0;
+        this->xSize = 0.0; 
+        this->ySize = 0.0;
+        this->holeDia = 0.0;
+        this->numVert = 0;
+        this->rotation = 0.0;
+    }
+
+    // Parametrized constructor (circles only)
+    Aperture(int aperNum, double circumDia, double holeDia)
+    {
+        this->aperNum = aperNum;
+        this->stanTemp = 'C'; // Only option is circle
+        this->circumDia = circumDia;
+        this->xSize = circumDia; // Circle presents diameter as maximum extent in x-direction
+        this->ySize = circumDia; // Circle presents diameter as maximum extent in y-direction
+        this->holeDia = holeDia;
+        this->numVert = 0;
+        this->rotation = 0.0; // Perfect circle cannot have an overall rotation
+    }
+
+    // Parametrized constructor (rectangles and obrounds/stadia)
+    Aperture(int aperNum, char stanTemp, double xSize, double ySize, double holeDia)
+    {
+        this->aperNum = aperNum;
+        if ((stanTemp != 'C') && (stanTemp != 'R') && (stanTemp != 'O') && (stanTemp != 'P'))
+        {
+            cerr << "Aperture standard templates must be 'C' (circle), 'R' (rectangle), 'O' (obround), or 'P' (polygon). Defaulting to 'R' for this constructor." << endl;
+            this->stanTemp = 'R';
+            this->circumDia = hypot(xSize, ySize); // Circumdiameter of a rectangle is the diagonal length
+            this->numVert = 4;
+            this->rotation = atan2(-ySize, xSize); // Effective rotation of diagonal to the horizontal (xSize > ySize) or vertical (ySize > xSize) orientation
+        }
+        else if ((stanTemp == 'C') && (this->xSize == this->ySize))
+        {
+            cerr << "This constructor is not meant for circles. Accepting input regardless." << endl;
+            this->stanTemp = 'C';
+            this->circumDia = xSize;
+            this->numVert = 0;
+            this->rotation = 0.0;
+        }
+        else if ((stanTemp == 'C') && (this->xSize != this->ySize))
+        {
+            cerr << "This constructor is not meant for circles. A circular aperture must have ySize equal to xSize. Defaulting to obround of given dimensions." << endl;
+            this->stanTemp = 'O';
+            this->circumDia = (xSize > ySize) ? xSize : ySize; // Ternary operator to select the larger dimension as the circumdiameter
+            this->numVert = 0;
+            this->rotation = (xSize > ySize) ? atan2(-ySize, xSize - ySize) : atan2(-(ySize - xSize), xSize); // Lower-right point of rectangle within stadium has rotation found by removing semicircle
+        }
+        else if (stanTemp == 'P')
+        {
+            cerr << "This constructor is not meant for regular polygons. Defaulting to standard rectangle of same dimensions." << endl;
+            this->stanTemp = 'R';
+            this->circumDia = hypot(xSize, ySize);
+            this->numVert = 4;
+            this->rotation = atan2(-ySize, xSize);
+        }
+        else if (stanTemp == 'R')
+        {
+            this->stanTemp = 'R';
+            this->circumDia = hypot(xSize, ySize);
+            this->numVert = 4;
+            this->rotation = atan2(-ySize, xSize); // Effective rotation of diagonal to the horizontal (xSize > ySize) or vertical (ySize > xSize) orientation
+        }
+        else
+        {
+            this->stanTemp = 'O'; // Obround is only option left
+            this->circumDia = (xSize > ySize) ? xSize : ySize; // Ternary operator to select the larger dimension as the circumdiameter
+            this->numVert = 0;
+            this->rotation = (xSize > ySize) ? atan2(-ySize, xSize - ySize) : atan2(-(ySize - xSize), xSize); // Lower-right point of rectangle within stadium has rotation found by removing semicircle
+        }
+        this->xSize = xSize;
+        this->ySize = ySize;
+        this->holeDia = holeDia;
+    }
+
+    // Parametrized constructor (regular polygons only)
+    Aperture(int aperNum, char stanTemp, double circumDia, double holeDia, int numVert, double rotation)
+    {
+        this->aperNum = aperNum;
+        if ((stanTemp != 'P') && (stanTemp != 'R'))
+        {
+            cerr << "This constructor only supports regular polygons. Treating input as regular polygon anyway." << endl;
+        }
+        else if ((stanTemp == 'R') && (numVert != 4))
+        {
+            cerr << "This constructor only supports regular polygons, and rectangles would have 4 vertices. Treating input as regular polygon." << endl;
+        }
+        else if ((stanTemp == 'R') && (numVert == 4))
+        {
+            cerr << "This constructor only supports regular polygons, not rectangles. Interpreting input as rotated square regardless." << endl;
+        }
+        this->stanTemp = 'P';
+        this->circumDia = circumDia;
+        this->xSize = circumDia; // This is not the true extent, but the calculation is too complicated for the value here
+        this->ySize = circumDia; // Same inaccuracy as xSize mentioned above
+        this->holeDia = holeDia;
+        this->numVert = numVert;
+        this->rotation = rotation;
+    }
+
+    // Get D-code aperture number
+    int getAperNum() const
+    {
+        return this->aperNum;
+    }
+
+    // Get the standard aperture template used (aperture macros disallowed)
+    // ('C' = circle, 'R' = rectangle, 'O' = obround/stadium, 'P' = regular polygon)
+    char getStanTemp() const
+    {
+        return this->stanTemp;
+    }
+
+    // Get the circumdiamter of the aperture (m)
+    double getCircumDia() const
+    {
+        return this->circumDia;
+    }
+
+    // Get the maximum aperture extent in the x-direction (m)
+    double getXSize() const
+    {
+        return this->xSize;
+    }
+
+    // Get the maximum aperture extent in the y-direction (m)
+    double getYSize() const
+    {
+        return this->ySize;
+    }
+
+    // Get the diameter of the center hole (m)
+    double getHoleDia() const
+    {
+        return this->holeDia;
+    }
+
+    // Get the number of vertices of the regular polygon standard aperture
+    // (3 = triangle, 4 = square, ..., 12 = dodecagon)
+    int getNumVert() const
+    {
+        return this->numVert;
+    }
+
+    // Get the rotation of the regular polgyon standard aperture (rad)
+    // (zero rotation has one vertex on positive x-axis)
+    double getRotation() const
+    {
+        return this->rotation;
+    }
+
+    // Is the aperture a circle?
+    bool isCircle() const
+    {
+        if (this->stanTemp == 'C')
+        {
+            return true;
+        }
+        else if ((this->stanTemp == 'O') && (this->xSize == this->ySize))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    // Is the aperture a square?
+    bool isSquare() const
+    {
+        if ((this->stanTemp == 'R') && (this->xSize == this->ySize))
+        {
+            return true;
+        }
+        else if ((this->stanTemp == 'P') && (this->numVert == 4))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    // Draw aperture as GDSII boundary at given position
+    boundary drawAsBound(double xo, double yo)
+    {
+        // Find coordinates of boundary based on standard aperture template
+        vector<double> bounds;
+        if (this->isCircle())
+        {
+            // Approximate circle as 24-gon with ending point same as starting point at phi=0
+            for (size_t indi = 0; indi <= 24; indi++)
+            {
+                bounds.push_back(xo + 0.5 * this->circumDia * cos(2.0 * M_PI * indi / 24)); // x-coordinate
+                bounds.push_back(yo + 0.5 * this->circumDia * sin(2.0 * M_PI * indi / 24)); // y-coordinate
+            }
+        }
+        else if (this->stanTemp == 'R')
+        {
+            // Push back pairs of coordinates for the 5 rectangle points CCW starting from lower-right with first point repeated
+            bounds.push_back(xo + 0.5 * this->xSize); // Lower-right
+            bounds.push_back(yo - 0.5 * this->ySize);
+            bounds.push_back(xo + 0.5 * this->xSize); // Upper-right
+            bounds.push_back(yo + 0.5 * this->ySize);
+            bounds.push_back(xo - 0.5 * this->xSize); // Upper-left
+            bounds.push_back(yo + 0.5 * this->ySize);
+            bounds.push_back(xo - 0.5 * this->xSize); // Lower-left
+            bounds.push_back(yo - 0.5 * this->ySize);
+            bounds.push_back(xo + 0.5 * this->xSize); // Lower-right repeated
+            bounds.push_back(yo - 0.5 * this->ySize);
+        }
+        else if (this->stanTemp == 'O')
+        {
+            // Approximate stadium as rectangle between two semi-24-gons (instead of semicircles)
+            if (this->xSize > this->ySize)
+            {
+                // Horizontal stadium
+                bounds.push_back(xo + 0.5 * (this->xSize - this->ySize)); // Lower-right point of rectangle determined by half the size difference
+                bounds.push_back(yo - 0.5 * this->ySize); // Lower-right point of rectangle has simple y-coordinate of half the width
+                for (size_t indi = 0; indi <= 12; indi++)
+                {
+                    bounds.push_back(xo + 0.5 * (this->xSize - this->ySize) + 0.5 * this->ySize * sin(2.0 * M_PI * indi / 24)); // x-coordinate has offset, rectangle point arithmetic, and semicircle radius determined by half the width
+                    bounds.push_back(yo - 0.5 * this->ySize * cos(2.0 * M_PI * indi / 24)); // y-coordinate has offset and semicircle radius
+                }
+                bounds.push_back(xo - 0.5 * (this->xSize - this->ySize)); // Upper-left point of rectangle drawn from upper-right point where semicircle ends
+                bounds.push_back(yo + 0.5 * this->ySize);
+                for (size_t indi = 0; indi <= 12; indi++)
+                {
+                    bounds.push_back(xo - 0.5 * (this->xSize - this->ySize) - 0.5 * this->ySize * sin(2.0 * M_PI * indi / 24));
+                    bounds.push_back(yo + 0.5 * this->ySize * cos(2.0 * M_PI * indi / 24));
+                }
+                bounds.push_back(xo + 0.5 * (this->xSize - this->ySize)); // Lower-right point of rectangle repeated from lower-left point where semicircle ends
+                bounds.push_back(yo - 0.5 * this->ySize);
+            }
+            else if (this->ySize > this->xSize)
+            {
+                // Vertical stadium
+                bounds.push_back(xo + 0.5 * this->xSize); // Lower-right point of rectangle has simple x-coordinate of half the length
+                bounds.push_back(yo - 0.5 * (this->ySize - this->xSize)); // Lower-right point of rectangle determined by half the size difference
+                bounds.push_back(xo + 0.5 * this->xSize); // Upper-right point of rectangle has simple x-coordinate of half the length
+                bounds.push_back(yo + 0.5 * (this->ySize - this->xSize)); // Upper-right point of rectangle determined by half the size difference
+                for (size_t indi = 0; indi <= 12; indi++)
+                {
+                    bounds.push_back(xo + 0.5 * this->xSize * cos(2.0 * M_PI * indi / 24)); // x-coordinate has offset and semicircle radius
+                    bounds.push_back(yo + 0.5 * (this->ySize - this->xSize) + 0.5 * this->xSize * sin(2.0 * M_PI * indi / 24)); // y-coordinate has offset, rectangle point arithmetic, and semicircle radius determined by half the length
+                }
+                bounds.push_back(xo - 0.5 * this->xSize); // Lower-left point of rectangle drawn from upper-left point where semicircle ends
+                bounds.push_back(yo - 0.5 * (this->ySize - this->xSize));
+                for (size_t indi = 0; indi <= 12; indi++)
+                {
+                    bounds.push_back(xo - 0.5 * this->xSize * cos(2.0 * M_PI * indi / 24));
+                    bounds.push_back(yo - 0.5 * (this->ySize - this->xSize) - 0.5 * this->xSize * sin(2.0 * M_PI * indi / 24));
+                } // Lower-right point of rectangle repeated where semicircle ends
+            } // Equality case handled by circle drawing
+        }
+        else if (this->stanTemp == 'P')
+        {
+            // Push back pairs of coordinates for the numVert + 1 polygon points CCW starting from phi=0+rotation
+            for (size_t indi = 0; indi <= this->numVert; indi++)
+            {
+                bounds.push_back(xo + 0.5 * this->circumDia * cos(2.0 * M_PI * indi / this->numVert + this->rotation)); // x-coordinate
+                bounds.push_back(yo + 0.5 * this->circumDia * sin(2.0 * M_PI * indi / this->numVert + this->rotation)); // y-coordinate
+            }
+        }
+
+        // Create re-entrant part of boundary only if there is a valid hole
+        if ((this->holeDia > 0) && (this->holeDia < this->circumDia))
+        {
+            // Approximate center hole as 24-gon starting and ending at the current rotation meticulously calculated for this purpose
+            for (size_t indi = 0; indi <= 24; indi++)
+            {
+                bounds.push_back(xo + 0.5 * this->holeDia * cos(2.0 * M_PI * indi / 24 + this->rotation)); // x-coordinate
+                bounds.push_back(yo + 0.5 * this->holeDia * sin(2.0 * M_PI * indi / 24 + this->rotation)); // y-coordinate
+            }
+        }
+
+        // Return the complete boundary in preferred order
+        boundary outBound = boundary(bounds, 1, { });
+        outBound.reorder();
+        return outBound;
+    }
+
+    // Print the aperture modifiers
+    void print() const
+    {
+        cout << " ------" << endl;
+        cout << " Aperture Modifiers:" << endl;
+        cout << "  Aperture number: D" << this->aperNum << endl;
+        cout << "  Standard aperture template: " << this->stanTemp << endl;
+        if (this->isCircle())
+        {
+            cout << "  Aperture diameter: " << this->xSize << " m" << endl;
+        }
+        else if (this->isSquare())
+        {
+            cout << "  Maximum aperture extents of square: " << this->xSize << " m in x-direction and " << this->ySize << " m in y-direction" << endl;
+            cout << "  Rotation angle of square (4 vertices): " << this->rotation << " rad" << endl;
+        }
+        else if (this->stanTemp == 'P')
+        {
+            cout << "  Maximum aperture extents: " << this->xSize << " m in x-direction and " << this->ySize << " m in y-direction" << endl;
+            cout << "  Number of regular polygon vertices: " << this->numVert << endl;
+            cout << "  Rotation angle of polygon: " << this->rotation << " rad" << endl;
+        }
+        else
+        {
+            cout << "  Maximum aperture extents: " << this->xSize << " m in x-direction and " << this->ySize << " m in y-direction" << endl;
+        }
+        cout << "  Diameter of center hole: " << this->holeDia << " m" << endl;
+    }
+
+    // Destructor
+    ~Aperture()
+    {
+        // Nothing
+    }
+};
+
+// Custom classes for containing solution and output Xyce/SPEF writer
 class SimSettings
 {
   private:
@@ -302,7 +643,7 @@ class Layer
         return this->lossTan;
     }
 
-    // Get layer conductivity
+    // Get layer conductivity (S/m)
     double getSigma() const
     {
         return this->sigma;
@@ -400,7 +741,7 @@ class Port
         return this->portDir;
     }
 
-    // Get impedance of attached source
+    // Get impedance of attached source (ohm)
     double getZSource() const
     {
         return this->Z_source;
@@ -641,39 +982,39 @@ class Parasitics
         this->nPorts = ports.size();
     }
 
-    // Set conductance matrix
+    // Set conductance matrix (S)
     void setGMatrix(spMat matG)
     {
         this->matG = matG;
     }
 
-    // Set capacitance matrix
+    // Set capacitance matrix (F)
     void setCMatrix(spMat matC)
     {
         this->matC = matC;
     }
 
-    // Return node-to-ground conductance
+    // Return node-to-ground conductance (S)
     double getGNodeGround(size_t indNode) const
     {
         // Calculate by summing along given row
         return (this->matG).innerVector(indNode).sum();
     }
 
-    // Return total conductance represented in matrix (sum of diagonal entries)
+    // Return total conductance represented in matrix (S, sum of diagonal entries)
     double getGTotal() const
     {
         return (this->matG).diagonal().sum();
     }
 
-    // Return node-to-ground capacitance
+    // Return node-to-ground capacitance (F)
     double getCNodeGround(size_t indNode) const
     {
         // Calculate by summing along given row
         return (this->matC).innerVector(indNode).sum();
     }
 
-    // Return total capacitance represented in matrix (sum of diagonal entries)
+    // Return total capacitance represented in matrix (F, sum of diagonal entries)
     double getCTotal() const
     {
         return (this->matC).diagonal().sum();
@@ -712,8 +1053,22 @@ class Parasitics
     }
 
     // Find ports in GDSII textboxes
-    vector<Port> setPortsGDSII(size_t indCell, vector<double> center, AsciiDataBase adb)
+    vector<Port> setPortsGDSII(size_t indCell, vector<double> center, strans transform, AsciiDataBase adb)
     {
+        // Error checking on input point
+        double xo, yo; // Coordinate offsets
+        if (center.size() != 2)
+        {
+            cerr << "Coordinates of reference frame center must be a length-2 vector. Defaulting to (0, 0)." << endl;
+            xo = 0.;
+            yo = 0.;
+        }
+        else
+        {
+            xo = center[0];
+            yo = center[1];
+        }
+
         // Recursively search cells for textboxes
         GeoCell thisCell = adb.getCell(indCell);
         vector<Port> portList;
@@ -721,14 +1076,28 @@ class Parasitics
         {
             string srefName = (thisCell.sreferences)[indi].getSRefName();
             size_t indNextCell = adb.locateCell(srefName);
-            vector<double> thisSRef = (thisCell.sreferences)[indi].getSRefs();
-            vector<Port> newPorts = this->setPortsGDSII(indNextCell, {(center[0] + thisSRef[0]), (center[1] + thisSRef[1])}, adb); // Recursion step
+            vector<double> refPt = transform.applyTranform((thisCell.sreferences)[indi].getSRefs()); // Center point of structure reference after linear transformation
+            vector<Port> newPorts = this->setPortsGDSII(indNextCell, { refPt[0] + xo, refPt[1] + yo }, (thisCell.sreferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
             portList.insert(portList.end(), newPorts.begin(), newPorts.end());
         }
-        for (size_t indi = 0; indi < thisCell.getNumText(); indi++) // Search cell at this level for textboxes
+        for (size_t indi = 0; indi < thisCell.getNumARef(); indi++) // Follow array references
+        {
+            string arefName = (thisCell.areferences)[indi].getARefName();
+            size_t indNextCell = adb.locateCell(arefName);
+            vector<vector<double>> instanceCoord = (thisCell.areferences[indi]).findInstances({ 0., 0. });
+            for (size_t indj = 0; indj < instanceCoord.size(); indj++) // Handle each instance in array reference
+            {
+                vector<double> centPt = transform.applyTranform(instanceCoord[indj]); // Center point of referred instance after linear transformation
+                vector<Port> newPorts = this->setPortsGDSII(indNextCell, { centPt[0] + xo, centPt[1] + yo }, (thisCell.areferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
+                portList.insert(portList.end(), newPorts.begin(), newPorts.end());
+            }
+        }
+
+        // Search cell at this level for textboxes
+        for (size_t indi = 0; indi < thisCell.getNumText(); indi++)
         {
             textbox thisTextBox = thisCell.textboxes[indi];
-            vector<double> coords = {(thisTextBox.getTexts()[0] + center[0]), (thisTextBox.getTexts()[1] + center[1]), 0., (thisTextBox.getTexts()[0] + center[0]), 0., 0.}; // Assume: xret = xsup, yret = 0, zsup = zret = 0 until layer heights set
+            vector<double> coords = { thisTextBox.getTexts()[0] + xo, thisTextBox.getTexts()[1] + yo, 0., thisTextBox.getTexts()[0] + xo, 0., 0. }; // Assume: xret = xsup, yret = 0, zret = zsup = 0 until layer heights set
             portList.emplace_back(Port(thisTextBox.getTextStr(), 'B', 50.0, thisTextBox.getTexts(), thisTextBox.getLayer()));
         }
 
@@ -1135,14 +1504,1223 @@ struct SolverDataBase
     }
 
     // Return all layer names
-    vector<string> findLayerNames() const
+    vector<std::string> findLayerNames() const
     {
-        vector<string> names;
+        vector<std::string> names;
         for (size_t indi = 0; indi < (this->layers).size(); indi++)
         {
             names.push_back(((this->layers)[indi]).getLayerName());
         }
         return names;
+    }
+
+    // Read outline (or unmarked dimension) Gerber file (extension must be included)
+    vector<double> readGerberOutline(std::string outlineGerberName)
+    {
+        // Attempt to open Gerber file with outline
+        ifstream outlineFile(outlineGerberName.c_str());
+        if (outlineFile.is_open())
+        {
+            // Build single geometric cell from limboint.h to store information (forget about timestamps)
+            GeoCell cellGerb;
+            cellGerb.cellName = "outline";
+
+            // Build ASCII database from limboint.h (forget about timestamps)
+            AsciiDataBase adbGerb;
+            adbGerb.setFileName(outlineGerberName.substr(0, outlineGerberName.find_last_of(".")) + ".gds");
+
+            // Gerber file is barely readable line-by-line
+            std::string fileLine;
+            getline(outlineFile, fileLine);
+
+            // Skip all comment lines (starting with G-code "G04" in RS-274X)
+            while (fileLine.compare(0, 3, "G04") == 0)
+            {
+                getline(outlineFile, fileLine);
+            }
+
+            // Initialize file-scope variables
+            int intPartX = 2; // Should be <= 6
+            int fracPartX = 4; // Should be 4, 5, or 6
+            int intPartY = 2; // Should be <= 6
+            int fracPartY = 4; // Should be 4, 5, or 6
+            int graphicsMode = 0; // Active modes are "G01" (linear interpolation), "G02" (CW circular interp.), "G03" (CCW circular interp.), "G04" (comment), "G36"/"G37" (set region mode on/off), "G74"/"G75" (set single/multi quadrant)
+            bool regionMode = false; // Is region mode on?
+            bool singleQuadMode = true; // true = single quadrant mode (angle between 0 and pi/2 rad), false = multi quadrant mode (angle greater than 0 and up to 2*pi rad)
+            vector<double> currentPt = { 0., 0. }; // Coordinates of current point
+            vector<Aperture> customAper = {}; // Custom apertures
+            Aperture currentAper = Aperture(); // Current aperture in use
+
+            // Read rest of file line-by-line with very rough parser
+            while (!outlineFile.eof())
+            {
+                // Handle format specification (starting with configuration parameter "%FS" in RS-274X)
+                if (fileLine.compare(0, 3, "%FS") == 0)
+                {
+                    // Find format specification delimiters for each coordinate
+                    size_t indXFormat = fileLine.find("X");
+                    size_t indYFormat = fileLine.find("Y");
+
+                    // Save format specification information to variables
+                    intPartX = stoi(fileLine.substr(indXFormat + 1, 1)); // First character after coordinate specifier is integer part of number representation
+                    fracPartX = stoi(fileLine.substr(indXFormat + 2, 1)); // Second character after coordinate specifier is fractional part of number representation
+                    intPartY = stoi(fileLine.substr(indYFormat + 1, 1));
+                    fracPartY = stoi(fileLine.substr(indYFormat + 2, 1));
+                }
+                // Handle units (starting with configuration parameter "%MO" in RS-274X)
+                else if (fileLine.compare(0, 3, "%MO") == 0)
+                {
+                    double multSI = 1.0;
+
+                    // Units are in inches
+                    if (fileLine.compare(3, 2, "IN") == 0)
+                    {
+                        multSI = 0.0254;
+                    }
+                    // Units are in millimeters
+                    if (fileLine.compare(3, 2, "MM") == 0)
+                    {
+                        multSI = 1e-3;
+                    }
+
+                    // Propagate units information to ASCII database now
+                    adbGerb.setdbUserUnits(1.);
+                    adbGerb.setdbUnits(multSI);
+                }
+                // Check image polarity (starting with configuration parameter "%IP" in RS-274X, affects nothing at present)
+                else if (fileLine.compare(0, 3, "%IP") == 0)
+                {
+                    bool isPosPol = true;
+                    if (fileLine.compare(3, 3, "POS") == 0)
+                    {
+                        isPosPol = true;
+                    }
+                    else if (fileLine.compare(3, 3, "NEG") == 0)
+                    {
+                        isPosPol = false;
+                    }
+                }
+                // Define an aperture (starting with D-code "%AD" in RS-274X) without allowing aperture macros
+                else if (fileLine.compare(0, 3, "%AD") == 0)
+                {
+                    // Find delimiters
+                    size_t indDNum = fileLine.find("D", 3); // D-code operation delimiter
+                    size_t indCirc = fileLine.find("C,"); // Standard aperture template for circle
+                    size_t indRect = fileLine.find("R,"); // Standard aperture template for rectangle
+                    size_t indStad = fileLine.find("O,"); // Standard aperture template for stadium (obround)
+                    size_t indPoly = fileLine.find("P,"); // Standard aperture template for regular polygon
+                    size_t indGraphicClose = fileLine.find("*%");
+
+                    // Follow standard aperture templates
+                    int aperNum = 0;
+                    if (indCirc != string::npos)
+                    {
+                        // Find D-code for aperture number
+                        aperNum = stoi(fileLine.substr(indDNum + 1, indCirc - indDNum - 1));
+
+                        // Check for hole delimiter in standard aperture template for circle
+                        double diameter = 0.0; // Outer diameter of circle (m)
+                        double holeDia = 0.0; // Diameter of center hole (m)
+                        size_t indHole = fileLine.find("X", indCirc);
+
+                        // Create aperture for circle without a hole
+                        if (indHole == string::npos)
+                        {
+                            diameter = stod(fileLine.substr(indCirc + 2, indGraphicClose - indCirc - 2)) * adbGerb.getdbUnits();
+                        }
+                        // Create aperture for circle with a hole (annulus)
+                        else
+                        {
+                            diameter = stod(fileLine.substr(indCirc + 2, indHole - indCirc - 2)) * adbGerb.getdbUnits();
+                            holeDia = stod(fileLine.substr(indHole + 2, indGraphicClose - indHole - 2)) * adbGerb.getdbUnits();
+                        }
+
+                        // Add defined aperture to custom apertures vector
+                        customAper.emplace_back(Aperture(aperNum, diameter, holeDia));
+                    }
+                    else if (indRect != string::npos)
+                    {
+                        // Find D-code for aperture number
+                        aperNum = stoi(fileLine.substr(indDNum + 1, indRect - indDNum - 1));
+
+                        // Check for y-dimension size and hole delimiters in standard aperture template for rectangle
+                        double xSize = 0.0; // Width in x-direction (m)
+                        double ySize = 0.0; // Lenght in y-direction (m)
+                        double holeDia = 0.0; // Diameter of center hole (m)
+                        size_t indYSize = fileLine.find("X", indRect); // Confusingly, the y-size comes after the x-size and letter "X"
+                        size_t indHole = fileLine.find("X", indYSize);
+                        xSize = stod(fileLine.substr(indRect + 2, indYSize - indRect - 2)) * adbGerb.getdbUnits();
+
+                        // Create aperture for rectangle without a hole
+                        if (indHole == string::npos)
+                        {
+                            ySize = stod(fileLine.substr(indYSize + 1, indGraphicClose - indYSize - 1)) * adbGerb.getdbUnits();
+                        }
+                        // Create aperture for rectangle with a hole
+                        else
+                        {
+                            ySize = stod(fileLine.substr(indYSize + 1, indHole - indYSize - 1)) * adbGerb.getdbUnits();
+                            holeDia = stod(fileLine.substr(indHole + 1, indGraphicClose - indHole - 1)) * adbGerb.getdbUnits();
+                        }
+
+                        // Add defined aperture to custom apertures vector
+                        customAper.emplace_back(Aperture(aperNum, 'R', xSize, ySize, holeDia));
+                    }
+                    else if (indStad != string::npos)
+                    {
+                        // Find D-code for aperture number
+                        aperNum = stoi(fileLine.substr(indDNum + 1, indStad - indDNum - 1));
+
+                        // Check for y-dimension enclosing size and hole delimiters in standard aperture template for stadium (obround)
+                        double xSize = 0.0; // Enclosing box size in x-direction (m)
+                        double ySize = 0.0; // Enclosing box size in y-direction (m)
+                        double holeDia = 0.0; // Diameter of center hole (m)
+                        size_t indYSize = fileLine.find("X", indStad); // Confusingly, the y-dimension enclosing box size comes after the x-dimension enclosing box size and letter "X"
+                        size_t indHole = fileLine.find("X", indYSize);
+                        xSize = stod(fileLine.substr(indStad + 2, indYSize - indStad - 2)) * adbGerb.getdbUnits();
+
+                        // Create aperture for stadium without a hole
+                        if (indHole == string::npos)
+                        {
+                            ySize = stod(fileLine.substr(indYSize + 1, indGraphicClose - indYSize - 1)) * adbGerb.getdbUnits();
+                        }
+                        // Create aperture for stadium with a hole
+                        else
+                        {
+                            ySize = stod(fileLine.substr(indYSize + 1, indHole - indYSize - 1)) * adbGerb.getdbUnits();
+                            holeDia = stod(fileLine.substr(indHole + 1, indGraphicClose - indHole - 1)) * adbGerb.getdbUnits();
+                        }
+
+                        // Add defined aperture to custom apertures vector
+                        customAper.emplace_back(Aperture(aperNum, 'O', xSize, ySize, holeDia));
+                    }
+                    else if (indPoly != string::npos)
+                    {
+                        // Find D-code for aperture number
+                        aperNum = stoi(fileLine.substr(indDNum + 1, indPoly - indDNum - 1));
+
+                        // Check for y-dimension enclosing size and hole delimiters in standard aperture template for regular polygon
+                        double circumDia = 0.0; // Circumdiameter, the diameter of the circle circumscribing the vertices
+                        int nVert = 3; // Number of vertices between 3 and 12
+                        double rotAngle = 0.0; // Rotation angle (rad)
+                        double holeDia = 0.0;  // Diameter of center hole (m)
+                        size_t indVert = fileLine.find("X", indPoly);
+                        size_t indRot = fileLine.find("X", indVert);
+                        size_t indHole = fileLine.find("X", indRot); // Should return string::npos if indRot could not be found previously
+                        circumDia = stod(fileLine.substr(indPoly + 2, indVert - indPoly - 2)) * adbGerb.getdbUnits();
+
+                        // Create aperture for regular polygon without rotation
+                        if (indRot == string::npos)
+                        {
+                            nVert = stoi(fileLine.substr(indVert + 1, indGraphicClose - indVert - 1));
+                        }
+                        // Create aperture for regular polygon with rotation
+                        else
+                        {
+                            nVert = stoi(fileLine.substr(indVert + 1, indRot - indVert - 1));
+
+                            // Rotated regular polygon aperture lacks a hole
+                            if (indHole == string::npos)
+                            {
+                                rotAngle = stod(fileLine.substr(indRot + 1, indGraphicClose - indRot - 1)) * M_PI / 180.;
+                            }
+                            // Rotated regular polygon aperture has a hole
+                            else
+                            {
+                                rotAngle = stod(fileLine.substr(indRot + 1, indHole - indRot - 1)) * M_PI / 180.;
+                                holeDia = stod(fileLine.substr(indHole + 1, indGraphicClose - indHole - 1)) * adbGerb.getdbUnits();
+                            }
+                        }
+
+                        // Add defined aperture to custom apertures vector
+                        customAper.emplace_back(Aperture(aperNum, 'P', circumDia, holeDia, nVert, rotAngle));
+                    }
+                    else
+                    {
+                        // Find where macro name starts
+                        size_t indMacroName = indDNum + 1;
+                        while (isdigit(fileLine[indMacroName]))
+                        {
+                            indMacroName++;
+                        }
+
+                        // Find D-code for aperture number
+                        aperNum = stoi(fileLine.substr(indDNum + 1, indMacroName - indDNum - 1));
+
+                        // Add ethereal circular aperture to custom apertures vector to hold the place of aperture macro
+                        customAper.emplace_back(Aperture(aperNum, 0.0, 0.0));
+                    }
+                }
+                // Set an aperture previously defined (starting with D-code "Dnn" in RS-274X, where "nn" >= 10)
+                else if (fileLine.compare(0, 1, "D") == 0)
+                {
+                    // Find D-code of aperture
+                    size_t indGraphicClose = fileLine.find("*");
+                    int aperNum = stoi(fileLine.substr(1, indGraphicClose - 1));
+
+                    // Look up the aperture among already defined apertures
+                    for (size_t indAper = 0; indAper < customAper.size(); indAper++)
+                    {
+                        if (aperNum == customAper[indAper].getAperNum())
+                        {
+                            // Switch to aperture
+                            currentAper = customAper[indAper];
+                        }
+                    }
+                }
+                // Switch graphics mode to linear interpolation (starting with G-code "G01" in RS-274X)
+                else if (fileLine.compare(0, 3, "G01") == 0)
+                {
+                    graphicsMode = 1;
+
+                    // See if any additional information on this line
+                    size_t indGraphicClose = fileLine.find("*");
+                    if (indGraphicClose > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                        size_t indDCOp = fileLine.find("D"); // D-code operation delimiter
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        if (indYEnd != string::npos)
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
+
+                        // Perform D-code operation
+                        switch (DCOp)
+                        {
+                        case 01:
+                        {
+                            // Interpolate operation
+                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                            if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
+                            {
+                                pathType = 1;
+                            }
+                            else
+                            {
+                                pathType = 2;
+                            }
+                            double width = currentAper.getCircumDia(); // Worst case scenario used
+
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width));
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+                            break;
+                        }
+                        case 02:
+                            // Move operation
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+                            break;
+                        case 03:
+                            // Flash operation (supposedly not allowed in region mode)
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+
+                            // Push polygon boundary of aperture image to geometric cell
+                            cellGerb.boundaries.emplace_back(currentAper.drawAsBound(xEnd, yEnd));
+                            break;
+                        }
+                    }
+                }
+                // Switch graphics mode to clockwise circular interpolation (starting with G-code "G02" in RS-274X)
+                else if (fileLine.compare(0, 3, "G02") == 0)
+                {
+                    graphicsMode = 2;
+
+                    // See if any additional information on this line
+                    size_t indGraphicClose = fileLine.find("*");
+                    if (indGraphicClose > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                        size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction
+                        size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction
+                        size_t indDCOp = fileLine.find("D"); // D-code operation delimiter
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        double iOff = 0.; // Initialize as zero offset from starting point to arc center (nonnegative for single quadrant, signed for multi quadrant)
+                        double jOff = 0.;
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        else
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        if ((indYEnd != string::npos) && (indIOff != string::npos))
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        else
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        if ((indIOff != string::npos) && (indJOff != string::npos))
+                        {
+                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        else
+                        {
+                            iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        if (indJOff != string::npos)
+                        {
+                            jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
+
+                        // Perform D-code operation
+                        switch (DCOp)
+                        {
+                        case 01:
+                        {
+                            // Interpolate operation
+                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                            if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
+                            {
+                                pathType = 1;
+                            }
+                            else
+                            {
+                                pathType = 2;
+                            }
+                            double width = currentAper.getCircumDia(); // Worst case scenario used
+
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0;
+                            double startAngle = 0.0;
+                            double endAngle = 0.0;
+                            double arcAngle = 0.0;
+                            if (singleQuadMode)
+                            {
+                                // Single quadrant mode has unsigned offsets to center in CW interpolation
+                                if ((xEnd <= xStart) && (yEnd >= yStart))
+                                {
+                                    // Arc moves back and up
+                                    xCent += iOff;
+                                    yCent += jOff;
+                                }
+                                else if ((xEnd <= xStart) && (yEnd <= yStart))
+                                {
+                                    // Arc moves back and down
+                                    xCent -= iOff;
+                                    yCent += jOff;
+                                }
+                                else if ((xEnd >= xStart) && (yEnd <= yStart))
+                                {
+                                    // Arc moves forward and down
+                                    xCent -= iOff;
+                                    yCent -= jOff;
+                                }
+                                else if ((xEnd >= xStart) && (yEnd >= yStart))
+                                {
+                                    // Arc moves forward and up
+                                    xCent += iOff;
+                                    yCent -= jOff;
+                                }
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                arcAngle = acos(((xStart - xCent) * (xEnd - xCent) + (yStart - yCent) * (yEnd - yCent)) / (hypot(xStart - xCent, yStart - yCent) * hypot(xEnd - xCent, yEnd - yCent))); // Dot product formula
+                            }
+                            else
+                            {
+                                // Multi quadrant mode has signed offsets to center
+                                xCent += iOff;
+                                yCent += jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                if (startAngle < 0)
+                                {
+                                    startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                if (endAngle < 0)
+                                {
+                                    endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                arcAngle = startAngle - endAngle; // Difference of angles CW
+                            }
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            for (size_t indi = 1; indi < nArcPt; indi++)
+                            {
+                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path(paths, 1, {}, pathType, width));
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+                            break;
+                        }
+                        case 02:
+                            // Move operation
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+                            break;
+                        case 03:
+                            // Flash operation (supposedly not allowed in region mode)
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+
+                            // Push polygon boundary of aperture image to geometric cell
+                            cellGerb.boundaries.emplace_back(currentAper.drawAsBound(xEnd, yEnd));
+                            break;
+                        }
+                    }
+                }
+                // Switch graphics mode to counterclockwise circular interpolation (starting with G-code "G03" in RS-274X)
+                else if (fileLine.compare(0, 3, "G03") == 0)
+                {
+                    graphicsMode = 3;
+
+                    // See if any additional information on this line
+                    size_t indGraphicClose = fileLine.find("*");
+                    if (indGraphicClose > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                        size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction
+                        size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction
+                        size_t indDCOp = fileLine.find("D"); // D-code operation delimiter
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        double iOff = 0.; // Initialize as zero offset from starting point to arc center (nonnegative for single quadrant, signed for multi quadrant)
+                        double jOff = 0.;
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        else
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        if ((indYEnd != string::npos) && (indIOff != string::npos))
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        else
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        if ((indIOff != string::npos) && (indJOff != string::npos))
+                        {
+                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        else
+                        {
+                            iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                        }
+                        if (indJOff != string::npos)
+                        {
+                            jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                        }
+                        int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
+
+                        // Perform D-code operation
+                        switch (DCOp)
+                        {
+                        case 01:
+                        {
+                            // Interpolate operation
+                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                            if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
+                            {
+                                pathType = 1;
+                            }
+                            else
+                            {
+                                pathType = 2;
+                            }
+                            double width = currentAper.getCircumDia(); // Worst case scenario used
+
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0;
+                            double startAngle = 0.0;
+                            double endAngle = 0.0;
+                            double arcAngle = 0.0;
+                            if (singleQuadMode)
+                            {
+                                // Single quadrant mode has unsigned offsets to center in CCW interpolation
+                                if ((xEnd <= xStart) && (yEnd >= yStart))
+                                {
+                                    // Arc moves back and up
+                                    xCent -= iOff;
+                                    yCent -= jOff;
+                                }
+                                else if ((xEnd <= xStart) && (yEnd <= yStart))
+                                {
+                                    // Arc moves back and down
+                                    xCent += iOff;
+                                    yCent -= jOff;
+                                }
+                                else if ((xEnd >= xStart) && (yEnd <= yStart))
+                                {
+                                    // Arc moves forward and down
+                                    xCent += iOff;
+                                    yCent += jOff;
+                                }
+                                else if ((xEnd >= xStart) && (yEnd >= yStart))
+                                {
+                                    // Arc moves forward and up
+                                    xCent -= iOff;
+                                    yCent += jOff;
+                                }
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                arcAngle = acos(((xStart - xCent) * (xEnd - xCent) + (yStart - yCent) * (yEnd - yCent)) / (hypot(xStart - xCent, yStart - yCent) * hypot(xEnd - xCent, yEnd - yCent))); // Dot product formula
+                            }
+                            else
+                            {
+                                // Multi quadrant mode has signed offsets to center
+                                xCent += iOff;
+                                yCent += jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                if (startAngle < 0)
+                                {
+                                    startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                if (endAngle < 0)
+                                {
+                                    endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                arcAngle = endAngle - startAngle; // Difference of angles CCW
+                            }
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            //cout << "startPt: (" << xStart << ", " << yStart << ")" << endl;
+                            //cout << " path points: ";
+                            for (size_t indi = 1; indi < nArcPt; indi++)
+                            {
+                                paths.push_back(xCent + arcRad * cos(2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                paths.push_back(yCent + arcRad * sin(2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                //cout << "(" << xCent + arcRad * cos(2.0 * M_PI * indi / 24 + startAngle) << ", " << yCent + arcRad * sin(2.0 * M_PI * indi / 24 + startAngle) << ") ";
+                            }
+                            //cout << endl;
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path(paths, 1, {}, pathType, width));
+
+                            // Update current point
+                            //cout << "currentPt: (" << xEnd << ", " << yEnd << ")" << endl;
+                            currentPt = { xEnd, yEnd };
+                            break;
+                        }
+                        case 02:
+                            // Move operation
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+                            break;
+                        case 03:
+                            // Flash operation (supposedly not allowed in region mode)
+
+                            // Update current point
+                            currentPt = { xEnd, yEnd };
+
+                            // Push polygon boundary of aperture image to geometric cell
+                            cellGerb.boundaries.emplace_back(currentAper.drawAsBound(xEnd, yEnd));
+                            break;
+                        }
+                    }
+                }
+                // Enable region mode (starting with G-code "G36" in RS-274X)
+                else if (fileLine.compare(0, 3, "G36") == 0)
+                {
+                    regionMode = true;
+                }
+                // Disable region mode (starting with G-code "G37" in RS-274X)
+                else if (fileLine.compare(0, 3, "G37") == 0)
+                {
+                    regionMode = false;
+                }
+                // Enable single quadrant mode (starting with G-code "G74" in RS-274X)
+                else if (fileLine.compare(0, 3, "G74") == 0)
+                {
+                    singleQuadMode = true;
+                }
+                // Enable multi quadrant mode (starting with G-code "G75" in RS-274X)
+                else if (fileLine.compare(0, 3, "G75") == 0)
+                {
+                    singleQuadMode = false;
+                }
+                // Handle D-code operations with current aperture and settings starting with x-coordinate of end point
+                else if (fileLine.compare(0, 1, "X") == 0)
+                {
+                    // Find delimiters
+                    size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                    size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                    size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction
+                    size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction
+                    size_t indDCOp = fileLine.find("D"); // D-code operation delimiter
+                    size_t indGraphicClose = fileLine.find("*");
+
+                    // Extract numbers
+                    double xEnd = currentPt[0]; // Initialize ending point to current point
+                    double yEnd = currentPt[1];
+                    double iOff = 0.; // Initialize as zero offset from starting point to arc center (nonnegative for single quadrant, signed for multi quadrant)
+                    double jOff = 0.;
+                    if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits(); // Length is index difference minus included characters with fractional part correction
+                    }
+                    else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indJOff - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    else
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indDCOp - indXEnd - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    if ((indYEnd != string::npos) && (indIOff != string::npos))
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    else
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    if ((indIOff != string::npos) && (indJOff != string::npos))
+                    {
+                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    else
+                    {
+                        iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    if (indJOff != string::npos)
+                    {
+                        jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
+
+                    // Perform D-code operation
+                    switch (DCOp)
+                    {
+                    case 01:
+                    {
+                        // Interpolate operation
+                        int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                        if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
+                        {
+                            pathType = 1;
+                        }
+                        else
+                        {
+                            pathType = 2;
+                        }
+                        double width = currentAper.getCircumDia(); // Worst case scenario used
+
+                        // Act based on active interpolation mode
+                        if (graphicsMode == 1)
+                        {
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width));
+                        }
+                        else if ((graphicsMode == 2) || (graphicsMode == 3))
+                        {
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0;
+                            double startAngle = 0.0;
+                            double endAngle = 0.0;
+                            double arcAngle = 0.0;
+                            if (singleQuadMode)
+                            {
+                                if (graphicsMode == 2)
+                                {
+                                    // Single quadrant mode has unsigned offsets to center in CW interpolation
+                                    if ((xEnd <= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves back and up
+                                        xCent += iOff;
+                                        yCent += jOff;
+                                    }
+                                    else if ((xEnd <= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves back and down
+                                        xCent -= iOff;
+                                        yCent += jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves forward and down
+                                        xCent -= iOff;
+                                        yCent -= jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves forward and up
+                                        xCent += iOff;
+                                        yCent -= jOff;
+                                    }
+                                }
+                                else
+                                {
+                                    // Single quadrant mode has unsigned offsets to center in CCW interpolation
+                                    if ((xEnd <= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves back and up
+                                        xCent -= iOff;
+                                        yCent -= jOff;
+                                    }
+                                    else if ((xEnd <= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves back and down
+                                        xCent += iOff;
+                                        yCent -= jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves forward and down
+                                        xCent += iOff;
+                                        yCent += jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves forward and up
+                                        xCent -= iOff;
+                                        yCent += jOff;
+                                    }
+                                }
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                arcAngle = acos(((xStart - xCent) * (xEnd - xCent) + (yStart - yCent) * (yEnd - yCent)) / (hypot(xStart - xCent, yStart - yCent) * hypot(xEnd - xCent, yEnd - yCent))); // Dot product formula
+                            }
+                            else
+                            {
+                                // Multi quadrant mode has signed offsets to center
+                                xCent += iOff;
+                                yCent += jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                if (startAngle < 0)
+                                {
+                                    startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                if (endAngle < 0)
+                                {
+                                    endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                if (graphicsMode == 2)
+                                {
+                                    arcAngle = startAngle - endAngle; // Difference of angles CW
+                                }
+                                else
+                                {
+                                    arcAngle = endAngle - startAngle; // Difference of angles CCW
+                                }
+                            }
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            if (graphicsMode == 2)
+                            {
+                                for (size_t indi = 1; indi < nArcPt; indi++)
+                                {
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                }
+                            }
+                            else
+                            {
+                                for (size_t indi = 1; indi < nArcPt; indi++)
+                                {
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                }
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path(paths, 1, {}, pathType, width));
+                        }
+
+                        // Update current point
+                        currentPt = { xEnd, yEnd };
+                        break;
+                    }
+                    case 02:
+                        // Move operation
+
+                        // Update current point
+                        currentPt = { xEnd, yEnd };
+                        break;
+                    case 03:
+                        // Flash operation (supposedly not allowed in region mode)
+
+                        // Update current point
+                        currentPt = { xEnd, yEnd };
+
+                        // Push polygon boundary of aperture image to geometric cell
+                        cellGerb.boundaries.emplace_back(currentAper.drawAsBound(xEnd, yEnd));
+                        break;
+                    }
+                }
+                // Handle D-code operations with current aperture and settings starting with y-coordinate of end point
+                else if (fileLine.compare(0, 1, "Y") == 0)
+                {
+                    // Find delimiters
+                    size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                    size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction
+                    size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction
+                    size_t indDCOp = fileLine.find("D"); // D-code operation delimiter
+                    size_t indGraphicClose = fileLine.find("*");
+
+                    // Extract numbers
+                    double xEnd = currentPt[0]; // Ending point must have same x-coordinate as starting point if not given
+                    double yEnd = currentPt[1]; // Initialize ending point to current point
+                    double iOff = 0.; // Initialize as zero offset from starting point to arc center (nonnegative for single quadrant, signed for multi quadrant)
+                    double jOff = 0.;
+                    if ((indYEnd != string::npos) && (indIOff != string::npos))
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    else if ((indYEnd != string::npos) && (indIOff == string::npos) && (indJOff != string::npos))
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indJOff - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    else
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indDCOp - indYEnd - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    if ((indIOff != string::npos) && (indJOff != string::npos))
+                    {
+                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    else
+                    {
+                        iOff = stod(fileLine.substr(indIOff + 1, indDCOp - indIOff - 1)) / pow(10.0, fracPartX) * adbGerb.getdbUnits();
+                    }
+                    if (indJOff != string::npos)
+                    {
+                        jOff = stod(fileLine.substr(indJOff + 1, indDCOp - indJOff - 1)) / pow(10.0, fracPartY) * adbGerb.getdbUnits();
+                    }
+                    int DCOp = stoi(fileLine.substr(indDCOp + 1, indGraphicClose - indDCOp - 1));
+
+                    // Perform D-code operation
+                    switch (DCOp)
+                    {
+                    case 01:
+                    {
+                        // Interpolate operation
+                        int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                        if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
+                        {
+                            pathType = 1;
+                        }
+                        else
+                        {
+                            pathType = 2;
+                        }
+                        double width = currentAper.getCircumDia(); // Worst case scenario used
+
+                                                                   // Act based on active interpolation mode
+                        if (graphicsMode == 1)
+                        {
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width));
+                        }
+                        else if ((graphicsMode == 2) || (graphicsMode == 3))
+                        {
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0;
+                            double startAngle = 0.0;
+                            double endAngle = 0.0;
+                            double arcAngle = 0.0;
+                            if (singleQuadMode)
+                            {
+                                if (graphicsMode == 2)
+                                {
+                                    // Single quadrant mode has unsigned offsets to center in CW interpolation
+                                    if ((xEnd <= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves back and up
+                                        xCent += iOff;
+                                        yCent += jOff;
+                                    }
+                                    else if ((xEnd <= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves back and down
+                                        xCent -= iOff;
+                                        yCent += jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves forward and down
+                                        xCent -= iOff;
+                                        yCent -= jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves forward and up
+                                        xCent += iOff;
+                                        yCent -= jOff;
+                                    }
+                                }
+                                else
+                                {
+                                    // Single quadrant mode has unsigned offsets to center in CCW interpolation
+                                    if ((xEnd <= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves back and up
+                                        xCent -= iOff;
+                                        yCent -= jOff;
+                                    }
+                                    else if ((xEnd <= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves back and down
+                                        xCent += iOff;
+                                        yCent -= jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd <= yStart))
+                                    {
+                                        // Arc moves forward and down
+                                        xCent += iOff;
+                                        yCent += jOff;
+                                    }
+                                    else if ((xEnd >= xStart) && (yEnd >= yStart))
+                                    {
+                                        // Arc moves forward and up
+                                        xCent -= iOff;
+                                        yCent += jOff;
+                                    }
+                                }
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                arcAngle = acos(((xStart - xCent) * (xEnd - xCent) + (yStart - yCent) * (yEnd - yCent)) / (hypot(xStart - xCent, yStart - yCent) * hypot(xEnd - xCent, yEnd - yCent))); // Dot product formula
+                            }
+                            else
+                            {
+                                // Multi quadrant mode has signed offsets to center
+                                xCent += iOff;
+                                yCent += jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                                startAngle = atan2(yStart - yCent, xStart - xCent);
+                                if (startAngle < 0)
+                                {
+                                    startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                                if (endAngle < 0)
+                                {
+                                    endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                                }
+                                if (graphicsMode == 2)
+                                {
+                                    arcAngle = startAngle - endAngle; // Difference of angles CW
+                                }
+                                else
+                                {
+                                    arcAngle = endAngle - startAngle; // Difference of angles CCW
+                                }
+                            }
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            if (graphicsMode == 2)
+                            {
+                                for (size_t indi = 1; indi < nArcPt; indi++)
+                                {
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                }
+                            }
+                            else
+                            {
+                                for (size_t indi = 1; indi < nArcPt; indi++)
+                                {
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                }
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Push new path to the geometric cell
+                            cellGerb.paths.emplace_back(path(paths, 1, {}, pathType, width));
+                        }
+
+                        // Update current point
+                        currentPt = { xEnd, yEnd };
+                        break;
+                    }
+                    case 02:
+                        // Move operation
+
+                        // Update current point
+                        currentPt = { xEnd, yEnd };
+                        break;
+                    case 03:
+                        // Flash operation (supposedly not allowed in region mode)
+
+                        // Update current point
+                        currentPt = { xEnd, yEnd };
+
+                        // Push polygon boundary of aperture image to geometric cell
+                        cellGerb.boundaries.emplace_back(currentAper.drawAsBound(xEnd, yEnd));
+                        break;
+                    }
+                }
+                // End of file (starting with command "M02" in RS-274X)
+                else if (fileLine.compare(0, 3, "M02") == 0)
+                {
+                    break;
+                }
+
+                // Keep reading new lines in file, skipping comments
+                getline(outlineFile, fileLine);
+                while (fileLine.compare(0, 3, "G04") == 0)
+                {
+                    getline(outlineFile, fileLine);
+                }
+            }
+
+            // Close file
+            outlineFile.close();
+
+            // Update ASCII database of Gerber outline
+            adbGerb.setLibName("outline");
+            adbGerb.appendCell(cellGerb);
+            adbGerb.setdbUnits(adbGerb.getdbUnits() * 1.e-3); // Rescale Gerber file units 0.001x to allow integer representation in GDSII
+            vector<complex<double>> hullPt = adbGerb.convexHull(cellGerb.cellName);
+
+            // Print and dump the ASCII database of Gerber outline
+            //adbGerb.print({ });
+            adbGerb.dump();
+
+            // Extract coordinates from successful Graham scan convex hull process after Gerber outline file read
+            cout << "Gerber outline file produced a convex hull of " << hullPt.size() << " points for the design limits" << endl;
+            vector<double> hullCoord;
+            for (size_t indi = 0; indi < hullPt.size(); indi++)
+            {
+                hullCoord.push_back(hullPt[indi].real()); // Real part is x-coordinate of a point
+                hullCoord.push_back(hullPt[indi].imag()); // Imaginary part is y-coordinate of a point
+            }
+
+            // Optionally create new ASCII database of convex hull
+            GeoCell cellHull;
+            cellHull.boundaries.emplace_back(boundary(hullCoord, 1, { })); // Single boundary of convex hull
+            cellHull.boundaries.back().reorder();
+            AsciiDataBase adbHull;
+            adbHull.setFileName(outlineGerberName.substr(0, outlineGerberName.find_last_of(".")) + "_HULL.gds");
+            adbHull.setLibName("convexHull");
+            adbHull.appendCell(cellHull);
+            adbHull.setdbUnits(adbGerb.getdbUnits());
+            adbHull.dump();
+
+            // Return the convex hull coordinates
+            return hullCoord;
+        }
+        else
+        {
+            // File could not be opened
+            cerr << "Unable to open Gerber outline file" << endl;
+            return { };
+        }
     }
 
     // Read interconnect modeling platform (IMP) file data into the solver database
@@ -1160,7 +2738,20 @@ struct SolverDataBase
 
             // Build single geometric cell from limboint.h to store information
             GeoCell cellIMP;
-            cellIMP.cellName = impFileName.substr(0, impFileName.find(".", 1));
+            size_t indPathSlash = impFileName.find_last_of("/");
+            size_t indPathExten = impFileName.find_last_of(".");
+            std::string cellName;
+            if (indPathSlash == string::npos)
+            {
+                // No slashes found in impFileName
+                cellName = impFileName.substr(0, indPathExten);
+            }
+            else
+            {
+                // Path for impFileName contains directories
+                cellName = impFileName.substr(indPathSlash + 1, indPathExten - indPathSlash - 1);
+            }
+            cellIMP.cellName = cellName;
             cellIMP.dateCreate = time;
             cellIMP.dateMod = time;
 
@@ -1181,15 +2772,15 @@ struct SolverDataBase
                 std::string version = fileLine.substr(7, fileLine.length() - 7); // 7 characters in header syntax
             }
 
+            // Initialize file-scope variables
+            static double stripLength = 0;       // Initialize the strip length
+            static int maxGDSIILayer = 0;        // Maximum GDSII layer number encountered
+            static int numFreqPts = 0;           // Number of points in frequency sweep
+            static vector<double> freqList = {}; // List of frequencies in sweep
+
             // Read rest of file line-by-line
             while (!impFile.eof())
             {
-                // Initialize file-scope varialbes
-                static double stripLength = 0;       // Initialize the strip length
-                static int maxGDSIILayer = 0;        // Maximum GDSII layer number encountered
-                static int numFreqPts = 0;           // Number of points in frequency sweep
-                static vector<double> freqList = {}; // List of frequencies in sweep
-
                 // Handle units
                 if (fileLine.compare(0, 12, "LINEARUNITS ") == 0)
                 {
@@ -1567,26 +3158,54 @@ struct SolverDataBase
                         getline(inputFile, fileLine);
                     }
 
+                    // Design limits information recorded differently based on how many numbers appear
+                    std::string noComment = fileLine.substr(0, fileLine.find(" #"));
+                    size_t nSpace = count(noComment.begin(), noComment.end(), ' ');
+
                     // Obtain limits of IC design size
                     double xmin, xmax, ymin, ymax, zmin, zmax;
-                    size_t indCoordStart = 0;
-                    size_t indCoordEnd = fileLine.find(" ", indCoordStart);
-                    xmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    xmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    ymin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    ymax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
-                    indCoordStart = indCoordEnd + 1;
-                    indCoordEnd = fileLine.find(" ", indCoordStart);
-                    zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    if (nSpace >= 5)
+                    {
+                        // Conventional specification has six numbers separated by spaces
+                        size_t indCoordStart = 0;
+                        size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        ymin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        ymax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    }
+                    else
+                    {
+                        // Alternative specification has Gerber outline file name followed by two numbers
+                        size_t indCoordStart = 0;
+                        size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                        xmin = NAN;
+                        xmax = NAN;
+                        ymin = NAN;
+                        ymax = NAN;
+                        std::string outlineFile = fileLine.substr(indCoordStart, indCoordEnd - indCoordStart);
+                        std::string outlinePath = inputFileName.substr(0, inputFileName.find_last_of("/") + 1) + outlineFile; // Get path up to simulation input file for outline file path
+                        vector<double> hullCoord = this->readGerberOutline(outlinePath); // Not doing anything with this data right now
+                        //cout << "Number of convex hull coordinates: " << hullCoord.size() << endl;
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmin = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                        indCoordStart = indCoordEnd + 1;
+                        indCoordEnd = fileLine.find(" ", indCoordStart);
+                        zmax = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart));
+                    }
 
                     // Move down one line, skipping comments
                     getline(inputFile, fileLine);
@@ -1906,7 +3525,7 @@ struct SolverDataBase
 
                         // Move down one line in port list, skipping comments
                         getline(inputFile, fileLine);
-                        while (fileLine.compare(0, 1, "#") == 0)
+                        while ((fileLine.compare(0, 1, "#") == 0) && !(inputFile.eof()))
                         {
                             getline(inputFile, fileLine);
                         }
@@ -1953,7 +3572,6 @@ struct SolverDataBase
 
         // Use layer stack-up information to set fields
         data->numStack = this->getNumLayer();
-        //data->stackEpsn; // Is this needed from SolverDataBase since it relies on z-coordinates of nodes?
         for (size_t indi = 0; indi < data->numStack; indi++)
         {
             Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration

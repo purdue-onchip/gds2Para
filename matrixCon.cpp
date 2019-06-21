@@ -128,7 +128,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     clock_t t1 = clock();
     clock_t ts = t1;
     status = merge_v0d1(sys, block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
-    cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+    cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
     myint node1, node2;
 
     for (indi = 0; indi < v0d1anum; indi++){    // the upper and lower planes are PEC
@@ -252,7 +252,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     /*leng_Ad = 0;
     clock_t t2 = clock();
     status = mklMatrixMulti(sys, leng_Ad, sys->v0d1aRowId, sys->v0d1aColId, sys->v0d1aval, sys->N_edge, leng_v0d1, sys->v0d1RowId, sys->v0d1ColId, sys->v0d1val, 1);
-    cout << "Matrix mutiplication time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;*/
+    cout << "Matrix mutiplication time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;*/
 
     ///*****************************************************************/
     sys->AdRowId = (myint*)calloc(leng_Ad, sizeof(myint));
@@ -564,7 +564,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
 
     while (sourcePort < sys->numPorts){
-
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
             sys->J[sys->portEdge[sourcePort][indi]] = sys->portCoor[sourcePort].portDirection;
@@ -594,13 +593,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
         /* End of solving */
 
 #ifndef SKIP_PARDISO
         t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
-        cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
 
         for (indi = 0; indi < leng_v0d1; indi++){
@@ -714,7 +713,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
 
 
@@ -744,7 +743,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, dRhs2, leng_v0d1, y0d2);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
 
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
@@ -771,7 +770,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             u0c[indi - sys->N_edge_s] = yd2[indi] + yc[indi];
         }
 
-        cout << "Time to generate u0d and u0c is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << endl;
+        cout << "Time to generate u0d and u0c is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
         for (int id = 0; id < sys->N_edge; id++){
             yd[id] = yd2[id] - (1i)*(yd1[id]);
@@ -918,7 +917,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     MPI_Finalize();
     if (sys->nfreq > 1){
         for (int id = 0; id < sys->nfreq; id++){
-            cout << "Z parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " is " << endl;
+            cout << "Z parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz is " << endl;
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
                     Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
@@ -928,7 +927,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
     }
     else{
-        cout << "Z parameter at frequency " << (sys->freqStart) * sys->freqUnit << " is " << endl;
+        cout << "Z parameter at frequency " << (sys->freqStart) * sys->freqUnit << " Hz is " << endl;
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
                 Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
@@ -2137,7 +2136,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
 //    iparmd[38] = 1;
 //    iparmd[34] = 1;    //0-based indexing
 //    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
-//    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+//    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 //
 //    return 0;
 //
@@ -2199,7 +2198,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     //        continue;
     //    }
     //}
-    //cout << "Time for finding the side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+    //cout << "Time for finding the side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
 
     leng_v0d1 = 0;
