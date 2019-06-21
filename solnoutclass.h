@@ -1053,8 +1053,22 @@ class Parasitics
     }
 
     // Find ports in GDSII textboxes
-    vector<Port> setPortsGDSII(size_t indCell, vector<double> center, AsciiDataBase adb)
+    vector<Port> setPortsGDSII(size_t indCell, vector<double> center, strans transform, AsciiDataBase adb)
     {
+        // Error checking on input point
+        double xo, yo; // Coordinate offsets
+        if (center.size() != 2)
+        {
+            cerr << "Coordinates of reference frame center must be a length-2 vector. Defaulting to (0, 0)." << endl;
+            xo = 0.;
+            yo = 0.;
+        }
+        else
+        {
+            xo = center[0];
+            yo = center[1];
+        }
+
         // Recursively search cells for textboxes
         GeoCell thisCell = adb.getCell(indCell);
         vector<Port> portList;
@@ -1062,14 +1076,28 @@ class Parasitics
         {
             string srefName = (thisCell.sreferences)[indi].getSRefName();
             size_t indNextCell = adb.locateCell(srefName);
-            vector<double> thisSRef = (thisCell.sreferences)[indi].getSRefs();
-            vector<Port> newPorts = this->setPortsGDSII(indNextCell, {(center[0] + thisSRef[0]), (center[1] + thisSRef[1])}, adb); // Recursion step
+            vector<double> refPt = transform.applyTranform((thisCell.sreferences)[indi].getSRefs()); // Center point of structure reference after linear transformation
+            vector<Port> newPorts = this->setPortsGDSII(indNextCell, { refPt[0] + xo, refPt[1] + yo }, (thisCell.sreferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
             portList.insert(portList.end(), newPorts.begin(), newPorts.end());
         }
-        for (size_t indi = 0; indi < thisCell.getNumText(); indi++) // Search cell at this level for textboxes
+        for (size_t indi = 0; indi < thisCell.getNumARef(); indi++) // Follow array references
+        {
+            string arefName = (thisCell.areferences)[indi].getARefName();
+            size_t indNextCell = adb.locateCell(arefName);
+            vector<vector<double>> instanceCoord = (thisCell.areferences[indi]).findInstances({ 0., 0. });
+            for (size_t indj = 0; indj < instanceCoord.size(); indj++) // Handle each instance in array reference
+            {
+                vector<double> centPt = transform.applyTranform(instanceCoord[indj]); // Center point of referred instance after linear transformation
+                vector<Port> newPorts = this->setPortsGDSII(indNextCell, { centPt[0] + xo, centPt[1] + yo }, (thisCell.areferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
+                portList.insert(portList.end(), newPorts.begin(), newPorts.end());
+            }
+        }
+
+        // Search cell at this level for textboxes
+        for (size_t indi = 0; indi < thisCell.getNumText(); indi++)
         {
             textbox thisTextBox = thisCell.textboxes[indi];
-            vector<double> coords = {(thisTextBox.getTexts()[0] + center[0]), (thisTextBox.getTexts()[1] + center[1]), 0., (thisTextBox.getTexts()[0] + center[0]), 0., 0.}; // Assume: xret = xsup, yret = 0, zsup = zret = 0 until layer heights set
+            vector<double> coords = { thisTextBox.getTexts()[0] + xo, thisTextBox.getTexts()[1] + yo, 0., thisTextBox.getTexts()[0] + xo, 0., 0. }; // Assume: xret = xsup, yret = 0, zret = zsup = 0 until layer heights set
             portList.emplace_back(Port(thisTextBox.getTextStr(), 'B', 50.0, thisTextBox.getTexts(), thisTextBox.getLayer()));
         }
 
@@ -2612,7 +2640,7 @@ struct SolverDataBase
                             paths.push_back(xEnd); // x-coordinate of end point
                             paths.push_back(yEnd); // y-coordinate of end point
 
-                                                   // Push new path to the geometric cell
+                            // Push new path to the geometric cell
                             cellGerb.paths.emplace_back(path(paths, 1, {}, pathType, width));
                         }
 
@@ -2658,7 +2686,7 @@ struct SolverDataBase
             adbGerb.setLibName("outline");
             adbGerb.appendCell(cellGerb);
             adbGerb.setdbUnits(adbGerb.getdbUnits() * 1.e-3); // Rescale Gerber file units 0.001x to allow integer representation in GDSII
-            vector<complex<double>> hullPt = adbGerb.convexHull(cellGerb.cellName, 0., 0.);
+            vector<complex<double>> hullPt = adbGerb.convexHull(cellGerb.cellName);
 
             // Print and dump the ASCII database of Gerber outline
             //adbGerb.print({ });
@@ -3544,7 +3572,6 @@ struct SolverDataBase
 
         // Use layer stack-up information to set fields
         data->numStack = this->getNumLayer();
-        //data->stackEpsn; // Is this needed from SolverDataBase since it relies on z-coordinates of nodes?
         for (size_t indi = 0; indi < data->numStack; indi++)
         {
             Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration

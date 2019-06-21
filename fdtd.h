@@ -64,7 +64,7 @@ using namespace std;
 //#define PRINT_NODE_COORD (1)
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
-//#define PRINT_PORT_SET
+#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time

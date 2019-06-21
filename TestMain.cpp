@@ -55,7 +55,7 @@ int main(int argc, char** argv)
             cout << " The first file passed after -s or --simulate (or -sx or --xyce) must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << " The first file passed after -sp or --spef must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
             cout << endl << "Bug reporting:" << endl;
-            cout << "Visit <https://github.com/purdue-onchip/gdsii-interface>" << endl;
+            cout << "Visit <https://github.com/purdue-onchip/gds2Para>" << endl;
         }
         else if (strcmp(argv[1], "--version") == 0)
         {
@@ -247,7 +247,7 @@ int main(int argc, char** argv)
             {
                 string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
                 vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
-                adb.saveToMesh(topCellName, 0., 0., &sys); // Recursively save GDSII conductor information to sys
+                adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys); // Recursively save GDSII conductor information to sys
                 adb.print(indCellPrint);
                 cout << "GDSII file read" << endl;
             }
@@ -303,6 +303,7 @@ int main(int argc, char** argv)
                 cerr << "matrixConstruction Fail!" << endl;
                 return status;
             }
+            //sys.print();
 
             // Set port
             clock_t t4 = clock();
