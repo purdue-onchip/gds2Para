@@ -111,10 +111,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, sideLen;
     unordered_map<myint, unordered_map<myint, double>> Ad1;
 
-    block1_x = (sys->xlim2 - sys->xlim1) / 20 * sys->lengthUnit;
-    block1_y = (sys->ylim2 - sys->ylim1) / 20 * sys->lengthUnit;
-    block2_x = 0;// (sys->xlim2 - sys->xlim1) / 50 * sys->lengthUnit;
-    block2_y = 0;// (sys->ylim2 - sys->ylim1) / 50 * sys->lengthUnit;
+    block1_x = (sys->xlim2 - sys->xlim1) / 10 * sys->lengthUnit;
+    block1_y = (sys->ylim2 - sys->ylim1) / 10 * sys->lengthUnit;
+    block2_x = (sys->xlim2 - sys->xlim1) / 10 * sys->lengthUnit;
+    block2_y = (sys->ylim2 - sys->ylim1) / 10 * sys->lengthUnit;
     block3_x = 0;
     block3_y = 0;
 #ifdef PRINT_V0D_BLOCKS
@@ -187,6 +187,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             }
         }
     }
+
     
     for (indi = 0; indi < leng_v0d1; indi++){
         leng_Ad += Ad1[indi].size();
@@ -241,8 +242,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sparse_matrix_t V0dat;
     s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, leng_v0d1, sys->N_edge, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
 
-    
-
     ///******************************************************************/
     ///* use MKL to do matrix multiplication */
     ///* Note that the result for each row, the col # is not in the increased order */
@@ -256,7 +255,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sys->AdColId = (myint*)calloc(leng_Ad, sizeof(myint));
     sys->Adval = (double*)calloc(leng_Ad, sizeof(double));
     j = 0;
-
+    
     for (indi = 0; indi < leng_v0d1; indi++){
         vector<pair<myint, double>> v(Ad1[indi].begin(), Ad1[indi].end());
         sort(v.begin(), v.end());
@@ -297,7 +296,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     count = 0;
 
 
-
     sys->cindex.push_back(-1);    // the last index in the sparse form for each conductor in V0c, i denotes ith conductor (starting from 1)
     sys->acu_cnno.push_back(0);    // how many v0c are in each conductor (accumulative), i denotes the ith conductor (starting from 1)
 
@@ -305,15 +303,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     count = 0;
     free(map);
     map = (myint*)calloc(sys->N_node, sizeof(myint));
-    block1_x = (sys->xlim2 - sys->xlim1) / 3 * sys->lengthUnit;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
-    block1_y = (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
-    block2_x = (sys->xlim2 - sys->xlim1) / 20 * sys->lengthUnit;
-    block2_y = (sys->ylim2 - sys->ylim1) / 20 * sys->lengthUnit;
+    block1_x = (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
+    block1_y = (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
+    block2_x = (sys->xlim2 - sys->xlim1) / 10 * sys->lengthUnit;
+    block2_y = (sys->ylim2 - sys->ylim1) / 10 * sys->lengthUnit;
 #ifdef PRINT_V0D_BLOCKS
     cout << "V0c's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
     cout << "V0c's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
 #endif
+    t1 = clock();
     status = merge_v0c(sys, block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
+    cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl; 
     j = 0;
 
     /*for (i = 0; i < sys->numCdt + 1; i++){
@@ -416,7 +416,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(sys->conductor[indi].node); sys->conductor[indi].node = NULL;
     }
     free(sys->conductor); sys->conductor = NULL;
-
     /*  trial of first set HYPRE matrix Ac */
     //HYPRE_IJMatrix ac;
     //HYPRE_ParCSRMatrix parcsr_ac;
@@ -699,12 +698,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             //free(y0cs); y0cs = NULL;
 
             //status = hypreSolve(sys, ac, parcsr_ac, leng_Ac, v0caJ, leng_v0c, y0c);
-            cout << "h" << endl;
             status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-
 
 
         /* V0cy0c */
@@ -766,13 +763,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             yd[id] = yd2[id] - (1i)*(yd1[id]);
         }
 
-
+        
         sys->y = (complex<double>*)malloc(sys->N_edge*sizeof(complex<double>));
         for (indi = 0; indi < sys->N_edge; indi++){
             sys->y[indi] = yd[indi].real() + yc[indi] + (1i) * yd[indi].imag();
         }
-
+        
         for (indi = 0; indi < sys->numPorts; indi++){
+            
             for (j = 0; j < sys->portEdge[indi].size(); j++){
                 if (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s){    // this edge is along z axis
                     inz = sys->portEdge[indi][j] / (sys->N_edge_s + sys->N_edge_v);
@@ -786,6 +784,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     iny = (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
                     leng = sys->yn[iny + 1] - sys->yn[iny];
                 }
+                
                 /*leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3]), 2);
                 leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 1]), 2);
                 leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 2]), 2);
@@ -794,7 +793,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             }
         }
-
+        
         /* calculate the Vh part */
 #ifndef SKIP_VH
         status = find_Vh(sys, u0, u0a, sourcePort);
@@ -2156,40 +2155,6 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         }
     }
 
-    /*for (int i = 0; i < sys->N_node_s; i++){
-    indx = i / (sys->N_cell_y + 1);
-    indy = i % (sys->N_cell_y + 1);
-    if (sys->xn[indx] >= 2256.2e-6 && sys->xn[indx] <= 2814.4e-6){
-    if (sys->yn[indy] >= 3079.8e-6 && sys->yn[indy] <= 3861.3e-6){
-    markLayerNode[i] = 1;
-    }
-    }
-    }*/
-
-
-    //t1 = clock();
-    //for (auto ni : layerNode){
-    //    indx = ni / (sys->N_cell_y + 1);
-    //    indy = ni % (sys->N_cell_y + 1);
-    //    if ((indx - 1) * (sys->N_cell_y + 1) + indy >= 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && (sys->xn[indx] - sys->xn[indx - 1]) < sideLen){    // this node is on the boundary of the projection
-    //        status = setsideLen((indx) * (sys->N_cell_y + 1) + indy, sideLen, markLayerNode, markProSide, sys);
-    //        continue;
-    //    }
-    //    else if ((indx + 1)* (sys->N_cell_y + 1) + indy < sys->N_node_s && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && (sys->xn[indx + 1] - sys->xn[indx]) < sideLen){
-    //        status = setsideLen((indx) * (sys->N_cell_y + 1) + indy, sideLen, markLayerNode, markProSide, sys);
-    //        continue;
-    //    }
-    //    else if (indx * (sys->N_cell_y + 1) + indy - 1 >= 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy - 1] == 0 && (sys->yn[indy] - sys->yn[indy - 1]) < sideLen){
-    //        status = setsideLen(indx * (sys->N_cell_y + 1) + indy, sideLen, markLayerNode, markProSide, sys);
-    //        continue;
-    //    }
-    //    else if (indx * (sys->N_cell_y + 1) + indy + 1 < sys->N_node_s && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && (sys->yn[indy + 1] - sys->yn[indy]) < sideLen){
-    //        status = setsideLen(indx * (sys->N_cell_y + 1) + indy, sideLen, markLayerNode, markProSide, sys);
-    //        continue;
-    //    }
-    //}
-    //cout << "Time for finding the side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-
 
     leng_v0d1 = 0;
     leng_v0d1a = 0;
@@ -2197,12 +2162,12 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     v0d1anum = 0;
     
     /* First assign a larger number of storage, don't need to calculate the entries twice */
-    myint *v0d1RowId = (myint*)malloc(sys->N_edge * sizeof(myint));
-    myint *v0d1ColId = (myint*)malloc(sys->N_edge * sizeof(myint));
-    double *v0d1val = (double*)malloc(sys->N_edge * sizeof(double));
+    myint *v0d1RowId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
+    myint *v0d1ColId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
+    double *v0d1val = (double*)malloc(2 * sys->N_edge * sizeof(double));
     /*myint *v0d1aRowId = (myint*)malloc(sys->N_edge * sizeof(myint));
     myint *v0d1aColId = (myint*)malloc(sys->N_edge * sizeof(myint));*/
-    double *v0d1aval = (double*)malloc(sys->N_edge * sizeof(double));
+    double *v0d1aval = (double*)malloc(2 * sys->N_edge * sizeof(double));
     
     int count = 1;    /* count which box it is */
     clock_t t2 = clock();
@@ -2210,6 +2175,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     myint eno;
     double lx_avg, ly_avg, lz_avg;
     t = 0; ta = 0;
+    
     for (int iz = 1; iz < sys->nz - 1; iz++){    // merge on each layer, not in the conductor
         visited = (int*)calloc(sys->nx * sys->ny, sizeof(int));
         for (int ix = 0; ix < sys->nx; ix++){
@@ -3786,7 +3752,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         free(visited); visited = NULL;
     }
 
-
+    cout << "Time to generate V0d1 is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
 
     /* V0d2 generation */
     int j;
@@ -3820,225 +3786,354 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     myint iz, ix, iy;
     queue<myint> qu;
     visited = (int*)calloc(sys->N_node, sizeof(int));
+    t2 = clock();
     for (i = 0; i < sys->numCdt; i++){
         //cout << sys->conductor[i].markPort << " ";
         if (sys->conductor[i].markPort == -1){
             continue;
         }
         else{
-
-            v.clear();
-            va.clear();
-            qu.push(sys->conductor[i].node[0]);
-            visited[sys->conductor[i].node[0]] = 1;
-            map[sys->conductor[i].node[0]] = count;
-
-            
-
-            /*for (indx = 0; indx < sys->nodeEdge[st.back()].size(); indx++){
-                v[sys->nodeEdge[st.back()][indx].first] = sys->nodeEdge[st.back()][indx].second;
-            }
-            for (indx = 0; indx < sys->nodeEdgea[st.back()].size(); indx++){
-                va[sys->nodeEdgea[st.back()][indx].first] = sys->nodeEdgea[st.back()][indx].second;
-            }*/
-            while (!qu.empty()){    // bfs
-                
-                iz = qu.front() / sys->N_node_s;
-                ix = (qu.front() % sys->N_node_s) / (sys->N_cell_y + 1);
-                iy = (qu.front() % sys->N_node_s) % (sys->N_cell_y + 1);
+            mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
+            //v.clear();
+            //va.clear();
+            for (j = 0; j < sys->cdtNumNode[i]; j++)
+            {
+                map[sys->conductor[i].node[j]] = count;
+                iz = sys->conductor[i].node[j] / sys->N_node_s;
+                ix = (sys->conductor[i].node[j] % sys->N_node_s) / (sys->N_cell_y + 1);
+                iy = (sys->conductor[i].node[j] % sys->N_node_s) % (sys->N_cell_y + 1);
                 status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
                 if (iz != 0){    // this node is not on the bottom plane
                     eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                    
-                    if (v.find(eno) == v.end()){
-                        v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                    }
-                    else{
-                        v.erase(eno);
-                    }
-                    if (va.find(eno) == va.end()){
-                        va[eno] = -lx_avg * ly_avg;
-                    }
-                    else{
-                        va.erase(eno);
-                    }
-                    if (sys->markEdge[eno] == i + 1){
-                        status = compute_edgelink(sys, eno, node1, node2);
-                        if (node1 != qu.front() && visited[node1] == 0){
-                            map[node1] = count;
-                            qu.push(node1);
-                            visited[node1] = 1;
-                        }
-                        else if (node2 != qu.front() && visited[node2] == 0){
-                            map[node2] = count;
-                            qu.push(node2);
-                            visited[node2] = 1;
-                        }
+
+                    if (sys->markEdge[eno] == 0){    // this edge is in the dielectric
+                        //v[eno] = -1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                        //va[eno] = -lx_avg * ly_avg;
+                        v0d1RowId[v0d1num] = eno;
+                        v0d1ColId[v0d1num] = leng_v0d1;
+                        v0d1val[v0d1num] = -1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                        v0d1num++;
+                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                        v0d1anum++;
+                        mark = 1;
                     }
                 }
                 if (iz != sys->nz - 1){   // this node is not on the top plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                    if (v.find(eno) == v.end()){
-                        v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                    }
-                    else{
-                        v.erase(eno);
-                    }
-                    if (va.find(eno) == va.end()){
-                        va[eno] = lx_avg * ly_avg;
-                    }
-                    else{
-                        va.erase(eno);
-                    }
-                    if (sys->markEdge[eno] == i + 1){
-                        status = compute_edgelink(sys, eno, node1, node2);
-                        if (node1 != qu.front() && visited[node1] == 0){
-                            map[node1] = count;
-                            qu.push(node1);
-                            visited[node1] = 1;
-                        }
-                        else if (node2 != qu.front() && visited[node2] == 0){
-                            map[node2] = count;
-                            qu.push(node2);
-                            visited[node2] = 1;
-                        }
+
+                    if (sys->markEdge[eno] == 0){
+                        //v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                        //va[eno] = lx_avg * ly_avg;
+                        v0d1RowId[v0d1num] = eno;
+                        v0d1ColId[v0d1num] = leng_v0d1;
+                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                        v0d1num++;
+                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                        v0d1anum++;
+                        mark = 1;
                     }
                 }
                 if (ix != 0){    // this node is not on the left plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                    if (v.find(eno) == v.end()){
-                        v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
-                    }
-                    else{
-                        v.erase(eno);
-                    }
-                    if (va.find(eno) == va.end()){
-                        va[eno] = -ly_avg * lz_avg;
-                    }
-                    else{
-                        va.erase(eno);
-                    }
-                    if (sys->markEdge[eno] == i + 1){
-                        status = compute_edgelink(sys, eno, node1, node2);
-                        if (node1 != qu.front() && visited[node1] == 0){
-                            map[node1] = count;
-                            qu.push(node1);
-                            visited[node1] = 1;
-                        }
-                        else if (node2 != qu.front() && visited[node2] == 0){
-                            map[node2] = count;
-                            qu.push(node2);
-                            visited[node2] = 1;
-                        }
+
+                    if (sys->markEdge[eno] == 0){
+                        //v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
+                        //va[eno] = -ly_avg * lz_avg;
+                        v0d1RowId[v0d1num] = eno;
+                        v0d1ColId[v0d1num] = leng_v0d1;
+                        v0d1val[v0d1num] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
+                        v0d1num++;
+                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                        v0d1anum++;
+                        mark = 1;
                     }
                 }
                 if (ix != sys->nx - 1){    // this node is not on the right plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                    if (v.find(eno) == v.end()){
-                        v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
-                    }
-                    else{
-                        v.erase(eno);
-                    }
-                    if (va.find(eno) == va.end()){
-                        va[eno] = ly_avg * lz_avg;
-                    }
-                    else{
-                        va.erase(eno);
-                    }
-                    if (sys->markEdge[eno] == i + 1){
-                        status = compute_edgelink(sys, eno, node1, node2);
-                        if (node1 != qu.front() && visited[node1] == 0){
-                            map[node1] = count;
-                            qu.push(node1);
-                            visited[node1] = 1;
-                        }
-                        else if (node2 != qu.front() && visited[node2] == 0){
-                            map[node2] = count;
-                            qu.push(node2);
-                            visited[node2] = 1;
-                        }
+
+                    if (sys->markEdge[eno] == 0){
+                        //v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
+                        //va[eno] = ly_avg * lz_avg;
+                        v0d1RowId[v0d1num] = eno;
+                        v0d1ColId[v0d1num] = leng_v0d1;
+                        v0d1val[v0d1num] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
+                        v0d1num++;
+                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                        v0d1anum++;
+                        mark = 1;
                     }
                 }
                 if (iy != 0){    // this node is not on the front plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                    if (v.find(eno) == v.end()){
-                        v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
-                    }
-                    else{
-                        v.erase(eno);
-                    }
-                    if (va.find(eno) == va.end()){
-                        va[eno] = -lx_avg * lz_avg;
-                    }
-                    else{
-                        va.erase(eno);
-                    }
-                    if (sys->markEdge[eno] == i + 1){
-                        status = compute_edgelink(sys, eno, node1, node2);
-                        if (node1 != qu.front() && visited[node1] == 0){
-                            map[node1] = count;
-                            qu.push(node1);
-                            visited[node1] = 1;
-                        }
-                        else if (node2 != qu.front() && visited[node2] == 0){
-                            map[node2] = count;
-                            qu.push(node2);
-                            visited[node2] = 1;
-                        }
+
+                    if (sys->markEdge[eno] == 0){
+                        //v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
+                        //va[eno] = -lx_avg * lz_avg;
+                        v0d1RowId[v0d1num] = eno;
+                        v0d1ColId[v0d1num] = leng_v0d1;
+                        v0d1val[v0d1num] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
+                        v0d1num++;
+                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                        v0d1anum++;
+                        mark = 1;
                     }
                 }
                 if (iy != sys->ny - 1){   // this node is not on the back plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                    if (v.find(eno) == v.end()){
-                        v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
-                    }
-                    else{
-                        v.erase(eno);
-                    }
-                    if (va.find(eno) == va.end()){
-                        va[eno] = lx_avg * lz_avg;
-                    }
-                    else{
-                        va.erase(eno);
-                    }
-                    if (sys->markEdge[eno] == i + 1){
-                        status = compute_edgelink(sys, eno, node1, node2);
-                        if (node1 != qu.front() && visited[node1] == 0){
-                            map[node1] = count;
-                            qu.push(node1);
-                            visited[node1] = 1;
-                        }
-                        else if (node2 != qu.front() && visited[node2] == 0){
-                            map[node2] = count;
-                            qu.push(node2);
-                            visited[node2] = 1;
-                        }
+
+                    if (sys->markEdge[eno] == 0){
+                        //v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
+                        //va[eno] = lx_avg * lz_avg;
+                        v0d1RowId[v0d1num] = eno;
+                        v0d1ColId[v0d1num] = leng_v0d1;
+                        v0d1val[v0d1num] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
+                        v0d1num++;
+                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                        v0d1anum++;
+                        mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
                     }
                 }
-                qu.pop();
             }
-            indnum = v.size();
-            if (indnum != 0){
-                for (auto vi : v){
-                    v0d1RowId[v0d1num] = vi.first;
-                    v0d1ColId[v0d1num] = leng_v0d1;
-                    v0d1val[v0d1num] = vi.second;
-                    v0d1num++;
-                }
+            if (mark == 1){
                 leng_v0d1++;
-                for (auto vai : va){
-                    /*v0d1aRowId[v0d1anum] = vai.first;
-                    v0d1aColId[v0d1anum] = leng_v0d1a;*/
-                    v0d1aval[v0d1anum] = vai.second;
-                    v0d1anum++;
-                }
                 leng_v0d1a++;
                 count++;
             }
+            //indnum = v.size();
+            //if (indnum != 0){
+            //    for (auto vi : v){
+            //        v0d1RowId[v0d1num] = vi.first;
+            //        v0d1ColId[v0d1num] = leng_v0d1;
+            //        v0d1val[v0d1num] = vi.second;
+            //        v0d1num++;
+            //    }
+            //    leng_v0d1++;
+            //    for (auto vai : va){
+            //        /*v0d1aRowId[v0d1anum] = vai.first;
+            //        v0d1aColId[v0d1anum] = leng_v0d1a;*/
+            //        v0d1aval[v0d1anum] = vai.second;
+            //        v0d1anum++;
+            //    }
+            //    leng_v0d1a++;
+            //    count++;
+            //}
         }
     }
 
+    //        // bfs
+    //        qu = queue<myint>();
+    //        v.clear();
+    //        va.clear();
+    //        qu.push(sys->conductor[i].node[0]);
+    //        visited[sys->conductor[i].node[0]] = 1;
+    //        map[sys->conductor[i].node[0]] = count;
+
+    //        
+
+    //        /*for (indx = 0; indx < sys->nodeEdge[st.back()].size(); indx++){
+    //            v[sys->nodeEdge[st.back()][indx].first] = sys->nodeEdge[st.back()][indx].second;
+    //        }
+    //        for (indx = 0; indx < sys->nodeEdgea[st.back()].size(); indx++){
+    //            va[sys->nodeEdgea[st.back()][indx].first] = sys->nodeEdgea[st.back()][indx].second;
+    //        }*/
+    //        while (!qu.empty()){    // bfs
+    //            
+    //            iz = qu.front() / sys->N_node_s;
+    //            ix = (qu.front() % sys->N_node_s) / (sys->N_cell_y + 1);
+    //            iy = (qu.front() % sys->N_node_s) % (sys->N_cell_y + 1);
+    //            status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
+    //            if (iz != 0){    // this node is not on the bottom plane
+    //                eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
+    //                
+    //                if (v.find(eno) == v.end()){
+    //                    v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+    //                }
+    //                else{
+    //                    v.erase(eno);
+    //                }
+    //                if (va.find(eno) == va.end()){
+    //                    va[eno] = -lx_avg * ly_avg;
+    //                }
+    //                else{
+    //                    va.erase(eno);
+    //                }
+    //                if (sys->markEdge[eno] == i + 1){
+    //                    status = compute_edgelink(sys, eno, node1, node2);
+    //                    if (node1 != qu.front() && visited[node1] == 0){
+    //                        map[node1] = count;
+    //                        qu.push(node1);
+    //                        visited[node1] = 1;
+    //                    }
+    //                    else if (node2 != qu.front() && visited[node2] == 0){
+    //                        map[node2] = count;
+    //                        qu.push(node2);
+    //                        visited[node2] = 1;
+    //                    }
+    //                }
+    //            }
+    //            if (iz != sys->nz - 1){   // this node is not on the top plane
+    //                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
+    //                if (v.find(eno) == v.end()){
+    //                    v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+    //                }
+    //                else{
+    //                    v.erase(eno);
+    //                }
+    //                if (va.find(eno) == va.end()){
+    //                    va[eno] = lx_avg * ly_avg;
+    //                }
+    //                else{
+    //                    va.erase(eno);
+    //                }
+    //                if (sys->markEdge[eno] == i + 1){
+    //                    status = compute_edgelink(sys, eno, node1, node2);
+    //                    if (node1 != qu.front() && visited[node1] == 0){
+    //                        map[node1] = count;
+    //                        qu.push(node1);
+    //                        visited[node1] = 1;
+    //                    }
+    //                    else if (node2 != qu.front() && visited[node2] == 0){
+    //                        map[node2] = count;
+    //                        qu.push(node2);
+    //                        visited[node2] = 1;
+    //                    }
+    //                }
+    //            }
+    //            if (ix != 0){    // this node is not on the left plane
+    //                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
+    //                if (v.find(eno) == v.end()){
+    //                    v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
+    //                }
+    //                else{
+    //                    v.erase(eno);
+    //                }
+    //                if (va.find(eno) == va.end()){
+    //                    va[eno] = -ly_avg * lz_avg;
+    //                }
+    //                else{
+    //                    va.erase(eno);
+    //                }
+    //                if (sys->markEdge[eno] == i + 1){
+    //                    status = compute_edgelink(sys, eno, node1, node2);
+    //                    if (node1 != qu.front() && visited[node1] == 0){
+    //                        map[node1] = count;
+    //                        qu.push(node1);
+    //                        visited[node1] = 1;
+    //                    }
+    //                    else if (node2 != qu.front() && visited[node2] == 0){
+    //                        map[node2] = count;
+    //                        qu.push(node2);
+    //                        visited[node2] = 1;
+    //                    }
+    //                }
+    //            }
+    //            if (ix != sys->nx - 1){    // this node is not on the right plane
+    //                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
+    //                if (v.find(eno) == v.end()){
+    //                    v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
+    //                }
+    //                else{
+    //                    v.erase(eno);
+    //                }
+    //                if (va.find(eno) == va.end()){
+    //                    va[eno] = ly_avg * lz_avg;
+    //                }
+    //                else{
+    //                    va.erase(eno);
+    //                }
+    //                if (sys->markEdge[eno] == i + 1){
+    //                    status = compute_edgelink(sys, eno, node1, node2);
+    //                    if (node1 != qu.front() && visited[node1] == 0){
+    //                        map[node1] = count;
+    //                        qu.push(node1);
+    //                        visited[node1] = 1;
+    //                    }
+    //                    else if (node2 != qu.front() && visited[node2] == 0){
+    //                        map[node2] = count;
+    //                        qu.push(node2);
+    //                        visited[node2] = 1;
+    //                    }
+    //                }
+    //            }
+    //            if (iy != 0){    // this node is not on the front plane
+    //                eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
+    //                if (v.find(eno) == v.end()){
+    //                    v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
+    //                }
+    //                else{
+    //                    v.erase(eno);
+    //                }
+    //                if (va.find(eno) == va.end()){
+    //                    va[eno] = -lx_avg * lz_avg;
+    //                }
+    //                else{
+    //                    va.erase(eno);
+    //                }
+    //                if (sys->markEdge[eno] == i + 1){
+    //                    status = compute_edgelink(sys, eno, node1, node2);
+    //                    if (node1 != qu.front() && visited[node1] == 0){
+    //                        map[node1] = count;
+    //                        qu.push(node1);
+    //                        visited[node1] = 1;
+    //                    }
+    //                    else if (node2 != qu.front() && visited[node2] == 0){
+    //                        map[node2] = count;
+    //                        qu.push(node2);
+    //                        visited[node2] = 1;
+    //                    }
+    //                }
+    //            }
+    //            if (iy != sys->ny - 1){   // this node is not on the back plane
+    //                eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
+    //                if (v.find(eno) == v.end()){
+    //                    v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
+    //                }
+    //                else{
+    //                    v.erase(eno);
+    //                }
+    //                if (va.find(eno) == va.end()){
+    //                    va[eno] = lx_avg * lz_avg;
+    //                }
+    //                else{
+    //                    va.erase(eno);
+    //                }
+    //                if (sys->markEdge[eno] == i + 1){
+    //                    status = compute_edgelink(sys, eno, node1, node2);
+    //                    if (node1 != qu.front() && visited[node1] == 0){
+    //                        map[node1] = count;
+    //                        qu.push(node1);
+    //                        visited[node1] = 1;
+    //                    }
+    //                    else if (node2 != qu.front() && visited[node2] == 0){
+    //                        map[node2] = count;
+    //                        qu.push(node2);
+    //                        visited[node2] = 1;
+    //                    }
+    //                }
+    //            }
+    //            qu.pop();
+    //        }
+    //        indnum = v.size();
+    //        if (indnum != 0){
+    //            for (auto vi : v){
+    //                v0d1RowId[v0d1num] = vi.first;
+    //                v0d1ColId[v0d1num] = leng_v0d1;
+    //                v0d1val[v0d1num] = vi.second;
+    //                v0d1num++;
+    //            }
+    //            leng_v0d1++;
+    //            for (auto vai : va){
+    //                /*v0d1aRowId[v0d1anum] = vai.first;
+    //                v0d1aColId[v0d1anum] = leng_v0d1a;*/
+    //                v0d1aval[v0d1anum] = vai.second;
+    //                v0d1anum++;
+    //            }
+    //            leng_v0d1a++;
+    //            count++;
+    //        }
+    //    }
+    //}
+    cout << "Time to generate V0d2 is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
 
 
     double lx_whole_avg = 0;
@@ -4061,6 +4156,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         sys->v0d1ColId[i] = v0d1ColId[i];
         sys->v0d1val[i] = v0d1val[i];
     }
+
     //ofstream out;
     //out.open("v0dal.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < v0d1anum; i++){
@@ -4185,7 +4281,6 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
     
 
     for (int ic = 0; ic < sys->numCdt; ic++){
-
         if (sys->conductor[ic].markPort <= 0){    // not excited conductors
             markcond = ic + 1;
             //visited = (int*)calloc(sys->N_node, sizeof(int));
@@ -4196,6 +4291,7 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                 if (visited[sys->conductor[ic].node[jc]] == 0 && sys->conductor[ic].node[jc] >= sys->N_node_s && sys->conductor[ic].node[jc] < sys->N_node - sys->N_node_s){
                     v.clear();
                     va.clear();
+                    
                     //if (!ind.empty())
                     //    ind.clear();
                     iz = sys->conductor[ic].node[jc] / (sys->N_node_s);

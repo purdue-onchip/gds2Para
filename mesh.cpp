@@ -63,7 +63,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         zOrigOld[j] = sys->portCoor[i].z2;
         j++;
     }
-
+    
     /*******************************************************************************************/
     /* Discretize domain in the x-direction */
     sort(xOrigOld, xOrigOld + numNode + 2 * sys->numPorts);
@@ -213,11 +213,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     double disMinz = minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
     //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
     double *zn = (double*)calloc(2 * sys->numStack + 6 * sys->numPorts, sizeof(double));
+    zn[0] = zOrigOld[0];
+    j = 0;
     for (i = 1; i < 2 * sys->numStack + 2 * sys->numPorts; i++){
         if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMinz){
             sys->nz++;
         }
-        zn[i] = zOrigOld[i];
+        j++;
+        zn[j] = zOrigOld[i];
     }
     int countz = 2 * sys->numStack + 2 * sys->numPorts - 1;
 
@@ -286,10 +289,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     sys->nz = j + 1;
     free(zn); zn = NULL;
-
+    
     // Putting the layer permittivities in order of increasing z-coordinate?
     i = 0;
-    if (sys->stackBegCoor[0] == 0){
+    if (sys->stackBegCoor[0] == sys->zn[0]){
         j = 0;
         while (i < sys->nz - 1) {
             if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]) {
@@ -313,6 +316,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             }
         }
     }
+    
     free(xOrigOld); xOrigOld = NULL;
     free(yOrigOld); yOrigOld = NULL;
     free(zOrigOld); zOrigOld = NULL;
@@ -378,15 +382,19 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 #endif
 
     double xc, yc;
+    myint xrange_max;
     unordered_map<myint, myint> xrange;
     vector<myint> xcoorv;
     set<myint> xcoor;
     unordered_map<myint, set<myint>> xcoory;    // store the start coordinate of the range, the end can be checked from xrange
     myint ss, ee;
-    myint y1, y2;
+    myint y1, y2, y3;
+    myint ys, yl;
+    myint x1, x2;
     myint l;
     clock_t tt = clock();
-    int mark1;
+    int mark1, mini_k;
+    double mini;
     // Fast algorithm to find nodes inside conductors
     for (i = 0; i < sys->numCdtRow; i++){
         xrange.clear();
@@ -395,14 +403,45 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         xcoory.clear();
         mark1 = 0;
         //cout << "Number of CdtRow is " << i << endl;
-        for (j = 0; j < sys->conductorIn[i].numVert; j++){
+        for (j = 0; j < sys->conductorIn[i].numVert - 1; j++){
+            if (sys->conductorIn[i].x[j] != sys->conductorIn[i].x[j + 1] && sys->conductorIn[i].y[j] != sys->conductorIn[i].y[j + 1]){   // line with a non-zero slope
+                if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[j + 1]){
+                    x1 = xi[sys->conductorIn[i].x[j]];   // smaller x
+                    x2 = xi[sys->conductorIn[i].x[j + 1]];    // larger x
+                }
+                else{
+                    x1 = xi[sys->conductorIn[i].x[j + 1]];
+                    x2 = xi[sys->conductorIn[i].x[j]];
+                }
+                for (l = x1; l <= x2; l++){
+                    xcoor.insert(l);
+                }
+            }
+            else{
+                xcoor.insert(xi[sys->conductorIn[i].x[j]]);
+            }
+        }
+        if (sys->conductorIn[i].x[j] != sys->conductorIn[i].x[0] && sys->conductorIn[i].y[j] != sys->conductorIn[i].y[0]){   // line with a non-zero slope
+            if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[0]){
+                x1 = xi[sys->conductorIn[i].x[j]];   // smaller x
+                x2 = xi[sys->conductorIn[i].x[0]];    // larger x
+            }
+            else{
+                x1 = xi[sys->conductorIn[i].x[0]];
+                x2 = xi[sys->conductorIn[i].x[j]];
+            }
+            for (l = x1; l <= x2; l++){
+                xcoor.insert(l);
+            }
+        }
+        else{
             xcoor.insert(xi[sys->conductorIn[i].x[j]]);
         }
 
         for (auto xcoori : xcoor){
             xcoorv.push_back(xcoori);
         }
-        
+        xrange_max = xcoorv.back();   // the maximal x coordinate
         
         for (j = 0; j < xcoorv.size() - 1; j++){
             mark1 = 1;    // the x coordinates are more than 1
@@ -422,9 +461,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                     if (ss == ee && mark1 == 1){
                         continue;
                     }
+                    
                     while (xrange[ss] <= ee){
                         xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){   // if this range is the rightmost one, or xrange only has one value, break
+                            
                             break;
                         }
                         ss = xrange[ss];
@@ -439,6 +480,73 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                     while (xrange[ss] <= ee){
                         xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
                         if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+                            
+                            break;
+                        }
+                        ss = xrange[ss];
+                    }
+                }
+            }
+            else if (sys->conductorIn[i].y[j] != sys->conductorIn[i].y[j + 1] && sys->conductorIn[i].x[j] != sys->conductorIn[i].x[j + 1]){   // this edge is with a slope
+                if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[j + 1]){
+                    ss = xi[sys->conductorIn[i].x[j]];
+                    ee = xi[sys->conductorIn[i].x[j + 1]];
+                    if (ss == ee && mark1 == 1){
+                        continue;
+                    }
+                    while (xrange[ss] <= ee){
+                        y3 = (sys->conductorIn[i].x[j + 1] - sys->xn[ss]) / (sys->conductorIn[i].x[j + 1] - sys->conductorIn[i].x[j]) * sys->conductorIn[i].y[j] + (sys->xn[ss] - sys->conductorIn[i].x[j]) / (sys->conductorIn[i].x[j + 1] - sys->conductorIn[i].x[j]) * sys->conductorIn[i].y[j + 1];
+                        if (sys->conductorIn[i].y[j] > sys->conductorIn[i].y[j + 1]){
+                            y1 = yi[sys->conductorIn[i].y[j + 1]];
+                            y2 = yi[sys->conductorIn[i].y[j]];
+                        }
+                        else{
+                            y1 = yi[sys->conductorIn[i].y[j]];
+                            y2 = yi[sys->conductorIn[i].y[j + 1]];
+                        }
+                        mini = DOUBLEMAX;
+                        mini_k = y1;
+                        for (l = y1; l <= y2; l++){    // find the closest y to y3
+                            if (mini < abs(sys->yn[l] - y3)){
+                                mini = abs(sys->yn[l] - y3);
+                                mini_k = l;
+                            }
+                        }
+                        xcoory[ss].insert(mini_k);
+                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){   // if this range is the rightmost one, or xrange only has one value, break
+                            
+                            break;
+                        }
+                        ss = xrange[ss];
+                    }
+                }
+                else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[j + 1]){
+                    ss = xi[sys->conductorIn[i].x[j + 1]];
+                    ee = xi[sys->conductorIn[i].x[j]];
+                    if (ss == ee && mark1 == 1){
+                        continue;
+                    }
+                    while (xrange[ss] <= ee){
+                        y3 = (sys->conductorIn[i].x[j] - sys->xn[ss]) / (sys->conductorIn[i].x[j] - sys->conductorIn[i].x[j + 1]) * sys->conductorIn[i].y[j + 1] + (sys->xn[ss] - sys->conductorIn[i].x[j + 1]) / (sys->conductorIn[i].x[j] - sys->conductorIn[i].x[j + 1]) * sys->conductorIn[i].y[j];
+                        if (sys->conductorIn[i].y[j] > sys->conductorIn[i].y[j + 1]){
+                            y1 = yi[sys->conductorIn[i].y[j + 1]];
+                            y2 = yi[sys->conductorIn[i].y[j]];
+                        }
+                        else{
+                            y1 = yi[sys->conductorIn[i].y[j]];
+                            y2 = yi[sys->conductorIn[i].y[j + 1]];
+                        }
+                        mini = DOUBLEMAX;
+                        mini_k = y1;
+                        for (l = y1; l <= y2; l++){    // find the closest y to y3
+                            if (mini < abs(sys->yn[l] - y3)){
+                                mini = abs(sys->yn[l] - y3);
+                                mini_k = l;
+                            }
+                        }
+                        xcoory[ss].insert(mini_k);
+                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+                            
                             break;
                         }
                         ss = xrange[ss];
@@ -456,6 +564,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 while (xrange[ss] <= ee){
                     xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
                     if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+                        
                         break;
                     }
                     ss = xrange[ss];
@@ -470,6 +579,73 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 while (xrange[ss] <= ee){
                     xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
                     if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+                        
+                        break;
+                    }
+                    ss = xrange[ss];
+                }
+            }
+        }
+        else if (sys->conductorIn[i].y[j] != sys->conductorIn[i].y[0] && sys->conductorIn[i].x[j] != sys->conductorIn[i].x[0]){   // this edge is with a slope
+            if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[0]){
+                ss = xi[sys->conductorIn[i].x[j]];
+                ee = xi[sys->conductorIn[i].x[0]];
+                if (ss == ee && mark1 == 1){
+                    continue;
+                }
+                while (xrange[ss] <= ee){
+                    y3 = (sys->conductorIn[i].x[0] - sys->xn[ss]) / (sys->conductorIn[i].x[0] - sys->conductorIn[i].x[j]) * sys->conductorIn[i].y[j] + (sys->xn[ss] - sys->conductorIn[i].x[j]) / (sys->conductorIn[i].x[0] - sys->conductorIn[i].x[j]) * sys->conductorIn[i].y[0];
+                    if (sys->conductorIn[i].y[j] > sys->conductorIn[i].y[0]){
+                        y1 = yi[sys->conductorIn[i].y[0]];
+                        y2 = yi[sys->conductorIn[i].y[j]];
+                    }
+                    else{
+                        y1 = yi[sys->conductorIn[i].y[j]];
+                        y2 = yi[sys->conductorIn[i].y[0]];
+                    }
+                    mini = DOUBLEMAX;
+                    mini_k = y1;
+                    for (l = y1; l <= y2; l++){    // find the closest y to y3
+                        if (mini < abs(sys->yn[l] - y3)){
+                            mini = abs(sys->yn[l] - y3);
+                            mini_k = l;
+                        }
+                    }
+                    xcoory[ss].insert(mini_k);
+                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){   // if this range is the rightmost one, or xrange only has one value, break
+                        
+                        break;
+                    }
+                    ss = xrange[ss];
+                }
+            }
+            else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[0]){
+                ss = xi[sys->conductorIn[i].x[0]];
+                ee = xi[sys->conductorIn[i].x[j]];
+                if (ss == ee && mark1 == 1){
+                    continue;
+                }
+                while (xrange[ss] <= ee){
+                    y3 = (sys->conductorIn[i].x[j] - sys->xn[ss]) / (sys->conductorIn[i].x[j] - sys->conductorIn[i].x[0]) * sys->conductorIn[i].y[0] + (sys->xn[ss] - sys->conductorIn[i].x[0]) / (sys->conductorIn[i].x[j] - sys->conductorIn[i].x[0]) * sys->conductorIn[i].y[j];
+                    if (sys->conductorIn[i].y[j] > sys->conductorIn[i].y[0]){
+                        y1 = yi[sys->conductorIn[i].y[0]];
+                        y2 = yi[sys->conductorIn[i].y[j]];
+                    }
+                    else{
+                        y1 = yi[sys->conductorIn[i].y[j]];
+                        y2 = yi[sys->conductorIn[i].y[0]];
+                    }
+                    mini = DOUBLEMAX;
+                    mini_k = y1;
+                    for (l = y1; l <= y2; l++){    // find the closest y to y3
+                        if (mini < abs(sys->yn[l] - y3)){
+                            mini = abs(sys->yn[l] - y3);
+                            mini_k = l;
+                        }
+                    }
+                    xcoory[ss].insert(mini_k);
+                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+                        
                         break;
                     }
                     ss = xrange[ss];
@@ -483,9 +659,43 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
         cout << endl;
         }*/
+        
+        if (mark1 == 0){    // only has one x
+            y1 = sys->ny;
+            y2 = 0;
+            for (auto xcooryi : xcoory){    // only one xcooryi
+                for (auto xrangey : xcooryi.second){
+                    if (y1 > xrangey){
+                        y1 = xrangey;
+                    }
+                    if (y2 < xrangey){
+                        y2 = xrangey;
+                    }
+                }
+                j = xcooryi.first;
+                for (l = zi[sys->conductorIn[i].zmin]; l <= zi[sys->conductorIn[i].zmax]; l++){
+                    for (k = y1; k < y2; k++){
+                        sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
+                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] = i + 1;
+                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
+                        if (l != zi[sys->conductorIn[i].zmax]){
+                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
+                        }
+                    }
+                    sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
+                    sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
+                    if (l != zi[sys->conductorIn[i].zmax]){
+                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
+                    }
+                }
+            }
+            continue;
+        }
         for (auto xcooryi : xcoory){
             mark = 0;
-            for (j = xcooryi.first; j < xrange[xcooryi.first]; j++){
+            x1 = xcooryi.first;
+            x2 = xrange[xcooryi.first];
+            for (j = x1; j < x2; j++){
                 mark = 0;
                 for (auto xrangey : xcooryi.second){
                     mark++;
@@ -504,44 +714,192 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                                 if (l != zi[sys->conductorIn[i].zmax]){
                                     sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
                                 }
+                                if (x2 == xrange_max && j == x2 - 1){    // If this range is the rightmost range, include the rightmost point
+                                    sys->markNode[l * sys->N_node_s + x2 * (sys->N_cell_y + 1) + k] = 1;
+                                    sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + x2 * (sys->N_cell_y) + k] = i + 1;
+                                    if (l != zi[sys->conductorIn[i].zmax]){
+                                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + x2 * (sys->N_cell_y + 1) + k] = i + 1;
+                                    }
+                                }
                             }
                             sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
                             sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
                             if (l != zi[sys->conductorIn[i].zmax]){
                                 sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
                             }
+                            if (x2 == xrange_max && j == x2 - 1){    // If this range is the rightmost range, include the rightmost point
+                                sys->markNode[l * sys->N_node_s + x2 * (sys->N_cell_y + 1) + k] = 1;
+                                if (l != zi[sys->conductorIn[i].zmax]){
+                                    sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + x2 * (sys->N_cell_y + 1) + k] = i + 1;
+                                }
+                            }
                         }
 
                     }
                 }
             }
-            mark = 0;
-            for (auto xrangey : xcooryi.second){
-                mark++;
-                if (mark % 2 == 1){
-                    y1 = xrangey;
-                    continue;
-                }
-                else if (mark % 2 == 0){
-                    y2 = xrangey;
-                    for (l = zi[sys->conductorIn[i].zmin]; l <= zi[sys->conductorIn[i].zmax]; l++){
-                        for (k = y1; k < y2; k++){
-                            sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
-                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] = i + 1;
-                            if (l != zi[sys->conductorIn[i].zmax]){
-                                sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
-                            }
-                        }
-                        sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
-                        if (l != zi[sys->conductorIn[i].zmax]){
-                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
-                        }
-                    }
-                }
-            }
+            
         }
         
     }
+
+//Original way to find nodes inside polygons, which only applies to the condition that the boundary is along x and y axis.
+//for (i = 0; i < sys->numCdtRow; i++){
+//    xrange.clear();
+//    xcoor.clear();
+//    xcoorv.clear();
+//    xcoory.clear();
+//    mark1 = 0;
+//    //cout << "Number of CdtRow is " << i << endl;
+//    for (j = 0; j < sys->conductorIn[i].numVert; j++){
+//        xcoor.insert(xi[sys->conductorIn[i].x[j]]);
+//    }
+//
+//    for (auto xcoori : xcoor){
+//        xcoorv.push_back(xcoori);
+//    }
+//
+//
+//    for (j = 0; j < xcoorv.size() - 1; j++){
+//        mark1 = 1;    // the x coordinates are more than 1
+//        xrange[xcoorv[j]] = xcoorv[j + 1];
+//
+//    }
+//    if (xcoorv.size() == 1){    // If it has only one value
+//        xrange[xcoorv[0]] = xcoorv[0];
+//    }
+//
+//
+//    for (j = 0; j < sys->conductorIn[i].numVert - 1; j++){
+//        if (sys->conductorIn[i].y[j] == sys->conductorIn[i].y[j + 1]){
+//            if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[j + 1]){
+//                ss = xi[sys->conductorIn[i].x[j]];
+//                ee = xi[sys->conductorIn[i].x[j + 1]];
+//                if (ss == ee && mark1 == 1){
+//                    continue;
+//                }
+//                while (xrange[ss] <= ee){
+//                    xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
+//                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+//                        break;
+//                    }
+//                    ss = xrange[ss];
+//                }
+//            }
+//            else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[j + 1]){
+//                ss = xi[sys->conductorIn[i].x[j + 1]];
+//                ee = xi[sys->conductorIn[i].x[j]];
+//                if (ss == ee && mark1 == 1){
+//                    continue;
+//                }
+//                while (xrange[ss] <= ee){
+//                    xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
+//                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+//                        break;
+//                    }
+//                    ss = xrange[ss];
+//                }
+//            }
+//        }
+//    }
+//    if (sys->conductorIn[i].y[j] == sys->conductorIn[i].y[0]){
+//        if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[0]){
+//            ss = xi[sys->conductorIn[i].x[j]];
+//            ee = xi[sys->conductorIn[i].x[0]];
+//            if (ss == ee && mark1 == 1){
+//                continue;
+//            }
+//            while (xrange[ss] <= ee){
+//                xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
+//                if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+//                    break;
+//                }
+//                ss = xrange[ss];
+//            }
+//        }
+//        else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[0]){
+//            ss = xi[sys->conductorIn[i].x[0]];
+//            ee = xi[sys->conductorIn[i].x[j]];
+//            if (ss == ee && mark1 == 1){
+//                continue;
+//            }
+//            while (xrange[ss] <= ee){
+//                xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
+//                if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
+//                    break;
+//                }
+//                ss = xrange[ss];
+//            }
+//        }
+//    }
+//    /*for (auto xcooryi : xcoory){
+//    cout << xcooryi.first << " : ";
+//    for (auto xcooryii : xcooryi.second){
+//    cout << xcooryii << " ";
+//    }
+//    cout << endl;
+//    }*/
+//    for (auto xcooryi : xcoory){
+//        mark = 0;
+//        for (j = xcooryi.first; j < xrange[xcooryi.first]; j++){
+//            mark = 0;
+//            for (auto xrangey : xcooryi.second){
+//                mark++;
+//                if (mark % 2 == 1){
+//                    y1 = xrangey;
+//                    continue;
+//                }
+//                else if (mark % 2 == 0){
+//                    y2 = xrangey;
+//
+//                    for (l = zi[sys->conductorIn[i].zmin]; l <= zi[sys->conductorIn[i].zmax]; l++){
+//                        for (k = y1; k < y2; k++){
+//                            sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
+//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] = i + 1;
+//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
+//                            if (l != zi[sys->conductorIn[i].zmax]){
+//                                sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
+//                            }
+//                        }
+//                        sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
+//                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
+//                        if (l != zi[sys->conductorIn[i].zmax]){
+//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
+//                        }
+//                    }
+//
+//                }
+//            }
+//        }
+//        mark = 0;
+//        for (auto xrangey : xcooryi.second){
+//            mark++;
+//            if (mark % 2 == 1){
+//                y1 = xrangey;
+//                continue;
+//            }
+//            else if (mark % 2 == 0){
+//                y2 = xrangey;
+//                for (l = zi[sys->conductorIn[i].zmin]; l <= zi[sys->conductorIn[i].zmax]; l++){
+//                    for (k = y1; k < y2; k++){
+//                        sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
+//                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] = i + 1;
+//                        if (l != zi[sys->conductorIn[i].zmax]){
+//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
+//                        }
+//                    }
+//                    sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
+//                    if (l != zi[sys->conductorIn[i].zmax]){
+//                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
+//                    }
+//                }
+//            }
+//        }
+//    }
+//
+//}
+
+    
     cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
     
     //for (i = 0; i < sys->numCdtRow; i++){
@@ -1183,7 +1541,7 @@ int compute_edgelink(fdtdMesh *sys, myint eno, myint &node1, myint &node2){
 
 int matrixConstruction(fdtdMesh *sys){
     int i, j;
-
+    //cout << sys->stackEpsn.size() << endl;
     /* construct D_eps */
     sys->eps = (double*)malloc(sizeof(double)*sys->N_edge);
     for (i = 0; i < sys->N_edge; i++){
@@ -1195,7 +1553,7 @@ int matrixConstruction(fdtdMesh *sys){
             sys->eps[i] = sys->stackEpsn[(i - sys->N_edge_s) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
     }
-
+    
     /* construct D_sig */
     sys->sig = (double*)calloc(sys->N_edge, sizeof(double));
     double a, b;
@@ -1214,7 +1572,7 @@ int matrixConstruction(fdtdMesh *sys){
 #endif
         }
     }
-
+    cout << "h" << endl;
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
     //free(sys->markCell); sys->markCell = NULL;
@@ -1228,6 +1586,7 @@ int matrixConstruction(fdtdMesh *sys){
     //cout << "sig's generation is done!\n";
 
     sys->stackEpsn.clear();
+    cout << "h" << endl;
     return 0;
 }
 
@@ -1242,8 +1601,10 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 
     for (i = 0; i < sys->numPorts; i++)
     {
+        cout << "Reminder to send error if sys->portCoor[i] == 0 because program will fail later" << endl;
         myint indMarkNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         myint indMarkNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
+        
         if ((indMarkNode1 != 0) && (sys->conductor[indMarkNode1 - 1].markPort > -1)){ // Only supply end of port not on PEC
             sys->portCoor[i].portCnd = indMarkNode1;
             sys->conductor[indMarkNode1 - 1].markPort = i + 1;    // markPort start from 1
@@ -1368,6 +1729,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             sys->portArea.push_back(a);
 
         }
+        
         sys->portEdge.push_back(edge);
         
 
