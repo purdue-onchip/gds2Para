@@ -41,25 +41,31 @@ int main(int argc, char** argv)
             cout << "Options:" << endl;
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
-            cout << "  -r, --read            Read given GDSII file into memory." << endl;
+            cout << "  -r, --read            Read given GDSII file into memory and display statistics." << endl;
             cout << "  -p, --parrot          Immediately output given GDSII file after reading." << endl;
             cout << "  -w, --write           Write database in memory to given SPEF file." << endl;
             cout << "  -i, --imp             Read given interconnect modeling platform file and write GDSII file with name also given." << endl;
-            cout << "  -s, --simulate        Read GDSII file and sim input file into memory, simulate, and write solution to Xyce (SPICE) subcircuit file." << endl;
+            cout << "  -t, --pslg            Read GDSII files of design and outline and write a PSLG file for each layer." << endl;
+            cout << "  -s, --simulate        Read GDSII and sim input files, simulate, and write solution to Xyce (SPICE) subcircuit." << endl;
             cout << "  -sx, --xyce           Identical to \"-s\"." << endl;
-            cout << "  -sp, --spef           Read GDSII file and sim input file into memory, simulate, and write solution to SPEF file." << endl;
+            cout << "  -sp, --spef           Read GDSII and sim input files into memory, simulate, and write solution to SPEF file." << endl;
+            cout << "  -sc, --citi           Read GDSII and sim input files into memory, simulate, and write solution to CITIfile." << endl;
+            cout << "  -st, --touchstone     Read GDSII and sim input files into memory, simulate, and write solution to Touchstone file." << endl;
             cout << endl << "Comments:" << endl;
             cout << " The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
             cout << " The first file passed after -i or --imp must be a 3D description .imp file, and the second must be a blank .gds file." << endl;
+            cout << " The first file passed after -t or --pslg must be a Calma GDSII stream file of the design, and the second must be a GDSII file of just the design's outline." << endl;
             cout << " The first file passed after -s or --simulate (or -sx or --xyce) must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << " The first file passed after -sp or --spef must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
+            cout << " The first file passed after -sc or --citi must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank CITIfile." << endl;
+            cout << " The first file passed after -sc or --citi must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Touchstone file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gds2Para>" << endl;
         }
         else if (strcmp(argv[1], "--version") == 0)
         {
-            cout << "Version Number for LayoutAnalyzer binary (beta with main testing features): " << "0.1" << endl;
+            cout << "Version Number for LayoutAnalyzer binary (beta with main testing features): " << "0.2" << endl;
         }
         else
         {
@@ -73,9 +79,8 @@ int main(int argc, char** argv)
             AsciiDataBase adb;
             string fName = argv[2];
             adb.setFileName(fName);
-            std::ifstream inFile(fName.c_str());
             GdsParser::GdsReader adbReader(adb);
-            bool adbIsGood = adbReader(inFile);
+            bool adbIsGood = adbReader(fName.c_str());
             vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
             adb.print(indCellPrint);
         }
@@ -93,26 +98,6 @@ int main(int argc, char** argv)
             // Dump to parroted file immediately
             adb.dump();
             cout << "Dumped parroted file" << endl;
-
-            // Read GDSII file of outline for PSLG purposes
-            /*AsciiDataBase adbOutline;
-            adbOutline.setFileName(fName.substr(0, indExtension) + "_BACK_DRILL.gds"); // Taking specific file name (to be changed later)
-            std::ifstream outlineFile(adbOutline.getFileName().c_str());
-            GdsParser::GdsReader adbOutlineReader(adbOutline);
-            bool adbOutlineGood = adbOutlineReader(outlineFile);
-            vector<complex<double>> outlinePt = adbOutline.findPoints(adbOutline.getCell(0).getCellName(), 0., 0.);*/
-            //vector<complex<double>> outlinePt = { complex<double>(+150e-6, -48.0e-6), complex<double>(+150e-6, +121e-6), complex<double>(-1.00e-6, +121e-6), complex<double>(-1.00e-6, -48.0e-6) }; // nand2 outline
-            //vector<complex<double>> outlinePt = { complex<double>(+12.77e-6, -0.230e-6), complex<double>(+12.77e-6, +3.03e-6), complex<double>(-0.230e-6, +3.03e-6), complex<double>(-0.230e-6, -0.230e-6) }; // SDFFRS_X2 outline
-            //vector<complex<double>> outlinePt = { complex<double>(+2.82e-3, +5.00e-5), complex<double>(+2.825e-3, +3.87e-3), complex<double>(+3.00e-5, +3.87e-3), complex<double>(+3.00e-5, +5.00e-5) }; // 4004 outline
-
-            // Convert to planar straight-line graph (PSLG) file for external meshing
-            /*adb.setFileName("examples/4004.gds");
-            vector<int> layers = adb.findLayers();
-            for (size_t indLayer = 0; indLayer < layers.size(); indLayer++)
-            {
-                adb.convertPSLG(adb.getCell(adb.getNumCell() - 1).getCellName(), layers[indLayer], outlinePt);
-            }
-            cout << "Created PSLG file for each layer" << endl;*/
         }
         else if ((strcmp(argv[1], "-w") == 0) || (strcmp(argv[1], "--write") == 0))
         {
@@ -190,16 +175,17 @@ int main(int argc, char** argv)
             listC.push_back(dTriplet(11, 11, 6.7e-15));
             listC.push_back(dTriplet(12, 12, 7.8e-15));
             matC.setFromTriplets(listC.begin(), listC.end()); // Assign nonzero entries to sparse capacitance matrix
-            matC.makeCompressed(); // Capactiance matrix in compressed sparse row (CSR) format
+            matC.makeCompressed(); // Capacitance matrix in compressed sparse row (CSR) format
 
             // Create variables of custom classes
-            Parasitics sample(ports, matG, matC);
+            Parasitics sample(ports, matG, matC, { 1000. });
             SolverDataBase sdb(design, blank, sample);
 
             // Prepare to write to file
             string fName = argv[2];
             sdb.setOutSPEF(fName);
-            bool couldDump = sdb.printDumpSPEF();
+            sdb.print({});
+            bool couldDump = sdb.dumpSPEF();
         }
         else
         {
@@ -217,14 +203,44 @@ int main(int argc, char** argv)
             bool sdbIsGood = sdb.readIMPwriteGDSII(inIMPFile, outGDSIIFile);
             cout << "File ready at " << outGDSIIFile << endl;
         }
+        else if ((strcmp(argv[1], "-t") == 0) || (strcmp(argv[1], "--pslg") == 0))
+        {
+            // Read and print existing GDSII file
+            AsciiDataBase adbDesign;
+            string designFileName = argv[2];
+            adbDesign.setFileName(designFileName);
+            GdsParser::GdsReader adbReader(adbDesign);
+            bool adbDesignGood = adbReader(designFileName.c_str());
+            adbDesign.print({});
+
+            // Read GDSII file of outline for PSLG purposes
+            AsciiDataBase adbOutline;
+            string outlineFileName = argv[2];
+            adbOutline.setFileName(outlineFileName);
+            GdsParser::GdsReader adbOutlineReader(adbOutline);
+            bool adbOutlineGood = adbOutlineReader(outlineFileName.c_str());
+            vector<complex<double>> outlinePt = adbOutline.findPoints(adbOutline.getCell(0).getCellName(), { 0., 0. }, strans());
+            //vector<complex<double>> outlinePt = { complex<double>(+150e-6, -48.0e-6), complex<double>(+150e-6, +121e-6), complex<double>(-1.00e-6, +121e-6), complex<double>(-1.00e-6, -48.0e-6) }; // nand2 outline
+            //vector<complex<double>> outlinePt = { complex<double>(+12.77e-6, -0.230e-6), complex<double>(+12.77e-6, +3.03e-6), complex<double>(-0.230e-6, +3.03e-6), complex<double>(-0.230e-6, -0.230e-6) }; // SDFFRS_X2 outline
+            //vector<complex<double>> outlinePt = { complex<double>(+2.82e-3, +5.00e-5), complex<double>(+2.825e-3, +3.87e-3), complex<double>(+3.00e-5, +3.87e-3), complex<double>(+3.00e-5, +5.00e-5) }; // 4004 outline
+
+            // Convert to planar straight-line graph (PSLG) file for external meshing
+            vector<int> layers = adbDesign.findLayers();
+            for (size_t indLayer = 0; indLayer < layers.size(); indLayer++)
+            {
+                adbDesign.convertPSLG(adbDesign.getCell(adbDesign.getNumCell() - 1).getCellName(), layers[indLayer], outlinePt);
+            }
+            cout << "Created PSLG file for each layer" << endl;
+        }
         else
         {
             cerr << "Must pass a .imp file to read and blank GDSII file to write after \"-i\" flag, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass two related GDSII files to read after \"-t\" flag, rerun with \"--help\" flag for details" << endl;
         }
     }
     else if (argc == 5)
     {
-        if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0) || (strcmp(argv[1], "-sx") == 0) || (strcmp(argv[1], "--xyce") == 0) || (strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
+        if ((strcmp(argv[1], "-s") == 0) || (strcmp(argv[1], "--simulate") == 0) || (strcmp(argv[1], "-sx") == 0) || (strcmp(argv[1], "--xyce") == 0) || (strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0) || (strcmp(argv[1], "-sc") == 0) || (strcmp(argv[1], "--citi") == 0) || (strcmp(argv[1], "-st") == 0) || (strcmp(argv[1], "--touchstone") == 0))
         {
             // Initialize SolverDataBase, mesh, and set variables for performance tracking
             clock_t t1 = clock();
@@ -350,63 +366,46 @@ int main(int argc, char** argv)
                 return status;
             }
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
 
-            // Parameter storage
-            spMat matG(sys.numPorts, sys.numPorts); // Initialize Eigen sparse conductance matrix (S)
-            spMat matC(sys.numPorts, sys.numPorts); // Initialize Eigen sparse capacitance matrix (F)
-            vector<dTriplet> listG; // Initialize triplet list for conductance matrix
-            vector<dTriplet> listC;
-            listG.reserve(sys.numPorts); // Reserve room so matrix could be dense
-            listC.reserve(sys.numPorts);
-            for (size_t indi = 0; indi < sys.numPorts; indi++) // Loop over excitation ports
-            {
-                double sumG = 0.;
-                double sumC = 0.;
-                for (size_t indj = 0; indj < sys.numPorts; indj++) // Loop over response ports
-                {
-                    // Find Y-parameters from Z-parameters (temporary measure for diagonal elements only)]
-                    double gij = sys.x[indi * sys.numPorts + indj].real() / norm(sys.x[indi * sys.numPorts + indj]); // Re(Z^-1) = Re(Z) / |Z|^2
-                    double gji = sys.x[indj * sys.numPorts + indi].real() / norm(sys.x[indj * sys.numPorts + indi]);
-                    double bij = -sys.x[indi * sys.numPorts + indj].imag() / norm(sys.x[indi * sys.numPorts + indj]); // Im(Z^-1) = -Im(Z) / |Z|^2
-                    double bji = -sys.x[indj * sys.numPorts + indi].imag() / norm(sys.x[indj * sys.numPorts + indi]);
-
-                    // Symmetrize diagonal components of admittance matrix before saving entry
-                    double symgij = 0.5 * (gij + gji);
-                    double symcij = 0.5 * (bij + bji) / (2. * M_PI * sys.freqStart * sys.freqUnit);
-                    //double symgij = 0.5 * (sys.Y[indi * sys.numPorts + indj].real() + sys.Y[indj * sys.numPorts + indi].real());
-                    //double symcij = 0.5 * (sys.Y[indi * sys.numPorts + indj].imag() + sys.Y[indj * sys.numPorts + indi].imag()) / (2. * M_PI * sys.freqStart * sys.freqUnit);
-                    listG.push_back(dTriplet(indj, indi, symgij));
-                    listC.push_back(dTriplet(indj, indi, symcij));
-                    /*if (indi != indj) // Off-diagonal entries are negated node-to-node admittances
-                    {
-                        listG.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].real()));
-                        listC.push_back(dTriplet(indi, indj, sys.Y[indi * sys.numPorts + indj].imag() / (2. * M_PI* sys.freqStart * sys.freqUnit)));
-                    }
-                    
-                    // Diagonal entries of bus matrix need to have sum of all attached admittances, so note them
-                    sumG += sys.Y[indi * sys.numPorts + indj].real();
-                    sumC += sys.Y[indi * sys.numPorts + indj].imag() / (2 * M_PI* sys.freqStart * sys.freqUnit);*/
-                }
-
-                // Record diagonal entries
-                listG.push_back(dTriplet(indi, indi, sumG));
-                listC.push_back(dTriplet(indi, indi, sumC));
-            }
-            matG.setFromTriplets(listG.begin(), listG.end()); // Assign nonzero entries to sparse conductance matrix
-            matC.setFromTriplets(listC.begin(), listC.end()); // Do not put in compressed sparse row (CSR) format due to density
-            Parasitics oldPara = sdb.getParasitics(); // Get outdated parastics structure to update
-            sdb.setParasitics(Parasitics(oldPara.getPorts(), matG, matC));
+            // Network parameter storage
+            Parasitics newPara = sdb.getParasitics(); // Start with outdated parastics to update
+            newPara.saveNetworkParam('Z', { sdb.getSimSettings().getFreqsHertz()[0] }, sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
+            sdb.setParasitics(newPara);
 
             // Select Output File Based on Control Mode
             if ((strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
             {
                 // Output SPEF file
                 string outSPEFFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
                 sdb.setDesignName(adb.findNames().back());
                 sdb.setOutSPEF(outSPEFFile);
-                bool sdbCouldDump = sdb.printDumpSPEF();
+                sdb.print(indLayerPrint);
+                bool sdbCouldDump = sdb.dumpSPEF();
                 cout << "File ready at " << outSPEFFile << endl;
+            }
+            else if ((strcmp(argv[1], "-sc") == 0) || (strcmp(argv[1], "--citi") == 0))
+            {
+                // Output Common Instrumentation Transfer and Interchange file (CITIfile)
+                string outCITIFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutCITI(outCITIFile);
+                sdb.print(indLayerPrint);
+                bool sdbCouldDump = sdb.dumpCITI();
+                cout << "File ready at " << outCITIFile << endl;
+            }
+            else if ((strcmp(argv[1], "-st") == 0) || (strcmp(argv[1], "--touchstone") == 0))
+            {
+                // Output Touchstone file
+                string outTstoneFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutTouchstone(outTstoneFile);
+                sdb.print(indLayerPrint);
+                bool sdbCouldDump = sdb.dumpTouchstone();
+                cout << "File ready at " << outTstoneFile << endl;
             }
             else
             {
@@ -415,14 +414,18 @@ int main(int argc, char** argv)
                 vector<size_t> indLayerPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
                 sdb.setDesignName(adb.findNames().back());
                 sdb.setOutXyce(outXyceFile);
-                sdbCouldDump = sdb.printDumpXyce(indLayerPrint);
+                sdb.print(indLayerPrint);
+                sdbCouldDump = sdb.dumpXyce();
                 cout << "File ready at " << outXyceFile << endl;
             }
         }
         else
         {
-            cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" or \"-sx\" flag, rerun with \"--help\" flag for details" << endl;
-            cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-sp\" flag, rerun with \"--help\" flag for details" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" or \"-sx\" flag" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-sp\" flag" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank CITI file to write after \"-sc\" flag" << endl;
+            cerr << "Must pass a GDSII file, sim_input file, and blank Touchstone file to write after \"-st\" flag" << endl;
+            cerr << "Rerun with \"--help\" flag for details" << endl;
         }
     }
     else

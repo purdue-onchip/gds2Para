@@ -32,10 +32,13 @@
 *.app
 
 # Repository-specific files
+*_log.txt
 *_out.txt
 *_parrot.gds
 *.cir
 *.spef
+*.citi
+*.ts
 Thumbs.db
 examples/WEDGE100_REV01.gds
 confidential/

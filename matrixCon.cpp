@@ -207,7 +207,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->v0d1aval[indi] = sys->v0d1aval[indi] * sqrt(sys->eps[sys->v0d1RowId[indi]]);
     }
 
-
     myint leng_v0d = leng_v0d1;
     sys->v0d1ColIdo = (myint*)malloc(v0d1num * sizeof(myint));
     for (indi = 0; indi < v0d1num; indi++)
@@ -229,10 +228,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     free(sys->v0d1aval); sys->v0d1aval = NULL;
     
 
-
-    cout << "Length of V0d1 is " << leng_v0d1 << " number of non-zeros in V0d1 is " << v0d1num << endl;
-    cout << "Length of V0d1a is " << leng_v0d1a << " number of non-zeros in V0d1a is " << v0d1anum << endl;
-    //cout << "Number of NNZ in V0d1 is " << v0d1num << endl;
+    cout << "Length of V0d1 is " << leng_v0d1 << ", and the number of non-zeros in V0d1 is " << v0d1num << endl;
+    cout << "Length of V0d1a is " << leng_v0d1a << ", and the number of non-zeros in V0d1a is " << v0d1anum << endl;
 
     sparse_status_t s;
 
@@ -426,7 +423,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //status = setHYPREMatrix(sys->AcRowId, sys->AcColId, sys->Acval, leng_v0c, ac, parcsr_ac);
     /* End */
 
-
     sys->v0cvalo = (double*)malloc(v0cnum * sizeof(double));
     for (indi = 0; indi < v0cnum; indi++)
         sys->v0cvalo[indi] = sys->v0cval[indi];    // v0cvalo is the v0c values without D_sig
@@ -439,8 +435,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (indi = 0; indi < v0canum; indi++){
         sys->v0caval[indi] = sys->v0caval[indi] * sqrt(sys->sig[sys->v0cRowId[indi]]);
     }
-    
-
 
     sys->v0cColIdo = (myint*)malloc(v0cnum * sizeof(myint));
     for (indi = 0; indi < v0cnum; indi++)
@@ -462,10 +456,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     free(sys->v0caColIdo); sys->v0caColIdo = NULL;*/
     free(sys->v0caval); sys->v0caval = NULL;
 
-
     //status = mklMatrixMulti(sys, leng_Ac, sys->v0caRowId, sys->v0caColId, sys->v0caval, sys->N_edge, leng_v0c, sys->v0cRowId, sys->v0cColId, sys->v0cval, 2);
 
-    cout << "leng v0c " << leng_v0c  << " number of non-zeros in V0c is " << v0cnum << endl;
+    cout << "leng v0c = " << leng_v0c  << ", and the number of non-zeros in V0c is " << v0cnum << endl;
     cout << "The number of nonzeros in Ac is " << leng_Ac << endl;
 
     /*for (i = 0; i < sys->numCdt + 1; i++){
@@ -489,7 +482,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *a;
     int *ia, *ja;
 
-
     /* Pick up a y0c2 cooresponding to one source port */
     complex<double> Zresult;
     double *bd1, *bd2;
@@ -510,7 +502,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->x[indi] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
     }
 
-
     double *b, *xc;    // the array of the right hand side
     xcol = 0;
 
@@ -523,7 +514,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double alpha = 1, beta = 0;
     char matdescra[6];
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << "Begin the iterative solve for network parameters!\n";
+    cout << "Begin the iterative solve for network parameters!" << endl;
     double *ydcp;
     double *y0c, *y0cs;
     double *yc, *yca;
@@ -548,8 +539,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     /* V0c^T's csr form handle for MKL */
     sparse_matrix_t V0ct;
     s = mkl_sparse_d_create_csr(&V0ct, SPARSE_INDEX_BASE_ZERO, leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cvalo);
-    
-    
+
+
     lapack_complex_double *tmp;
     lapack_complex_double *m_h, *m_hc;
     lapack_complex_double *rhs_h, *rhs_h0;
@@ -570,7 +561,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             //cout << sys->portEdge[sourcePort][indi] << " " << sys->portCoor[sourcePort].portDirection;
         }
         //cout << endl;
-        
 
 
         dRhs = (double*)malloc(sys->N_edge*sizeof(double));
@@ -580,17 +570,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
         y0d = (double*)calloc(leng_v0d1, sizeof(double));
-        
+
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        
+
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, dRhs, beta, v0daJ);
-        
+
         /* solve V0d system */
 
         t1 = clock();
-        
+
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
@@ -709,7 +699,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             //free(y0cs); y0cs = NULL;
 
             //status = hypreSolve(sys, ac, parcsr_ac, leng_Ac, v0caJ, leng_v0c, y0c);
-            cout << "h\n";
+            cout << "h" << endl;
             status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
@@ -789,11 +779,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     leng = sys->zn[inz + 1] - sys->zn[inz];
                 }
                 else if (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)){    // this edge is along x axis
-                    inx = ((sys->v0d1aRowId[indi] % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
+                    inx = ((sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
                     leng = sys->xn[inx + 1] - sys->xn[inx];
                 }
                 else{    // this edge is along y axis
-                    iny = (sys->v0d1aRowId[indi] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
+                    iny = (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
                     leng = sys->yn[iny + 1] - sys->yn[iny];
                 }
                 /*leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3]), 2);
@@ -921,7 +911,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
                     Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
-                    cout << Zresult << "\n";
+                    cout << Zresult << endl;
                 }
             }
         }
@@ -931,7 +921,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
                 Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
-                cout << Zresult << "\n";
+                cout << Zresult << endl;
             }
         }
     }
@@ -1122,7 +1112,7 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //            }
 //            cblas_daxpy(N, mdone, rhs, ione, temp, ione);
 //            euclidean_norm = cblas_dnrm2(N, temp, ione) / cblas_dnrm2(N, rhs, ione);
-//            //cout << euclidean_norm << "\n";
+//            //cout << euclidean_norm << endl;
 //            if (euclidean_norm > 1.e-3)
 //                continue;
 //            else
@@ -1135,8 +1125,8 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //    }
 //
 //    dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
-//    //cout << itercount << "\n";
-//    //cout << euclidean_norm << "\n";
+//    //cout << itercount << endl;
+//    //cout << euclidean_norm << endl;
 //    free(tmp);
 //    free(temp);
 //    free(ipar);
@@ -1734,7 +1724,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
     //            inz = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] / sys->N_node_s;
     //            inx = (sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] - inz * sys->N_node_s) / (sys->N_cell_y + 1);
     //            iny = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] % (sys->N_cell_y + 1);
-    //            /*cout << "h\n";*/
+    //            /*cout << "h" << endl;*/
     //            if (iny == 0){
     //                rowId.push_back(inz*(sys->N_edge_s + sys->N_edge_v) + inx*(sys->N_cell_y) + iny);
     //                colId.push_back(1);

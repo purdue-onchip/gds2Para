@@ -22,12 +22,19 @@
 #include <algorithm>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
+#include <Eigen/Core>
 #include "limboint.h"
 #include "fdtd.h"
 
+// Parasitics representation macros
+#define EIGEN_COMPRESS // Enable to allow compressed sparse row (CSR) format for sparse matrices
+#define WRITE_THRESH (1.e-5) // Threshold for saving a parasitic value to file as fraction of total represented in matrix
+
 // Define types for Eigen
 typedef Eigen::Triplet<double, int> dTriplet;
+typedef Eigen::Triplet<complex<double>, int> cdTriplet;
 typedef Eigen::SparseMatrix<double, Eigen::RowMajor> spMat;
+typedef Eigen::SparseMatrix<complex<double>, Eigen::RowMajor> cspMat;
 struct myPruneFunctor
 {
   private:
@@ -485,6 +492,17 @@ class SimSettings
         return this->freqs;
     }
 
+    // Get list of frequencies with frequency unit applied (Hz)
+    vector<double> getFreqsHertz() const
+    {
+        vector<double> propFreqs = this->getFreqs();
+        for (size_t indFreq = 0; indFreq < this->getNFreq(); indFreq++)
+        {
+            propFreqs[indFreq] *= this->getFreqUnit();
+        }
+        return propFreqs;
+    }
+
     // Set length unit (m)
     void setLengthUnit(double lengthUnit)
     {
@@ -532,6 +550,7 @@ class SimSettings
     {
         this->freqScale = freqScale;
     }
+
     // Set list of frequencies (linear or logarithmic [preferred] spacing)
     void setFreqs(vector<double> freqs)
     {
@@ -926,29 +945,61 @@ class Waveforms
 class Parasitics
 {
   private:
-    size_t nPorts;      // Number of ports
-    vector<Port> ports; // Vector of port information
-    spMat matG;         // Conductance matrix (S)
-    spMat matC;         // Capacitance matrix (F)
+    size_t nPorts;           // Number of ports
+    vector<Port> ports;      // Vector of port information
+    spMat matG;              // Nodal conductance matrix (S)
+    spMat matC;              // Nodal capacitance matrix (F)
+    vector<double> freqs;    // List of frequencies for network parameter matrix states (Hz)
+    char param;              // Interpretation of network parameters
+    vector<cspMat> matParam; // Network parameter matrix at each frequency
   public:
     // Default constructor
     Parasitics()
     {
         vector<Port> ports;
-        spMat emptMat;
         this->nPorts = 0;
         this->ports = ports;
-        this->matG = emptMat;
-        this->matC = emptMat;
+        this->matG = spMat();
+        this->matC = spMat();
+        this->freqs = vector<double>();
+        this->param = 'S'; // Default to S-parameters
+        this->matParam = vector<cspMat>();
     }
 
-    // Parametrized constructor
-    Parasitics(vector<Port> ports, spMat matG, spMat matC)
+    // Parametrized constructor for nodal admittance matrices (circuit construction)
+    Parasitics(vector<Port> ports, spMat matG, spMat matC, vector<double> freqs)
     {
         this->nPorts = ports.size();
         this->ports = ports;
         this->matG = matG;
         this->matC = matC;
+        this->freqs = freqs;
+        this->param = 'Y';
+        this->matParam = vector<cspMat>();
+    }
+
+    // Parametrized constructor for network parameters (port interactions)
+    Parasitics(vector<Port> ports, vector<double> freqs, char param, vector<cspMat> matParam)
+    {
+        this->nPorts = ports.size();
+        this->ports = ports;
+        this->matG = spMat();
+        this->matC = spMat();
+        this->freqs = freqs;
+        if ((param != 'S') && (param != 'Y') && (param != 'Z'))
+        {
+            cerr << "Network parameter matrix must be 'S' (scattering S-parameters), 'Y' (admittance Y-parameters), or 'Z' (impedance Z-parameters). Defaulting to 'S'." << endl;
+            this->param = 'S';
+        }
+        else
+        {
+            this->param = param;
+        }
+        if (freqs.size() != matParam.size())
+        {
+            cerr << "Number of frequencies and number of network parameter matrix states do not match. Taking no action." << endl;
+        }
+        this->matParam = matParam;
     }
 
     // Get number of ports
@@ -975,6 +1026,25 @@ class Parasitics
         return this->matC;
     }
 
+    // Get list of frequencies (Hz)
+    vector<double> getFreqs() const
+    {
+        return this->freqs;
+    }
+
+    // Get interpretation of network parameters matrix
+    // ('S' = scattering, 'Y' = admittance, 'Z' = impedance)
+    char getParamType() const
+    {
+        return this->param;
+    }
+
+    // Get network parameter matrix
+    vector<cspMat> getParamMatrix() const
+    {
+        return this->matParam;
+    }
+
     // Set vector of port information
     void setPorts(vector<Port> ports)
     {
@@ -994,30 +1064,39 @@ class Parasitics
         this->matC = matC;
     }
 
-    // Return node-to-ground conductance (S)
-    double getGNodeGround(size_t indNode) const
+    // Set list of frequencies (Hz)
+    void setFreqs(vector<double> freqs)
     {
-        // Calculate by summing along given row
-        return (this->matG).innerVector(indNode).sum();
+        if (freqs.size() != this->matParam.size())
+        {
+            cerr << "Number of frequencies and number of network parameter matrix states do not match. Taking no action." << endl;
+        }
+        this->freqs = freqs;
     }
 
-    // Return total conductance represented in matrix (S, sum of diagonal entries)
-    double getGTotal() const
+    // Set interpretation of network parameters matrix
+    // ('S' = scattering, 'Y' = admittance, 'Z' = impedance)
+    void setParamType(char param)
     {
-        return (this->matG).diagonal().sum();
+        if ((param != 'S') && (param != 'Y') && (param != 'Z'))
+        {
+            cerr << "Network parameter matrix must be 'S' (scattering S-parameters), 'Y' (admittance Y-parameters), or 'Z' (impedance Z-parameters). Defaulting to 'S'." << endl;
+            this->param = 'S';
+        }
+        else
+        {
+            this->param = param;
+        }
     }
 
-    // Return node-to-ground capacitance (F)
-    double getCNodeGround(size_t indNode) const
+    // Set network parameter matrix
+    void setParamMatrix(vector<cspMat> matParam)
     {
-        // Calculate by summing along given row
-        return (this->matC).innerVector(indNode).sum();
-    }
-
-    // Return total capacitance represented in matrix (F, sum of diagonal entries)
-    double getCTotal() const
-    {
-        return (this->matC).diagonal().sum();
+        if (this->freqs.size() != matParam.size())
+        {
+            cerr << "Number of frequencies and number of network parameter matrix states do not match. Taking no action." << endl;
+        }
+        this->matParam = matParam;
     }
 
     // Find index of port by name
@@ -1105,6 +1184,269 @@ class Parasitics
         this->ports = portList;
     }
 
+    // Return node-to-ground conductance (S)
+    double getGNodeGround(size_t indNode) const
+    {
+        // Calculate by summing along given row
+        return (this->matG).innerVector(indNode).sum();
+    }
+
+    // Return total conductance represented in matrix (S)
+    double getGTotal() const
+    {
+        spMat matGUpper = (this->matG).triangularView<Eigen::Upper>(); // Upper triangular part of conductance matrix (S)
+        double GTot = 0.0; // Total conductance in matrix (S)
+        for (size_t indi = 0; indi < matGUpper.outerSize(); indi++) // Loop only over upper triangular portion
+        {
+            for (spMat::InnerIterator it(matGUpper, indi); it; ++it)
+            {
+                /* Diagonal elements have total conductance attached to the node.
+                The sum of the main diagonal by itself (trace) would double count the off-diagonal conductances.
+                The trace plus the strictly upper triangular elements would remove the second count, making only the upper triangular sum needed. */
+                GTot += it.value();
+            }
+        }
+        return GTot;
+    }
+
+    // Is conductance matrix reciprocal (is matrix symmetric)?
+    bool isGRecip() const
+    {
+        return this->matG.isApprox(this->matG.transpose());
+    }
+
+    // Make conductance matrix reciprocal
+    void makeGSym()
+    {
+        spMat symG = this->matG; // Start with original conductance matrix (S)
+        if (!this->isGRecip())
+        {
+            symG += spMat(this->matG.transpose()); // Copy constructor ensures sparse matrices have same storage order for addition
+            this->setGMatrix(symG); // Overwrite the conductance matrix with the symmetrized one
+        }
+    }
+
+    // Return node-to-ground capacitance (F)
+    double getCNodeGround(size_t indNode) const
+    {
+        // Calculate by summing along given row
+        return (this->matC).innerVector(indNode).sum();
+    }
+
+    // Return total capacitance represented in matrix (F)
+    double getCTotal() const
+    {
+        spMat matCUpper = (this->matC).triangularView<Eigen::Upper>(); // Upper triangular part of capacitance matrix (F)
+        double CTot = 0.0; // Total capacitance in matrix (F)
+        for (size_t indi = 0; indi < matCUpper.outerSize(); indi++) // Loop only over upper triangular portion
+        {
+            for (spMat::InnerIterator it(matCUpper, indi); it; ++it)
+            {
+                /* Diagonal elements have total capacitance attached to the node.
+                The sum of the main diagonal by itself (trace) would double count the off-diagonal capacitances.
+                The trace plus the strictly upper triangular elements would remove the second count, making only the upper triangular sum needed. */
+                CTot += it.value();
+            }
+        }
+        return CTot;
+    }
+
+    // Is capacitance matrix reciprocal (is matrix symmetric)?
+    bool isCRecip() const
+    {
+        return this->matC.isApprox(this->matC.transpose());
+    }
+
+    // Make capacitance matrix reciprocal
+    void makeCSym()
+    {
+        spMat symC = this->matC; // Start with original capacitance matrix (F)
+        if (!this->isCRecip())
+        {
+            symC += spMat(this->matC.transpose()); // Copy constructor ensures sparse matrices have same storage order for addition
+            this->setCMatrix(symC); // Overwrite the capacitance matrix with the symmetrized one
+        }
+    }
+
+    // Save network parameters as a sparse matrix (retrieve from fdtdMesh)
+    void saveNetworkParam(char param, vector<double> freqs, complex<double> *p)
+    {
+        // Parameter storage
+        char savedParam = param;
+        size_t nPorts = this->getNPort();
+        size_t nEntries = (sizeof p) / (sizeof p[0]); // NELEMENT(p);
+        if (nPorts * nPorts * freqs.size() != nEntries)
+        {
+            cerr << "The number of network parameter evaluated entries (" << nEntries << ") does not match the number of ports squared times the frequency points (" << nPorts * nPorts * freqs.size() << "). Attempting execution anyways." << endl;
+        }
+        for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+        {
+            // Build up triplet list for network parameter matrix
+            //cout << "Saving " << param << "-parameters evaluated at f=" << freqs[indFreq] << " Hz" << endl;
+            vector<cdTriplet> listP;
+            listP.reserve(nPorts * nPorts); // Reserve room so matrix could be dense
+            for (size_t indi = 0; indi < nPorts; indi++) // Loop over excitation ports (each row)
+            {
+                for (size_t indj = 0; indj < nPorts; indj++) // Loop over response ports (each column)
+                {
+                    if (param == 'Y')
+                    {
+                        // Save Y-parameters
+                        listP.push_back(cdTriplet(indi, indj, p[indi * nPorts + indj])); // Admittance entry (S)
+                        savedParam = 'Y';
+                    }
+                    else if (param == 'Z')
+                    {
+                        // Find Y-parameters from Z-parameters (temporary measure only accurate for diagonal entries)]
+                        // Y = Z^-1 = (Re{Z} - j*Im{Z}) / (Re{Z}^2 + Im{Z}^2) = Z* / |Z|^2
+                        //cout << "Z-parameter [" << indi + 1 << "," << indj + 1 << "] is " << p[indi * nPorts + indj] << endl;
+                        listP.push_back(cdTriplet(indi, indj, conj(p[indi * nPorts + indj]) / norm(p[indi * nPorts + indj]))); // Admittance entry (S)
+                        savedParam = 'Y';
+                    }
+                    else if (param == 'S')
+                    {
+                        // Save S-parameters
+                        listP.push_back(cdTriplet(indi, indj, p[indi * nPorts + indj])); // Scattering entry
+                        savedParam = 'S';
+                    }
+                    else
+                    {
+                        cerr << "Unrecognized network parameters. Breaking now." << endl;
+                        return;
+                    }
+                }
+            }
+
+            // Generate the sparse network parameter matrix from nonzero entries
+            cspMat thisP(nPorts, nPorts); // Initialize Eigen complex sparse matrix for this frequency
+            thisP.setFromTriplets(listP.begin(), listP.end());
+#ifdef EIGEN_COMPRESS
+            thisP.makeCompressed(); // Save memory by removing room for inserting new entries
+#endif
+            this->matParam.push_back(thisP); // Update an object in this class with this network parameters evaluation
+        }
+
+        // Save information to class
+        this->setParamType(savedParam);
+        this->setFreqs(freqs);
+
+        // Generate nodal admittance matrices if Y-parameters saved
+        if (savedParam == 'Y')
+        {
+            this->computeYBusFromParam(0); // Draw circuit based on the lowest frequency present
+        }
+    }
+
+    // Compute admittance parameters from nodal admittance matrices
+    void computeYParamFromCircuit()
+    {
+        // Set network parameter matrix interpretation
+        this->param = 'Y';
+
+        // Parameter storage
+        size_t nPorts = this->getNPort();
+        vector<cdTriplet> listG; // Initialize first of two triplet lists for admittance matrix
+        listG.reserve(nPorts * nPorts); // Reserve room so matrix could be dense
+
+        // Matrix entry real-part calculation (frequency-independent)
+        spMat matG = this->getGMatrix(); // Nodal conductance sparse matrix (S)
+        for (size_t indi = 0; indi < matG.outerSize(); indi++) // Loop over excitation ports (each row)
+        {
+            for (spMat::InnerIterator it(matG, indi); it; ++it) // Loop over response ports (each column)
+            {
+                // First pass sets conductance as real part of admittance (S)
+                listG.push_back(cdTriplet(indi, it.col(), complex<double>(it.value(), 0.0)));
+            }
+        }
+
+        // Matrix entry imaginary-part calculation (frequency-dependent) and construction
+        spMat matC = this->getCMatrix(); // Nodal capacitance sparse matrix (F)
+        for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+        {
+            vector<cdTriplet> listB; // Initialize second of two triplet lists for admittance matrix
+            listB.reserve(2 * nPorts * nPorts); // Reserve room so matrix could be dense after copying another list
+            for (size_t indi = 0; indi < matC.outerSize(); indi++) // Loop over excitation ports (each row)
+            {
+                for (spMat::InnerIterator it(matC, indi); it; ++it) // Loop over response ports (each column)
+                {
+                    // Second pass sets susceptance as imaginary part of admittance for each frequency (S)
+                    listB.push_back(cdTriplet(indi, it.col(), complex<double>(0.0, 2. * M_PI * this->freqs[indFreq] * it.value())));
+                }
+            }
+
+            // Concatenate the two vectors of triplets by copying (preserves conductances already found once)
+            listB.insert(listB.end(), listG.begin(), listG.end());
+
+            // Generate the sparse Y-parameter matrix from nonzero entries (anonymous function has duplicate entries added)
+            cspMat thisY(nPorts, nPorts); // Initialize Eigen complex sparse admittance matrix for this frequency (S)
+            thisY.setFromTriplets(listB.begin(), listB.end(), [](const complex<double> &a, const complex<double> &b) { return a + b; });
+#ifdef EIGEN_COMPRESS
+            thisY.makeCompressed(); // Save memory by removing room for inserting new entries
+#endif
+            this->matParam.push_back(thisY); // Update an object in this class with this Y-parameter evaluation
+        }
+    }
+
+    // Compute nodal admittance matrices from network parameters at a certain frequency
+    void computeYBusFromParam(size_t indFreq)
+    {
+        // Need to get Y-parameters
+        const int nPorts = (const int)this->getNPort();
+        cspMat matY;
+        switch (this->param)
+        {
+        case ('Y'):
+        {
+            cout << "Directly using Y-parameters to place circuit elements." << endl;
+            matY = this->matParam[indFreq];
+            break;
+        }
+        case ('Z'):
+        {
+            cout << "Notice: Finding Y-parameters from Z-parameters to place circuit elements is unimplemented. Exiting." << endl;
+            return;
+            /*cout << "Notice: Finding Y-parameters from Z-parameters with slow matrix inversion. Placing circuit elements afterwards." << endl;
+            Eigen::Matrix<complex<double>, Eigen::Dynamic, Eigen::Dynamic> matZ = Eigen::Matrix<complex<double>, Eigen::Dynamic, Eigen::Dynamic>(this->matParam[indFreq]);*/
+            break;
+        }
+        case ('S'):
+        {
+            cout << "Notice: Finding Y-parameters from S-parameters is unimplemented. Exiting." << endl;
+            return;
+            /*cout << "Notice: Finding Y-parameters from S-parameters with port impedances, matrix arithmetic, and slow matrix inversion. Placing circuit elements afterwards." << endl;
+            Eigen::Matrix<complex<double>, Eigen::Dynamic, Eigen::Dynamic> matS = Eigen::Matrix<complex<double>, Eigen::Dynamic, Eigen::Dynamic>(this->matParam[indFreq]);*/
+            break;
+        }
+    }
+
+        // Parameter storage
+        vector<dTriplet> listG, listC; // Initialize triplet lists for conductance and capacitance matrices
+        listG.reserve(nPorts * nPorts); // Reserve room so matrix could be dense
+        listC.reserve(nPorts * nPorts);
+
+        // Matrix entries calculation
+        for (size_t indi = 0; indi < matY.outerSize(); indi++) // Loop over excitation ports (each row)
+        {
+            for (cspMat::InnerIterator it(matY, indi); it; ++it) // Loop over response ports (each column)
+            {
+                listG.push_back(dTriplet(indi, it.col(), it.value().real())); // gij = Re{yij} (S)
+                listC.push_back(dTriplet(indi, it.col(), it.value().imag() / (2. * M_PI * this->freqs[indFreq]))); // cij = bij / omega = Im{yij} / (2*pi*f) (F)
+            }
+        }
+
+        // Generate the sparse nodal admittance matrices from nonzero entries
+        spMat matG(nPorts, nPorts); // Initialize Eigen sparse nodal conductance matrix for this frequency (S)
+        spMat matC(nPorts, nPorts); // Initialize Eigen sparse nodal capacitance matrix for this frequency (F)
+        matG.setFromTriplets(listG.begin(), listG.end());
+        matC.setFromTriplets(listC.begin(), listC.end());
+#ifdef EIGEN_COMPRESS
+        matG.makeCompressed(); // Save memory by removing room for inserting new entries
+        matC.makeCompressed();
+#endif
+        this->setGMatrix(matG); // Update the objects in this class
+        this->setCMatrix(matC);
+    }
+
     // Print the parasitics information
     void print() const
     {
@@ -1120,7 +1462,7 @@ class Parasitics
         {
             for (spMat::InnerIterator it(this->matG, indi); it; ++it)
             {
-                cout << "   row " << setw(4) << it.row() << ", column " << setw(4) << it.col() << ", value " << it.value() << endl;
+                cout << "   row " << setw(4) << it.row() + 1 << ", column " << setw(4) << it.col() + 1 << ", value " << it.value() << endl;
             }
         }
         cout << "  Capacitance Matrix (F):" << endl;
@@ -1128,9 +1470,10 @@ class Parasitics
         {
             for (spMat::InnerIterator it(this->matC, indi); it; ++it)
             {
-                cout << "   row " << setw(4) << it.row() << ", column " << setw(4) << it.col() << ", value " << it.value() << endl;
+                cout << "   row " << setw(4) << it.row() + 1 << ", column " << setw(4) << it.col() + 1 << ", value " << it.value() << endl;
             }
         }
+        cout << " Using " << this->param << "-parameters for the " << this->freqs.size() << " frequencies in the sweep" << endl;
         cout << " ------" << endl;
     }
 
@@ -1182,8 +1525,12 @@ class Parasitics
             }
         }
 
+        // Symmetrize matrices if needed so that network is reciprocal
+        this->makeCSym();
+        this->makeGSym();
+
         // Populate Spef struct nets vector (single net)
-        double capTot = this->getCTotal();
+        double capTot = this->getCTotal(); // Find total capacitance represented in matrix (F)
         double condTot = this->getGTotal();
         (this->matC).prune(myPruneFunctor(saveThresh * capTot)); // Prune away nonzeros sufficiently smaller than threshold
         (this->matG).prune(myPruneFunctor(saveThresh * condTot));
@@ -1191,8 +1538,6 @@ class Parasitics
         para.nets.back().name = "all";
         para.nets.back().lcap = capTot;
 
-        //spMat symC = ((this->matC) + (this->matC).transpose()) / 2.0;
-        //spMat symG = ((this->matG) + (this->matG).transpose()) / 2.0;
         for (size_t indi = 0; indi < numPort; indi++)
         {
             para.nets.back().connections.emplace_back(spef::Connection());
@@ -1201,27 +1546,25 @@ class Parasitics
             para.nets.back().connections.back().direction = (para.ports[indi]).direction; // Same as port direction
             for (spMat::InnerIterator it(this->matC, indi); it; ++it)
             {
-                para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, it.value()));
-                /*if ((it.row() == it.col()) && (abs(this->getCNodeGround(indi)) >= saveThresh * capTot)) // Diagonal element, so sufficient admittance to ground
+                if ((it.row() == it.col()) && (abs(this->getCNodeGround(indi)) >= saveThresh * capTot)) // Diagonal element, so should be sufficient network admittance to ground
                 {
                     para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, "", this->getCNodeGround(indi)));
                 }
-                else if (it.col() > it.row()) // Upper triangular element, so negate node-to-node admittance
+                else if (it.col() > it.row()) // Upper triangular element, so negate node-to-node network admittance
                 {
                     para.nets.back().caps.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, -it.value()));
-                } // Skip lower triangular element, which is repeated */
+                } // Skip lower triangular element, which is repeated due to symmetry
             }
             for (spMat::InnerIterator it(this->matG, indi); it; ++it)
             {
-                para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, 1.0 / (it.value())));
-                /*if ((it.row() == it.col()) && (abs(this->getGNodeGround(indi)) >= saveThresh * condTot)) // Diagonal element, so sufficient admittance to ground
+                if ((it.row() == it.col()) && (abs(this->getGNodeGround(indi)) >= saveThresh * condTot)) // Diagonal element, so should be sufficient network admittance to ground
                 {
                     para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, "", 1.0 / this->getGNodeGround(indi)));
                 }
-                else if (it.col() > it.row()) // Upper triangular element, so negate node-to-node admittance
+                else if (it.col() > it.row()) // Upper triangular element, so negate node-to-node network admittance
                 {
                     para.nets.back().ress.emplace_back(forward_as_tuple((para.ports)[indi].name, (para.ports)[it.col()].name, -1.0 / it.value()));
-                } // Skip lower triangular element, which is repeated */
+                } // Skip lower triangular element, which is repeated due to symmetry
             }
         }
 
@@ -1260,6 +1603,10 @@ class Parasitics
             }
             xyceFile << endl; // End the subcircuit definition line
 
+            // Symmetrize matrices if needed so that network is reciprocal
+            this->makeCSym();
+            this->makeGSym();
+
             // Write each circuit element
             double capTot = this->getCTotal();
             double condTot = this->getGTotal();
@@ -1274,7 +1621,7 @@ class Parasitics
                 {
                     if ((it.row() == it.col()) && (abs(it.value()) >= saveThresh * capTot)) // Diagonal element
                     {
-                        xyceFile << "C" << numCap++ << " " << (this->ports)[indi].getPortName() << " 0 " << abs(it.value()) << endl;
+                        xyceFile << "C" << numCap++ << " " << (this->ports)[indi].getPortName() << " 0 " << abs(this->getCNodeGround(indi)) << endl;
                     }
                     else if (it.col() > it.row()) // Upper triangular element
                     {
@@ -1285,7 +1632,7 @@ class Parasitics
                 {
                     if ((it.row() == it.col()) && (abs(it.value()) >= saveThresh * condTot)) // Diagonal element
                     {
-                        xyceFile << "R" << numRes++ << " " << (this->ports)[indi].getPortName() << " 0 " << abs(1.0 / it.value()) << endl;
+                        xyceFile << "R" << numRes++ << " " << (this->ports)[indi].getPortName() << " 0 " << abs(1.0 / this->getGNodeGround(indi)) << endl;
                     }
                     else if (it.col() > it.row()) // Upper triangular element
                     {
@@ -1330,6 +1677,8 @@ struct SolverDataBase
     Parasitics para;        // Parasitics
     std::string outSPEF;    // SPEF output file name
     std::string outXyce;    // Xyce (SPICE) output file name
+    std::string outCITI;    // CITIfile output name
+    std::string outTstone;  // Touchstone output file name
   public:
     // Default constructor
     SolverDataBase()
@@ -1345,6 +1694,8 @@ struct SolverDataBase
         this->para = para;
         this->outSPEF = "";
         this->outXyce = "";
+        this->outCITI = "";
+        this->outTstone = "";
     }
 
     // Parametrized constructor
@@ -1359,6 +1710,8 @@ struct SolverDataBase
         this->para = para;
         this->outSPEF = "";
         this->outXyce = "";
+        this->outCITI = "";
+        this->outTstone = "";
     }
 
     // Get name of design
@@ -1409,6 +1762,18 @@ struct SolverDataBase
         return this->outXyce;
     }
 
+    // Get CITIfile output name
+    std::string getOutCITI() const
+    {
+        return this->outCITI;
+    }
+
+    // Get Touchstone output file name
+    std::string getOutTouchstone() const
+    {
+        return this->outTstone;
+    }
+
     // Set name of design
     void setDesignName(std::string designName)
     {
@@ -1449,6 +1814,18 @@ struct SolverDataBase
     void setOutXyce(std::string fileName)
     {
         this->outXyce = fileName;
+    }
+
+    // Set CITIfile output name
+    void setOutCITI(std::string fileName)
+    {
+        this->outCITI = fileName;
+    }
+
+    // Set Touchstone output file name
+    void setOutTouchstone(std::string fileName)
+    {
+        this->outTstone = fileName;
     }
 
     // Find index of layer by name
@@ -3104,7 +3481,7 @@ struct SolverDataBase
                     }
 
                     // Propagate port information to Solver Database now
-                    this->para = Parasitics(ports, spMat(), spMat());
+                    this->para = Parasitics(ports, spMat(), spMat(), freqList);
                 }
 
                 // Keep reading new lines in file
@@ -3532,7 +3909,7 @@ struct SolverDataBase
                     }
 
                     // Propagate port list to parasitics data structure now
-                    this->para = Parasitics(ports, spMat(numPort, numPort), spMat(numPort, numPort));
+                    this->para = Parasitics(ports, spMat(numPort, numPort), spMat(numPort, numPort), (this->settings).getFreqsHertz());
                 }
 
                 // Keep reading new lines in file
@@ -3631,49 +4008,8 @@ struct SolverDataBase
         }
     }
 
-    // Print the solver database and dump to SPEF file
-    bool printDumpSPEF()
-    {
-        // Print
-        int numLayer = this->getNumLayer();
-        cout << "Solver Database of IC Design, " << this->designName << ":" << endl;
-        cout << " Settings for the simulation:" << endl;
-        (this->settings).print(); // Print the simulation settings
-        cout << " Details of the " << numLayer << " layers:" << endl;
-        cout << "  ------" << endl;
-        for (size_t indi = 0; indi < numLayer; indi++)
-        {
-            (this->layers)[indi].print();
-        }
-        cout << " Waveforms:" << endl;
-        (this->wf).print(); // Print the waveforms
-        cout << " Parasitics in file " << this->outSPEF << ":" << endl;
-        (this->para).print(); // Print the parasitics
-        cout << "------" << endl;
-
-        // Attempt to open output file
-        ofstream spefFile((this->outSPEF).c_str());
-
-        // Dump
-        if (spefFile.is_open())
-        {
-            // Write to file
-            spef::Spef designPara = (this->para).toSPEF(this->designName, 1.0e-5);
-            designPara.dump(spefFile);
-
-            // Close file
-            spefFile.close();
-            return true;
-        }
-        else
-        {
-            // File could not be opened
-            return false;
-        }
-    }
-
-    // Print the solver database and dump to Xyce (SPICE) subcircuit file
-    bool printDumpXyce(vector<size_t> indLayerPrint)
+    // Print the solver database
+    void print(vector<size_t> indLayerPrint)
     {
         // Print
         int numLayer = this->getNumLayer();
@@ -3691,10 +4027,209 @@ struct SolverDataBase
         cout << " Parasitics in file " << this->outXyce << ":" << endl;
         (this->para).print(); // Print the parasitics
         cout << "------" << endl;
+    }
 
+    // Dump the solver database to SPEF file
+    bool dumpSPEF()
+    {
+        // Attempt to open output file
+        ofstream spefFile((this->outSPEF).c_str());
+
+        // Dump
+        if (spefFile.is_open())
+        {
+            // Write to file
+            spef::Spef designPara = (this->para).toSPEF(this->designName, WRITE_THRESH);
+            designPara.dump(spefFile);
+
+            // Close file
+            spefFile.close();
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
+    }
+
+    // Dump the solver database to Xyce (SPICE) subcircuit file
+    bool dumpXyce()
+    {
         // Attempt to dump to Xyce File
-        bool couldDump = (this->para).toXyce(this->outXyce, this->designName, 1.0e-5);
+        bool couldDump = (this->para).toXyce(this->outXyce, this->designName, WRITE_THRESH);
         return couldDump;
+    }
+
+    // Dump the solver database to CITIfile
+    bool dumpCITI()
+    {
+        // Attempt to open output file
+        ofstream citiFile((this->outCITI).c_str());
+
+        // Dump
+        if (citiFile.is_open())
+        {
+            // Initialize time variables
+            char timeStr[80];                                                             // Character array to hold formatted time
+            time_t rawtime;                                                               // Timer variable
+            strftime(timeStr, sizeof(timeStr), "%Y %m %d %H %M %S", localtime(&rawtime)); // Use local timezone to format string according to CITIfile requirements
+            std::string time(timeStr);                                                    // Formatted time to string parametrized constructor
+
+            // Convert design name to uppercase
+            char design[this->designName.size() + 1];
+            for (size_t indi = 0; indi <= this->designName.size(); indi++)
+            {
+                design[indi] = toupper((char)(this->designName).c_str()[indi]);
+            }
+
+            // Retrieve frequency sweep information
+            vector<double> freqs = this->para.getFreqs(); //this->settings.getFreqsHertz();
+            size_t nfreq = freqs.size(); // this->settings.getNFreq();
+
+            // Retrieve network parameter information
+            char paramType = this->para.getParamType();
+            size_t nPorts = this->para.getNPort();
+            vector<cspMat> matParam = this->para.getParamMatrix();
+
+            // Write a Common Instrumentation Transfer and Interchange file (CITIfile) package header
+            citiFile << "CITIFILE A.01.01" << endl; // File identification and format revision code
+            citiFile << "CONSTANT TIME " << time << endl; // Time stamp in correct format
+            citiFile << "NAME " << design << endl; // CITIfile package name is design name all in uppercase with no spaces
+            citiFile << "VAR FREQ MAG " << nfreq << endl; // Independent variable is frequency in "magnitude" format with nfreq points
+            for (size_t indi = 0; indi < nPorts; indi++)
+            {
+                for (size_t indj = 0; indj < nPorts; indj++)
+                {
+                    citiFile << "DATA " << paramType << "[" << indi + 1 << "," << indj + 1 << "] RI" << endl; // Data array line for network parameter in real/imaginary format
+                }
+            }
+
+            // Write the frequencies as the independent variables in the package
+            citiFile << "VAR_LIST_BEGIN" << endl;
+            for (size_t indFreq = 0; indFreq < nfreq; indFreq++)
+            {
+                citiFile << std::left << std::setw(13) << std::setprecision(7) << freqs[indFreq] << endl;
+            }
+            citiFile << "VAR_LIST_END" << endl;
+
+            // Write the network parameters
+            for (size_t indi = 0; indi < nPorts; indi++) // Network parameter row
+            {
+                for (size_t indj = 0; indj < nPorts; indj++) // Network parameter column
+                {
+                    citiFile << "BEGIN" << endl;
+                    for (size_t indFreq = 0; indFreq < nfreq; indFreq++)
+                    {
+                        complex<double> pij = matParam[indFreq].coeffRef(indi, indj); // Expensive binary search to get specific index of sparse parameter matrix
+                        citiFile << std::left << std::setw(13) << std::setprecision(7) << pij.real() << "," << std::left << std::setw(13) << std::setprecision(7) << pij.imag() << endl; // One entry of the parameter matrix at a given frequency (real, imaginary)
+                    }
+                    citiFile << "END" << endl;
+                }
+            }
+
+            // Close file
+            citiFile.close();
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
+    }
+
+    // Dump the solver database to Touchstone file
+    bool dumpTouchstone()
+    {
+        // Attempt to open output file
+        ofstream tstoneFile((this->outTstone).c_str());
+
+        // Dump
+        if (tstoneFile.is_open())
+        {
+            // Initialize time variables
+            char timeStr[80];                                                             // Character array to hold formatted time
+            time_t rawtime;                                                               // Timer variable
+            strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localtime(&rawtime)); // Use local timezone to format string for a comment
+            std::string time(timeStr);
+
+            // Retrieve frequency sweep information
+            vector<double> freqs = this->para.getFreqs(); //this->settings.getFreqsHertz();
+            size_t nfreq = freqs.size(); // this->settings.getNFreq();
+
+            // Retrieve network parameter information
+            char paramType = this->para.getParamType();
+            size_t nPorts = this->para.getNPort();
+            double Zport = this->para.getPort(0).getZSource(); // Reference impedance of the first port (ohm)
+            vector<cspMat> matParam = this->para.getParamMatrix();
+
+            // Write a Touchstone file header
+            tstoneFile << "[Version] 2.0" << endl; // Touchstone version 2.0 released by IBIS on April 24, 2009
+            tstoneFile << "# Hz " << paramType << " RI R " << Zport << endl; // Option line with frequency units (Hz, kHz, MHz, or GHz), network parameters types (S, Y, Z, H, or G), complex number format (DB, MA, or RI), and reference resistance
+            tstoneFile << "[Number of Ports] " << nPorts << endl; // Required number of ports line
+            if (nPorts == 2)
+            {
+                tstoneFile << "[Two-Port Data Order] 12_21" << endl; // Required line for 2-ports indicating no special column order for the 2-port case
+            }
+            tstoneFile << "[Number of Frequencies] " << nfreq << endl; // Number of freqencies in file
+            tstoneFile << "[Reference]" << endl; // Optional reference resistance on its own line (only used for S-parameters, others non-normalized)
+            for (size_t indPort = 0; indPort < nPorts; indPort++)
+            {
+                tstoneFile << this->para.getPort(indPort).getZSource() << " "; // Each port's real impedance in order, space-separated (ohm)
+            }
+            tstoneFile << endl << "[Matrix Format] Full" << endl; // Close previous line and give optional matrix format line (Full, Lower, or Upper)
+            tstoneFile << "! Date/Time " << time << endl; // Time stamp
+            tstoneFile << "! Name " << this->designName << endl; // Design name
+            tstoneFile << "! Provider: DARPA ERI IDEA/POSH Contributors" << endl;
+            tstoneFile << "! Program: Xyce Writer from DARPA ERI" << endl;
+            tstoneFile << "! Author: Purdue University" << endl;
+            tstoneFile << "[Network Data] " << endl; // Required network data line
+
+            // Write the network data
+            tstoneFile << "!freq         "; // Begin helpful comment line
+            for (size_t indi = 0; indi < nPorts; indi++)
+            {
+                for (size_t indj = 0; indj < nPorts; indj++)
+                {
+                    tstoneFile << "Re" << paramType << indi + 1 << "," << indj + 1 << std::string(8 - indi / 10 - indj / 10, ' '); // Identify number and pad with spaces from string fill constructor with integer division
+                    tstoneFile << "Im" << paramType << indi + 1 << "," << indj + 1 << std::string(8 - indi / 10 - indj / 10, ' ');
+                    if (((indj + 1) % 4 == 0) && (indj + 1 != nPorts) && (nPorts > 2))
+                    {
+                        tstoneFile << endl << "!" << std::string(13, ' '); // Put no more than 4 columns of parameters on one file line
+                    }
+                }
+            }
+            tstoneFile << endl; // End helpful comment line
+            for (size_t indFreq = 0; indFreq < nfreq; indFreq++)
+            {
+                tstoneFile << std::left << std::setw(13) << std::setprecision(7) << freqs[indFreq] << " ";
+                for (size_t indi = 0; indi < nPorts; indi++)
+                {
+                    for (size_t indj = 0; indj < nPorts; indj++)
+                    {
+                        complex<double> pij = matParam[indFreq].coeffRef(indi, indj); // Expensive binary search to get specific index of sparse parameter matrix
+                        tstoneFile << std::left << std::setw(13) << std::setprecision(7) << pij.real() << " "; // Real part of parameter entry at this frequency
+                        tstoneFile << std::left << std::setw(13) << std::setprecision(7) << pij.imag() << " "; // Imaginary part of parameter entry at this frequency
+                        if (((indj + 1) % 4 == 0) && (indj + 1 != nPorts) && (nPorts > 2))
+                        {
+                            tstoneFile << endl << std::string(14, ' '); // Put no more than 4 columns of parameters on one file line
+                        }
+                    }
+                    tstoneFile << " ! row " << indi + 1 << endl; // Comment to mark the end of a row
+                }
+            }
+            tstoneFile << "[End]" << endl;
+
+            // Close file
+            tstoneFile.close();
+            return true;
+        }
+        else
+        {
+            // File could not be opened
+            return false;
+        }
     }
 
     // Destructor

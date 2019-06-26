@@ -22,7 +22,7 @@
 #include <utility>
 
  //HYPRE and MKL data type control
-#define LARGE_SYSTEM (1)
+#define LARGE_SYSTEM (1) // Must leave defined with the current makefile
 #ifdef LARGE_SYSTEM
 #define MKL_ILP64 (1) // Must define before including mkl.h if using long long int 
 //#define HYPRE_BIGINT (1)    // not sure how to use this
@@ -45,7 +45,6 @@ using namespace std;
 #define SIGMA (5.8e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
-//#define SOLVERLENGTH (128)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
 #define MINDISFRACXY (1.0e-6) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
@@ -64,7 +63,7 @@ using namespace std;
 //#define PRINT_NODE_COORD (1)
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
-#define PRINT_PORT_SET
+//#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
@@ -72,7 +71,7 @@ using namespace std;
 
 
 // Function-like macros
-#define NELEMENT(x) (sizeof(x) / sizeof((x)[0]))
+#define NELEMENT(x) ((sizeof x) / (sizeof x[0]))
 
 
 class fdtdOneCondct {
