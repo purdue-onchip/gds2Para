@@ -14,7 +14,7 @@ numStack = 8
 0         z = -0.296 h = 0.296 e = 4.1 sigma = 58000000 # Ground plane
 Substrate z = 0.0000 h = 0.000 e = 4.1 sigma = 5.e+7
 ILD0      z = 0.0000 h = 0.120 e = 8.0 TanD = 0
-ILDM1     z = +0.120 h = 0.285 e = 4.1 TanD = 0 sigma = 58000000
+1         z = +0.120 h = 0.285 e = 4.1 TanD = 0 sigma = 58000000
 ILD1      z = +0.405 h = 0.615 e = 4.1 TanD = 0
 ILDM2     z = +1.020 h = 0.120 e = 8.0 TanD = 0 sigma = 58000000
 ILD2      z = +1.140 h = 0.308 e = 4.1 TanD = 0

@@ -61,7 +61,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     vector<double> values;
     vector<HYPRE_Int> cols;
     HYPRE_Int index = 0;
-
+    
     for (i = ilower; i <= iupper; i++)
     {
         nnz = 0;   // Number of non-zeros on row i
@@ -71,13 +71,14 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
             nnz++;
             index++;
         }
+        
 
         /* Set the values for row i */
         HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
         cols.clear();
         values.clear();
     }
-
+    cout << endl;
     /* Assemble after setting the coefficients */
     HYPRE_IJMatrixAssemble(A);
 
