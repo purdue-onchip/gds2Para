@@ -25,7 +25,6 @@
 #define LARGE_SYSTEM (1)
 #ifdef LARGE_SYSTEM
 #define MKL_ILP64 (1) // Must define before including mkl.h if using long long int 
-//#define HYPRE_BIGINT (1)    // not sure how to use this
 typedef long long int myint;
 #else
 typedef int myint;
@@ -50,7 +49,7 @@ using namespace std;
 #define DOUBLEMIN (-1.e+30)
 #define MINDISFRACXY (1.0e-6) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
 #define MINDISFRACZ (0.1) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (1.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16)
@@ -61,10 +60,10 @@ using namespace std;
 #define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
 
 // Debug testing macros (comment out if not necessary)
-//#define PRINT_NODE_COORD (1)
+#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
-#define PRINT_PORT_SET
+//#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
