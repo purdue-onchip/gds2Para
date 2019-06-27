@@ -208,6 +208,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->v0d1aval[indi] = sys->v0d1aval[indi] * sqrt(sys->eps[sys->v0d1RowId[indi]]);
     }
 
+
     myint leng_v0d = leng_v0d1;
     sys->v0d1ColIdo = (myint*)malloc(v0d1num * sizeof(myint));
     for (indi = 0; indi < v0d1num; indi++)
@@ -229,8 +230,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     free(sys->v0d1aval); sys->v0d1aval = NULL;
     
 
-    cout << "Length of V0d1 is " << leng_v0d1 << ", and the number of non-zeros in V0d1 is " << v0d1num << endl;
-    cout << "Length of V0d1a is " << leng_v0d1a << ", and the number of non-zeros in V0d1a is " << v0d1anum << endl;
+
+    cout << "Length of V0d1 is " << leng_v0d1 << " number of non-zeros in V0d1 is " << v0d1num << endl;
+    cout << "Length of V0d1a is " << leng_v0d1a << " number of non-zeros in V0d1a is " << v0d1anum << endl;
+    //cout << "Number of NNZ in V0d1 is " << v0d1num << endl;
 
     sparse_status_t s;
 
@@ -241,6 +244,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     /* V0da^T's csr form handle for MKL */
     sparse_matrix_t V0dat;
     s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, leng_v0d1, sys->N_edge, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
+
+    
 
     ///******************************************************************/
     ///* use MKL to do matrix multiplication */
@@ -294,6 +299,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int numPortCdt = 0;
     myint leng_Ac = 0;
     count = 0;
+
 
 
     sys->cindex.push_back(-1);    // the last index in the sparse form for each conductor in V0c, i denotes ith conductor (starting from 1)
@@ -422,6 +428,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //status = setHYPREMatrix(sys->AcRowId, sys->AcColId, sys->Acval, leng_v0c, ac, parcsr_ac);
     /* End */
 
+
     sys->v0cvalo = (double*)malloc(v0cnum * sizeof(double));
     for (indi = 0; indi < v0cnum; indi++)
         sys->v0cvalo[indi] = sys->v0cval[indi];    // v0cvalo is the v0c values without D_sig
@@ -434,6 +441,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     for (indi = 0; indi < v0canum; indi++){
         sys->v0caval[indi] = sys->v0caval[indi] * sqrt(sys->sig[sys->v0cRowId[indi]]);
     }
+    
+
 
     sys->v0cColIdo = (myint*)malloc(v0cnum * sizeof(myint));
     for (indi = 0; indi < v0cnum; indi++)
@@ -455,9 +464,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     free(sys->v0caColIdo); sys->v0caColIdo = NULL;*/
     free(sys->v0caval); sys->v0caval = NULL;
 
+
     //status = mklMatrixMulti(sys, leng_Ac, sys->v0caRowId, sys->v0caColId, sys->v0caval, sys->N_edge, leng_v0c, sys->v0cRowId, sys->v0cColId, sys->v0cval, 2);
 
-    cout << "leng v0c = " << leng_v0c  << ", and the number of non-zeros in V0c is " << v0cnum << endl;
+    cout << "leng v0c " << leng_v0c  << " number of non-zeros in V0c is " << v0cnum << endl;
     cout << "The number of nonzeros in Ac is " << leng_Ac << endl;
 
     /*for (i = 0; i < sys->numCdt + 1; i++){
@@ -481,6 +491,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *a;
     int *ia, *ja;
 
+
     /* Pick up a y0c2 cooresponding to one source port */
     complex<double> Zresult;
     double *bd1, *bd2;
@@ -501,6 +512,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->x[indi] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
     }
 
+
     double *b, *xc;    // the array of the right hand side
     xcol = 0;
 
@@ -513,7 +525,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double alpha = 1, beta = 0;
     char matdescra[6];
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << "Begin the iterative solve for network parameters!" << endl;
+    cout << "Begin the iterative solve for network parameters!\n";
     double *ydcp;
     double *y0c, *y0cs;
     double *yc, *yca;
@@ -538,8 +550,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     /* V0c^T's csr form handle for MKL */
     sparse_matrix_t V0ct;
     s = mkl_sparse_d_create_csr(&V0ct, SPARSE_INDEX_BASE_ZERO, leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cvalo);
-
-
+    
+    
     lapack_complex_double *tmp;
     lapack_complex_double *m_h, *m_hc;
     lapack_complex_double *rhs_h, *rhs_h0;
@@ -560,6 +572,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             //cout << sys->portEdge[sourcePort][indi] << " " << sys->portCoor[sourcePort].portDirection;
         }
         //cout << endl;
+        
 
 
         dRhs = (double*)malloc(sys->N_edge*sizeof(double));
@@ -569,17 +582,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
         y0d = (double*)calloc(leng_v0d1, sizeof(double));
-
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-
+        
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, dRhs, beta, v0daJ);
-
+        
         /* solve V0d system */
 
         t1 = clock();
-
+        
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
@@ -702,6 +715,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         }
         cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+
 
 
         /* V0cy0c */
@@ -910,7 +924,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
                     Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
-                    cout << Zresult << endl;
+                    cout << Zresult << "\n";
                 }
             }
         }
@@ -920,7 +934,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
                 Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
-                cout << Zresult << endl;
+                cout << Zresult << "\n";
             }
         }
     }
@@ -1111,7 +1125,7 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //            }
 //            cblas_daxpy(N, mdone, rhs, ione, temp, ione);
 //            euclidean_norm = cblas_dnrm2(N, temp, ione) / cblas_dnrm2(N, rhs, ione);
-//            //cout << euclidean_norm << endl;
+//            //cout << euclidean_norm << "\n";
 //            if (euclidean_norm > 1.e-3)
 //                continue;
 //            else
@@ -1124,8 +1138,8 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //    }
 //
 //    dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
-//    //cout << itercount << endl;
-//    //cout << euclidean_norm << endl;
+//    //cout << itercount << "\n";
+//    //cout << euclidean_norm << "\n";
 //    free(tmp);
 //    free(temp);
 //    free(ipar);
@@ -1723,7 +1737,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
     //            inz = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] / sys->N_node_s;
     //            inx = (sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] - inz * sys->N_node_s) / (sys->N_cell_y + 1);
     //            iny = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] % (sys->N_cell_y + 1);
-    //            /*cout << "h" << endl;*/
+    //            /*cout << "h\n";*/
     //            if (iny == 0){
     //                rowId.push_back(inz*(sys->N_edge_s + sys->N_edge_v) + inx*(sys->N_cell_y) + iny);
     //                colId.push_back(1);
@@ -2172,66 +2186,28 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     int count = 1;    /* count which box it is */
     clock_t t2 = clock();
     unordered_map<myint, double> va, v;
+    set<myint> node_group;
     myint eno;
     double lx_avg, ly_avg, lz_avg;
     t = 0; ta = 0;
-    
+    myint node1, node2;
     for (int iz = 1; iz < sys->nz - 1; iz++){    // merge on each layer, not in the conductor
         visited = (int*)calloc(sys->nx * sys->ny, sizeof(int));
         for (int ix = 0; ix < sys->nx; ix++){
             for (int iy = 0; iy < sys->ny; iy++){
                 if (visited[ix * (sys->N_cell_y + 1) + iy] == 0 && sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] == 0){
-                    va.clear();
-                    v.clear();
+                    node_group.clear();
                     if (markLayerNode[ix * (sys->N_cell_y + 1) + iy] == 0 && sys->markProSide[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] == 0){    // this point is not visited and it is outside the conductor, not in the projection of the excited conductor
                         //if (!ind.empty())
                         //    ind.clear();
                         startx = sys->xn[ix];
                         starty = sys->yn[iy];
-
+                        node_group.insert(iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy);
                         map[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] = count;
                         //ind.push_back(iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy);
                         st.push_back(ix * (sys->N_cell_y + 1) + iy);
                         visited[ix * (sys->N_cell_y + 1) + iy] = 1;
-                        status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
-                        if (iz != 0){    // this node is not on the bottom plane
-                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                            va[eno] = -lx_avg * ly_avg;
-                        }
-                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                            va[eno] = lx_avg * ly_avg;
-                        }
-                        if (ix != 0){    // this node is not on the left plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                            v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
-                            va[eno] = -ly_avg * lz_avg;
-                        }
-                        if (ix != sys->nx - 1){    // this node is not on the right plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                            v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
-                            va[eno] = ly_avg * lz_avg;
-                        }
-                        if (iy != 0){    // this node is not on the front plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                            v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
-                            va[eno] = -lx_avg * lz_avg;
-                        }
-                        if (iy != sys->ny - 1){   // this node is not on the back plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                            v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
-                            va[eno] = lx_avg * lz_avg;
-                        }
-
                         
-                        /*for (int i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
-                            va[sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
-                        }
-                        for (int i = 0; i < sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
-                            v[sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
-                        }*/
                         while (!st.empty()){
                             mark = 0;
                             indx = (st.back()) / (sys->N_cell_y + 1);
@@ -2239,109 +2215,10 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block1_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block1_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy, indx + 1, lx_avg, ly_avg, lz_avg);
-                                        
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-                                            
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx + 1 != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx + 1 != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 2] - sys->xn[indx + 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
-
                                         st.push_back((indx + 1)*(sys->N_cell_y + 1) + indy);
                                         visited[(indx + 1)*(sys->N_cell_y + 1) + indy] = 1;
                                         map[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy);
 
                                         mark = 1;
                                         continue;
@@ -2351,106 +2228,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indx != 0){    // it must have a left x edge, thus left x node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block1_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block1_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy, indx - 1, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx - 1 != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 2) * (sys->N_cell_y + 1) + indy;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx - 1] - sys->xn[indx - 2]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx - 1 != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
+                                        
                                         st.push_back((indx - 1)*(sys->N_cell_y + 1) + indy);
                                         visited[(indx - 1)*(sys->N_cell_y + 1) + indy] = 1;
                                         map[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy);
 
                                         mark = 1;
                                         continue;
@@ -2460,107 +2242,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && sys->markProSide[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block1_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block1_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy + 1, indx, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy + 1;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy + 1 != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy + 1 != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy + 1;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 2] - sys->yn[indy + 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
+                                        
                                         st.push_back((indx)*(sys->N_cell_y + 1) + indy + 1);
                                         visited[(indx)*(sys->N_cell_y + 1) + indy + 1] = 1;
                                         map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1);
 
                                         mark = 1;
                                         continue;
@@ -2570,107 +2256,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indy != 0){    // it must have a closer y edge, thus closer y node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && sys->markProSide[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block1_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block1_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy - 1, indx, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy - 1;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy - 1;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy - 1 != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 2;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy - 1] - sys->yn[indy - 2]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy - 1 != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
 
                                         st.push_back((indx)*(sys->N_cell_y + 1) + indy - 1);
                                         visited[(indx)*(sys->N_cell_y + 1) + indy - 1] = 1;
                                         map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1);
 
                                         mark = 1;
                                         continue;
@@ -2681,80 +2271,170 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 st.pop_back();
                             }
                         }
-                        indnum = v.size();
 
-                        if (indnum != 0){
-
-                            for (auto vi : v){
-                                v0d1RowId[v0d1num] = vi.first;
-                                v0d1ColId[v0d1num] = leng_v0d1;
-                                v0d1val[v0d1num] = vi.second;
-                                v0d1num++;
+                        for (auto ndi : node_group){
+                            indx = (ndi % sys->N_node_s) / (sys->N_cell_y + 1);
+                            indy = (ndi % sys->N_node_s) % (sys->N_cell_y + 1);
+                            status = avg_length(sys, iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                            if (iz != 0){    // this node is not on the bottom plane
+                                eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the lower edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
                             }
-                            leng_v0d1++;
-
-                            //status = nodeAddAvgLarger(&ind[0], indnum, sys->N_edge, sys, v0d1anum, leng_v0d1a, v0d1aRowId, v0d1aColId, v0d1aval);    // used to find v0d1anum and leng_v0d1a
-                            //if (status != 0)
-                            //    return status;
-                            for (auto vai : va){
-                                /*v0d1aRowId[v0d1anum] = vai.first;
-                                v0d1aColId[v0d1anum] = leng_v0d1a;*/
-                                v0d1aval[v0d1anum] = vai.second;
-                                v0d1anum++;
+                            if (iz != sys->nz - 1){   // this node is not on the top plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the upper edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
                             }
-                            leng_v0d1a++;
-                            count++;
+                            if (indx != 0){    // this node is not on the left plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the left edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indx != sys->nx - 1){    // this node is not on the right plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the right edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indy != 0){    // this node is not on the front plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the front edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indy != sys->ny - 1){   // this node is not on the back plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the back edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
                         }
-
+                        
+                        leng_v0d1++;
+                        leng_v0d1a++;
+                        count++;
                     }
 
                     else if (markLayerNode[ix * (sys->N_cell_y + 1) + iy] == 1 && sys->markProSide[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] == 0){//&& sys->exciteCdtLayer[iz] == 1){    // this point is not visited and it is outside the conductor, in the projection of the excited conductor
-                        //while (!ind.empty())
-                        //    ind.clear();
                         startx = sys->xn[ix];
                         starty = sys->yn[iy];
-                        //ind.push_back(iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy);
+                        
                         map[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] = count;
                         st.push_back(ix * (sys->N_cell_y + 1) + iy);
                         visited[ix * (sys->N_cell_y + 1) + iy] = 1;
-                        status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
-                        if (iz != 0){    // this node is not on the bottom plane
-                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                            va[eno] = -lx_avg * ly_avg;
-                        }
-                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                            va[eno] = lx_avg * ly_avg;
-                        }
-                        if (ix != 0){    // this node is not on the left plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                            v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
-                            va[eno] = -ly_avg * lz_avg;
-                        }
-                        if (ix != sys->nx - 1){    // this node is not on the right plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                            v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
-                            va[eno] = ly_avg * lz_avg;
-                        }
-                        if (iy != 0){    // this node is not on the front plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                            v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
-                            va[eno] = -lx_avg * lz_avg;
-                        }
-                        if (iy != sys->ny - 1){   // this node is not on the back plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                            v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
-                            va[eno] = lx_avg * lz_avg;
-                        }
-
-                        /*for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
-                            va[sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
-                        }
-                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
-                            v[sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
-                        }*/
+                        node_group.insert(iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy);
                         while (!st.empty()){
                             mark = 0;
                             indx = (st.back()) / (sys->N_cell_y + 1);
@@ -2763,109 +2443,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (sys->N_cell_y + 1) + indy] == 1 && sys->markProSide[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block2_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block2_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy, indx + 1, lx_avg, ly_avg, lz_avg);
-
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx + 1 != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx + 1 != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 2] - sys->xn[indx + 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
 
                                         st.push_back((indx + 1)*(sys->N_cell_y + 1) + indy);
                                         visited[(indx + 1)*(sys->N_cell_y + 1) + indy] = 1;
                                         map[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy);
 
                                         mark = 1;
                                         continue;
@@ -2876,106 +2458,12 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indx != 0){    // it must have a left x edge, thus left x node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (sys->N_cell_y + 1) + indy] == 1 && sys->markProSide[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block2_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block2_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy, indx - 1, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx - 1 != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 2) * (sys->N_cell_y + 1) + indy;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx - 1] - sys->xn[indx - 2]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx - 1 != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
+                                        
                                         st.push_back((indx - 1)*(sys->N_cell_y + 1) + indy);
                                         visited[(indx - 1)*(sys->N_cell_y + 1) + indy] = 1;
                                         map[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy);
+
                                         mark = 1;
                                         continue;
                                     }
@@ -2984,107 +2472,12 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (sys->N_cell_y + 1) + indy + 1] == 1 && sys->markProSide[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block2_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block2_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy + 1, indx, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy + 1;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy + 1 != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy + 1 != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy + 1;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 2] - sys->yn[indy + 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
                                         
                                         st.push_back((indx)*(sys->N_cell_y + 1) + indy + 1);
                                         visited[(indx)*(sys->N_cell_y + 1) + indy + 1] = 1;
                                         map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1);
+
                                         mark = 1;
                                         continue;
                                     }
@@ -3093,107 +2486,12 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indy != 0){    // it must have a closer y edge, thus closer y node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (sys->N_cell_y + 1) + indy - 1] == 1 && sys->markProSide[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 0){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block2_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block2_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy - 1, indx, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy - 1;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy - 1;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy - 1 != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 2;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy - 1] - sys->yn[indy - 2]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy - 1 != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
                                         
                                         st.push_back((indx)*(sys->N_cell_y + 1) + indy - 1);
                                         visited[(indx)*(sys->N_cell_y + 1) + indy - 1] = 1;
                                         map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1);
+
                                         mark = 1;
                                         continue;
                                     }
@@ -3203,27 +2501,161 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 st.pop_back();
                             }
                         }
-                        indnum = v.size();
 
-                        if (indnum != 0){
-
-                            for (auto vi : v){
-                                v0d1RowId[v0d1num] = vi.first;
-                                v0d1ColId[v0d1num] = leng_v0d1;
-                                v0d1val[v0d1num] = vi.second;
-                                v0d1num++;
+                        for (auto ndi : node_group){
+                            indx = (ndi % sys->N_node_s) / (sys->N_cell_y + 1);
+                            indy = (ndi % sys->N_node_s) % (sys->N_cell_y + 1);
+                            status = avg_length(sys, iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                            if (iz != 0){    // this node is not on the bottom plane
+                                eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the lower edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
                             }
-                            leng_v0d1++;
-
-                            for (auto vai : va){
-                                /*v0d1aRowId[v0d1anum] = vai.first;
-                                v0d1aColId[v0d1anum] = leng_v0d1a;*/
-                                v0d1aval[v0d1anum] = vai.second;
-                                v0d1anum++;
+                            if (iz != sys->nz - 1){   // this node is not on the top plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the upper edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
                             }
-                            leng_v0d1a++;
-                            count++;
+                            if (indx != 0){    // this node is not on the left plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the left edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indx != sys->nx - 1){    // this node is not on the right plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the right edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indy != 0){    // this node is not on the front plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the front edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indy != sys->ny - 1){   // this node is not on the back plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the back edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
                         }
+
+                        leng_v0d1++;
+                        leng_v0d1a++;
+                        count++;
+
                     }
                     else{
 
@@ -3234,45 +2666,8 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                         map[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] = count;
                         st.push_back(ix * (sys->N_cell_y + 1) + iy);
                         visited[ix * (sys->N_cell_y + 1) + iy] = 1;
+                        node_group.insert(iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy);
 
-                        status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
-                        if (iz != 0){    // this node is not on the bottom plane
-                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                            va[eno] = -lx_avg * ly_avg;
-                        }
-                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                            va[eno] = lx_avg * ly_avg;
-                        }
-                        if (ix != 0){    // this node is not on the left plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                            v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
-                            va[eno] = -ly_avg * lz_avg;
-                        }
-                        if (ix != sys->nx - 1){    // this node is not on the right plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                            v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
-                            va[eno] = ly_avg * lz_avg;
-                        }
-                        if (iy != 0){    // this node is not on the front plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                            v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
-                            va[eno] = -lx_avg * lz_avg;
-                        }
-                        if (iy != sys->ny - 1){   // this node is not on the back plane
-                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                            v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
-                            va[eno] = lx_avg * lz_avg;
-                        }
-
-                        /*for (i = 0; i < sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
-                            va[sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdgea[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
-                        }
-                        for (i = 0; i < sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy].size(); i++){
-                            v[sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].first] = sys->nodeEdge[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy][i].second;
-                        }*/
                         while (!st.empty()){
                             mark = 0;
                             indx = (st.back()) / (sys->N_cell_y + 1);
@@ -3281,110 +2676,10 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() + sys->N_cell_y + 1] == 0 && visited[(indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 1){    // this node is in the sideLen
                                     if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block3_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block3_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy, indx + 1, lx_avg, ly_avg, lz_avg);
-
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx + 1 != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx + 1 != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 2] - sys->xn[indx + 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
-
-                                        
                                         st.push_back((indx + 1)*(sys->N_cell_y + 1) + indy);
                                         visited[(indx + 1)*(sys->N_cell_y + 1) + indy] = 1;
                                         map[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy);
                                         mark = 1;
                                         continue;
                                     }
@@ -3393,109 +2688,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indx != 0){    // it must have a left x edge, thus left x node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() - sys->N_cell_y - 1] == 0 && visited[(indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && sys->markProSide[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 1){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block3_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block3_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy, indx - 1, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
 
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx - 1 != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 2) * (sys->N_cell_y + 1) + indy;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx - 1] - sys->xn[indx - 2]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx - 1 != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
-
-                                        
                                         st.push_back((indx - 1)*(sys->N_cell_y + 1) + indy);
                                         visited[(indx - 1)*(sys->N_cell_y + 1) + indy] = 1;
                                         map[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy);
                                         mark = 1;
                                         continue;
                                     }
@@ -3504,107 +2701,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() + 1] == 0 && visited[indx * (sys->N_cell_y + 1) + indy + 1] == 0 && sys->markProSide[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 1){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block3_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block3_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy + 1, indx, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy + 1;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy + 1 != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy + 1 != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy + 1;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy + 2] - sys->yn[indy + 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
+                                        
                                         st.push_back((indx)*(sys->N_cell_y + 1) + indy + 1);
                                         visited[(indx)*(sys->N_cell_y + 1) + indy + 1] = 1;
                                         map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1);
                                         mark = 1;
                                         continue;
                                     }
@@ -3613,107 +2714,11 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                             if (indy != 0){    // it must have a closer y edge, thus closer y node
                                 if (sys->markNode[iz * sys->N_node_s + st.back() - 1] == 0 && visited[(indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && sys->markProSide[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 1){    // this node is in dielectric and this node is not visited
                                     if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block3_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block3_y){    // this node is within the block area
-                                        status = avg_length(sys, iz, indy - 1, indx, lx_avg, ly_avg, lz_avg);
-                                        if (iz != 0){    // this node is not on the bottom plane
-                                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the lower edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (iz != sys->nz - 1){   // this node is not on the top plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the upper edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * ly_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != 0){    // this node is not on the left plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy - 1;    // the left edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indx != sys->nx - 1){    // this node is not on the right plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy - 1;    // the right edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = ly_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy - 1 != 0){    // this node is not on the front plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 2;    // the front edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = -1 / (sys->yn[indy - 1] - sys->yn[indy - 2]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = -lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-                                        if (indy - 1 != sys->ny - 1){   // this node is not on the back plane
-                                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the back edge
-                                            if (v.find(eno) == v.end()){
-                                                v[eno] = 1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                            }
-                                            else {
-                                                v.erase(eno);
-                                            }
-
-                                            if (va.find(eno) == va.end()){
-                                                va[eno] = lx_avg * lz_avg;
-                                            }
-                                            else {
-                                                va.erase(eno);
-                                            }
-                                        }
-
+                                        
                                         st.push_back((indx)*(sys->N_cell_y + 1) + indy - 1);
                                         visited[(indx)*(sys->N_cell_y + 1) + indy - 1] = 1;
                                         map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = count;
+                                        node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1);
                                         mark = 1;
                                         continue;
                                     }
@@ -3723,27 +2728,159 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                                 st.pop_back();
                             }
                         }
-                        indnum = v.size();
-
-                        if (indnum != 0){
-
-                            for (auto vi : v){
-                                v0d1RowId[v0d1num] = vi.first;
-                                v0d1ColId[v0d1num] = leng_v0d1;
-                                v0d1val[v0d1num] = vi.second;
-                                v0d1num++;
+                        for (auto ndi : node_group){
+                            indx = (ndi % sys->N_node_s) / (sys->N_cell_y + 1);
+                            indy = (ndi % sys->N_node_s) % (sys->N_cell_y + 1);
+                            status = avg_length(sys, iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                            if (iz != 0){    // this node is not on the bottom plane
+                                eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the lower edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
                             }
-                            leng_v0d1++;
-
-                            for (auto vai : va){
-                                /*v0d1aRowId[v0d1anum] = vai.first;
-                                v0d1aColId[v0d1anum] = leng_v0d1a;*/
-                                v0d1aval[v0d1anum] = vai.second;
-                                v0d1anum++;
+                            if (iz != sys->nz - 1){   // this node is not on the top plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the upper edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * ly_avg;
+                                        v0d1anum++;
+                                    }
+                                }
                             }
-                            leng_v0d1a++;
-                            count++;
+                            if (indx != 0){    // this node is not on the left plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the left edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indx != sys->nx - 1){    // this node is not on the right plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the right edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = ly_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indy != 0){    // this node is not on the front plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the front edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = -lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
+                            if (indy != sys->ny - 1){   // this node is not on the back plane
+                                eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the back edge
+                                status = compute_edgelink(sys, eno, node1, node2);
+                                if (node1 != ndi){
+                                    if (node_group.find(node1) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                                else if (node2 != ndi){
+                                    if (node_group.find(node2) == node_group.end()){
+                                        v0d1RowId[v0d1num] = eno;
+                                        v0d1ColId[v0d1num] = leng_v0d1;
+                                        v0d1val[v0d1num] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                        v0d1num++;
+                                        v0d1aval[v0d1anum] = lx_avg * lz_avg;
+                                        v0d1anum++;
+                                    }
+                                }
+                            }
                         }
+
+                        leng_v0d1++;
+                        leng_v0d1a++;
+                        count++;
                     }
                 }
 
@@ -3781,7 +2918,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     //    }
     //}
 
-    myint node1, node2;
+    
     myint inz, inx, iny;
     myint iz, ix, iy;
     queue<myint> qu;
@@ -4269,6 +3406,8 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
     int map_count = 1;
     myint eno;
     double lx_avg, ly_avg, lz_avg;
+    myint node1, node2;
+
     
     myint *v0cRowId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
     myint *v0cColId = (myint*)malloc(2 * sys->N_edge * sizeof(myint));
@@ -4278,6 +3417,7 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
     double *v0caval = (double*)malloc(2 * sys->N_edge * sizeof(double));
     unordered_map<myint, double> v, va;
     visited = (int*)calloc(sys->N_node, sizeof(int));
+    set<myint> node_group;
     
 
     for (int ic = 0; ic < sys->numCdt; ic++){
@@ -4289,8 +3429,7 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                 n = sys->cdtNumNode[ic];
             for (int jc = 0; jc < n; jc++){
                 if (visited[sys->conductor[ic].node[jc]] == 0 && sys->conductor[ic].node[jc] >= sys->N_node_s && sys->conductor[ic].node[jc] < sys->N_node - sys->N_node_s){
-                    v.clear();
-                    va.clear();
+                    node_group.clear();
                     
                     //if (!ind.empty())
                     //    ind.clear();
@@ -4304,44 +3443,7 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                     visited[sys->conductor[ic].node[jc]] = 1;
                     map[sys->conductor[ic].node[jc]] = map_count;
 
-                    status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
-                    if (iz != 0){    // this node is not on the bottom plane
-                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                        v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                        va[eno] = -lx_avg * ly_avg;
-                    }
-                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                        v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                        va[eno] = lx_avg * ly_avg;
-                    }
-                    if (ix != 0){    // this node is not on the left plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                        v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
-                        va[eno] = -ly_avg * lz_avg;
-                    }
-                    if (ix != sys->nx - 1){    // this node is not on the right plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                        v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
-                        va[eno] = ly_avg * lz_avg;
-                    }
-                    if (iy != 0){    // this node is not on the front plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                        v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
-                        va[eno] = -lx_avg * lz_avg;
-                    }
-                    if (iy != sys->ny - 1){   // this node is not on the back plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                        v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
-                        va[eno] = lx_avg * lz_avg;
-                    }
-
-                    /*for (i = 0; i < sys->nodeEdge[st.front() + iz * sys->N_node_s].size(); i++){
-                        v[sys->nodeEdge[st.front() + iz * sys->N_node_s][i].first] = sys->nodeEdge[st.front() + iz * sys->N_node_s][i].second;
-                    }
-                    for (i = 0; i < sys->nodeEdgea[st.front() + iz * sys->N_node_s].size(); i++){
-                        va[sys->nodeEdgea[st.front() + iz * sys->N_node_s][i].first] = sys->nodeEdgea[st.front() + iz * sys->N_node_s][i].second;
-                    }*/
+                    node_group.insert(sys->conductor[ic].node[jc]);
                     while (!st.empty()){
 
                         mark = 0;
@@ -4351,107 +3453,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_x + 1) * indx + indy] == markcond && visited[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && (iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy, indx + 1, lx_avg, ly_avg, lz_avg);
-
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx + 1 != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx + 1 != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx + 2] - sys->xn[indx + 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                        }
-                                            else {
-                                                v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
+                                    
                                     st.push((indx + 1)*(sys->N_cell_y + 1) + indy);
                                     visited[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy] = 1;
                                     map[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy);
                                     //mark = 1;
 
                                     //continue;
@@ -4461,106 +3467,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indx != 0){    // it must have a left x edge, thus left x node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_x + 1) * (indx - 1) + indy] == markcond && visited[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && (iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy, indx - 1, lx_avg, ly_avg, lz_avg);
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx - 1 != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 2) * (sys->N_cell_y + 1) + indy;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx - 1] - sys->xn[indx - 2]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx - 1 != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
+                                    
                                     st.push((indx - 1)*(sys->N_cell_y + 1) + indy);
                                     visited[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = 1;
                                     map[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy);
                                     //mark = 1;
 
                                     //continue;
@@ -4570,107 +3481,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * indx + indy] == markcond && visited[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 0 && (iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1 != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy + 1, indx, lx_avg, ly_avg, lz_avg);
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy + 1;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy + 1 != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy + 1 != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy + 1;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy + 2] - sys->yn[indy + 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-
+                                    
                                     st.push((indx)*(sys->N_cell_y + 1) + indy + 1);
                                     visited[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = 1;
                                     map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1);
                                     //mark = 1;
 
                                     //continue;
@@ -4680,106 +3495,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indy != 0){    // it must have a closer y edge, thus closer y node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * indx + indy - 1] == markcond && visited[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && (iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy - 1 != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy - 1, indx, lx_avg, ly_avg, lz_avg);
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy - 1;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy - 1;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy - 1 != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 2;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy - 1] - sys->yn[indy - 2]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy - 1 != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
+                                    
                                     st.push((indx)*(sys->N_cell_y + 1) + indy - 1);
                                     visited[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = 1;
                                     map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1);
                                     //mark = 1;
 
                                     //continue;
@@ -4790,36 +3510,159 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         st.pop();
                         //}
                     }
-
-                    indnum = v.size();
-
-
-                    //if (indnum != 0){
-                    //    status = nodeAddLarger(&ind[0], indnum, sys->N_edge, sys, v0cnum, leng_v0c, v0cRowId, v0cColId, v0cval);    // used to find v0d1num and leng_v0d1
-                    //    if (status != 0)
-                    //        return status;
-
-                    //    status = nodeAddAvgLarger(&ind[0], indnum, sys->N_edge, sys, v0canum, leng_v0ca, v0caRowId, v0caColId, v0caval);    // used to find v0d1anum and leng_v0d1a
-                    //    if (status != 0)
-                    //        return status;
-                    //}
-                    if (indnum != 0){
-                        for (auto vi : v){
-                            v0cRowId[v0cnum] = vi.first;
-                            v0cColId[v0cnum] = leng_v0c;
-                            v0cval[v0cnum] = vi.second;
-                            v0cnum++;
+                    for (auto ndi : node_group){
+                        indx = (ndi % sys->N_node_s) / (sys->N_cell_y + 1);
+                        indy = (ndi % sys->N_node_s) % (sys->N_cell_y + 1);
+                        status = avg_length(sys, iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                        if (iz != 0){    // this node is not on the bottom plane
+                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the lower edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
                         }
-                        leng_v0c++;
-                        for (auto vai : va){
-                            //v0caRowId[v0canum] = vai.first;
-                            //v0caColId[v0canum] = leng_v0ca;
-                            v0caval[v0canum] = vai.second;
-                            v0canum++;
+                        if (iz != sys->nz - 1){   // this node is not on the top plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the upper edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
                         }
-                        leng_v0ca++;
-                        map_count++;
+                        if (indx != 0){    // this node is not on the left plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the left edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
+                        if (indx != sys->nx - 1){    // this node is not on the right plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the right edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
+                        if (indy != 0){    // this node is not on the front plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the front edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
+                        if (indy != sys->ny - 1){   // this node is not on the back plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the back edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
                     }
+
+                    leng_v0c++;
+                    leng_v0ca++;
+                    map_count++;
 
                 }
             }
@@ -4838,8 +3681,7 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
             n = sys->cdtNumNode[ic] - 1;
             for (int jc = 0; jc < n; jc++){
                 if (visited[sys->conductor[ic].node[jc]] == 0 && sys->conductor[ic].node[jc] >= sys->N_node_s && sys->conductor[ic].node[jc] < sys->N_node - sys->N_node_s){
-                    v.clear();
-                    va.clear();
+                    node_group.clear();
                     //if (!ind.empty())
                     //    ind.clear();
                     iz = sys->conductor[ic].node[jc] / (sys->N_node_s);
@@ -4851,45 +3693,8 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                     st.push(ix * (sys->N_cell_y + 1) + iy);
                     visited[sys->conductor[ic].node[jc]] = 1;
                     map[sys->conductor[ic].node[jc]] = map_count;
+                    node_group.insert(sys->conductor[ic].node[jc]);
 
-                    status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
-                    if (iz != 0){    // this node is not on the bottom plane
-                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                        v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                        va[eno] = -lx_avg * ly_avg;
-                    }
-                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                        v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                        va[eno] = lx_avg * ly_avg;
-                    }
-                    if (ix != 0){    // this node is not on the left plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                        v[eno] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
-                        va[eno] = -ly_avg * lz_avg;
-                    }
-                    if (ix != sys->nx - 1){    // this node is not on the right plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                        v[eno] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
-                        va[eno] = ly_avg * lz_avg;
-                    }
-                    if (iy != 0){    // this node is not on the front plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                        v[eno] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
-                        va[eno] = -lx_avg * lz_avg;
-                    }
-                    if (iy != sys->ny - 1){   // this node is not on the back plane
-                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                        v[eno] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
-                        va[eno] = lx_avg * lz_avg;
-                    }
-
-                    //for (i = 0; i < sys->nodeEdge[st.front() + iz * sys->N_node_s].size(); i++){
-                    //    v[sys->nodeEdge[st.front() + iz * sys->N_node_s][i].first] = sys->nodeEdge[st.front() + iz * sys->N_node_s][i].second;
-                    //}
-                    //for (i = 0; i < sys->nodeEdgea[st.front() + iz * sys->N_node_s].size(); i++){
-                    //    va[sys->nodeEdgea[st.front() + iz * sys->N_node_s][i].first] = sys->nodeEdgea[st.front() + iz * sys->N_node_s][i].second;
-                    //}
                     while (!st.empty()){
 
                         mark = 0;
@@ -4899,108 +3704,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indx != sys->nx - 1){    // it must have a right x edge, thus right x node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_x + 1) * indx + indy] == markcond && visited[iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy] == 0 && (iz * sys->N_node_s + (indx + 1) * (sys->N_cell_y + 1) + indy != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx + 1] - startx) >= 0 && (sys->xn[indx + 1] - startx) <= block2_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block2_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy, indx + 1, lx_avg, ly_avg, lz_avg);
-
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx + 1 != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx + 1 != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx + 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx + 2] - sys->xn[indx + 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx + 1) * sys->N_cell_y + indy;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-
+                                    
                                     st.push((indx + 1)*(sys->N_cell_y + 1) + indy);
                                     visited[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy] = 1;
                                     map[iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx + 1)*(sys->N_cell_y + 1) + indy);
                                     //mark = 1;
 
                                     //continue;
@@ -5010,106 +3718,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indx != 0){    // it must have a left x edge, thus left x node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_x + 1) * (indx - 1) + indy] == markcond && visited[iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy] == 0 && (iz * sys->N_node_s + (indx - 1) * (sys->N_cell_y + 1) + indy != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx - 1] - startx) >= 0 && (sys->xn[indx - 1] - startx) <= block2_x && (sys->yn[indy] - starty) >= 0 && (sys->yn[indy] - starty) <= block2_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy, indx - 1, lx_avg, ly_avg, lz_avg);
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
 
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx - 1 != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 2) * (sys->N_cell_y + 1) + indy;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx - 1] - sys->xn[indx - 2]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx - 1 != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
                                     st.push((indx - 1)*(sys->N_cell_y + 1) + indy);
                                     visited[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = 1;
                                     map[iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx - 1)*(sys->N_cell_y + 1) + indy);
                                     //mark = 1;
 
                                     //continue;
@@ -5119,107 +3732,11 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indy != sys->ny - 1){    // it must have a farther y edge, thus farther y node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * indx + indy] == markcond && visited[iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1] == 0 && (iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy + 1 != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block2_x && (sys->yn[indy + 1] - starty) >= 0 && (sys->yn[indy + 1] - starty) <= block2_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy + 1, indx, lx_avg, ly_avg, lz_avg);
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy + 1;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy + 1;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy + 1 != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy + 1] - sys->yn[indy]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy + 1 != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy + 1;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy + 2] - sys->yn[indy + 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
 
                                     st.push((indx)*(sys->N_cell_y + 1) + indy + 1);
                                     visited[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = 1;
                                     map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy + 1);
                                     //mark = 1;
 
                                     //continue;
@@ -5229,106 +3746,10 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
                         if (indy != 0){    // it must have a closer y edge, thus closer y node
                             if (sys->markEdge[iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * indx + indy - 1] == markcond && visited[iz * sys->N_node_s + (indx)* (sys->N_cell_y + 1) + indy - 1] == 0 && (iz * sys->N_node_s + indx * (sys->N_cell_y + 1) + indy - 1 != sys->conductor[ic].node[sys->cdtNumNode[ic] - 1] || sys->conductor[ic].markPort == -1)){    // this node is in conductor and this node is not visited
                                 if ((sys->xn[indx] - startx) >= 0 && (sys->xn[indx] - startx) <= block2_x && (sys->yn[indy - 1] - starty) >= 0 && (sys->yn[indy - 1] - starty) <= block2_y){    // this node is within the block area
-                                    status = avg_length(sys, iz, indy - 1, indx, lx_avg, ly_avg, lz_avg);
-                                    if (iz != 0){    // this node is not on the bottom plane
-                                        eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the lower edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (iz != sys->nz - 1){   // this node is not on the top plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy - 1;    // the upper edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * ly_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != 0){    // this node is not on the left plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy - 1;    // the left edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indx != sys->nx - 1){    // this node is not on the right plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy - 1;    // the right edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = ly_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy - 1 != 0){    // this node is not on the front plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 2;    // the front edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = -1 / (sys->yn[indy - 1] - sys->yn[indy - 2]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = -lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
-                                    if (indy - 1 != sys->ny - 1){   // this node is not on the back plane
-                                        eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the back edge
-                                        if (v.find(eno) == v.end()){
-                                            v[eno] = 1 / (sys->yn[indy] - sys->yn[indy - 1]);
-                                        }
-                                        else {
-                                            v.erase(eno);
-                                        }
-
-                                        if (va.find(eno) == va.end()){
-                                            va[eno] = lx_avg * lz_avg;
-                                        }
-                                        else {
-                                            va.erase(eno);
-                                        }
-                                    }
                                     st.push((indx)*(sys->N_cell_y + 1) + indy - 1);
                                     visited[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = 1;
                                     map[iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1] = map_count;
+                                    node_group.insert(iz * sys->N_node_s + (indx)*(sys->N_cell_y + 1) + indy - 1);
                                     //mark = 1;
 
                                     //continue;
@@ -5341,37 +3762,161 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
 
                         //}
                     }
-
-                    indnum = v.size();
-
-
-                    //if (indnum != 0){
-
-                    //    status = nodeAddLarger(&ind[0], indnum, sys->N_edge, sys, v0cnum, leng_v0c, v0cRowId, v0cColId, v0cval);    // used to find v0d1num and leng_v0d1
-                    //    if (status != 0)
-                    //        return status;
-
-                    //    status = nodeAddAvgLarger(&ind[0], indnum, sys->N_edge, sys, v0canum, leng_v0ca, v0caRowId, v0caColId, v0caval);    // used to find v0d1anum and leng_v0d1a
-                    //    if (status != 0)
-                    //        return status;
-                    //}
-                    if (indnum != 0){
-                        for (auto vi : v){
-                            v0cRowId[v0cnum] = vi.first;
-                            v0cColId[v0cnum] = leng_v0c;
-                            v0cval[v0cnum] = vi.second;
-                            v0cnum++;
+                    for (auto ndi : node_group){
+                        indx = (ndi % sys->N_node_s) / (sys->N_cell_y + 1);
+                        indy = (ndi % sys->N_node_s) % (sys->N_cell_y + 1);
+                        status = avg_length(sys, iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                        if (iz != 0){    // this node is not on the bottom plane
+                            eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the lower edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
                         }
-                        leng_v0c++;
-                        for (auto vai : va){
-                            //v0caRowId[v0canum] = vai.first;
-                            //v0caColId[v0canum] = leng_v0ca;
-                            v0caval[v0canum] = vai.second;
-                            v0canum++;
+                        if (iz != sys->nz - 1){   // this node is not on the top plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx * (sys->N_cell_y + 1) + indy;    // the upper edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * ly_avg;
+                                    v0canum++;
+                                }
+                            }
                         }
-                        leng_v0ca++;
-                        map_count++;
+                        if (indx != 0){    // this node is not on the left plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy;    // the left edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
+                        if (indx != sys->nx - 1){    // this node is not on the right plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indx * (sys->N_cell_y + 1) + indy;    // the right edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->xn[indx + 1] - sys->xn[indx]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = ly_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
+                        if (indy != 0){    // this node is not on the front plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy - 1;    // the front edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = -1 / (sys->yn[indy] - sys->yn[indy - 1]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = -lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
+                        if (indy != sys->ny - 1){   // this node is not on the back plane
+                            eno = iz * (sys->N_edge_s + sys->N_edge_v) + indx * sys->N_cell_y + indy;    // the back edge
+                            status = compute_edgelink(sys, eno, node1, node2);
+                            if (node1 != ndi){
+                                if (node_group.find(node1) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                            else if (node2 != ndi){
+                                if (node_group.find(node2) == node_group.end()){
+                                    v0cRowId[v0cnum] = eno;
+                                    v0cColId[v0cnum] = leng_v0c;
+                                    v0cval[v0cnum] = 1 / (sys->yn[indy + 1] - sys->yn[indy]);
+                                    v0cnum++;
+                                    v0caval[v0canum] = lx_avg * lz_avg;
+                                    v0canum++;
+                                }
+                            }
+                        }
                     }
+
+                    leng_v0c++;
+                    leng_v0ca++;
+                    map_count++;
+
+
                 }
             }
 
