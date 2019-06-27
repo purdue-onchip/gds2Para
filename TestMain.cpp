@@ -81,7 +81,7 @@ int main(int argc, char** argv)
             adb.setFileName(fName);
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
+            vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
             adb.print(indCellPrint);
         }
         else if ((strcmp(argv[1], "-p") == 0) || (strcmp(argv[1], "--parrot") == 0))
