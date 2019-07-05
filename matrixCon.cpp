@@ -319,7 +319,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 #endif
     t1 = clock();
     status = merge_v0c(sys, block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
-    cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl; 
+    cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl; 
     j = 0;
 
     /*for (i = 0; i < sys->numCdt + 1; i++){
@@ -525,7 +525,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double alpha = 1, beta = 0;
     char matdescra[6];
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << "Begin the iterative solve for network parameters!\n";
+    cout << "Begin the iterative solve for network parameters!" << endl;
     double *ydcp;
     double *y0c, *y0cs;
     double *yc, *yca;
@@ -595,13 +595,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
         /* End of solving */
 
 #ifndef SKIP_PARDISO
         t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
-        cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        cout << " Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
 
         for (indi = 0; indi < leng_v0d1; indi++){
@@ -714,7 +714,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
 
 
@@ -744,7 +744,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, dRhs2, leng_v0d1, y0d2);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
 
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
@@ -771,7 +771,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             u0c[indi - sys->N_edge_s] = yd2[indi] + yc[indi];
         }
 
-        cout << "Time to generate u0d and u0c is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        cout << " Time to generate u0d and u0c is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
         for (int id = 0; id < sys->N_edge; id++){
             yd[id] = yd2[id] - (1i)*(yd1[id]);
@@ -920,22 +920,23 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     MPI_Finalize();
     if (sys->nfreq > 1){
         for (int id = 0; id < sys->nfreq; id++){
-            cout << "Z parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz is " << endl;
+            cout << "Single Z-parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
                     Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
-                    cout << Zresult << "\n";
+                    cout << Zresult << endl;
                 }
             }
         }
     }
     else{
-        cout << "Z parameter at frequency " << (sys->freqStart) * sys->freqUnit << " Hz is " << endl;
+        cout << "Z-parameters at frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
                 Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
-                cout << Zresult << "\n";
+                cout << Zresult << "  ";
             }
+            cout << endl;
         }
     }
 
@@ -1062,7 +1063,6 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 }
 #endif
 
-
 //int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys){
 //    // ia, ja, a are CSR form with one-based indexing and it is only upper triangular elements (symmetric)
 //    double mdone = -1;
@@ -1125,7 +1125,7 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //            }
 //            cblas_daxpy(N, mdone, rhs, ione, temp, ione);
 //            euclidean_norm = cblas_dnrm2(N, temp, ione) / cblas_dnrm2(N, rhs, ione);
-//            //cout << euclidean_norm << "\n";
+//            //cout << euclidean_norm << endl;
 //            if (euclidean_norm > 1.e-3)
 //                continue;
 //            else
@@ -1138,8 +1138,8 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //    }
 //
 //    dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
-//    //cout << itercount << "\n";
-//    //cout << euclidean_norm << "\n";
+//    //cout << itercount << endl;
+//    //cout << euclidean_norm << endl;
 //    free(tmp);
 //    free(temp);
 //    free(ipar);
@@ -1561,7 +1561,6 @@ int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vecto
     return 0;
 }
 
-
 int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val){
     int i;
     vector<int> rowId2;
@@ -1737,7 +1736,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
     //            inz = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] / sys->N_node_s;
     //            inx = (sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] - inz * sys->N_node_s) / (sys->N_cell_y + 1);
     //            iny = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] % (sys->N_cell_y + 1);
-    //            /*cout << "h\n";*/
+    //            /*cout << "h" << endl;*/
     //            if (iny == 0){
     //                rowId.push_back(inz*(sys->N_edge_s + sys->N_edge_v) + inx*(sys->N_cell_y) + iny);
     //                colId.push_back(1);
@@ -2889,7 +2888,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         free(visited); visited = NULL;
     }
 
-    cout << "Time to generate V0d1 is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+    cout << "Time to generate V0d1 is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
     /* V0d2 generation */
     int j;
@@ -3270,7 +3269,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     //        }
     //    }
     //}
-    cout << "Time to generate V0d2 is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << endl;
+    cout << "Time to generate V0d2 is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
 
     double lx_whole_avg = 0;

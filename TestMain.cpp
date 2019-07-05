@@ -37,7 +37,7 @@ int main(int argc, char** argv)
         if (strcmp(argv[1], "--help") == 0)
         {
             cout << "Help for LayoutAnalyzer binary (with main testing features)" << endl;
-            cout << "Usage: LayoutAnalyzer [options] file1 [file2..file3]" << endl;
+            cout << "Usage: LayoutAnalyzer options file1 [file2..file3]" << endl;
             cout << "Options:" << endl;
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
@@ -81,7 +81,7 @@ int main(int argc, char** argv)
             adb.setFileName(fName);
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
+            vector<size_t> indCellPrint = { adb.getNumCell() - 1 };
             adb.print(indCellPrint);
         }
         else if ((strcmp(argv[1], "-p") == 0) || (strcmp(argv[1], "--parrot") == 0))
@@ -298,7 +298,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "meshAndMark Success!" << endl;
-                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
             }
             else
             {
@@ -313,7 +313,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "matrixConstruction Success!" << endl;
-                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
             }
             else {
                 cerr << "matrixConstruction Fail!" << endl;
@@ -327,7 +327,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "portSet Success!" << endl;
-                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
             }
             else
             {
@@ -343,7 +343,7 @@ int main(int argc, char** argv)
             if (status == 0)
             {
                 cout << "generateStiff Success!" << endl;
-                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
             }
             else
             {
@@ -351,20 +351,21 @@ int main(int argc, char** argv)
                 return status;
             }
 #endif
-            cout << "Start to generate parameter!\n";
+
             // Parameter generation
             clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;
-                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
             }
             else
             {
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
+            //sys.print();
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
 
@@ -374,6 +375,7 @@ int main(int argc, char** argv)
             sdb.setParasitics(newPara);
 
             // Select Output File Based on Control Mode
+            cout << endl;
             if ((strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
             {
                 // Output SPEF file
@@ -387,6 +389,11 @@ int main(int argc, char** argv)
             }
             else if ((strcmp(argv[1], "-sc") == 0) || (strcmp(argv[1], "--citi") == 0))
             {
+                // Convert to S-parameters
+                Parasitics newPara = sdb.getParasitics(); // Start with copy of parastics to reinterpret
+                newPara.convertParam('S');
+                sdb.setParasitics(newPara);
+
                 // Output Common Instrumentation Transfer and Interchange file (CITIfile)
                 string outCITIFile = argv[4];
                 vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division

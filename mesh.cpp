@@ -2,7 +2,6 @@
 #include "fdtd.h"
 
 
-
 int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
 {
     int lyr;
@@ -21,7 +20,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
-    double disMin = 4e-4; // MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }
@@ -900,7 +899,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 //}
 
     
-    cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
+    cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
     
     //for (i = 0; i < sys->numCdtRow; i++){
     //    //cout << polyIn((0 + 4.9e-7) / 2, -1.7e-7, sys, 2) << endl;
@@ -1572,21 +1571,12 @@ int matrixConstruction(fdtdMesh *sys){
 #endif
         }
     }
-    cout << "h" << endl;
+
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
     //free(sys->markCell); sys->markCell = NULL;
-    
-    /*ofstream out;
-    out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge; i++){
-        out << sys->sig[i] << endl;
-    }
-    out.close();*/
-    //cout << "sig's generation is done!\n";
 
     sys->stackEpsn.clear();
-    cout << "h" << endl;
     return 0;
 }
 
@@ -1945,7 +1935,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             }
         }
     }
-    cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+    cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
     sys->conductorIn.clear();
     return 0;

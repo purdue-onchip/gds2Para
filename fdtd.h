@@ -59,7 +59,7 @@ using namespace std;
 #define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
 
 // Debug testing macros (comment out if not necessary)
-#define PRINT_NODE_COORD
+//#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
 //#define PRINT_PORT_SET

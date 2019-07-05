@@ -1369,6 +1369,168 @@ class Parasitics
         this->computeYBusFromParam(0); // Draw circuit based on the lowest frequency present
     }
 
+    // Convert existing network parameters to different type
+    // ('S' = scattering, 'Y' = admittance, 'Z' = impedance)
+    void convertParam(char newParam)
+    {
+        // Orignally had admittance parameters
+        if (this->param == 'Y')
+        {
+            if (newParam == 'Y')
+            {
+                //cout << "No conversion needed to get Y-parameters." << endl;
+            }
+            else if (newParam == 'Z')
+            {
+                cout << "Notice: Finding Z-parameters by inverting Y-parameters matrix." << endl;
+                for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+                {
+                    cdMat matZ = this->matParam[indFreq].inverse();
+                    this->matParam[indFreq] = matZ;
+                }
+                this->setParamType('Z');
+            }
+            else if (newParam == 'S')
+            {
+                cout << "Notice: Finding S-parameters from Y-parameters with port impedances, matrix arithmetic, and slow matrix inversion." << endl;
+                const int nPorts = (const int)this->getNPort();
+                cdMat matEye = cdMat::Identity(nPorts, nPorts); // Initialize, size, and set the entries of the identity matrix
+                Eigen::VectorXd diagPortZ(nPorts); // Declare a vector to hold square roots of the port characteristic impedances
+                for (size_t indPort = 0; indPort < nPorts; indPort++)
+                {
+                    diagPortZ(indPort) = sqrt(this->ports[indPort].getZSource());
+                }
+                Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic> diagZroot(nPorts); // Declare the diagonal matrix
+                diagZroot.diagonal() = diagPortZ; // Set the entries of the diagonal matrix
+                for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+                {
+                    cdMat matLFactor(nPorts, nPorts);
+                    matLFactor = matEye - diagZroot * this->matParam[indFreq] * diagZroot; // Left factor
+                    cdMat matRFactor(nPorts, nPorts);
+                    matRFactor = matEye + diagZroot * this->matParam[indFreq] * diagZroot; // Right factor prior to matrix inversion
+                    cdMat matS = matLFactor * matRFactor.inverse();
+                    this->matParam[indFreq] = matS;
+                }
+                this->setParamType('S');
+            }
+            else
+            {
+                cerr << "New network parameter matrix must be 'S' (scattering S-parameters), 'Y' (admittance Y-parameters), or 'Z' (impedance Z-parameters). Taking no action." << endl;
+            }
+        }
+
+        // Originally had impedance parameters
+        else if (this->param == 'Z')
+        {
+            if (newParam == 'Y')
+            {
+                cout << "Notice: Finding Y-parameters by inverting Z-parameters matrix." << endl;
+                for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+                {
+                    cdMat matY = this->matParam[indFreq].inverse();
+                    this->matParam[indFreq] = matY;
+                }
+                this->setParamType('Y');
+            }
+            else if (newParam == 'Z')
+            {
+                //cout << "No conversion needed to get Z-parameters." << endl;
+            }
+            else if (newParam == 'S')
+            {
+                cout << "Notice: Finding S-parameters from Z-parameters with port admittances, matrix arithmetic, and slow matrix inversion." << endl;
+                const int nPorts = (const int)this->getNPort();
+                cdMat matEye = cdMat::Identity(nPorts, nPorts); // Initialize, size, and set the entries of the identity matrix
+                Eigen::VectorXd diagPortY(nPorts); // Declare a vector to hold square roots of the port characteristic admittances
+                for (size_t indPort = 0; indPort < nPorts; indPort++)
+                {
+                    diagPortY(indPort) = sqrt(1.0 / this->ports[indPort].getZSource());
+                }
+                Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic> diagYroot(nPorts); // Declare the diagonal matrix
+                diagYroot.diagonal() = diagPortY; // Set the entries of the diagonal matrix
+                for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+                {
+                    cdMat matLFactor(nPorts, nPorts);
+                    matLFactor = diagYroot * this->matParam[indFreq] * diagYroot - matEye; // Left factor
+                    cdMat matRFactor(nPorts, nPorts);
+                    matRFactor = diagYroot * this->matParam[indFreq] * diagYroot + matEye; // Right factor prior to matrix inversion
+                    cdMat matS = matLFactor * matRFactor.inverse();
+                    this->matParam[indFreq] = matS;
+                }
+                this->setParamType('S');
+            }
+            else
+            {
+                cerr << "New network parameter matrix must be 'S' (scattering S-parameters), 'Y' (admittance Y-parameters), or 'Z' (impedance Z-parameters). Taking no action." << endl;
+            }
+        }
+
+        // Originally had scattering parameters
+        else if (this->param == 'S')
+        {
+            if (newParam == 'Y')
+            {
+                cout << "Notice: Finding Y-parameters from S-parameters with port admittances, matrix arithmetic, and slow matrix inversion." << endl;
+                const int nPorts = (const int)this->getNPort();
+                cdMat matEye = cdMat::Identity(nPorts, nPorts); // Initialize, size, and set the entries of the identity matrix
+                Eigen::VectorXd diagPortY(nPorts); // Declare a vector to hold square roots of the port characteristic admittances
+                for (size_t indPort = 0; indPort < nPorts; indPort++)
+                {
+                    diagPortY(indPort) = sqrt(1.0 / this->ports[indPort].getZSource());
+                }
+                Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic> diagYroot(nPorts); // Declare the diagonal matrix
+                diagYroot.diagonal() = diagPortY; // Set the entries of the diagonal matrix
+                for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+                {
+                    cdMat matLFactor(nPorts, nPorts);
+                    matLFactor = matEye - this->matParam[indFreq]; // Inner-left factor
+                    cdMat matRFactor(nPorts, nPorts);
+                    matRFactor = matEye + this->matParam[indFreq]; // Inner-right factor prior to matrix inversion
+                    cdMat matY = diagYroot * matLFactor * matRFactor.inverse() * diagYroot;
+                    this->matParam[indFreq] = matY;
+                }
+                this->setParamType('Y');
+            }
+            else if (newParam == 'Z')
+            {
+                cout << "Notice: Finding Z-parameters from S-parameters with port impedances, matrix arithmetic, and slow matrix inversion." << endl;
+                const int nPorts = (const int)this->getNPort();
+                cdMat matEye = cdMat::Identity(nPorts, nPorts); // Initialize, size, and set the entries of the identity matrix
+                Eigen::VectorXd diagPortZ(nPorts); // Declare a vector to hold square roots of the port characteristic impedances
+                for (size_t indPort = 0; indPort < nPorts; indPort++)
+                {
+                    diagPortZ(indPort) = sqrt(this->ports[indPort].getZSource());
+                }
+                Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic> diagZroot(nPorts); // Declare the diagonal matrix
+                diagZroot.diagonal() = diagPortZ; // Set the entries of the diagonal matrix
+                for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+                {
+                    cdMat matLFactor(nPorts, nPorts);
+                    matLFactor = matEye + this->matParam[indFreq]; // Inner-left factor
+                    cdMat matRFactor(nPorts, nPorts);
+                    matRFactor = matEye - this->matParam[indFreq]; // Inner-right factor prior to matrix inversion
+                    cdMat matZ = diagZroot * matLFactor * matRFactor.inverse() * diagZroot;
+                    this->matParam[indFreq] = matZ;
+                }
+                this->setParamType('Z');
+            }
+            else if (newParam == 'S')
+            {
+                //cout << "No conversion needed to get S-parameters." << endl;
+            }
+            else
+            {
+                cerr << "New network parameter matrix must be 'S' (scattering S-parameters), 'Y' (admittance Y-parameters), or 'Z' (impedance Z-parameters). Taking no action." << endl;
+            }
+        }
+
+        // Originally had unrecognized parameters
+        else
+        {
+            cerr << "Original network parameter matrix unexpectedly was neither 'S' (scattering S-parameters), 'Y' (admittance Y-parameters), nor 'Z' (impedance Z-parameters). Taking no action." << endl;
+        }
+    }
+
     // Compute admittance parameters from nodal admittance matrices
     void computeYParamFromCircuit()
     {
@@ -1435,7 +1597,7 @@ class Parasitics
     // Compute nodal admittance matrices from network parameters at a certain frequency
     void computeYBusFromParam(size_t indFreq)
     {
-        // Need to get Y-parameters
+        // Need to get Y-parameters temporarily
         const int nPorts = (const int)this->getNPort();
         cdMat matY;
         switch (this->param)
@@ -1448,26 +1610,31 @@ class Parasitics
         }
         case ('Z'):
         {
-            cout << "Notice: Inverting Z-parameters matrix to find Y-parameters. Placing circuit elements afterwards." << endl;
+            cout << "Notice: Finding Y-parameters by inverting Z-parameters matrix. Placing circuit elements afterwards." << endl;
             matY = this->matParam[indFreq].inverse();
             break;
         }
         case ('S'):
         {
-            cout << "Notice: Finding Y-parameters from S-parameters with port impedances, matrix arithmetic, and slow matrix inversion. Placing circuit elements afterwards." << endl;
+            cout << "Notice: Finding Y-parameters from S-parameters with port admittances, matrix arithmetic, and slow matrix inversion." << endl;
+            const int nPorts = (const int)this->getNPort();
             cdMat matEye = cdMat::Identity(nPorts, nPorts); // Initialize, size, and set the entries of the identity matrix
-            Eigen::VectorXd diagPortZ(nPorts); // Declare a vector to hold square roots of the port characteristic impedances
+            Eigen::VectorXd diagPortY(nPorts); // Declare a vector to hold square roots of the port characteristic admittances
             for (size_t indPort = 0; indPort < nPorts; indPort++)
             {
-                diagPortZ(indPort) = sqrt(this->ports[indPort].getZSource());
+                diagPortY(indPort) = sqrt(1.0 / this->ports[indPort].getZSource());
             }
-            Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic> diagZroot(nPorts); // Declare the diagonal matrix
-            diagZroot.diagonal() = diagPortZ; // Set the entries of the diagonal matrix
-            cdMat matLFactor(nPorts, nPorts);
-            matLFactor = matEye - diagZroot * this->matParam[indFreq] * diagZroot; // Left factor
-            cdMat matRFactor(nPorts, nPorts);
-            matRFactor = matEye + diagZroot * this->matParam[indFreq] * diagZroot; // Right factor prior to matrix inversion
-            matY = matLFactor * matRFactor.inverse();
+            Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic> diagYroot(nPorts); // Declare the diagonal matrix
+            diagYroot.diagonal() = diagPortY; // Set the entries of the diagonal matrix
+            for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+            {
+                cdMat matLFactor(nPorts, nPorts);
+                matLFactor = matEye - this->matParam[indFreq]; // Inner-left factor
+                cdMat matRFactor(nPorts, nPorts);
+                matRFactor = matEye + this->matParam[indFreq]; // Inner-right factor prior to matrix inversion
+                cdMat matY = diagYroot * matLFactor * matRFactor.inverse() * diagYroot;
+                this->matParam[indFreq] = matY;
+            }
             break;
         }
     }
@@ -1506,6 +1673,160 @@ class Parasitics
 #endif
         this->setGMatrix(matG); // Update the objects in this class
         this->setCMatrix(matC);
+    }
+
+    // Terminate port of Z-parameter matrix with known impedance for all frequencies
+    void terminatePortZ(size_t indPort, vector<complex<double>> ZLoad)
+    {
+        // Check the input
+        if (this->param != 'Z')
+        {
+            cerr << "Unable to terminate port with impedance because Z-parameters are not stored. Breaking now." << endl;
+            return;
+        }
+        size_t nPorts = this->getNPort(); // Number of ports
+        if (indPort >= nPorts)
+        {
+            cerr << "Port index for impedance termination greater than matrix size. Breaking now." << endl;
+            return;
+        }
+        vector<complex<double>> ZL; // Initialize port impedance response (ohm)
+        if ((ZLoad.size() == 1) || (this->freqs.size() != 1))
+        {
+            cout << "Interpolating port termination impedance from starting frequency to all subsequent frequencies, assuming inductive behavior." << endl;
+            for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+            {
+                ZL.push_back(complex<double>(ZLoad[0].real(), ZLoad[0].imag() * this->freqs[indFreq] / this->freqs[0]));
+            }
+        }
+        else if (ZLoad.size() != this->freqs.size())
+        {
+            cerr << "Number of port termination impedance evaluations does not match the frequency evaluations of the network parameters. Breaking now." << endl;
+            return;
+        }
+        else
+        {
+            ZL = ZLoad; // Use the port termination impedance evaluations directly (ohm)
+        }
+
+        // Kron reduction of system of linear equations
+        // zij -> zij - (zik * zkj) / (zkk + Zp); where Zp is the port load impedance and k is the index of the loaded port not affecting the i,j numbers
+        for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+        {
+            cdMat newZ(nPorts - 1, nPorts - 1);
+            for (size_t indi = 0; indi < nPorts; indi++)
+            {
+                for (size_t indj = indi; indj < nPorts; indj++) // Index the upper triangular elements
+                {
+                    // Index manipulation for reduced Z-parameters matrix
+                    size_t newi = indi;
+                    size_t newj = indj;
+                    if (indi = indPort)
+                    {
+                        continue; // Nothing to do for this row
+                    }
+                    else if (indi > indPort)
+                    {
+                        newi--; // Adjust index of subsequent rows in reduced Z-parameters matrix
+                    }
+                    if (indj = indPort)
+                    {
+                        continue; // Nothing to do for this column
+                    }
+                    else if (indj > indPort)
+                    {
+                        newi--; // Adjust index of subsequent columns in reduced Z-parameters matrix
+                    }
+
+                    // Kron reduction step for entries in symmetric positions
+                    newZ(newi, newj) = this->matParam[indFreq](indi, indj) - (this->matParam[indFreq](indi, indPort) * this->matParam[indFreq](indPort, indj)) / (this->matParam[indFreq](indPort, indPort) + ZL[indFreq]);
+                }
+            }
+
+            // Update saved network parameters evaluation information
+            this->matParam[indFreq] = newZ;
+        }
+
+        // Update saved ports information
+        this->ports.erase(this->ports.begin() + indPort); // Remove the port
+        this->nPorts--; // Adjust number of ports
+    }
+
+    // Terminate port of Y-parameter matrix with known admittance for all frequencies
+    void terminatePortY(size_t indPort, vector<complex<double>> YLoad)
+    {
+        // Check the input
+        if (this->param != 'Y')
+        {
+            cerr << "Unable to terminate port with admittance because Y-parameters are not stored. Breaking now." << endl;
+            return;
+        }
+        size_t nPorts = this->getNPort(); // Number of ports
+        if (indPort >= nPorts)
+        {
+            cerr << "Port index for admittance termination greater than matrix size. Breaking now." << endl;
+            return;
+        }
+        vector<complex<double>> YL; // Initialize port admittance response (S)
+        if ((YLoad.size() == 1) || (this->freqs.size() != 1))
+        {
+            cout << "Interpolating port termination admittance from starting frequency to all subsequent frequencies, assuming capacitive behavior." << endl;
+            for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+            {
+                YL.push_back(complex<double>(YLoad[0].real(), YLoad[0].imag() * this->freqs[indFreq] / this->freqs[0]));
+            }
+        }
+        else if (YLoad.size() != this->freqs.size())
+        {
+            cerr << "Number of port termination admittance evaluations does not match the frequency evaluations of the network parameters. Breaking now." << endl;
+            return;
+        }
+        else
+        {
+            YL = YLoad; // Use the port termination admittance evaluations directly (S)
+        }
+
+        // Kron reduction of system of linear equations
+        // yij -> yij - (yik * ykj) / (ykk + Yp); where Yp is the port load admittance and k is the index of the loaded port not affecting the i,j numbers
+        for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
+        {
+            cdMat newY(nPorts - 1, nPorts - 1);
+            for (size_t indi = 0; indi < nPorts; indi++)
+            {
+                for (size_t indj = indi; indj < nPorts; indj++) // Index the upper triangular elements
+                {
+                    // Index manipulation for reduced Y-parameters matrix
+                    size_t newi = indi;
+                    size_t newj = indj;
+                    if (indi = indPort)
+                    {
+                        continue; // Nothing to do for this row
+                    }
+                    else if (indi > indPort)
+                    {
+                        newi--; // Adjust index of subsequent rows in reduced Y-parameters matrix
+                    }
+                    if (indj = indPort)
+                    {
+                        continue; // Nothing to do for this column
+                    }
+                    else if (indj > indPort)
+                    {
+                        newi--; // Adjust index of subsequent columns in reduced Y-parameters matrix
+                    }
+
+                    // Kron reduction step for entries in symmetric positions
+                    newY(newi, newj) = this->matParam[indFreq](indi, indj) - (this->matParam[indFreq](indi, indPort) * this->matParam[indFreq](indPort, indj)) / (this->matParam[indFreq](indPort, indPort) + YL[indFreq]);
+                }
+            }
+
+            // Update saved network parameters evaluation information
+            this->matParam[indFreq] = newY;
+        }
+
+        // Update saved ports information
+        this->ports.erase(this->ports.begin() + indPort); // Remove the port
+        this->nPorts--; // Adjust number of ports
     }
 
     // Print the parasitics information

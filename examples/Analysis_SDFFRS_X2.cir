@@ -1,0 +1,24 @@
+* File: examples/Analysis_SDFFRS_X2.cir
+* Design: Test network for SDFFRS_X2
+* Vendor: DARPA ERI Contributors
+* Program: Handmade
+* Author: Purdue University
+* Date: 07-04-2019 19:12:00
+
+* Voltage Sources
+VSS 1 0 0.0V
+VDD 2 0 1.1V
+VCK 5 0 PULSE(0.0V 1.1V 0.0 10ns 10ns 0.5us 1us)
+VIN 6 0 SIN(0.55V 1.1V 1.0GHz 0.0s 0.0s -90)
+* Analysis Command
+.tran 20ps 20us
+* Output
+.print V(5) V(6) V(10)
+* Subcircuit Reference
+* (Ports: 1 = VSS, 2 = VDD, 3 = RN, 4 = SN, 5 = CK, 6 = D, 7 = SE, 8 = SI, 9 = QN, 10 = Q)
+X1 1 2 3 4 5 6 7 8 9 10 SDFFRS_X2
+R1 3 2 0
+R2 4 2 0
+R3 7 1 0
+R4 8 1 0
+.end
