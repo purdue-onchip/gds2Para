@@ -877,7 +877,8 @@ class Port
             break;
         case 'B':
             // Bidirectional pin means current can flow EITHER direction within source
-            return 0;
+            // Logic for bidirectional pins: match input pins since Z-parameters will be same for those ports
+            return (coordEffect ? -1 : +1);
             break;
         }
     }
@@ -1006,7 +1007,7 @@ class Parasitics
         }
         if (freqs.size() != matParam.size())
         {
-            cerr << "Number of frequencies and number of network parameter matrix states do not match. Taking no action." << endl;
+            cerr << "Number of frequencies (" << freqs.size() << ") and number of network parameter matrix states (" << matParam.size() << ") do not match. Taking no action." << endl;
         }
         this->matParam = matParam;
     }
@@ -1078,7 +1079,7 @@ class Parasitics
     {
         if (freqs.size() != this->matParam.size())
         {
-            cerr << "Number of frequencies and number of network parameter matrix states do not match. Taking no action." << endl;
+            cerr << "Number of frequencies (" << freqs.size() << ") and number of network parameter matrix states (" << this->matParam.size() << ") do not match. Taking no action." << endl;
         }
         this->freqs = freqs;
     }
@@ -1103,7 +1104,7 @@ class Parasitics
     {
         if (this->freqs.size() != matParam.size())
         {
-            cerr << "Number of frequencies and number of network parameter matrix states do not match. Taking no action." << endl;
+            cerr << "Number of frequencies (" << this->freqs.size() << ") and number of network parameter matrix states (" << matParam.size() << ") do not match. Taking no action." << endl;
         }
         this->matParam = matParam;
     }
@@ -1308,14 +1309,13 @@ class Parasitics
     }
 
     // Save network parameters as a sparse matrix (retrieve from fdtdMesh)
-    void saveNetworkParam(char param, vector<double> freqs, complex<double> *p)
+    void saveNetworkParam(char param, vector<double> freqs, vector<complex<double>> p)
     {
         // Parameter storage
         size_t nPorts = this->getNPort();
-        size_t nEntries = (sizeof p) / (sizeof p[0]); // NELEMENT(p);
-        if (nPorts * nPorts * freqs.size() != nEntries)
+        if (nPorts * nPorts * freqs.size() != p.size())
         {
-            cerr << "The number of network parameter evaluated entries (" << nEntries << ") does not match the number of ports squared times the frequency points (" << nPorts * nPorts * freqs.size() << "). Attempting execution anyways." << endl;
+            cerr << "The number of network parameter evaluated entries (" << p.size() << ") does not match the number of ports squared times the frequency points (" << nPorts * nPorts * freqs.size() << "). Attempting execution anyways." << endl;
         }
         for (size_t indFreq = 0; indFreq < this->freqs.size(); indFreq++)
         {
@@ -1335,9 +1335,9 @@ class Parasitics
                     {
                         // Save network parameters
 #ifdef EIGEN_SPARSE
-                        listP.push_back(cdTriplet(indi, indj, p[indi * nPorts + indj])); // Matrix entry
+                        listP.push_back(cdTriplet(indi, indj, p[(indFreq * nPorts + indi) * nPorts + indj])); // Matrix entry
 #else
-                        thisP(indi, indj) = p[indi * nPorts + indj]; // Matrix entry
+                        thisP(indi, indj) = p[(indFreq * nPorts + indi) * nPorts + indj]; // Matrix entry
 #endif
                     }
                     else
@@ -4683,12 +4683,23 @@ struct SolverDataBase
             {
                 for (size_t indj = 0; indj < nPorts; indj++)
                 {
-                    tstoneFile << "Re" << paramType << indi + 1 << "," << indj + 1 << std::string(8 - indi / 10 - indj / 10, ' '); // Identify number and pad with spaces from string fill constructor with integer division
+                    if ((nPorts > 2) && (indi > 0) && (indj == 0))
+                    {
+                        tstoneFile << "!Re" << paramType << indi + 1 << "," << indj + 1 << std::string(7 - indi / 10 - indj / 10, ' '); // Identify number and pad with spaces from string fill constructor with integer division on new row
+                    }
+                    else
+                    {
+                        tstoneFile << "Re" << paramType << indi + 1 << "," << indj + 1 << std::string(8 - indi / 10 - indj / 10, ' '); // Identify number and pad with spaces from string fill constructor with integer division
+                    }
                     tstoneFile << "Im" << paramType << indi + 1 << "," << indj + 1 << std::string(8 - indi / 10 - indj / 10, ' ');
                     if (((indj + 1) % 4 == 0) && (indj + 1 != nPorts) && (nPorts > 2))
                     {
                         tstoneFile << endl << "!" << std::string(13, ' '); // Put no more than 4 columns of parameters on one file line
                     }
+                }
+                if (nPorts > 2)
+                {
+                    tstoneFile << endl; // End the row of the long, helpful comment
                 }
             }
             tstoneFile << endl; // End helpful comment line

@@ -371,7 +371,7 @@ int main(int argc, char** argv)
 
             // Network parameter storage
             Parasitics newPara = sdb.getParasitics(); // Start with outdated parastics to update
-            newPara.saveNetworkParam('Z', { sdb.getSimSettings().getFreqsHertz()[0] }, sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
+            newPara.saveNetworkParam('Z', sdb.getSimSettings().getFreqsHertz(), sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
             sdb.setParasitics(newPara);
 
             // Select Output File Based on Control Mode

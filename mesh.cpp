@@ -226,7 +226,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /*************************************************************************************/
 
-
+    /* More discretization math */
     sort(xn, xn + countx + 1);
     xi.clear();
     sys->xn = (double*)calloc(sys->nx, sizeof(double));
@@ -343,10 +343,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     
     /***********************************************************************************************/
 
+    /* Save counts of the final discretization */
     sys->N_cell_x = sys->nx - (myint)1;
     sys->N_cell_y = sys->ny - (myint)1;
     sys->N_cell_z = sys->nz - (myint)1;
-
 
     sys->N_edge_s = sys->N_cell_y*(sys->N_cell_x + 1) + sys->N_cell_x*(sys->N_cell_y + 1);
     sys->N_edge_v = (sys->N_cell_x + 1)*(sys->N_cell_y + 1);
@@ -366,11 +366,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 #ifdef PRINT_DIS_COUNT
     cout << endl;
-    cout << "disMin   = " << disMin << endl;
-    cout << "disMinz  = " << disMinz << endl;
-    cout << "disMaxx  = " << disMaxx << endl;
-    cout << "disMaxy  = " << disMaxy << endl;
-    //cout << "disMaxz  = " << disMaxz << endl;
+    cout << "disMin   = " << disMin << " m" << endl;
+    cout << "disMinz  = " << disMinz << " m" << endl;
+    cout << "disMaxx  = " << disMaxx << " m" << endl;
+    cout << "disMaxy  = " << disMaxy << " m" << endl;
+    //cout << "disMaxz  = " << disMaxz << " m" << endl;
     cout << endl;
     cout << "N_edge   = " << sys->N_edge << endl;
     cout << "N_node   = " << sys->N_node << endl;
@@ -379,6 +379,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     cout << "N_cell_z = " << sys->N_cell_z << endl;
     cout << endl;
 #endif
+
+    /* Discretization warnings */
+    if (sys->N_cell_x <= 1)
+    {
+        cerr << "Failed to generate mesh with more than one element in the x-direction. Check value of disMin. Aborting now." << endl;
+        return 1;
+    }
+    if (sys->N_cell_y <= 1)
+    {
+        cerr << "Failed to generate mesh with more than one element in the y-direction. Check value of disMin. Aborting now." << endl;
+        return 1;
+    }
 
     double xc, yc;
     myint xrange_max;
@@ -1591,7 +1603,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 
     for (i = 0; i < sys->numPorts; i++)
     {
-        cout << "Reminder to send error if sys->portCoor[i] == 0 because program will fail later" << endl;
+        //cout << "Reminder to send error if sys->portCoor[i] == 0 because program will fail later" << endl;
         myint indMarkNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         myint indMarkNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
         
@@ -2360,14 +2372,7 @@ void fdtdMesh::print()
     {
         cout << "  y array has size " << NELEMENT(this->y) << endl;
     }
-    if (this->x == nullptr)
-    {
-        cout << "  x array exists (" << (this->x != nullptr) << ")" << endl;
-    }
-    else
-    {
-        cout << "  x array has size " << NELEMENT(this->x) << endl;
-    }
+    cout << "  x vector has size " << this->x.size() << endl;
     cout << " Port information:" << endl;
     cout << "  Number of ports: " << this->numPorts << endl;
     if (this->portCoor == nullptr)

@@ -41,4 +41,5 @@
 *.ts
 Thumbs.db
 examples/WEDGE100_REV01.gds
+examples/WEDGE100_REV02.gds
 confidential/

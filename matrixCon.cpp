@@ -507,9 +507,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int startCol;
     startCol = 0;
     sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
-    sys->x = (complex<double>*) calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
+    sys->x = { };
     for (indi = 0; indi < sys->numPorts*sys->numPorts; indi++){
-        sys->x[indi] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
+        sys->x.emplace_back(complex<double>(0., 0.)); // Complex double constructor from real and imaginary
     }
 
 
@@ -564,7 +564,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     lapack_complex_double *J_h;
     double *ferr, *berr;
 
-
+    /* HYPRE solves for each port are messy */
     while (sourcePort < sys->numPorts){
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
@@ -771,7 +771,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             u0c[indi - sys->N_edge_s] = yd2[indi] + yc[indi];
         }
 
-        cout << " Time to generate u0d and u0c is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+        cout << " Time to generate u0d and u0c up to port" << sourcePort + 1 << " is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
         for (int id = 0; id < sys->N_edge; id++){
             yd[id] = yd2[id] - (1i)*(yd1[id]);
@@ -918,23 +918,65 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     }
     MPI_Finalize();
+
+    /* Report the Z-parameters */
     if (sys->nfreq > 1){
         for (int id = 0; id < sys->nfreq; id++){
-            cout << "Single Z-parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
+            double freq; // Initialize specific frequency (Hz)
+            if (id == 0)
+            {
+                // First frequency in sweep
+                freq = sys->freqStart * sys->freqUnit;
+
+                // Report the saved result
+                cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
+                for (indi = 0; indi < sys->numPorts; indi++) {
+                    for (j = 0; j < sys->numPorts; j++) {
+                        Zresult = sys->x[j + indi*sys->numPorts];
+                        cout << "  " << Zresult;
+                    }
+                    cout << endl;
+                }
+                continue;
+            }
+            else if (id == sys->nfreq - 1)
+            {
+                // Last frequency in sweep
+                freq = sys->freqEnd * sys->freqUnit;
+            }
+            else
+            {
+                // All other frequencies in sweep
+                if (sys->freqScale == 1)
+                {
+                    // Linear interpolation of frequency sweep
+                    freq = (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
+                }
+                else
+                {
+                    // Logarithmic interpolation of frequency sweep
+                    freq = sys->freqStart * pow(10, id * log10(sys->freqEnd / sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit; // Should be most numerically stable calculated like this
+                }
+            }
+
+            // Report the results beyond the first and append to storage object
+            cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
-                    Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
-                    cout << Zresult << endl;
+                    Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart * sys->freqUnit / freq;
+                    cout << "  " << Zresult;
+                    sys->x.push_back(Zresult);
                 }
+                cout << endl;
             }
         }
     }
     else{
-        cout << "Z-parameters at frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
+        cout << "Z-parameters at single frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
-                Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
-                cout << Zresult << "  ";
+                Zresult = sys->x[j + indi*sys->numPorts];
+                cout << Zresult << " ";
             }
             cout << endl;
         }
@@ -942,7 +984,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     sys->cindex.clear();
     sys->acu_cnno.clear();
-    //free(sys->x); sys->x = NULL; // Cannot free if result is to be saved
 
     free(sys->AdColId); sys->AdColId = NULL;
     free(sys->Adval); sys->Adval = NULL;
