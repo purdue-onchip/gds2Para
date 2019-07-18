@@ -78,7 +78,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         cols.clear();
         values.clear();
     }
-    cout << endl;
+
     /* Assemble after setting the coefficients */
     HYPRE_IJMatrixAssemble(A);
 

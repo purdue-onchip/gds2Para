@@ -59,7 +59,7 @@ using namespace std;
 #define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
 
 // Debug testing macros (comment out if not necessary)
-#define PRINT_NODE_COORD
+//#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
 //#define PRINT_PORT_SET
@@ -165,6 +165,8 @@ class fdtdMesh {
     /* Mesh information */
 public:
     double lengthUnit;
+    myint outedge;
+    myint inedge;
 
     /* Frequency parameters */
     double freqUnit;
@@ -235,7 +237,7 @@ public:
     vector<int> acu_cnno; // accumulated conductor number of nodes
     vector<int> cindex;
     int *exciteCdtLayer;
-    vector<unordered_set<int>> cond2condIn;
+    unordered_set<int> cond2condIn;    // put the active conductors' corresponding conductorIn #
     int *markProSide;
 
     /* Patch information */

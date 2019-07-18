@@ -306,21 +306,21 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-
+            cout << endl;
             // Set D_eps and D_sig
             clock_t t3 = clock();
             status = matrixConstruction(&sys);
             if (status == 0)
             {
-                cout << "matrixConstruction Success!" << endl;
-                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                //cout << "matrixConstruction Success!" << endl;
+                //cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             }
             else {
                 cerr << "matrixConstruction Fail!" << endl;
                 return status;
             }
             //sys.print();
-
+            cout << endl;
             // Set port
             clock_t t4 = clock();
             status = portSet(&sys, xi, yi, zi);
@@ -335,7 +335,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-
+            cout << endl;
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
@@ -351,7 +351,7 @@ int main(int argc, char** argv)
                 return status;
             }
 #endif
-            cout << "Start to generate parameter!\n";
+            cout << endl;
             // Parameter generation
             clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
@@ -365,6 +365,7 @@ int main(int argc, char** argv)
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
+            cout << endl;
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
 
