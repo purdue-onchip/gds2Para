@@ -20,11 +20,9 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
-<<<<<<< HEAD
-    double disMin = 1e-4; // MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
-=======
+
     double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
->>>>>>> f8e4fb9be6be04ab91b41251f84d1af353be93c4
+
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }

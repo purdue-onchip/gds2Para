@@ -112,10 +112,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //unordered_map<myint, double> Ad1;
     unordered_map<myint, unordered_map<myint, double>> Ad1;
 
-    block1_x = (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
-    block1_y = (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
-    block2_x = (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
-    block2_y = (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
+    block1_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
+    block1_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
+    block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
+    block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
     block3_x = 0;
     block3_y = 0;
 #ifdef PRINT_V0D_BLOCKS
@@ -326,10 +326,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     count = 0;
     free(map);
     map = (myint*)calloc(sys->N_node, sizeof(myint));
-    block1_x = (sys->xlim2 - sys->xlim1) / 3 * sys->lengthUnit;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
-    block1_y = (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
-    block2_x = (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
-    block2_y = (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
+    block1_x = 0;// (sys->xlim2 - sys->xlim1) / 3 * sys->lengthUnit;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
+    block1_y = 0;// (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
+    block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
+    block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
 #ifdef PRINT_V0C_BLOCKS
     cout << "V0c's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
     cout << "V0c's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
