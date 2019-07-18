@@ -277,10 +277,10 @@ public:
         }
         vector<double> newPt = oldPt;
 
-        // Apply any x-direction mirroring
+        // Apply any x-axis mirroring
         if (this->mirrored)
         {
-            newPt[0] = -newPt[0];
+            newPt[1] = -newPt[1];
         }
 
         // Apply any rotation
@@ -300,6 +300,12 @@ public:
 
         // Return the new point
         return newPt;
+    }
+
+    // Print function
+    void print()
+    {
+        cout << "   Linear transformation: mirrored (" << (this->mirrored ? "Y" : "N") << "), magnification of " << this->magnify << "x (" << (this->absMagnify ? "absolute" : "relative") << "), rotation of " << this->rotation << " rad (" << (this->absRotate ? "absolute" : "relative") << ")" << endl;
     }
 
     // Destructor
@@ -1774,6 +1780,7 @@ public:
             char point[128];
             sprintf(point, "(%1.4g, %1.4g) ", (((this->textboxes)[indi]).getTexts())[0], (((this->textboxes)[indi]).getTexts())[1]);
             cout << "    " << point << endl; // Print ordered pair of center
+            (this->textboxes)[indi].getTransform().print();
             //delete[] point; // Free array pointer
         }
         cout << "  List of " << numSRef << " structure references:" << endl;
@@ -1790,6 +1797,7 @@ public:
             char point[128];
             sprintf(point, "(%1.4g, %1.4g)", (((this->sreferences)[indi]).getSRefs())[0], (((this->sreferences)[indi]).getSRefs())[1]);
             cout << "    " << point << endl; // Print ordered pair of center
+            (this->sreferences)[indi].getTransform().print();
             //delete[] point; // Free array pointer
         }
         cout << "  List of " << numARef << " array references:" << endl;
@@ -1808,6 +1816,7 @@ public:
             vector<double> arefCoord = ((this->areferences)[indi]).getARefs();
             sprintf(point, "corner instance: (%1.4g, %1.4g), last columnar: (%1.4g, %1.4g), last row: (%1.4g, %1.4g)", arefCoord[0], arefCoord[1], arefCoord[2], arefCoord[3], arefCoord[4], arefCoord[5]);
             cout << "    " << point << endl; // Print ordered pair of center
+            (this->areferences)[indi].getTransform().print();
             //delete[] point; // Free array pointer
         }
         cout << " ------" << endl;
@@ -2738,7 +2747,6 @@ public:
         // Set conductor information from all elements in this geometric cell
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
-
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
             this->numCdtIn++;
             sys->conductorIn.push_back(fdtdOneCondct());
