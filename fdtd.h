@@ -315,7 +315,7 @@ public:
 
     /* Solution storage */
     complex<double> *y;
-    complex<double> *x;    // the solution involving all the sourcePorts
+    vector<complex<double>> x;    // the solution involving all the sourcePorts
 
     /* Port coordinates */
     int numPorts;
@@ -410,7 +410,6 @@ public:
         SColId = NULL;
         Sval = NULL;
         y = NULL;
-        x = NULL;
         portCoor = NULL;
         J = NULL;
         v0csJ = NULL;

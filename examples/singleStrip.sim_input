@@ -7,7 +7,7 @@ freqUnit = 1.0e+6
 freqStart = 45
 freqEnd = 50000
 nfreq = 50
-freqScale = 0
+freqScale = 1
 
 DIELECTRIC STACK
 numStack = 8
@@ -21,7 +21,7 @@ ILD2      z = +1.140 h = 0.308 e = 4.1 TanD = 0
 3         z = +1.448 h = 1.448 e = 4.1 sigma = 5.e+7 # Top plane
 
 PORT
-numPort = 1
-149.999 0.049 0.405 149.999 0.049 1.448 -1
-#+155. +0.06 +0.12 +155. +0.06 0.00 +1 # Near side on fixture
-#+155. +200.04 +0.12 +155. +200.04 0.00 -1 # Far side left open
+numPort = 2
+#149.999 0.049 0.296 149.999 0.049 0.416 1
++155. +0.06 +0.12 +155. +0.06 0.00 +1 # Near side on fixture
++155. +200.04 +0.12 +155. +200.04 0.00 -1 # Far side left open

@@ -152,9 +152,8 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
         if (myid == 0)
         {
-            cout << endl;
-            cout << "Iterations = " << num_iterations << endl;
-            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << endl << " Iterations = " << num_iterations << endl;
+            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */
@@ -206,9 +205,8 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
         if (myid == 0)
         {
-            cout << endl;
-            cout << "Iterations = " << num_iterations << endl;
-            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << endl << " Iterations = " << num_iterations << endl;
+            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */
@@ -278,9 +276,8 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         if (myid == 0)
         {
-            cout << endl;
-            cout << "Iterations = " << num_iterations << endl;
-            cout << "Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << endl << " Iterations = " << num_iterations << endl;
+            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */

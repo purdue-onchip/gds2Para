@@ -2,7 +2,6 @@
 #include "fdtd.h"
 
 
-
 int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
 {
     int lyr;
@@ -21,7 +20,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
+<<<<<<< HEAD
     double disMin = 1e-4; // MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+=======
+    double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+>>>>>>> f8e4fb9be6be04ab91b41251f84d1af353be93c4
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }
@@ -227,7 +230,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /*************************************************************************************/
 
-
+    /* More discretization math */
     sort(xn, xn + countx + 1);
     xi.clear();
     sys->xn = (double*)calloc(sys->nx, sizeof(double));
@@ -346,10 +349,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     
     /***********************************************************************************************/
 
+    /* Save counts of the final discretization */
     sys->N_cell_x = sys->nx - (myint)1;
     sys->N_cell_y = sys->ny - (myint)1;
     sys->N_cell_z = sys->nz - (myint)1;
-
 
     sys->N_edge_s = sys->N_cell_y*(sys->N_cell_x + 1) + sys->N_cell_x*(sys->N_cell_y + 1);
     sys->N_edge_v = (sys->N_cell_x + 1)*(sys->N_cell_y + 1);
@@ -371,11 +374,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 #ifdef PRINT_DIS_COUNT
     cout << endl;
-    cout << "disMin   = " << disMin << endl;
-    cout << "disMinz  = " << disMinz << endl;
-    cout << "disMaxx  = " << disMaxx << endl;
-    cout << "disMaxy  = " << disMaxy << endl;
-    //cout << "disMaxz  = " << disMaxz << endl;
+    cout << "disMin   = " << disMin << " m" << endl;
+    cout << "disMinz  = " << disMinz << " m" << endl;
+    cout << "disMaxx  = " << disMaxx << " m" << endl;
+    cout << "disMaxy  = " << disMaxy << " m" << endl;
+    //cout << "disMaxz  = " << disMaxz << " m" << endl;
     cout << endl;
     cout << "N_edge   = " << sys->N_edge << endl;
     cout << "N_node   = " << sys->N_node << endl;
@@ -384,7 +387,21 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     cout << "N_cell_z = " << sys->N_cell_z << endl;
     cout << endl;
 #endif
-    
+
+
+    /* Discretization warnings */
+    if (sys->N_cell_x <= 1)
+    {
+        cerr << "Failed to generate mesh with more than one element in the x-direction. Check value of disMin. Aborting now." << endl;
+        return 1;
+    }
+    if (sys->N_cell_y <= 1)
+    {
+        cerr << "Failed to generate mesh with more than one element in the y-direction. Check value of disMin. Aborting now." << endl;
+        return 1;
+    }
+
+
     double xc, yc;
     myint xrange_max;
     unordered_map<myint, myint> xrange;
@@ -905,7 +922,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 //}
 
     
-    
+
     
     //for (i = 0; i < sys->numCdtRow; i++){
     //    //cout << polyIn((0 + 4.9e-7) / 2, -1.7e-7, sys, 2) << endl;
@@ -1823,20 +1840,15 @@ int matrixConstruction(fdtdMesh *sys){
         }
     }*/
     
+
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
     //free(sys->markCell); sys->markCell = NULL;
-    
-    /*ofstream out;
-    out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge; i++){
-        out << sys->sig[i] << endl;
-    }
-    out.close();*/
-    //cout << "sig's generation is done!\n";
+
 
     /*sys->stackEpsn.clear();*/
     
+
     return 0;
 }
 
@@ -2177,7 +2189,9 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             }
         }
     }
+
     //cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+
 
     sys->conductorIn.clear();
     return 0;
@@ -2602,14 +2616,7 @@ void fdtdMesh::print()
     {
         cout << "  y array has size " << NELEMENT(this->y) << endl;
     }
-    if (this->x == nullptr)
-    {
-        cout << "  x array exists (" << (this->x != nullptr) << ")" << endl;
-    }
-    else
-    {
-        cout << "  x array has size " << NELEMENT(this->x) << endl;
-    }
+    cout << "  x vector has size " << this->x.size() << endl;
     cout << " Port information:" << endl;
     cout << "  Number of ports: " << this->numPorts << endl;
     if (this->portCoor == nullptr)

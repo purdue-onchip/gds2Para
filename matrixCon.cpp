@@ -336,10 +336,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 #endif
     t1 = clock();
     status = merge_v0c(sys, block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
+
     //cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl; 
     cout << "Length of V0c is " << leng_v0c << " number of non-zeros in V0c is " << v0cnum << endl;
     cout << "Length of V0ca is " << leng_v0ca << " number of non-zeros in V0ca is " << v0canum << endl;
     cout << "V0c is generated!" << endl;
+
     j = 0;
 
     /*for (i = 0; i < sys->numCdt + 1; i++){
@@ -531,9 +533,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     int startCol;
     startCol = 0;
     sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
-    sys->x = (complex<double>*) calloc(sys->numPorts * sys->numPorts, sizeof(complex<double>));
+    sys->x = { };
     for (indi = 0; indi < sys->numPorts*sys->numPorts; indi++){
-        sys->x[indi] = complex<double>(0., 0.); // Complex double constructor from real and imaginary
+        sys->x.emplace_back(complex<double>(0., 0.)); // Complex double constructor from real and imaginary
     }
 
 
@@ -551,6 +553,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
     cout << endl;
     cout << "Begin to solve for network parameters!\n";
+
     double *ydcp;
     double *y0c, *y0cs;
     double *yc, *yca;
@@ -588,7 +591,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     lapack_complex_double *J_h;
     double *ferr, *berr;
 
-
+    /* HYPRE solves for each port are messy */
     while (sourcePort < sys->numPorts){
         t1 = clock();
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
@@ -617,13 +620,15 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
+
         //cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+
         /* End of solving */
 
 #ifndef SKIP_PARDISO
         t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
-        cout << "Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        cout << " Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
         t1 = clock();
         for (indi = 0; indi < leng_v0d1; indi++){
@@ -736,8 +741,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
+
         free(v0caJ); v0caJ = NULL;
         //cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+
 
         t1 = clock();
 
@@ -770,6 +777,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, dRhs2, leng_v0d1, y0d2);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
+
         free(dRhs2); dRhs2 = NULL;
        // cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
@@ -946,30 +954,72 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     }
     MPI_Finalize();
+
+    /* Report the Z-parameters */
     if (sys->nfreq > 1){
         for (int id = 0; id < sys->nfreq; id++){
-            cout << "Z parameter at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz is " << endl;
+            double freq; // Initialize specific frequency (Hz)
+            if (id == 0)
+            {
+                // First frequency in sweep
+                freq = sys->freqStart * sys->freqUnit;
+
+                // Report the saved result
+                cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
+                for (indi = 0; indi < sys->numPorts; indi++) {
+                    for (j = 0; j < sys->numPorts; j++) {
+                        Zresult = sys->x[j + indi*sys->numPorts];
+                        cout << "  " << Zresult;
+                    }
+                    cout << endl;
+                }
+                continue;
+            }
+            else if (id == sys->nfreq - 1)
+            {
+                // Last frequency in sweep
+                freq = sys->freqEnd * sys->freqUnit;
+            }
+            else
+            {
+                // All other frequencies in sweep
+                if (sys->freqScale == 1)
+                {
+                    // Linear interpolation of frequency sweep
+                    freq = (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
+                }
+                else
+                {
+                    // Logarithmic interpolation of frequency sweep
+                    freq = sys->freqStart * pow(10, id * log10(sys->freqEnd / sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit; // Should be most numerically stable calculated like this
+                }
+            }
+
+            // Report the results beyond the first and append to storage object
+            cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
-                    Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart / (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1));
-                    cout << Zresult << "\n";
+                    Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart * sys->freqUnit / freq;
+                    cout << "  " << Zresult;
+                    sys->x.push_back(Zresult);
                 }
+                cout << endl;
             }
         }
     }
     else{
-        cout << "Z parameter at frequency " << (sys->freqStart) * sys->freqUnit << " Hz is " << endl;
+        cout << "Z-parameters at single frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
-                Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag();
-                cout << Zresult << "\n";
+                Zresult = sys->x[j + indi*sys->numPorts];
+                cout << Zresult << " ";
             }
+            cout << endl;
         }
     }
 
     sys->cindex.clear();
     sys->acu_cnno.clear();
-    //free(sys->x); sys->x = NULL; // Cannot free if result is to be saved
 
     free(sys->AdColId); sys->AdColId = NULL;
     free(sys->Adval); sys->Adval = NULL;
@@ -1091,7 +1141,6 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 }
 #endif
 
-
 //int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys){
 //    // ia, ja, a are CSR form with one-based indexing and it is only upper triangular elements (symmetric)
 //    double mdone = -1;
@@ -1154,7 +1203,7 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //            }
 //            cblas_daxpy(N, mdone, rhs, ione, temp, ione);
 //            euclidean_norm = cblas_dnrm2(N, temp, ione) / cblas_dnrm2(N, rhs, ione);
-//            //cout << euclidean_norm << "\n";
+//            //cout << euclidean_norm << endl;
 //            if (euclidean_norm > 1.e-3)
 //                continue;
 //            else
@@ -1167,8 +1216,8 @@ int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, 
 //    }
 //
 //    dfgmres_get(&N, solution, rhs, &RCI_request, ipar, dpar, tmp, &itercount);
-//    //cout << itercount << "\n";
-//    //cout << euclidean_norm << "\n";
+//    //cout << itercount << endl;
+//    //cout << euclidean_norm << endl;
 //    free(tmp);
 //    free(temp);
 //    free(ipar);
@@ -1590,7 +1639,6 @@ int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vecto
     return 0;
 }
 
-
 int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val){
     int i;
     vector<int> rowId2;
@@ -1766,7 +1814,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
     //            inz = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] / sys->N_node_s;
     //            inx = (sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] - inz * sys->N_node_s) / (sys->N_cell_y + 1);
     //            iny = sys->edgelink[sys->nodeEdge[st.top()][j].first * 2] % (sys->N_cell_y + 1);
-    //            /*cout << "h\n";*/
+    //            /*cout << "h" << endl;*/
     //            if (iny == 0){
     //                rowId.push_back(inz*(sys->N_edge_s + sys->N_edge_v) + inx*(sys->N_cell_y) + iny);
     //                colId.push_back(1);
@@ -2782,7 +2830,6 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
         }
         free(visited); visited = NULL;
     }
-    
     /* V0d2 generation */
     int j;
 
@@ -2881,6 +2928,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
     sys->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
     sys->v0d1val = (double*)malloc(v0d1num * sizeof(double));
     sys->v0d1aval = (double*)malloc(v0d1anum * sizeof(double));
+
     double lx_whole_avg = 0;
     double ly_whole_avg = 0;
     double lz_whole_avg = 0;
