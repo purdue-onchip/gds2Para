@@ -165,6 +165,8 @@ class fdtdMesh {
     /* Mesh information */
 public:
     double lengthUnit;
+    myint outedge;
+    myint inedge;
 
     /* Frequency parameters */
     double freqUnit;
@@ -235,7 +237,7 @@ public:
     vector<int> acu_cnno; // accumulated conductor number of nodes
     vector<int> cindex;
     int *exciteCdtLayer;
-    vector<unordered_set<int>> cond2condIn;
+    unordered_set<int> cond2condIn;    // put the active conductors' corresponding conductorIn #
     int *markProSide;
 
     /* Patch information */

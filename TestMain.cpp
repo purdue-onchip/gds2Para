@@ -306,7 +306,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-
+            cout << endl;
             // Set D_eps and D_sig
             clock_t t3 = clock();
             status = matrixConstruction(&sys);
@@ -320,7 +320,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-
+            cout << endl;
             // Set port
             clock_t t4 = clock();
             status = portSet(&sys, xi, yi, zi);
@@ -335,7 +335,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-
+            cout << endl;
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
@@ -365,7 +365,7 @@ int main(int argc, char** argv)
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-            //sys.print();
+
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
 
