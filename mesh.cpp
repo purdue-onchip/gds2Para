@@ -12,11 +12,9 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int mark;
     double xmin, xmax, ymin, ymax, xwid, ywid;
     clock_t tt = clock();
-    /*cout << " Print the conductor information: " << endl;
-    for (i = 0; i < sys->numCdtRow; i++){
-    cout << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].zmin << " " << sys->conductorIn[i].zmax << endl;
-    }*/
+    
 
+    cout << " Print the conductor information: " << endl;
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
@@ -415,6 +413,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int mark1, mini_k;
     double mini;
     // Fast algorithm to find nodes inside conductors
+    
     for (i = 0; i < sys->numCdtRow; i++){
         xrange.clear();
         xcoor.clear();
@@ -1499,7 +1498,7 @@ for (i = 0; i < sys->N_node; i++) {
         sys->markNode[i] = visited[i];
         
     }
-    
+   
     //cout << "Time to assign markEdge and markNode is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
     tt = clock();
     
@@ -1546,6 +1545,8 @@ for (i = 0; i < sys->N_node; i++) {
     set<int> cond;    // the port conductors
     //cout << "Time to assign conductor parameter is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
     cout << "Number of conductors is " << sys->numCdt << endl;
+    
+    
     tt = clock();
     for (i = 0; i < sys->numPorts; i++){
         indPortNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
