@@ -77,9 +77,9 @@ public:
     // Default constructor
     pslg()
     {
-        this->vertices = {};
-        this->segments = {};
-        this->regions = {};
+        this->vertices = { };
+        this->segments = { };
+        this->regions = { };
     }
 
     // Parametrized constructor
@@ -428,7 +428,7 @@ public:
         polyArea /= 2.0; // Closed polygon area (m^2)
         centroidX /= (6.0 * polyArea); // Polygon centroid x-coordinate (m)
         centroidY /= (6.0 * polyArea); // Polygon centroid y-coordinate (m)
-        return{ centroidX, centroidY };
+        return {centroidX, centroidY};
     }
 
     // Reorder points with lower-right first, going counterclockwise
@@ -760,7 +760,7 @@ public:
         nodeArea /= 2.0; // Closed node area (m^2)
         centroidX /= (6.0 * nodeArea); // Node centroid x-coordinate (m)
         centroidY /= (6.0 * nodeArea); // Node centroid y-coordinate (m)
-        return{ centroidX, centroidY };
+        return { centroidX, centroidY };
     }
 
     // Reorder points with lower-right first, going counterclockwise
@@ -946,7 +946,7 @@ public:
         boxArea /= 2.0; // Closed box area (m^2)
         centroidX /= (6.0 * boxArea); // Box outline centroid x-coordinate (m)
         centroidY /= (6.0 * boxArea); // Box outline centroid y-coordinate (m)
-        return{ centroidX, centroidY };
+        return { centroidX, centroidY };
     }
 
     // Reorder points with lower-right first, going counterclockwise
@@ -1461,11 +1461,11 @@ public:
         {
             double xColSep = ((this->arefs)[2] - (this->arefs[0])) / (numCol - 1.); // x-component of separation between columnar instances
             double yColSep = ((this->arefs)[3] - (this->arefs[1])) / (numCol - 1.); // y-component of separation between columnar instances
-            return{ xColSep, yColSep };
+            return { xColSep, yColSep };
         }
         else // Separation undefined if singleton or nonexistant column
         {
-            return{ 0., 0. };
+            return { 0., 0. };
         }
     }
 
@@ -1477,11 +1477,11 @@ public:
         {
             double xRowSep = ((this->arefs)[4] - (this->arefs[0])) / (numRow - 1.); // x-component of separation between row instances
             double yRowSep = ((this->arefs)[5] - (this->arefs[1])) / (numRow - 1.); // y-component of separation between row instances
-            return{ xRowSep, yRowSep };
+            return { xRowSep, yRowSep };
         }
         else // Separation undefined if singleton or nonexistant row
         {
-            return{ 0., 0. };
+            return { 0., 0. };
         }
     }
 
@@ -2196,7 +2196,7 @@ public:
                 }
                 else if (indNextCell < this->getNumCell()) // Valid, non-via cell name was found ...
                 {
-                    vector<vector<double>> newVias = this->findVias(indNextCell, { instanceCoord[indj][0], instanceCoord[indj][1] }, viaName); // Recursion step
+                    vector<vector<double>> newVias = this->findVias(indNextCell, { instanceCoord[indj][0] , instanceCoord[indj][1] }, viaName); // Recursion step
                     viaList.insert(viaList.end(), newVias.begin(), newVias.end());
                 }
             }
@@ -2232,7 +2232,7 @@ public:
             for (size_t indj = 0; indj < boundCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising boundary except repeated point
             {
                 vector<double> boundPt = transform.applyTranform({ boundCoord[2 * indj], boundCoord[2 * indj + 1] }); // Apply the linear transformation of this cell reference
-                complex<double> zBound(boundPt[0] + xo, boundPt[1] + yo);
+                complex<double> zBound(boundPt[0] + xo, boundPt[ 1] + yo);
                 allPt.push_back(zBound); // Complex number with x- and y-coordinates (m)
             }
         }
@@ -2586,11 +2586,11 @@ public:
         if (candPt.size() < 3)
         {
             cerr << "Not enough points remain to construct a convex hull of PCB outline" << endl;
-            return{};
+            return { };
         }
 
         // Convex hull will start with first three candidate points
-        vector<complex<double>> hullPt = { candPt[0], candPt[1], candPt[2] };
+        vector<complex<double>> hullPt = {candPt[0], candPt[1], candPt[2]};
 
         // Convex hull points change based on orientation angle of remaining candidates
         for (size_t indi = 3; indi < candPt.size(); indi++)
@@ -2653,7 +2653,7 @@ public:
                 outlineCoord.push_back(outlinePt[indi].real()); // x-coordinate of an outline point
                 outlineCoord.push_back(outlinePt[indi].imag()); // y-coordinate of an outline point
             }
-            node outlineNode = node(outlineCoord, 1, {}, 0);
+            node outlineNode = node(outlineCoord, 1, { }, 0);
             outlineNode.reorder();
             vector<double> outlineCentroid = outlineNode.findCentroid(0., 0.);
             size_t indUnusedOutline = 0;
@@ -2948,7 +2948,7 @@ public:
                     sys->conductorIn[si].ymin = sys->conductorIn[si].y[condj];
                 }
                 condj++;
-
+                
             }
         }
         for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference recursively
@@ -3239,9 +3239,9 @@ public:
         // Data Printing
         /*if (true) //(this->getElement() == 'a')
         {
-        cout << "ascii_record_type: " << ascii_record_type << endl
-        << "ascii_data_type: " << ascii_data_type << endl
-        << "data size: " << data.size() << endl;
+            cout << "ascii_record_type: " << ascii_record_type << endl
+            << "ascii_data_type: " << ascii_data_type << endl
+            << "data size: " << data.size() << endl;
         }*/
 
         // Data handling

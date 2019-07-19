@@ -4,10 +4,10 @@ lengthUnit = 1
 
 FREQUENCY
 freqUnit = 1.0e+6
-freqStart = 1000.0
-freqEnd = 1000.0
-nfreq = 1
-freqScale = 0
+freqStart = 0.740
+freqEnd = 74.0
+nfreq = 101
+freqScale = 1
 
 DIELECTRIC STACK
 numStack = 7
@@ -20,11 +20,11 @@ numStack = 7
 7 z = 2.4e-4 h = 4.0e-5 e = 3.9 # Li added PEC
 
 PORT
-numPorts = 16
-1.15e-3 1.04e-4 2.00e-4 1.15e-3 1.04e-4 0.00 0  # d0; pin 1
-1.86e-3 1.04e-4 2.00e-4 1.86e-3 1.04e-4 0.00 0  # d1; pin 2
-2.75e-3 3.90e-4 2.00e-4 2.75e-3 3.90e-4 0.00 0  # d2; pin 3
-2.75e-3 1.05e-3 2.00e-4 2.75e-3 1.05e-3 0.00 0  # d3; pin 4
+numPorts = 7
+#1.15e-3 1.04e-4 2.00e-4 1.15e-3 1.04e-4 0.00 0  # d0; pin 1
+#1.86e-3 1.04e-4 2.00e-4 1.86e-3 1.04e-4 0.00 0  # d1; pin 2
+#2.75e-3 3.90e-4 2.00e-4 2.75e-3 3.90e-4 0.00 0  # d2; pin 3
+#2.75e-3 1.05e-3 2.00e-4 2.75e-3 1.05e-3 0.00 0  # d3; pin 4
 2.75e-3 3.03e-3 2.00e-4 2.75e-3 3.03e-3 0.00 -1 # GND (VSS); pin 5
 2.75e-3 3.47e-3 2.00e-4 2.75e-3 3.47e-3 0.00 +1 # clk1 (clock phase 1); pin 6
 2.32e-3 3.80e-3 2.00e-4 2.32e-3 3.80e-3 0.00 +1 # clk2 (clock phase 2); pin 7
@@ -32,9 +32,9 @@ numPorts = 16
 1.53e-3 3.80e-3 2.00e-4 1.53e-3 3.80e-3 0.00 -1 # sync (sync-out); pin 8
 9.18e-4 3.80e-3 2.00e-4 9.18e-4 3.80e-3 0.00 +1 # reset (clear); pin 9
 4.00e-4 3.80e-3 2.00e-4 4.00e-4 3.80e-3 0.00 +1 # test; pin 10
-1.00e-4 3.30e-3 2.00e-4 1.00e-4 3.30e-3 0.00 -1 # cm_rom (memory control output); pin 11
+#1.00e-4 3.30e-3 2.00e-4 1.00e-4 3.30e-3 0.00 -1 # cm_rom (memory control output); pin 11
 1.00e-4 1.76e-3 2.00e-4 1.00e-4 1.76e-3 0.00 +1 # VDD; pin 12
-1.00e-4 1.24e-3 2.00e-4 1.00e-4 1.24e-3 0.00 -1 # cm_ram3; pin 13
-1.00e-4 8.00e-4 2.00e-4 1.00e-4 8.00e-4 0.00 -1 # cm_ram2; pin 14
-3.00e-4 1.04e-4 2.00e-4 3.00e-4 1.04e-4 0.00 -1 # cm_ram1; pin 15
-8.00e-4 1.04e-4 2.00e-4 8.00e-4 1.04e-4 0.00 -1 # cm_ram0; pin 16
+#1.00e-4 1.24e-3 2.00e-4 1.00e-4 1.24e-3 0.00 -1 # cm_ram3; pin 13
+#1.00e-4 8.00e-4 2.00e-4 1.00e-4 8.00e-4 0.00 -1 # cm_ram2; pin 14
+#3.00e-4 1.04e-4 2.00e-4 3.00e-4 1.04e-4 0.00 -1 # cm_ram1; pin 15
+#8.00e-4 1.04e-4 2.00e-4 8.00e-4 1.04e-4 0.00 -1 # cm_ram0; pin 16
