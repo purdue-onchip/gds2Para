@@ -1,5 +1,5 @@
 /* Generate the stiffness matrix */
-#include "fdtd.h"
+#include "fdtd.hpp"
 using namespace std::complex_literals;
 
 
@@ -595,7 +595,7 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     complex<double> *J;
     J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
     for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
-        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2 * M_PI;
+        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2. * M_PI;
         //J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * M_PI;
         //J[i - sys->N_edge_s].re = 0;
     }
@@ -612,8 +612,8 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
                 // valc[indi] needs omega * (-omega * epsilon  + j * sigma) added to it
-                complex<double> addedPart(-(2 * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
-                valc[indi] += (2 * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
+                complex<double> addedPart(-(2. * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
+                valc[indi] += (2. * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
                 //valc[indi] += -std::complex::pow((2 * M_PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[indi] + sys->N_edge_s] + (1i) * (2 * M_PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[indi] + sys->N_edge_s];
                 //valc[i].re += - pow((2 * M_PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
                 //valc[i].i += (2 * M_PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
@@ -698,7 +698,7 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
 
     free(RowId1); RowId1 = NULL;
     free(valc); valc = NULL;
-
+    return 0;
 }
 
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
@@ -933,6 +933,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     mkl_sparse_destroy(a);
     mkl_sparse_destroy(b);
     mkl_sparse_destroy(A);
+    return 0;
 }
 
 int matrix_multi_cd(char operation, lapack_complex_double *a, myint arow, myint acol, double *b, myint brow, myint bcol, lapack_complex_double *tmp3){    //complex multiply double

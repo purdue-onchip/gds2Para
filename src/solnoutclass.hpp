@@ -24,8 +24,8 @@
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <Eigen/Sparse>
-#include "limboint.h"
-#include "fdtd.h"
+#include "limboint.hpp"
+#include "fdtd.hpp"
 
 // Parasitics representation macros
 //#define EIGEN_SPARSE // Enable to use sparse matrices for parasitics reporting
@@ -880,6 +880,8 @@ class Port
             // Logic for bidirectional pins: match input pins since Z-parameters will be same for those ports
             return (coordEffect ? -1 : +1);
             break;
+        default:
+            return 0;
         }
     }
 
@@ -1142,7 +1144,7 @@ class Parasitics
     }
 
     // Find ports in GDSII textboxes
-    vector<Port> setPortsGDSII(size_t indCell, vector<double> center, strans transform, AsciiDataBase adb)
+    vector<Port> findPortsGDSII(size_t indCell, vector<double> center, strans transform, AsciiDataBase adb)
     {
         // Error checking on input point
         double xo, yo; // Coordinate offsets
@@ -1166,7 +1168,7 @@ class Parasitics
             string srefName = (thisCell.sreferences)[indi].getSRefName();
             size_t indNextCell = adb.locateCell(srefName);
             vector<double> refPt = transform.applyTranform((thisCell.sreferences)[indi].getSRefs()); // Center point of structure reference after linear transformation
-            vector<Port> newPorts = this->setPortsGDSII(indNextCell, { refPt[0] + xo, refPt[1] + yo }, (thisCell.sreferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
+            vector<Port> newPorts = this->findPortsGDSII(indNextCell, { refPt[0] + xo, refPt[1] + yo }, (thisCell.sreferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
             portList.insert(portList.end(), newPorts.begin(), newPorts.end());
         }
         for (size_t indi = 0; indi < thisCell.getNumARef(); indi++) // Follow array references
@@ -1177,7 +1179,7 @@ class Parasitics
             for (size_t indj = 0; indj < instanceCoord.size(); indj++) // Handle each instance in array reference
             {
                 vector<double> centPt = transform.applyTranform(instanceCoord[indj]); // Center point of referred instance after linear transformation
-                vector<Port> newPorts = this->setPortsGDSII(indNextCell, { centPt[0] + xo, centPt[1] + yo }, (thisCell.areferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
+                vector<Port> newPorts = this->findPortsGDSII(indNextCell, { centPt[0] + xo, centPt[1] + yo }, (thisCell.areferences)[indi].getTransform().composeTransform(transform), adb); // Recursion step
                 portList.insert(portList.end(), newPorts.begin(), newPorts.end());
             }
         }
@@ -1190,8 +1192,8 @@ class Parasitics
             portList.emplace_back(Port(thisTextBox.getTextStr(), 'B', 50.0, thisTextBox.getTexts(), thisTextBox.getLayer()));
         }
 
-        // Set vector of port information
-        this->ports = portList;
+        // Return vector of port information
+        return portList;
     }
 
     // Return node-to-ground conductance (S)

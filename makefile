@@ -1,18 +1,22 @@
-# Custom makefile for LimboInterface
+# Custom makefile for gds2Para LayoutAnalyzer
 # Directories and Names
 LIB_PREFIX = gds
+BOOST_ROOT_DIR = ${BOOST_DIR}
 LIMBO_ROOT_DIR = ${LIMBO_DIR}
-PARSER_SPEF_ROOT_DIR = $(realpath ../Parser-SPEF/)
-EIGEN_ROOT_DIR = $(realpath ../eigen-git-mirror/)
+LIMBO_LIB_DIR = ${LIMBO_DIR}/lib
+PARSER_SPEF_ROOT_DIR = ${PARSER_SPEF_DIR}
+EIGEN_ROOT_DIR = ${EIGEN_DIR}
 MKL_ROOT_DIR = ${MKL_DIR}
+HYPRE_LIB_DIR = ${HYPRE_DIR}/src/hypre/lib
+HYPRE_HEAD_DIR = ${HYPRE_DIR}/src/hypre/include
+SRCDIR = $(realpath ./)/src
 OBJDIR = $(realpath ./)/obj
-LIBDIR = $(LIMBO_ROOT_DIR)/lib
 MKDIR = if [ ! -d $(@D) ]; then mkdir -p $(@D); fi
-HYPRE_DIR = $(realpath ../hypre/src/hypre)
 
-# Compilation Flags
+# Compilation Flags (serial MKL and debug options)
+MKLFLAGS =-Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group -lm -pthread -ldl
 DBG =0 # Off by default
-#include $(LIMBO_ROOT_DIR)/Include.mk # Include environ config
+#include $(LIMBO_LIB_DIR)/../Include.mk # Include environ config
 
 ifeq ($(DBG), 1)
 	CXXFLAGS =$(CXXFLAGS_DEBUG) -DDEBUG_GDSREADER -DDEBUG_GDSWRITER
@@ -26,70 +30,57 @@ ifdef BOOST_DIR # Boost library support
 endif
 endif
 
-MKLFLAGS =-Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group -lm -pthread -ldl
-
-
-
 # Special Libraries to Include
-INCLUDE =-I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include -I $(HYPRE_DIR)/include
-LIB =-L $(LIBDIR) -l$(LIB_PREFIX)parser -L $(HYPRE_DIR)/lib -lHYPRE -lm
+INCLUDE =-I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(HYPRE_HEAD_DIR) -I $(MKL_ROOT_DIR)/include
+LIB =-L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -L $(HYPRE_LIB_DIR) -lHYPRE -lm
 
 ifdef false #ZLIB_DIR
 ifdef BOOST_DIR
-	INCLUDE += -I $(BOOST_DIR)/include $(ZLIB_INCLUDE_FLAG)
-	LIB += -L $(BOOST_DIR)/lib -lboost_iostreams \
+	INCLUDE += -I $(BOOST_DIR) $(ZLIB_INCLUDE_FLAG)
+	LIB += -L $(BOOST_DIR)/../libs -lboost_iostreams \
 		   $(ZLIB_LINK_FLAG) -lz
 endif
 endif
 
 # Standard make Settings and Recipes
-SRCS = $(wildcard *.cpp)
-OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
+SRCS = $(wildcard $(SRCDIR)/*.cpp)
+OBJS = $(SRCS:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 DEPS = $(OBJS:%.o=%.d) # Dependency file for each source
 
 all: LayoutAnalyzer
 
-$(OBJDIR)/%.d: %.cpp
+LayoutAnalyzer: $(OBJS)
+	mpicxx $(CXXFLAGS) -o $@ $(OBJS) $(LIB) $(INCLUDE) $(MKLFLAGS) $(LFLAGS)
+
+$(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboint.hpp $(SRCDIR)/solnoutclass.hpp
 	@$(MKDIR)
-	$(CXX) $(CXXFLAGS) $< -MM -MT $(@:%.d=%.o) >$@ $(INCLUDE)
--include %(DEPS)
+	mpicxx -std=c++17 -g -lstdc++fs -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
 
-%(OBJDIR)/%.o: %.cpp
+$(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDE)
+	mpicxx -g -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o -I $(MKL_ROOT_DIR)/include
 
-LimboInterface: $(OBJS) $(LIBDIR)/lib$(LIB_PREFIX)parser.a
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LIB) -l$(LIB_PREFIX)parser $(INCLUDE)
+$(OBJDIR)/matrixCon.o: $(SRCDIR)/matrixCon.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
+	@$(MKDIR)
+	mpicxx -g -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
-LayoutAnalyzer: TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o findVh.o
-	mpicxx $(CXXFLAGS) -o $@ TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o findVh.o $(LIB) $(INCLUDE) $(MKLFLAGS) $(LFLAGS)
+$(OBJDIR)/hypreSolve.o: $(SRCDIR)/hypreSolve.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
+	@$(MKDIR)
+	mpicxx -g -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
-explicit: TestMain.o mesh.o matrixCon.o
-	g++ -std=c++17 -g -lstdc++fs -o Test_$@ TestMain.o mesh.o matrixCon.o hypreSolve.o generateStiff.o -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I$(MKL_ROOT_DIR)/include -Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group  -lm -pthread -ldl -L $(HYPRE_DIR)/lib
+$(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
+	@$(MKDIR)
+	mpicxx -g -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o -I $(MKL_ROOT_DIR)/include
 
-TestMain.o: TestMain.cpp fdtd.h limboint.h solnoutclass.h #$(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/GdsReader.h $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/GdsWriter.h $(PARSER_SPEF_ROOT_DIR)/parser-spef/parser-spef.hpp $(EIGEN_ROOT_DIR)/Eigen/Sparse
-	g++ -std=c++17 -g -lstdc++fs -c TestMain.cpp -L $(LIBDIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(LIMBO_ROOT_DIR)/limbo/parsers/gdsii/stream/ -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
-	
-mesh.o: mesh.cpp fdtd.h
-	g++ -c -g mesh.cpp -I $(MKL_ROOT_DIR)/include
-
-matrixCon.o: matrixCon.cpp fdtd.h hypreSolverh.h
-	mpicxx -c -g matrixCon.cpp -I $(MKL_ROOT_DIR)/include -I $(HYPRE_DIR)/include -L $(HYPRE_DIR)/lib -lHYPRE -lm $(LFLAGS)
-
-hypreSolve.o: hypreSolve.cpp fdtd.h hypreSolverh.h
-	mpicxx -c -g hypreSolve.cpp -I $(MKL_ROOT_DIR)/include -I $(HYPRE_DIR)/include -L $(HYPRE_DIR)/lib -lHYPRE -lm $(LFLAGS)
-
-generateStiff.o: generateStiff.cpp fdtd.h
-	g++ -c -g generateStiff.cpp -I $(MKL_ROOT_DIR)/include
-
-findVh.o: findVh.cpp fdtd.h
-	g++ -c -g findVh.cpp -I $(MKL_ROOT_DIR)/include
+$(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
+	@$(MKDIR)
+	mpicxx -g -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o -I $(MKL_ROOT_DIR)/include
 
 
 .PHONY: clean
 clean: cleandep
-	rm -f LimboInterface core
+	rm -f LayoutAnalyzer
 
 .PHONY: cleandep
 cleandep:
-	rm -f $(DEPS)
+	rm -f $(OBJS)

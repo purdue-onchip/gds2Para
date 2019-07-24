@@ -39,6 +39,8 @@
 *.spef
 *.citi
 *.ts
+*.lis
+*.st[0-9]*
 Thumbs.db
 examples/WEDGE100_REV01.gds
 examples/WEDGE100_REV02.gds
