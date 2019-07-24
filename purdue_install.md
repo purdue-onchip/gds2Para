@@ -17,7 +17,7 @@ Please direct all questions, bug reports, and issues relating to installing or r
     * Boost C++ Libraries (Boost version 1.66.0 or newer): `locate "filtering_stream.hpp"`
     * CMake (CMake version 3.7.0 or newer): `which cmake` and `cmake --version`
     * git: `which git`
-<!--    * Intel Math Kernel Library (MKL): `locate "mklvars.sh"`
+    <!--* Intel Math Kernel Library (MKL): `locate "mklvars.sh"`
     * Lemon: `which lemon`
     * OpenMPI (OpenMPI version 4.0.1 or newer): `which mpicc`, `which mpicxx` -->
     * Zlib (Zlib version 3.13 or newer): `locate "zlib.h"`
