@@ -1,5 +1,5 @@
 //#include "stdafx.h"
-#include "fdtd.h"
+#include "fdtd.hpp"
 
 
 int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)

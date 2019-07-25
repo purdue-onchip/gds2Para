@@ -1,4 +1,4 @@
-#include "fdtd.h"
+#include "fdtd.hpp"
 
 static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b)
 {

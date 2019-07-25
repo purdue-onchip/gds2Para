@@ -1,7 +1,7 @@
 //#include "stdafx.h"
 #include <ctime>
-#include "fdtd.h"
-#include "hypreSolverh.h"
+#include "fdtd.hpp"
+#include "hypreSolver.h"
 
 
 static bool comp(pair<double, int> a, pair<double, int> b)
@@ -133,8 +133,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     myint node1, node2;
 
     t1 = clock();
-    cout << "Length of V0d1 is " << leng_v0d1 << " number of non-zeros in V0d1 is " << v0d1num << endl;
-    cout << "Length of V0d1a is " << leng_v0d1a << " number of non-zeros in V0d1a is " << v0d1anum << endl;
+    cout << "Length of V0d1 is " << leng_v0d1 << ", and number of non-zeros in V0d1 is " << v0d1num << endl;
+    cout << "Length of V0d1a is " << leng_v0d1a << ", and number of non-zeros in V0d1a is " << v0d1anum << endl;
     cout << "V0d is generated!" << endl;
 
     for (indi = 0; indi < v0d1anum; indi++){    // the upper and lower planes are PEC
@@ -551,8 +551,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double alpha = 1, beta = 0;
     char matdescra[6];
     matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << endl;
-    cout << "Begin to solve for network parameters!\n";
+    cout << endl << "Begin to solve for network parameters!" << endl;
 
     double *ydcp;
     double *y0c, *y0cs;
@@ -805,6 +804,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //    u0a[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2a[indi] + yca[indi]) / nna;    // u0ca
         //}
 
+        cout << " Time to generate u0d and u0c up to port" << sourcePort + 1 << " is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
         for (int id = 0; id < sys->N_edge; id++){
             yd[id] = yd2[id] - (1i)*(yd1[id]);
