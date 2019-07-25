@@ -597,9 +597,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
             sys->J[sys->portEdge[sourcePort][indi]] = sys->portCoor[sourcePort].portDirection;
-            //cout << sys->portEdge[sourcePort][indi] << " " << sys->portCoor[sourcePort].portDirection;
         }
-        //cout << endl;
 
 
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
@@ -613,6 +611,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < leng_v0d1; indi++){
             v0daJ[indi] = -v0daJ[indi];
         }
+        cout << "The non-zero entry in v0da'J is " << count_non << endl;
         //cout << "Time before the first HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
         /* solve V0d system */
 
@@ -667,9 +666,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sys->J, beta, v0caJ);
+        count_non = 0;
         for (indi = 0; indi < leng_v0c; indi++){
             v0caJ[indi] = -v0caJ[indi];
         }
+
         crhs = (double*)calloc(leng_v0c, sizeof(double));
         for (indi = 0; indi < sys->N_edge; indi++){
             yd1[indi] = ydt[indi];
@@ -817,7 +818,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             yd[indi] = yd[indi].real() + yc[indi] + (1i) * yd[indi].imag();
         }
         free(yc); yc = NULL;
-        
+
         for (indi = 0; indi < sys->numPorts; indi++){
             
             for (j = 0; j < sys->portEdge[indi].size(); j++){
@@ -839,7 +840,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 2]), 2);
                 leng = sqrt(leng);*/
                 sys->x[indi + sys->numPorts*xcol] = (sys->x[indi + sys->numPorts*xcol].real() + yd[sys->portEdge[indi][j]].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))) + (1i)*(yd[sys->portEdge[indi][j]].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + sys->x[indi + sys->numPorts*xcol].imag());
-
+                
             }
         }
         //cout << "Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
@@ -935,7 +936,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //free(yca); yca = NULL;
         //free(yd2a); yd2a = NULL;
         free(yd); yd = NULL;
-        free(ydcp); ydcp = NULL;
         
         
 
@@ -957,6 +957,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     /* Report the Z-parameters */
     if (sys->nfreq > 1){
+        
         for (int id = 0; id < sys->nfreq; id++){
             double freq; // Initialize specific frequency (Hz)
             if (id == 0)
@@ -991,12 +992,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 else
                 {
                     // Logarithmic interpolation of frequency sweep
-                    freq = sys->freqStart * pow(10, id * log10(sys->freqEnd / sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit; // Should be most numerically stable calculated like this
+                    freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (id * 1.0 / (sys->nfreq - 1))); // Should be most numerically stable calculated like this
+                    cout << "Log freq interp: " << freq << " Hz" << endl;
                 }
             }
 
             // Report the results beyond the first and append to storage object
-            cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
+            cout << "Z-parameters at frequency " << freq << " Hz:" << endl;
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
                     Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart * sys->freqUnit / freq;
@@ -1013,6 +1015,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             for (j = 0; j < sys->numPorts; j++){
                 Zresult = sys->x[j + indi*sys->numPorts];
                 cout << Zresult << " ";
+                //cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " ";
             }
             cout << endl;
         }
@@ -1047,7 +1050,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     free(sys->AcRowId); sys->AcRowId = NULL;
     free(sys->AcColId); sys->AcColId = NULL;
     free(sys->Acval); sys->Acval = NULL;
+    free(sys->xn); sys->xn = NULL;
+    free(sys->yn); sys->yn = NULL;
+    free(sys->zn); sys->zn = NULL;
     sys->stackEpsn.clear();
+    sys->portEdge.clear();
 
     mkl_sparse_destroy(V0dt);
     mkl_sparse_destroy(V0dat);
