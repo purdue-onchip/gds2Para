@@ -610,7 +610,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < leng_v0d1; indi++){
             v0daJ[indi] = -v0daJ[indi];
         }
-        cout << "The non-zero entry in v0da'J is " << count_non << endl;
+        // cout << "The non-zero entry in v0da'J is " << count << endl; // Line modified because count_non not defined yet in function
         //cout << "Time before the first HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
         /* solve V0d system */
 
@@ -665,7 +665,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sys->J, beta, v0caJ);
-        count_non = 0;
+        // myint count_non = 0; // This is not used later in the function but was used for printing earlier
         for (indi = 0; indi < leng_v0c; indi++){
             v0caJ[indi] = -v0caJ[indi];
         }
