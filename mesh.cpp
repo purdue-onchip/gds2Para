@@ -19,7 +19,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
 
-    double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = 1e-9;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
 
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
@@ -1551,7 +1551,7 @@ for (i = 0; i < sys->N_node; i++) {
     for (i = 0; i < sys->numPorts; i++){
         indPortNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         indPortNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
-        
+        cout << "Port 1 conductor is " << indPortNode1 << " and Port 2 conductor is " << indPortNode2 << endl;
         if (cond.find(indPortNode1) == cond.end()){
             cond.insert(indPortNode1);
             for (j = 0; j < sys->cdtNumNode[indPortNode1 - 1]; j++){
