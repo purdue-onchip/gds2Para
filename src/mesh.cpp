@@ -12,13 +12,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int mark;
     double xmin, xmax, ymin, ymax, xwid, ywid;
     clock_t tt = clock();
-    
-    cout << " Print the conductor information: " << endl;
+
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
 
-    double disMin = 1e-8;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
 
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
@@ -365,21 +364,24 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->markNode = (int*)calloc(sys->N_node, sizeof(int));   // mark which conductor index a given node is inside
     //cout << "N_node = " << sys->N_node << ", sizeof(myint) = " << sizeof(myint) << ", their product is " << sys->N_node * sizeof(myint) << ", and sys->markNode has size " << sizeof(sys->markNode) << "/" << sizeof(sys->markNode[0]) << endl;
 
-    //cout << "The time to read and assign x, y, z coordinates is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "The time to read and assign x, y, z coordinates is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
 
 #ifdef PRINT_DIS_COUNT
     cout << endl;
-    cout << "disMin   = " << disMin << " m" << endl;
-    cout << "disMinz  = " << disMinz << " m" << endl;
-    cout << "disMaxx  = " << disMaxx << " m" << endl;
-    cout << "disMaxy  = " << disMaxy << " m" << endl;
-    //cout << "disMaxz  = " << disMaxz << " m" << endl;
+    cout << "Discretization information: " << endl;
+    cout << " disMin   = " << disMin << " m" << endl;
+    cout << " disMinz  = " << disMinz << " m" << endl;
+    cout << " disMaxx  = " << disMaxx << " m" << endl;
+    cout << " disMaxy  = " << disMaxy << " m" << endl;
+    //cout << " disMaxz  = " << disMaxz << " m" << endl;
     cout << endl;
-    cout << "N_edge   = " << sys->N_edge << endl;
-    cout << "N_node   = " << sys->N_node << endl;
-    cout << "N_cell_x = " << sys->N_cell_x << endl;
-    cout << "N_cell_y = " << sys->N_cell_y << endl;
-    cout << "N_cell_z = " << sys->N_cell_z << endl;
+    cout << " N_edge   = " << sys->N_edge << endl;
+    cout << " N_node   = " << sys->N_node << endl;
+    cout << " N_cell_x = " << sys->N_cell_x << endl;
+    cout << " N_cell_y = " << sys->N_cell_y << endl;
+    cout << " N_cell_z = " << sys->N_cell_z << endl;
     cout << endl;
 #endif
 
@@ -759,10 +761,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
         
     }
-    //cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
-    
 
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
 
+    // Assign markers to nodes and edges beyond included conductors
     for (i = 0; i < sys->N_edge_s; i++){    // the lower PEC plane
         sys->markEdge[i] = sys->numCdtRow + 1;
     }
@@ -1087,10 +1091,12 @@ for (i = 0; i < sys->N_node; i++) {
         }
     }
 }
-//cout << "Time to find conductors is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
 
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to find conductors is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+    cout << "Number of conductors is " << count << endl;
+#endif
 
-    //cout << "Number of conductors is " << count << endl;
     /*for (i = 0; i < sys->N_node; i++){
     if (visited[i] != 0){
     for (j = 0; j < sys->nodeEdge[i].size(); j++){
@@ -1102,16 +1108,16 @@ for (i = 0; i < sys->N_node; i++) {
     }*/
 
     tt = clock();
-    
-
     for (i = 0; i < sys->N_node; i++){
         sys->markNode[i] = visited[i];
         
     }
-   
-    //cout << "Time to assign markEdge and markNode is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
+
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to assign markEdge and markNode is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
+
     tt = clock();
-    
 
     /* Construct each isolated conductor */
     sys->numCdt = count;
@@ -1153,10 +1159,11 @@ for (i = 0; i < sys->N_node; i++) {
     
     myint indPortNode1, indPortNode2;
     set<int> cond;    // the port conductors
-    //cout << "Time to assign conductor parameter is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to assign conductor parameter is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
     cout << "Number of conductors is " << sys->numCdt << endl;
-    
-    
+
     tt = clock();
     for (i = 0; i < sys->numPorts; i++){
         indPortNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
@@ -1257,10 +1264,11 @@ for (i = 0; i < sys->N_node; i++) {
         }
     }
     cond.clear();
-    cout << "cond2condIn is set sucessfully!\n" << endl;
-    //cout << sys->cond2condIn.size() << endl;
-    //cout << "Time to construct sys->cond2condIn is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
-    
+    cout << "cond2condIn is set sucessfully!" << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to construct sys->cond2condIn (size " <<  sys->cond2condIn.size() << ") is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
+
     sys->outedge = 0;
     sys->inedge = 0;
     tt = clock();
@@ -1279,9 +1287,13 @@ for (i = 0; i < sys->N_node; i++) {
             sys->outedge++;
         }
     }
-    //cout << "Time to assign markEdge is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
-    //cout << "The number of inside conductor edge is " << sys->inedge << endl;
-    //cout << "The number of outside conductor edge is " << sys->outedge << endl;
+
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to assign markEdge is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+    cout << "The number of inside conductor edge is " << sys->inedge << endl;
+    cout << "The number of outside conductor edge is " << sys->outedge << endl;
+#endif
+
     free(visited);
     visited = NULL;
 
@@ -1799,8 +1811,9 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
         }
     }
 
-    //cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
 
     sys->conductorIn.clear();
     return 0;

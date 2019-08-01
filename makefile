@@ -58,15 +58,15 @@ $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboi
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o -I $(MKL_ROOT_DIR)/include
+	mpicxx -g -O1 -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o -I $(MKL_ROOT_DIR)/include
 
 $(OBJDIR)/matrixCon.o: $(SRCDIR)/matrixCon.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -O1 -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
 $(OBJDIR)/hypreSolve.o: $(SRCDIR)/hypreSolve.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -O1 -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
 $(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)

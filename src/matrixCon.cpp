@@ -129,7 +129,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     clock_t t1 = clock();
     clock_t ts = t1;
     status = merge_v0d1(sys, block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
-    //cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
     myint node1, node2;
 
     t1 = clock();
@@ -235,10 +237,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     if (status != 0)
         return status;*/
     free(sys->v0d1aval); sys->v0d1aval = NULL;
-    
 
-
-    
     //cout << "Number of NNZ in V0d1 is " << v0d1num << endl;
 
     sparse_status_t s;
@@ -251,15 +250,15 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sparse_matrix_t V0dat;
     s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, leng_v0d1, sys->N_edge, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
 
-    
-
     ///******************************************************************/
     ///* use MKL to do matrix multiplication */
     ///* Note that the result for each row, the col # is not in the increased order */
     /*leng_Ad = 0;
     clock_t t2 = clock();
-    status = mklMatrixMulti(sys, leng_Ad, sys->v0d1aRowId, sys->v0d1aColId, sys->v0d1aval, sys->N_edge, leng_v0d1, sys->v0d1RowId, sys->v0d1ColId, sys->v0d1val, 1);
-    cout << "Matrix mutiplication time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;*/
+    status = mklMatrixMulti(sys, leng_Ad, sys->v0d1aRowId, sys->v0d1aColId, sys->v0d1aval, sys->N_edge, leng_v0d1, sys->v0d1RowId, sys->v0d1ColId, sys->v0d1val, 1);*/
+#ifdef PRINT_VERBOSE_TIMING
+    //cout << "Matrix mutiplication time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
 
     ///*****************************************************************/
     sys->AdRowId = (myint*)calloc(leng_Ad, sizeof(myint));
@@ -290,9 +289,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         v.clear();
     }
     Ad1.clear();
-    //cout << "Time to generate Ad is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to generate Ad is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+    cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
+#endif
 
-    //cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
     int *argc;
     char ***argv;
     /*  trial of first set HYPRE matrix Ad */
@@ -337,7 +338,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     t1 = clock();
     status = merge_v0c(sys, block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
 
-    //cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl; 
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
     cout << "Length of V0c is " << leng_v0c << " number of non-zeros in V0c is " << v0cnum << endl;
     cout << "Length of V0ca is " << leng_v0ca << " number of non-zeros in V0ca is " << v0canum << endl;
     cout << "V0c is generated!" << endl;
@@ -435,11 +438,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         v.clear();
     }
     sys->cindex.push_back(j - 1);
-    //cout << "Time to generate Ac is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    //cout << "Number of non-zeros in Ac is " << leng_Ac << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time to generate Ac is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+    cout << "Number of non-zeros in Ac is " << leng_Ac << endl;
+#endif
     Ac.clear();
     free(sys->markNode); sys->markNode = NULL;
-    
+
     for (indi = 0; indi < sys->numCdt; indi++){
         free(sys->conductor[indi].node); sys->conductor[indi].node = NULL;
     }
@@ -610,17 +615,19 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < leng_v0d1; indi++){
             v0daJ[indi] = -v0daJ[indi];
         }
-        // cout << "The non-zero entry in v0da'J is " << count << endl; // Line modified because count_non not defined yet in function
-        //cout << "Time before the first HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+        //cout << "The non-zero entry in v0da'J is " << count << endl; // Line modified because count_non not defined yet in function
+        cout << " Time before the first HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
         /* solve V0d system */
 
         t1 = clock();
         
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
-
-        //cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-
+#ifdef PRINT_VERBOSE_TIMING
+        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
         /* End of solving */
 
 #ifndef SKIP_PARDISO
@@ -695,7 +702,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(crhs); crhs = NULL;
 
 
-        //cout << "Time between the first and the second HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        //cout << "Time between the first and the second HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
         /*solve c system block by block*/
         t1 = clock();
         for (indi = 1; indi <= 1; indi++){
@@ -743,8 +750,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
 
         free(v0caJ); v0caJ = NULL;
-        //cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-
+#ifdef PRINT_VERBOSE_TIMING
+        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
 
         t1 = clock();
 
@@ -771,7 +779,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, yccp, beta, dRhs2);
-        //cout << "Time between the second and the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+        cout << " Time between the second and the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
         free(yccp); yccp = NULL;
 
         t1 = clock();
@@ -779,8 +789,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
 
         free(dRhs2); dRhs2 = NULL;
-       // cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-
+#ifdef PRINT_VERBOSE_TIMING
+        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
         t1 = clock();
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
         //yd2a = (double*)calloc(sys->N_edge, sizeof(double));
@@ -843,7 +854,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 
             }
         }
-        //cout << "Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+        cout << " Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
+
         /* calculate the Vh part */
 #ifndef SKIP_VH
         status = find_Vh(sys, u0, u0a, sourcePort);
@@ -917,11 +931,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
          [comment out above to save matrix solve time ^^^^^^]
 
-        /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        outfile << final_x[i].real << " " << final_x[i].imag << endl;
-        }
-        outfile.close();*/
 #endif
 
         /*free(tmp); tmp = NULL;
@@ -955,7 +964,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
     MPI_Finalize();
 
-    /* Report the Z-parameters */
+    /* Report the Z-parameters and Prepare to Export Them */
     if (sys->nfreq > 1){
         
         for (int id = 0; id < sys->nfreq; id++){
@@ -966,13 +975,19 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 freq = sys->freqStart * sys->freqUnit;
 
                 // Report the saved result
+#ifdef PRINT_Z_PARAM
                 cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
+#endif
                 for (indi = 0; indi < sys->numPorts; indi++) {
                     for (j = 0; j < sys->numPorts; j++) {
                         Zresult = sys->x[j + indi*sys->numPorts];
+#ifdef PRINT_Z_PARAM
                         cout << "  " << Zresult;
+#endif
                     }
+#ifdef PRINT_Z_PARAM
                     cout << endl;
+#endif
                 }
                 continue;
             }
@@ -993,31 +1008,43 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 {
                     // Logarithmic interpolation of frequency sweep
                     freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (id * 1.0 / (sys->nfreq - 1))); // Should be most numerically stable calculated like this
-                    cout << "Log freq interp: " << freq << " Hz" << endl;
+                    //cout << "Log freq interp: " << freq << " Hz" << endl;
                 }
             }
 
             // Report the results beyond the first and append to storage object
+#ifdef PRINT_Z_PARAM
             cout << "Z-parameters at frequency " << freq << " Hz:" << endl;
+#endif
             for (indi = 0; indi < sys->numPorts; indi++){
                 for (j = 0; j < sys->numPorts; j++){
                     Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart * sys->freqUnit / freq;
+#ifdef PRINT_Z_PARAM
                     cout << "  " << Zresult;
+#endif
                     sys->x.push_back(Zresult);
                 }
+#ifdef PRINT_Z_PARAM
                 cout << endl;
+#endif
             }
         }
     }
     else{
+#ifdef PRINT_Z_PARAM
         cout << "Z-parameters at single frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
+#endif
         for (indi = 0; indi < sys->numPorts; indi++){
             for (j = 0; j < sys->numPorts; j++){
                 Zresult = sys->x[j + indi*sys->numPorts];
+#ifdef PRINT_Z_PARAM
                 cout << Zresult << " ";
-                //cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " ";
+#endif
+                //cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " "; // Alternative for copying and pasting into MATLAB
             }
+#ifdef PRINT_Z_PARAM
             cout << endl;
+#endif
         }
     }
 
@@ -2192,42 +2219,41 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
 }
 
 #ifndef SKIP_PARDISO
-//int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1){
-//    
-//    clock_t t1 = clock();
-//    /* A\b1 */
-//    double *d = &(sys->Adval[0]);
-//    int *id = &(sys->AdRowId1[0]);
-//    int *jd = &(sys->AdColId[0]);
-//    
-//    void *ptd[64];
-//    int mtyped;
-//    int iparmd[64];
-//    double dparmd[64];
-//    int maxfctd, mnumd, phased, errord, solverd;
-//    int num_processd;   //number of processors
-//    int v0csin;
-//    int permd;
-//    int nrhs = 1;
-//    int msglvld = 0;    //print statistical information
-//
-//    mtyped = 11;    // real and not symmetric
-//    solverd = 0;
-//    errord = 0;
-//    maxfctd = 1;    //maximum number of numerical factorizations
-//    mnumd = 1;    //which factorization to use
-//    phased = 13;    //analysis
-//
-//    pardisoinit(ptd, &mtyped, iparmd);
-//    nrhs = 1;
-//    iparmd[38] = 1;
-//    iparmd[34] = 1;    //0-based indexing
-//    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
-//    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-//
-//    return 0;
-//
-//}
+int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1){
+
+    clock_t t1 = clock();
+    /* A\b1 */
+    double *d = &(sys->Adval[0]);
+    int *id = &(sys->AdRowId1[0]);
+    int *jd = &(sys->AdColId[0]);
+
+    void *ptd[64];
+    int mtyped;
+    int iparmd[64];
+    double dparmd[64];
+    int maxfctd, mnumd, phased, errord, solverd;
+    int num_processd;   //number of processors
+    int v0csin;
+    int permd;
+    int nrhs = 1;
+    int msglvld = 0;    //print statistical information
+
+    mtyped = 11;    // real and not symmetric
+    solverd = 0;
+    errord = 0;
+    maxfctd = 1;    //maximum number of numerical factorizations
+    mnumd = 1;    //which factorization to use
+    phased = 13;    //analysis
+
+    pardisoinit(ptd, &mtyped, iparmd);
+    nrhs = 1;
+    iparmd[38] = 1;
+    iparmd[34] = 1;    //0-based indexing
+    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
+    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+
+    return 0;
+}
 #endif
 
 int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){

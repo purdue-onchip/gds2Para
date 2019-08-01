@@ -143,7 +143,8 @@ Please follow these instructions for a general deployment on Linux machines. The
 18. Run `make` in shell to compile executable **LayoutAnalyzer**
 19. Run `LayoutAnalyzer --help` to get a list of the available control modes which the executable supports
 20. Run `LayoutAnalyser -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file
-21. Perform a complete parameter extraction by running `LayoutAnalyzer -s examples/SDFFRS_X2.gds examples/SDFFRS_X2.sim_input examples/SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a Xyce (SPICE-compatible) subcircuit
+21. Perform a complete parameter extraction by running `mpirun LayoutAnalyzer -s examples/SDFFRS_X2.gds examples/SDFFRS_X2.sim_input examples/SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a Xyce (SPICE-compatible) subcircuit
+    * It is necessary to use `mpirun` to guarantee memory integrity in the parallelized portions of the software.
 
 ## HYPRE Setup
 1. Clone the [HYPRE repository](https://github.com/hypre-space/hypre) into your working location with `git clone https://github.com/hypre-space/hypre.git`

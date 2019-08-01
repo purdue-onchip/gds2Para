@@ -846,7 +846,9 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
     free(yh3); yh3 = NULL;
     free(xr); xr = NULL;
     free(rsc); rsc = NULL;
-    cout << "Time for 10 steps our proposed time marching is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+#ifdef PRINT_VERBOSE_TIMING
+    cout << "Time for 10 steps our proposed time marching is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#endif
     /*ofstream out;
     out.open("y1.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint ind = 0; ind < nt; ind++){

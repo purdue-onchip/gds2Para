@@ -59,11 +59,13 @@ using namespace std;
 #define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
 
 // Debug testing macros (comment out if not necessary)
-#define PRINT_NODE_COORD
+//#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
+//#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
+//#define PRINT_Z_PARAM // Terminal output with raw Z-parameters from solver
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
 #define SKIP_STIFF_REFERENCE 
