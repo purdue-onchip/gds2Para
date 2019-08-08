@@ -3272,6 +3272,17 @@ public:
             // Store library name
             this->libName = label;
         }
+        else if (ascii_record_type == "FORMAT")
+        {
+            //if (data[0] == 0)
+            //{
+            //    cout << "Reading an archived GDSII file" << endl;
+            //}
+            //else if (data[0] == 1)
+            //{
+            //    cout << "Reading a filtered GDSII file" << endl; // Only has subset of mask layers (needs MASK records)
+            //}
+        }
         else if (ascii_record_type == "UNITS")
         {
             this->dbUserUnits = data[0];
