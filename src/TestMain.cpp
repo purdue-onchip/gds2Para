@@ -15,11 +15,9 @@
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
-#include "limboint.h"
-#include "solnoutclass.h"
+#include "limboint.hpp"
+#include "solnoutclass.hpp"
 
-// Debug testing macros (comment out if not necessary)
-#define SKIP_GENERATE_STIFF
 
 // Manipulate namespace
 using std::cerr;

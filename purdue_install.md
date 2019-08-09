@@ -6,7 +6,23 @@ Please direct all questions, bug reports, and issues relating to installing or r
 * [Michael Hayashi](mailto:mhayashi@purdue.edu?subject=Inquiry%20for%20gds2Para), Graduate Research Assistant, School of ECE, Purdue University
 
 ## Installation and Usage
-1. Clone this respository into your working location with `git clone git@github.com:purdue-onchip/gds2Para.git`
+1. Ensure that the following programs are installed on the machine by seeing if there is an output to each of the following commands in these categories:
+    * Selected package manager development tools
+        * GNU Autoconf: `which autoconf`
+        * GNU Automake: `which automake`
+        * GNU Bison: `which bison`
+        * Flex: `which flex`
+        * GNU Compiler Collection (GCC version 7 or newer): `which gcc`, `which g++`, and `which gfortran`
+        * GNU Make: `which make`
+    * Boost C++ Libraries (Boost version 1.66.0 or newer): `locate "filtering_stream.hpp"`
+    * CMake (CMake version 3.7.0 or newer): `which cmake` and `cmake --version`
+    * git: `which git`
+    <!--* Intel Math Kernel Library (MKL): `locate "mklvars.sh"`
+    * Lemon: `which lemon`
+    * OpenMPI (OpenMPI version 4.0.1 or newer): `which mpicc`, `which mpicxx` -->
+    * Zlib (Zlib version 3.13 or newer): `locate "zlib.h"`
+    * If any of these programs are not installed, then it is recommended that someone with root access install whatever is missing using the package manager (most programs) or by building from source (GCC, Boost, and OpenMPI).
+2. Clone this respository into your working location with `git clone git@github.com:purdue-onchip/gds2Para.git`
     * If cloning fails, the usual reason is that a secure connection to the server could not be made. It is important to clone to be able to use `git` to receive updates. These steps will help get yourself going using `git`:
         1. Check if you have any public keys such as **id_rsa.pub** by running `ls -lh .ssh` in your home directory
         2. If no public keys appear, then generate one by running `ssh-keygen -t rsa -C <Purdue email>` in your home directory, where \<Purdue email> is your Purdue email address ending in "@purdue.edu"
@@ -21,26 +37,25 @@ Please direct all questions, bug reports, and issues relating to installing or r
         1. Move the zip archive to the working location
         2. Unzip the archive with `unzip gds2Para-master.zip`
         3. Rename the recently created directory from "gds2Para-master" to "gds2Para"
-2. Clone the [Limbo repository](https://github.com/limbo018/Limbo) into your working location with `git clone https://github.com/limbo018/Limbo.git`
+3. Clone the [Limbo repository](https://github.com/limbo018/Limbo) into your working location with `git clone https://github.com/limbo018/Limbo.git`
     * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the Limbo repository followed by "Download ZIP"
         1. Move the zip archive to the working location
         2. Unzip the archive with `unzip Limbo-master.zip`
         3. Rename the recently created directory from "Limbo-master" to "Limbo"
-3. Clone the [Parser-SPEF repository](https://github.com/OpenTimer/Parser-SPEF) into your working location with `git clone https://github.com/OpenTimer/Parser-SPEF.git`
+4. Clone the [Parser-SPEF repository](https://github.com/OpenTimer/Parser-SPEF) into your working location with `git clone https://github.com/OpenTimer/Parser-SPEF.git`
     * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the Parser-SPEF repository followed by "Download ZIP"
         1. Move the zip archive to the working location
         2. Unzip the archive with `unzip Parser-SPEF-master.zip`
         3. Rename the recently created directory from "Parser-SPEF-master" to "Parser-SPEF"
-4. Clone the [eigen-git-mirror repository](https://github.com/eigenteam/eigen-git-mirror) into your working location with `git clone https://github.com/eigenteam/eigen-git-mirror.git`
+5. Clone the [eigen-git-mirror repository](https://github.com/eigenteam/eigen-git-mirror) into your working location with `git clone https://github.com/eigenteam/eigen-git-mirror.git`
     * If cloning fails, try to download the files by clicking the green "Clone or download" button on the Code tab of the eigen-git-mirror repository followed by "Download ZIP"
         1. Move the zip archive to the working location
         2. Unzip the archive with `unzip eigen-git-mirror-master.zip`
         3. Rename the recently created directory from "eigen-git-mirror-master" to "eigen-git-mirror"
-5. Ensure that you are the owner of the files that were downloaded with full read/write/execute permissions
+6. Ensure that you are the owner of the files that were downloaded with full read/write/execute permissions
     * Change ownership with `chown -R <username>:<username> <directory>`, where \<username> is your Purdue username and \<directory> is each of "gds2Para/", "Limbo/", "Parser-SPEF/", or "eigen-git-mirror/"
     * Change permissions with `chmod -R 744 <directory>`, where \<directory> is each of "gds2Para/", "Limbo/", "Parser-SPEF/", or "eigen-git-mirror/"
-6. Ensure that GNU bison is installed on the machine by seeing if there is an output to the terminal with `which bison`
-7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory> for a valid path when it appears
+7. Modify run commands files depending on the shell indicated by `echo $SHELL`, substituting \<absolute path to Limbo directory>, \<absolute path to Parser-SPEF directory>, \<absolute path to Eigen directory>, \<absolute path to future HYPRE directory> for valid paths when they appears
     * For "bash", edit the file ".bashrc" in your home directory by appending the following:
     ```bash
     # Skip rest of file if not interactive
@@ -51,7 +66,7 @@ Please direct all questions, bug reports, and issues relating to installing or r
     # Improve Compilers
     alias cc="gcc"
     export CC=/opt/gcc/7.1.0/bin/gcc
-    export CXX=/opt/gcc/7.1.0/bin/gcc
+    export CXX=/opt/gcc/7.1.0/bin/g++
     export FC=/opt/gcc/7.1.0/bin/gfortran
     export PATH=/opt/gcc/7.1.0/bin:$PATH
     export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
@@ -59,9 +74,19 @@ Please direct all questions, bug reports, and issues relating to installing or r
     # Improve OpenMPI Version
     export PATH=/opt/mpich2-gcc/1.4.1p1/bin:${PATH}
     export LD_LIBRARY_PATH=/opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
-    export OMPI_CC=/opt/gcc/7.1.0/bin/gcc
-    export OMPI_CXX=/opt/gcc/7.1.0/bin/gcc
-    export OMPI_FC=/opt/gcc/7.1.0/bin/gfortran
+    export OMPI_CC=$CC
+    export OMPI_CXX=$CXX
+    export OMPI_FC=$FC
+
+    # Improve Intel MKL Version
+    export INTEL_MATH_LIB=/opt/intel/current/lib/intel64_lin
+    export MKL_DIR=/opt/intel/current/mkl
+    export MKLROOT=$MKL_DIR
+    export LD_LIBRARY_PATH=$INTEL_MATH_LIB:$MKL_DIR/lib/intel64_lin:$LD_LIBRARY_PATH
+
+    # Improve LAPACK / BLAS Version
+    export LAPACK_DIR=/opt/lapack/3.8.0
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LAPACK_DIR/lib64
 
     # Improve git Version
     export PATH=/opt/git/2.18.0/bin:$PATH
@@ -69,9 +94,10 @@ Please direct all questions, bug reports, and issues relating to installing or r
 
     # Environment Variables for GDSII File Handling
     export BOOST_DIR="/opt/boost/1.57.0"
-    export FLEX_DIR="/usr/bin/flex"
     export LIMBO_DIR="<absolute path to Limbo directory>"
-    export MKL_DIR="/opt/intel/current/mkl"
+    export PARSER_SPEF_DIR="<absolute path to Parser-SPEF directory>"
+    export EIGEN_DIR="<absolute path to Eigen directory>"
+    export HYPRE_DIR="<absolute path to future HYPRE directory>"
     ```
     * For "tcsh", edit the file ".cshrc" in your home directory by appending the following:
     ```tcsh
@@ -83,7 +109,7 @@ Please direct all questions, bug reports, and issues relating to installing or r
     # Improve gcc Version
     alias cc 'gcc'
     setenv CC /opt/gcc/7.1.0/bin/gcc
-    setenv CXX /opt/gcc/7.1.0/bin/gcc
+    setenv CXX /opt/gcc/7.1.0/bin/g++
     setenv FC /opt/gcc/7.1.0/bin/gfortran
     setenv PATH /opt/gcc/7.1.0/bin:${PATH}
     setenv LD_LIBRARY_PATH /opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:${LD_LIBRARY_PATH}
@@ -91,9 +117,19 @@ Please direct all questions, bug reports, and issues relating to installing or r
     # Improve OpenMPI Version
     setenv PATH /opt/mpich2-gcc/1.4.1p1/bin:${PATH}
     setenv LD_LIBRARY_PATH /opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
-    setenv OMPI_CC /opt/gcc/7.1.0/bin/gcc
-    setenv OMPI_CXX /opt/gcc/7.1.0/bin/gcc
-    setenv OMPI_FC /opt/gcc/7.1.0/bin/gfortran
+    setenv OMPI_CC ${CC}
+    setenv OMPI_CXX ${CXX}
+    setenv OMPI_FC ${FC}
+
+    # Improve Intel MKL Version
+    setenv INTEL_MATH_LIB /opt/intel/current/lib/intel64_lin
+    setenv MKL_DIR /opt/intel/current/mkl
+    setenv MKLROOT ${MKL_DIR}
+    setenv LD_LIBRARY_PATH ${INTEL_MATH_LIB}:${MKL_DIR}/lib/intel64_lin:${LD_LIBRARY_PATH}
+
+    # Improve LAPACK / BLAS Version
+    setenv LAPACK_DIR /opt/lapack/3.8.0
+    setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:${LAPACK_DIR}/lib64
 
     # Improve git Version
     setenv PATH /opt/git/2.18.0/bin:${PATH}
@@ -101,32 +137,38 @@ Please direct all questions, bug reports, and issues relating to installing or r
 
     # Environment Variables for GDSII File Handling
     setenv BOOST_DIR /opt/boost/1.57.0
-    setenv FLEX_DIR /usr/bin/flex
     setenv LIMBO_DIR <absolute path to Limbo directory>
-    setenv MKL_DIR /opt/intel/current/mkl
+    setenv PARSER_SPEF_DIR <absolute path to Parser-SPEF directory>
+    setenv EIGEN_DIR <absolute path to Eigen directory>
+    setenv HYPRE_DIR <absolute path to future HYPRE directory>
     ```
 8. Exit the shell and terminate the connection before logging back in
 9. Ensure that the run command files were properly loaded by running `echo $LIMBO_DIR`
     * If nothing shows up for "bash" users, run `cp .bashrc .bash_profile` in the home directory, exit the shell, log back in, and try again
     * If nothing shows up for "tcsh" users, run `cp .cshrc .tcshrc` in the home directory, exit the shell, log back in, and try again
     * For all other errors, contact the primary maintainer
-10. Enter the directory "Limbo/limbo/parsers/gdsii/stream" from the working location
-11. Run `make` in this directory to build Limbo libraries
-12. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
-13. Follow the instructions in [HYPRE Setup](#HYPRE-Setup) to prepare multigrid methods from HYPRE
+10. Enter the directory "Limbo" from the working location
+11. Run `git checkout 3.3.0` to revert to an earlier version of the repository
+    * The partial installation of Limbo components needed to run gds2Para is feasible only before CMake was introduced as the way to build the entirety of Limbo
+    * Only the necessary parsers will be built from Limbo using these instructions, and users wanting to use other Limbo features should follow the installation instructions given in that repository
+    * (Optional) It is believed that the necessary components and most other components of Limbo can be built using `make` in the top directory of Limbo following these instructions, but this has not been tested
+12. Enter the directory "limbo/parsers/gdsii/stream" from the previous location
+13. Run `make -j 2` in this directory to build certain Limbo libraries
+14. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
+15. Follow the instructions in [HYPRE Setup](#HYPRE-Setup) to prepare multigrid methods from HYPRE
     * It is necessary to make all changes to ".bashrc" and ".cshrc" in the home directory before following these instructions
     * Continue following the remaining steps once HYPRE is installed
-14. Enter the directory "gds2Para" from the working location
-15. (Optional) Add GDSII files besides "nand2.gds", "SDFFRS_X2.gds", and "4004.gds" to the directory "examples/" within the working location
+16. Enter the directory "gds2Para" from the working location
+17. (Optional) Add GDSII files besides "nand2.gds", "SDFFRS_X2.gds", and "4004.gds" to the directory "examples/" within the working location
     * Some usage modes of this software may also require a simulation input file in a similar format to "nand2.sim_input", "SDFFRS_X2.sim_input", and "4004.sim_input" (the file name before the suffix must match that of the GDSII file before ".gds")
     * Files created from the software will be added directly to the present working directory, which is "gds2Para" for this point in these instructions
-16. Run `make` in shell to compile executable **LayoutAnalyzer**
-17. Run `LayoutAnalyzer --help` to get a list of the available control modes which the executable supports
-18. Run `LayoutAnalyser -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
-19. Perform a complete parameter extraction by running `LayoutAnalyzer -s examples/SDFFRS_X2.gds examples/SDFFRS_X2.sim_input examples/SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a SPICE subcircuit
+18. Run `make` in shell to compile executable **LayoutAnalyzer**
+19. Run `LayoutAnalyzer --help` to get a list of the available control modes which the executable supports
+20. Run `LayoutAnalyser -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
+21. Perform a complete parameter extraction by running `LayoutAnalyzer -s examples/SDFFRS_X2.gds examples/SDFFRS_X2.sim_input examples/SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a Xyce (SPICE-compatible) subcircuit
 
 ## HYPRE Setup
-1. Clone the [HYPRE repository](https://github.com/LLNL/hypre) into your working location with `git clone git@github.com:LLNL/hypre.git`
+1. Clone the [HYPRE repository](https://github.com/hypre-space/hypre) into your working location with `git clone https://github.com/hypre-space/hypre.git`
     * This requires the setup of an SSH key for a secure connection
     * Setup will follow the instructions at "hyper/INSTALL" using information known to affect Purdue ECN users
 2. Enter the directory "hypre/src/cmbuild" from the working location
@@ -138,5 +180,5 @@ Please direct all questions, bug reports, and issues relating to installing or r
     * Check ".bashrc" or ".cshrc" in your home directory to see if the environment variables for the compilers are properly set
     * For all other issues, contact the primary maintainer
 5. Run `cmake ..` to produce a makefile
-6. Run `make install` from within the same location ("hypre/src/cmbuild" in the working location) to install header files
+6. Run `make install -j 2` from within the same location ("hypre/src/cmbuild" in the working location) to install header files
 7. Return to working directory and ensure that a new library file named **HYPRE.h** exists by running `ls -lh hypre/src/hypre/include`

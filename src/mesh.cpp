@@ -1,5 +1,5 @@
 //#include "stdafx.h"
-#include "fdtd.h"
+#include "fdtd.hpp"
 
 
 int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
@@ -10,49 +10,122 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int status;
     int count;
     int mark;
-    double xmin, xmax, ymin, ymax, xwid, ywid;
+    double xmin, xmax, ymin, ymax, zmin, zmax, xwid, ywid;
     clock_t tt = clock();
     
-
     cout << " Print the conductor information: " << endl;
     /* Generate the mesh nodes based on conductorIn information */
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
 
-    double disMin = 1e-9;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = 1e-8;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
 
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }
-    //cout << numNode << endl;
-    xOrigOld = (double*)calloc(numNode + 2 * sys->numPorts, sizeof(double));
-    yOrigOld = (double*)calloc(numNode + 2 * sys->numPorts, sizeof(double));
-    zOrigOld = (double*)calloc(2 * sys->numStack + 2 * sys->numPorts, sizeof(double));
+
+    int n_surx = 1, n_sury = 0, n_surz = 1;    // The surrounding discretized points around the conductors
+    double dis_surx = 5e-6, dis_sury = 1e-5, dis_surz = 1e-6;
+    xOrigOld = (double*)calloc((n_surx * 2 + 1) * (numNode + 2 * sys->numPorts), sizeof(double));
+    yOrigOld = (double*)calloc((n_sury * 2 + 1) * (numNode + 2 * sys->numPorts), sizeof(double));
+    zOrigOld = (double*)calloc((n_surz * 2 + 1) * (2 * sys->numStack + 2 * sys->numPorts), sizeof(double));
     double minLayerDist = sys->zlim2 - sys->zlim1;// Initialize smallest distance between layers as entire domain height (units included)
+    xmin = sys->xlim1 * sys->lengthUnit;
+    xmax = sys->xlim2 * sys->lengthUnit;
+    ymin = sys->ylim1 * sys->lengthUnit;
+    ymax = sys->ylim2 * sys->lengthUnit;
 
     j = 0;
+    int jtx = 0, jty = 0;
     for (i = 0; i < sys->numCdtRow; i++) {
         for (k = 0; k < sys->conductorIn[i].numVert; k++) {
-            xOrigOld[j] = sys->conductorIn[i].x[k];
-            yOrigOld[j] = sys->conductorIn[i].y[k];
-            j++;
+            xOrigOld[jtx] = sys->conductorIn[i].x[k];
+            yOrigOld[jty] = sys->conductorIn[i].y[k];
+            jtx++;
+            jty++;
+            
+            //if (sys->conductorIn[i].x[k] != xmin && sys->conductorIn[i].x[k] != xmax){
+                for (int inde = n_surx; inde > 0; inde--){
+                    if (sys->conductorIn[i].x[k] - inde * dis_surx > xmin){
+                        xOrigOld[jtx] = sys->conductorIn[i].x[k] - inde * dis_surx;
+                        jtx++;
+                    }
+                }
+                for (int inde = 0; inde < n_surx; inde++){
+                    if (sys->conductorIn[i].x[k] + (inde + 1) * dis_surx < xmax){
+                        xOrigOld[jtx] = sys->conductorIn[i].x[k] + (inde + 1) * dis_surx;
+                        jtx++;
+                    }
+                }
+            //}
+            
+            if (sys->conductorIn[i].y[k] != ymin && sys->conductorIn[i].y[k] != ymax){
+                for (int inde = n_sury; inde > 0; inde--){
+                    if (sys->conductorIn[i].y[k] - inde * dis_sury > ymin){
+                        yOrigOld[jty] = sys->conductorIn[i].y[k] - inde * dis_sury;
+                        jty++;
+                    }
+                }
+                for (int inde = 0; inde < n_sury; inde++){
+                    if (sys->conductorIn[i].y[k] + (inde + 1) * dis_sury < ymax){
+                        yOrigOld[jty] = sys->conductorIn[i].y[k] + (inde + 1) * dis_sury;
+                        jty++;
+                    }
+                }
+            }
+            
         }
     }
-
     for (i = 0; i < sys->numPorts; i++) {
-        xOrigOld[j] = sys->portCoor[i].x1;
-        yOrigOld[j] = sys->portCoor[i].y1;
-        j++;
-        xOrigOld[j] = sys->portCoor[i].x2;
-        yOrigOld[j] = sys->portCoor[i].y2;
-        j++;
+        xOrigOld[jtx] = sys->portCoor[i].x1;
+        yOrigOld[jty] = sys->portCoor[i].y1;
+        jtx++;
+        jty++;
+        xOrigOld[jtx] = sys->portCoor[i].x2;
+        yOrigOld[jty] = sys->portCoor[i].y2;
+        jtx++;
+        jty++;
     }
+    int count_xOrigOld = jtx;
+    int count_yOrigOld = jty;
+    
+
     j = 0;
+    zmin = sys->stackBegCoor[0];
+    zmax = sys->stackEndCoor[sys->numStack - 1];
     for (i = 0; i < sys->numStack; i++) {
         zOrigOld[j] = sys->stackBegCoor[i];
         j++;
+        if (sys->stackBegCoor[i] != zmin){
+            for (int inde = n_surz; inde > 0; inde--){
+                if (sys->stackBegCoor[i] - inde * dis_surz > zmin){
+                    zOrigOld[j] = sys->stackBegCoor[i] - inde * dis_surz;
+                    j++;
+                }
+            }
+            for (int inde = 0; inde < n_surz; inde++){
+                if (sys->stackBegCoor[i] + (inde + 1) * dis_surz < zmax){
+                    zOrigOld[j] = sys->stackBegCoor[i] + (inde + 1) * dis_surz;
+                    j++;
+                }
+            }
+        }
         zOrigOld[j] = sys->stackEndCoor[i];
         j++;
+        if (sys->stackEndCoor[i] != zmax){
+            for (int inde = n_surz; inde > 0; inde--){
+                if (sys->stackEndCoor[i] - inde * dis_surz > zmin){
+                    zOrigOld[j] = sys->stackEndCoor[i] - inde * dis_surz;
+                    j++;
+                }
+            }
+            for (int inde = 0; inde < n_surz; inde++){
+                if (sys->stackEndCoor[i] + (inde + 1) * dis_surz < zmax){
+                    zOrigOld[j] = sys->stackEndCoor[i] + (inde + 1) * dis_surz;
+                    j++;
+                }
+            }
+        }
         if (sys->stackEndCoor[i] - sys->stackBegCoor[i] > 0)
             minLayerDist = fmin(minLayerDist, sys->stackEndCoor[i] - sys->stackBegCoor[i]); // Update smallest distance between layers as each layer processed (units included)
     }
@@ -62,27 +135,33 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         zOrigOld[j] = sys->portCoor[i].z2;
         j++;
     }
-    
+    int count_zOrigOld = j;
     /*******************************************************************************************/
     /* Discretize domain in the x-direction */
-    sort(xOrigOld, xOrigOld + numNode + 2 * sys->numPorts);
+    
+    sort(xOrigOld, xOrigOld + count_xOrigOld);
+    
     sys->nx = 1;
-    xmin = xOrigOld[0];
-    xmax = xOrigOld[numNode + 2 * sys->numPorts - 1];
-    double disMaxx = MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
+    double disMaxx = 0.0002;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     int xMaxInd = (xmax - xmin) / disMaxx;
 
-    for (i = 1; i < numNode + 2 * sys->numPorts; i++){
+    if (dis_surx < disMin){
+        dis_surx = disMin;
+    }
+
+    for (i = 1; i < count_xOrigOld; i++){
         if (abs(xOrigOld[i] - xOrigOld[i - 1]) > disMin){
             sys->nx++;
         }
     }
-    double *xn = (double*)calloc(numNode + 6 * sys->numPorts + xMaxInd, sizeof(double));
+    double *xn = (double*)calloc((2 * n_surx + 1) * (numNode + 6 * sys->numPorts) + xMaxInd, sizeof(double));
     xn[0] = xOrigOld[0];
     double temp = xn[0];
     j = 0;
     sys->nx = 1;
-    for (i = 1; i < numNode + 2 * sys->numPorts; i++){
+
+    
+    for (i = 1; i < count_xOrigOld; i++){
         if (abs(xOrigOld[i] - temp) > disMin && abs(xOrigOld[i] - temp) <= disMaxx){
             j++;
             xn[j] = xOrigOld[i];
@@ -110,7 +189,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     int countx = j;
     //sort(xn, xn + countx + 1);
-
     //sys->xnu = (double*)calloc(sys->nx, sizeof(double));
 
     j = 0;
@@ -134,26 +212,25 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /***************************************************************************/
     /* Discretize domain in the y-direction */
-    sort(yOrigOld, yOrigOld + numNode + 2 * sys->numPorts);
+    sort(yOrigOld, yOrigOld + count_yOrigOld);
     sys->ny = 1;
-    ymin = yOrigOld[0];
-    ymax = yOrigOld[numNode + 2 * sys->numPorts - 1];
-    double disMaxy = MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
+    double disMaxy = 0.00005;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     int yMaxInd = (ymax - ymin) / disMaxy;
 
-    for (i = 1; i < numNode + 2 * sys->numPorts; i++){
+    for (i = 1; i < count_yOrigOld; i++){
         if (abs(yOrigOld[i] - yOrigOld[i - 1]) > disMin){
             sys->ny++;
         }
     }
 
-    double *yn = (double*)calloc(numNode + 6 * sys->numPorts + yMaxInd, sizeof(double));
+    double *yn = (double*)calloc((2 * n_sury + 1) * (numNode + 6 * sys->numPorts) + yMaxInd, sizeof(double));
     yn[0] = yOrigOld[0];
     j = 0;
     sys->ny = 1;
-
     temp = yn[0];
-    for (i = 1; i < numNode + 2 * sys->numPorts; i++){
+
+
+    for (i = 1; i < count_yOrigOld; i++){
         if (abs(yOrigOld[i] - temp) > disMin && abs(yOrigOld[i] - temp) <= disMaxy){
             j++;
             yn[j] = yOrigOld[i];
@@ -167,6 +244,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 temp = yn[j];
                 sys->ny++;
             }
+            // make the mesh around conductor boundary finer
             if (abs(yOrigOld[i] - temp) > disMin){
                 sys->ny++;
                 temp = yOrigOld[i];
@@ -179,6 +257,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             yn[j] = yOrigOld[i];
         }
     }
+
+	
 
     int county = j;
     //sort(yn, yn + county + 1);
@@ -207,21 +287,21 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /********************************************************************************/
     /* Discretize domain in the z-direction */
-    sort(zOrigOld, zOrigOld + 2 * sys->numStack + 2 * sys->numPorts);
+    sort(zOrigOld, zOrigOld + count_zOrigOld);
     sys->nz = 1;
-    double disMinz = minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
+    double disMinz = 1e-7;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
     //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
-    double *zn = (double*)calloc(2 * sys->numStack + 6 * sys->numPorts, sizeof(double));
+    double *zn = (double*)calloc(count_zOrigOld, sizeof(double));
     zn[0] = zOrigOld[0];
     j = 0;
-    for (i = 1; i < 2 * sys->numStack + 2 * sys->numPorts; i++){
+    for (i = 1; i < count_zOrigOld; i++){
         if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMinz){
             sys->nz++;
         }
         j++;
         zn[j] = zOrigOld[i];
     }
-    int countz = 2 * sys->numStack + 2 * sys->numPorts - 1;
+    int countz = j;
 
 
     /*************************************************************************************/
@@ -247,6 +327,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     sys->nx = j + 1;
     free(xn); xn = NULL;
+	
 
     sort(yn, yn + county + 1);
     yi.clear();
@@ -269,6 +350,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     sys->ny = j + 1;
     free(yn); yn = NULL;
+	
 
     sort(zn, zn + countz + 1);
     zi.clear();
@@ -317,6 +399,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             }
         }
     }
+
+
     
     free(xOrigOld); xOrigOld = NULL;
     free(yOrigOld); yOrigOld = NULL;
@@ -762,223 +846,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     //cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
     
-//Original way to find nodes inside polygons, which only applies to the condition that the boundary is along x and y axis.
-//for (i = 0; i < sys->numCdtRow; i++){
-//    xrange.clear();
-//    xcoor.clear();
-//    xcoorv.clear();
-//    xcoory.clear();
-//    mark1 = 0;
-//    //cout << "Number of CdtRow is " << i << endl;
-//    for (j = 0; j < sys->conductorIn[i].numVert; j++){
-//        xcoor.insert(xi[sys->conductorIn[i].x[j]]);
-//    }
-//
-//    for (auto xcoori : xcoor){
-//        xcoorv.push_back(xcoori);
-//    }
-//
-//
-//    for (j = 0; j < xcoorv.size() - 1; j++){
-//        mark1 = 1;    // the x coordinates are more than 1
-//        xrange[xcoorv[j]] = xcoorv[j + 1];
-//
-//    }
-//    if (xcoorv.size() == 1){    // If it has only one value
-//        xrange[xcoorv[0]] = xcoorv[0];
-//    }
-//
-//
-//    for (j = 0; j < sys->conductorIn[i].numVert - 1; j++){
-//        if (sys->conductorIn[i].y[j] == sys->conductorIn[i].y[j + 1]){
-//            if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[j + 1]){
-//                ss = xi[sys->conductorIn[i].x[j]];
-//                ee = xi[sys->conductorIn[i].x[j + 1]];
-//                if (ss == ee && mark1 == 1){
-//                    continue;
-//                }
-//                while (xrange[ss] <= ee){
-//                    xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-//                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
-//                        break;
-//                    }
-//                    ss = xrange[ss];
-//                }
-//            }
-//            else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[j + 1]){
-//                ss = xi[sys->conductorIn[i].x[j + 1]];
-//                ee = xi[sys->conductorIn[i].x[j]];
-//                if (ss == ee && mark1 == 1){
-//                    continue;
-//                }
-//                while (xrange[ss] <= ee){
-//                    xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-//                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
-//                        break;
-//                    }
-//                    ss = xrange[ss];
-//                }
-//            }
-//        }
-//    }
-//    if (sys->conductorIn[i].y[j] == sys->conductorIn[i].y[0]){
-//        if (sys->conductorIn[i].x[j] < sys->conductorIn[i].x[0]){
-//            ss = xi[sys->conductorIn[i].x[j]];
-//            ee = xi[sys->conductorIn[i].x[0]];
-//            if (ss == ee && mark1 == 1){
-//                continue;
-//            }
-//            while (xrange[ss] <= ee){
-//                xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-//                if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
-//                    break;
-//                }
-//                ss = xrange[ss];
-//            }
-//        }
-//        else if (sys->conductorIn[i].x[j] > sys->conductorIn[i].x[0]){
-//            ss = xi[sys->conductorIn[i].x[0]];
-//            ee = xi[sys->conductorIn[i].x[j]];
-//            if (ss == ee && mark1 == 1){
-//                continue;
-//            }
-//            while (xrange[ss] <= ee){
-//                xcoory[ss].insert(yi[sys->conductorIn[i].y[j]]);
-//                if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0){
-//                    break;
-//                }
-//                ss = xrange[ss];
-//            }
-//        }
-//    }
-//    /*for (auto xcooryi : xcoory){
-//    cout << xcooryi.first << " : ";
-//    for (auto xcooryii : xcooryi.second){
-//    cout << xcooryii << " ";
-//    }
-//    cout << endl;
-//    }*/
-//    for (auto xcooryi : xcoory){
-//        mark = 0;
-//        for (j = xcooryi.first; j < xrange[xcooryi.first]; j++){
-//            mark = 0;
-//            for (auto xrangey : xcooryi.second){
-//                mark++;
-//                if (mark % 2 == 1){
-//                    y1 = xrangey;
-//                    continue;
-//                }
-//                else if (mark % 2 == 0){
-//                    y2 = xrangey;
-//
-//                    for (l = zi[sys->conductorIn[i].zmin]; l <= zi[sys->conductorIn[i].zmax]; l++){
-//                        for (k = y1; k < y2; k++){
-//                            sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
-//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] = i + 1;
-//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
-//                            if (l != zi[sys->conductorIn[i].zmax]){
-//                                sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
-//                            }
-//                        }
-//                        sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
-//                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + j * (sys->N_cell_y + 1) + k] = i + 1;
-//                        if (l != zi[sys->conductorIn[i].zmax]){
-//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
-//                        }
-//                    }
-//
-//                }
-//            }
-//        }
-//        mark = 0;
-//        for (auto xrangey : xcooryi.second){
-//            mark++;
-//            if (mark % 2 == 1){
-//                y1 = xrangey;
-//                continue;
-//            }
-//            else if (mark % 2 == 0){
-//                y2 = xrangey;
-//                for (l = zi[sys->conductorIn[i].zmin]; l <= zi[sys->conductorIn[i].zmax]; l++){
-//                    for (k = y1; k < y2; k++){
-//                        sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
-//                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + j * (sys->N_cell_y) + k] = i + 1;
-//                        if (l != zi[sys->conductorIn[i].zmax]){
-//                            sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
-//                        }
-//                    }
-//                    sys->markNode[l * sys->N_node_s + j * (sys->N_cell_y + 1) + k] = 1;
-//                    if (l != zi[sys->conductorIn[i].zmax]){
-//                        sys->markEdge[l * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j * (sys->N_cell_y + 1) + k] = i + 1;
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//}
 
-    
-
-    
-    //for (i = 0; i < sys->numCdtRow; i++){
-    //    //cout << polyIn((0 + 4.9e-7) / 2, -1.7e-7, sys, 2) << endl;
-    //    numNode = (xi[sys->conductorIn[i].xmax] - xi[sys->conductorIn[i].xmin] + 1)
-    //        *(yi[sys->conductorIn[i].ymax] - yi[sys->conductorIn[i].ymin] + 1)
-    //        *(zi[sys->conductorIn[i].zmax] - zi[sys->conductorIn[i].zmin] + 1);
-    //    //cout << sys->conductorIn[i].xmax << " " << sys->conductorIn[i].xmin << " " << sys->conductorIn[i].ymax << " " << sys->conductorIn[i].ymin << " " << sys->conductorIn[i].zmax << " " << sys->conductorIn[i].zmin << endl;
-    //    sys->conductorIn[i].cdtInNode = (myint*)malloc(numNode*sizeof(myint));
-    //    sys->conductorIn[i].numNode = 0;
-    //    
-
-    //    for (j = xi[sys->conductorIn[i].xmin]; j <= xi[sys->conductorIn[i].xmax]; j++){
-    //        for (k = yi[sys->conductorIn[i].ymin]; k <= yi[sys->conductorIn[i].ymax]; k++){
-    //            if (polyIn(sys->xn[j], sys->yn[k], sys, i)){
-    //                for (m = zi[sys->conductorIn[i].zmin]; m < zi[sys->conductorIn[i].zmax]; m++){
-    //                    //cout << sys->xn[j] << " " << sys->yn[k] << endl;
-    //                    sys->conductorIn[i].cdtInNode[sys->conductorIn[i].numNode] = m*sys->N_node_s + (sys->N_cell_y + 1)*j + k;
-    //                    sys->conductorIn[i].numNode++;
-    //                    sys->markNode[m*sys->N_node_s + (sys->N_cell_y + 1)*j + k] = 1;
-    //                    if (sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k] == 0){   // set the z direction markEdge
-    //                        sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k] = i + 1;
-    //                        //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + j*(sys->N_cell_y + 1) + k << endl;
-    //                    }
-    //                }
-    //                sys->conductorIn[i].cdtInNode[sys->conductorIn[i].numNode] = m*sys->N_node_s + (sys->N_cell_y + 1)*j + k;
-    //                sys->conductorIn[i].numNode++;
-    //                sys->markNode[m*sys->N_node_s + (sys->N_cell_y + 1)*j + k] = 1;
-    //            }
-
-    //        }
-    //    }
-    //    for (j = xi[sys->conductorIn[i].xmin]; j <= xi[sys->conductorIn[i].xmax]; j++){   // set the y direction markEdge
-    //        for (k = yi[sys->conductorIn[i].ymin]; k < yi[sys->conductorIn[i].ymax]; k++){
-    //            for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
-    //                xc = sys->xn[j];
-    //                yc = (sys->yn[k] + sys->yn[k + 1]) / 2;
-    //                if (polyIn(xc, yc, sys, i)){
-    //                    sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k] = i + 1;
-    //                    //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k << endl;
-    //                    //cout << zi[sys->conductorIn[i].zmax] * (sys->N_edge_s + sys->N_edge_v) + j*(sys->N_cell_y) + k << endl;
-    //                }
-    //            }
-    //        }
-    //    }
-    //    for (j = yi[sys->conductorIn[i].ymin]; j <= yi[sys->conductorIn[i].ymax]; j++){    // set the x direction markEdge
-    //        for (k = xi[sys->conductorIn[i].xmin]; k < xi[sys->conductorIn[i].xmax]; k++){
-    //            for (m = zi[sys->conductorIn[i].zmin]; m <= zi[sys->conductorIn[i].zmax]; m++){
-    //                xc = (sys->xn[k] + sys->xn[k + 1]) / 2;
-    //                yc = sys->yn[j];
-    //                //cout << xc << " " << yc << "" << i << " " << polyIn(xc, yc, sys, i) << endl;
-    //                if (polyIn(xc, yc, sys, i)){
-    //                    sys->markEdge[m * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j] = i + 1;
-    //                    //cout << zi[sys->conductorIn[i].zmin] * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j << endl;
-    //                    //cout << zi[sys->conductorIn[i].zmax] * (sys->N_edge_s + sys->N_edge_v) + (sys->N_cell_y)*(sys->N_cell_x + 1) + k * (sys->N_cell_y + 1) + j << endl;
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
 
     for (i = 0; i < sys->N_edge_s; i++){    // the lower PEC plane
         sys->markEdge[i] = sys->numCdtRow + 1;
@@ -986,12 +854,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (i = 0; i < sys->N_node_s; i++){
         sys->markNode[i] = 1;
     }
+#ifdef UPPER_BOUNDARY_PEC
     for (i = sys->N_edge - sys->N_edge_s; i < sys->N_edge; i++){    // the upper PEC plane
         sys->markEdge[i] = sys->numCdtRow + 2;
     }
     for (i = sys->N_node - sys->N_node_s; i < sys->N_node; i++){
         sys->markNode[i] = 1;
     }
+#endif
 
     /* experimental: store PEC planes as CdtRow to avoid segfault*/
     /* fdtdOneCondct class lacks a parametrized constructor or GDSII layer numbers to make this easy */
@@ -1020,6 +890,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->conductorIn.back().x = xOuter;
     sys->conductorIn.back().y = yOuter;
     sys->conductorIn.back().layer = layerMin;
+#ifdef UPPER_BOUNDARY_PEC
     sys->conductorIn.push_back(fdtdOneCondct()); // the upper PEC plane
     sys->conductorIn.back().numVert = 4;
     sys->conductorIn.back().xmax = sys->xlim2;
@@ -1029,6 +900,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->conductorIn.back().x = xOuter;
     sys->conductorIn.back().y = yOuter;
     sys->conductorIn.back().layer = layerMax;
+#endif
 
     /* construct edgelink, no need for edgelink */
     myint eno;
@@ -1172,7 +1044,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     //    }
     //}
 
-    /* implement dfs */
+    /* implement bfs */
     myint *visited;
     vector<int> st;
     unordered_set<int> base;
@@ -1180,179 +1052,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     count = 0;
     queue<myint> qu;
 
-    //tt = clock();
-    //for (i = 0; i < sys->N_node; i++) {
-    //    if (sys->markNode[i] == 0) {
-    //        continue;
-    //    }
-    //    else {
-    //        if (visited[i] != 0) {
-    //            continue;
-    //        }
-    //        else {
-    //            st.clear();
-    //            st.push_back(i);
-    //            count++;
-    //            visited[i] = count;
-    //            //sys->cond2condIn.push_back(base);
-    //            while (!st.empty()) {
-    //                mark = 0;
-    //                inz = st.back() / (sys->N_node_s);
-    //                inx = (st.back() % sys->N_node_s) / (sys->N_cell_y + 1);
-    //                iny = (st.back() % sys->N_node_s) % (sys->N_cell_y + 1);
-    //                // how many edges this node connects to
-    //                if (inz != 0){    // this node is not on the bottom plane
-    //                    eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-    //                    if (sys->markEdge[eno] != 0){
-    //                        //if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()){
-    //                            //sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
-    //                        //}
-
-    //                        status = compute_edgelink(sys, eno, node1, node2);    // compute_edgelink is used to get edge eno's two side's nodes node1, node2
-    //                        if ((node1 != st.back() && visited[node1] == 0)) {
-    //                            visited[node1] = count;
-    //                            st.push_back(node1);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                        else if ((node2 != st.back() && visited[node2] == 0)) {
-    //                            visited[node2] = count;
-    //                            st.push_back(node2);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                    }
-    //                }
-    //                if (inz != sys->nz - 1){    // this node is not on the upper plane
-    //                    eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-    //                    if (sys->markEdge[eno] != 0) {
-    //                        //if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
-    //                            //sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
-    //                        //}
-    //                        status = compute_edgelink(sys, eno, node1, node2);
-    //                        if ((node1 != st.back() && visited[node1] == 0)) {
-    //                            visited[node1] = count;
-    //                            st.push_back(node1);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                        else if ((node2 != st.back() && visited[node2] == 0)) {
-    //                            visited[node2] = count;
-    //                            st.push_back(node2);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-
-    //                    }
-    //                }
-    //                if (inx != 0){    // this node is not on the left plane
-    //                    eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
-    //                    if (sys->markEdge[eno] != 0) {
-    //                        //if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
-    //                            //sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
-    //                        //}
-    //                        status = compute_edgelink(sys, eno, node1, node2);
-    //                        if ((node1 != st.back() && visited[node1] == 0)) {
-    //                            visited[node1] = count;
-    //                            st.push_back(node1);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                        else if ((node2 != st.back() && visited[node2] == 0)) {
-    //                            visited[node2] = count;
-    //                            st.push_back(node2);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-
-    //                    }
-    //                }
-    //                if (inx != sys->nx - 1){    // this node is not on the right plane
-    //                    eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
-    //                    if (sys->markEdge[eno] != 0) {
-    //                        //if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
-    //                            //sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
-    //                        //}
-    //                        status = compute_edgelink(sys, eno, node1, node2);
-    //                        if ((node1 != st.back() && visited[node1] == 0)) {
-    //                            visited[node1] = count;
-    //                            st.push_back(node1);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                        else if ((node2 != st.back() && visited[node2] == 0)) {
-    //                            visited[node2] = count;
-    //                            st.push_back(node2);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-
-    //                    }
-    //                }
-    //                if (iny != 0){    // this node is not on the front plane
-    //                    eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
-    //                    if (sys->markEdge[eno] != 0) {
-    //                        //if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
-    //                            //sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
-    //                        //}
-    //                        status = compute_edgelink(sys, eno, node1, node2);
-    //                        if ((node1 != st.back() && visited[node1] == 0)) {
-    //                            visited[node1] = count;
-    //                            st.push_back(node1);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                        else if ((node2 != st.back() && visited[node2] == 0)) {
-    //                            visited[node2] = count;
-    //                            st.push_back(node2);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-
-    //                    }
-    //                }
-    //                if (iny != sys->ny - 1){    // this node is not on the back plane
-    //                    eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
-    //                    if (sys->markEdge[eno] != 0) {
-    //                        //if (sys->cond2condIn[count - 1].find(sys->markEdge[eno]) == sys->cond2condIn[count - 1].end()) {
-    //                            //sys->cond2condIn[count - 1].insert(sys->markEdge[eno]);
-    //                        //}
-    //                        status = compute_edgelink(sys, eno, node1, node2);
-    //                        if ((node1 != st.back() && visited[node1] == 0)) {
-    //                            visited[node1] = count;
-    //                            st.push_back(node1);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-    //                        else if ((node2 != st.back() && visited[node2] == 0)) {
-    //                            visited[node2] = count;
-    //                            st.push_back(node2);
-    //                            mark = 1;
-
-    //                            goto GOTO;
-    //                        }
-
-    //                    }
-    //                }
-    //           GOTO: if (mark == 0) {
-    //                    st.pop_back();
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-    //cout << "Time to find conductors is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
 
 /* bfs to figure out the disjoint conductors */
 
@@ -1496,9 +1195,9 @@ for (i = 0; i < sys->N_node; i++) {
 
     for (i = 0; i < sys->N_node; i++){
         sys->markNode[i] = visited[i];
-        
     }
    
+    cout << endl;
     //cout << "Time to assign markEdge and markNode is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << endl;
     tt = clock();
     

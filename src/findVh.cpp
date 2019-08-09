@@ -1,4 +1,4 @@
-#include "fdtd.h"
+#include "fdtd.hpp"
 
 static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b)
 {
@@ -1098,51 +1098,13 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     outfile.close();*/
     
     sys->Vh = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * i_re * sizeof(lapack_complex_double));
-    lapack_complex_double *V_re2 = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * i_re * sizeof(lapack_complex_double));
     for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){    // A*V_re
         for (myint inde2 = 0; inde2 < i_re; inde2++){
             sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
             sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
-            V_re2[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
-                - 2 * M_PI * sys->freqStart * sys->freqUnit * V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
-            V_re2[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (sys->freqStart * sys->freqUnit * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
-                - V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
         }
     }
 
-    y_re = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));    // u0a'*A*V_re
-    status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, V_re2, (sys->N_edge - 2 * sys->N_edge_s), i_re, y_re);
-
-    tmp3 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){    // A*u0
-        for (myint inde2 = 0; inde2 < 2; inde2++){
-            tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
-                - 2 * M_PI * sys->freqStart * sys->freqUnit * u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
-            tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (sys->freqStart * sys->freqUnit * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
-                - u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
-        }
-    }
-
-    tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
-    status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp3, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp4);    // u0a'*A*u0
-    ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
-    y_new = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));
-    /*outfile.open("ma.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint inde = 0; inde < 2; inde++){
-        for (myint inde1 = 0; inde1 < 2; inde1++){
-            outfile << tmp4[inde1 * 2 + inde].real << " " << tmp4[inde1 * 2 + inde].imag << " ";
-        }
-        outfile << endl;
-    }*/
-    info = LAPACKE_zcgesv(LAPACK_COL_MAJOR, 2, i_re, tmp4, 2, ipiv, y_re, 2, y_new, 2, &iter);    // (u0a'*A*u0)\(u0a'*A*V_re)
-    m_new = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_re, sizeof(lapack_complex_double));
-    status = matrix_multi('N', u0, (sys->N_edge - 2 * sys->N_edge_s), 2, y_new, 2, i_re, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-        for (myint inde2 = 0; inde2 < i_re; inde2++){
-            sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real -m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
-            sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag -m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
-        }
-    }
     ofstream out;
     
     /*out.open("Vh.txt", std::ofstream::out | std::ofstream::trunc);
@@ -1166,13 +1128,6 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 
     sys->leng_Vh = i_re;
 
-    free(y_re); y_re = NULL;
-    free(V_re2); V_re2 = NULL;
-    free(tmp3); tmp3 = NULL;
-    free(tmp4); tmp4 = NULL;
-    free(ipiv); ipiv = NULL;
-    free(y_new); y_new = NULL;
-    free(m_new); m_new = NULL;
     
 
     return 0;

@@ -24,7 +24,7 @@
 #include <complex>
 #include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <limbo/parsers/gdsii/stream/GdsWriter.h>
-#include "fdtd.h"
+#include "fdtd.hpp"
 
 // PSLG macro
 #define REL_INTERIOR_PRECISION (0.001) // Relative preceision to set interior points of a PSLG region

@@ -1,7 +1,7 @@
 #include <cmath>
 #include <ctime>
-#include "fdtd.h"
-#include "hypreSolverh.h"
+#include "fdtd.hpp"
+#include "hypreSolver.h"
 #include "vis.c"
 
 
