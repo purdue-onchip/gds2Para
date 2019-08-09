@@ -589,10 +589,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     lapack_complex_double *final_x;
     lapack_complex_double *J_h;
     double *ferr, *berr;
+    
 
     /* HYPRE solves for each port are messy */
     while (sourcePort < sys->numPorts){
         t1 = clock();
+		cout << "Source id is " << sourcePort << endl;
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
             sys->J[sys->portEdge[sourcePort][indi]] = sys->portCoor[sourcePort].portDirection;
@@ -601,11 +603,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         v0daJ = (double*)calloc(leng_v0d1, sizeof(double));
         y0d = (double*)calloc(leng_v0d1, sizeof(double));
-        
+
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        
+
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, sys->J, beta, v0daJ);
         for (indi = 0; indi < leng_v0d1; indi++){
             v0daJ[indi] = -v0daJ[indi];
@@ -615,7 +617,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         /* solve V0d system */
 
         t1 = clock();
-        
+
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
 
@@ -633,29 +635,29 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             y0d[indi] = y0d[indi] / (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
         }
         ydt = (double*)calloc(sys->N_edge, sizeof(double));
-        //ydat = (double*)calloc(sys->N_edge, sizeof(double));
+        ydat = (double*)calloc(sys->N_edge, sizeof(double));
         yd1 = (double*)malloc(sys->N_edge * sizeof(double));
 
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d, beta, ydt);    // -V0d*(D_eps0\(V0da'*rsc))
-        //s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d, beta, ydat);    // -V0da*(D_eps0\(V0da'*rsc))
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d, beta, ydat);    // -V0da*(D_eps0\(V0da'*rsc))
 
-        //u0 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
-        //u0a = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
-        //nn = 0;
-        //nna = 0;
-        //for (indi = 0; indi < sys->N_edge; indi++){
-        //    nn += ydt[indi] * ydt[indi];
-        //    nna += ydat[indi] * ydat[indi];
-        //}
-        //nn = sqrt(nn);
-        //nna = sqrt(nna);
-        //for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
-        //    u0[indi - sys->N_edge_s].real = ydt[indi] / nn;    // u0d is one vector in V0
-        //    u0a[indi - sys->N_edge_s].real = ydat[indi] / nna;    // u0da
-        //}
+        u0 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
+        u0a = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
+        nn = 0;
+        nna = 0;
+        for (indi = 0; indi < sys->N_edge; indi++){
+            nn += ydt[indi] * ydt[indi];
+            nna += ydat[indi] * ydat[indi];
+        }
+        nn = sqrt(nn);
+        nna = sqrt(nna);
+        for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
+            u0[indi - sys->N_edge_s].real = ydt[indi] / nn;    // u0d is one vector in V0
+            u0a[indi - sys->N_edge_s].real = ydat[indi] / nna;    // u0da
+        }
 
         /* Compute C right hand side */
         y0c = (double*)calloc(leng_v0c, sizeof(double));
@@ -750,7 +752,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         /* V0cy0c */
         yc = (double*)calloc(sys->N_edge, sizeof(double));
-        //yca = (double*)calloc(sys->N_edge, sizeof(double));
+        yca = (double*)calloc(sys->N_edge, sizeof(double));
         yccp = (double*)malloc(sys->N_edge * sizeof(double));
         dRhs2 = (double*)calloc(leng_v0d1, sizeof(double));
         y0d2 = (double*)calloc(leng_v0d1, sizeof(double));
@@ -759,7 +761,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, y0c, beta, yc);
-        //s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0cat, descr, y0c, beta, yca);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0cat, descr, y0c, beta, yca);
 
         free(y0c); y0c = NULL;
 
@@ -779,30 +781,31 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
 
         free(dRhs2); dRhs2 = NULL;
-       // cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+        // cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 
         t1 = clock();
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
-        //yd2a = (double*)calloc(sys->N_edge, sizeof(double));
+        yd2a = (double*)calloc(sys->N_edge, sizeof(double));
 
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d2, beta, yd2);
-        //s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d2, beta, yd2a);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d2, beta, yd2a);
         free(y0d2); y0d2 = NULL;
-        //nn = 0;
-        //nna = 0;
-        //for (indi = 0; indi < sys->N_edge; indi++){
-        //    nn += (yd2[indi] + yc[indi]) * (yd2[indi] + yc[indi]);
-        //    nna += (yd2a[indi] + yca[indi]) * (yd2a[indi] + yca[indi]);
-        //}
-        //nn = sqrt(nn);
-        //nna = sqrt(nna);
-        //for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
-        //    u0[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2[indi] + yc[indi]) / nn;    // u0c is the other vector in u0
-        //    u0a[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2a[indi] + yca[indi]) / nna;    // u0ca
-        //}
+        nn = 0;
+        nna = 0;
+        for (indi = 0; indi < sys->N_edge; indi++){
+            nn += (yd2[indi] + yc[indi]) * (yd2[indi] + yc[indi]);
+            nna += (yd2a[indi] + yca[indi]) * (yd2a[indi] + yca[indi]);
+        }
+		
+        nn = sqrt(nn);
+        nna = sqrt(nna);
+        for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
+            u0[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2[indi] + yc[indi]) / nn;    // u0c is the other vector in u0
+            u0a[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2a[indi] + yca[indi]) / nna;    // u0ca
+        }
 
         cout << " Time to generate u0d and u0c up to port" << sourcePort + 1 << " is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
@@ -820,7 +823,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(yc); yc = NULL;
 
         for (indi = 0; indi < sys->numPorts; indi++){
-            
+
             for (j = 0; j < sys->portEdge[indi].size(); j++){
                 if (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s){    // this edge is along z axis
                     inz = sys->portEdge[indi][j] / (sys->N_edge_s + sys->N_edge_v);
@@ -834,192 +837,285 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     iny = (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
                     leng = sys->yn[iny + 1] - sys->yn[iny];
                 }
-                
+
                 /*leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3]), 2);
                 leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 1]), 2);
                 leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 2]), 2);
                 leng = sqrt(leng);*/
                 sys->x[indi + sys->numPorts*xcol] = (sys->x[indi + sys->numPorts*xcol].real() + yd[sys->portEdge[indi][j]].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))) + (1i)*(yd[sys->portEdge[indi][j]].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + sys->x[indi + sys->numPorts*xcol].imag());
-                
+
             }
         }
-        //cout << "Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-        /* calculate the Vh part */
-#ifndef SKIP_VH
-        status = find_Vh(sys, u0, u0a, sourcePort);
-        
-
-        // V_re1'*(A+C)*V_re1
-        tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
-        for (j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
-            i = 0;
-            while (i < sys->leng_S){
-                start = sys->SRowId[i];
-                while (i < sys->leng_S && sys->SRowId[i] == start){
-                    
-                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].real += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].real;
-                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].imag += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].imag;
-                    
-                    
-                    i++;
-                }
-            }
-            
-            for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-                if (sys->markEdge[i + sys->N_edge_s] != 0){
-                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
-                        - sys->freqEnd * sys->freqUnit * 2 * M_PI * SIGMA * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
-                    tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
-                        + sys->freqEnd * sys->freqUnit * 2 * M_PI * SIGMA * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
-                }
-            }
-        }
-
-
-        m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
-        status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, tmp, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
-
-
-        rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
-        J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
-        for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
-            J[i - sys->N_edge_s].imag = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * M_PI;
-        }
-        status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
-        
-        /* V_re1'*A*u */
-        free(tmp);
-        tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-            if (sys->markEdge[i + sys->N_edge_s] != 0){
-                tmp[i].real = -pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[i + sys->N_edge_s].real() - sys->freqEnd * sys->freqUnit * 2 * M_PI * SIGMA * yd[i + sys->N_edge_s].imag();
-                tmp[i].imag = sys->freqEnd * sys->freqUnit * 2 * M_PI * SIGMA * yd[i + sys->N_edge_s].real() - pow(sys->freqEnd * sys->freqUnit * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[i + sys->N_edge_s].imag();
-            }
-        }
-        rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
-        status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
-        for (i = 0; i < sys->leng_Vh; i++){
-            rhs_h[i].real = rhs_h[i].real - rhs_h0[i].real;
-            rhs_h[i].imag = rhs_h[i].imag - rhs_h0[i].imag;
-        }
-
-        ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
-        info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
-        
-        y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-        status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-
-         [comment out below to save matrix solve time vvvvvv]
-        final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-            final_x[i].real = yd[i + sys->N_edge_s].real();// +y_h[i].real;
-            final_x[i].imag = yd[i + sys->N_edge_s].imag();// +y_h[i].imag;
-        }
-         [comment out above to save matrix solve time ^^^^^^]
-
-        /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
-        outfile << final_x[i].real << " " << final_x[i].imag << endl;
-        }
-        outfile.close();*/
-#endif
-
         /*free(tmp); tmp = NULL;
         free(m_h); m_h = NULL;
         free(rhs_h); rhs_h = NULL;
         free(y_h); y_h = NULL;
         free(ipiv); ipiv = NULL;
         free(J); J = NULL;*/
-        
-        
+
+
         //free(ydat); ydat = NULL;
         //free(yca); yca = NULL;
         //free(yd2a); yd2a = NULL;
         free(yd); yd = NULL;
-        
-        
-
-        // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
-#ifndef SKIP_STIFF_REFERENCE
-        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
-
-#endif
-
+		
         free(sys->J); sys->J = NULL;
         /*free(u0); u0 = NULL;*/
         //free(sys->y); sys->y = NULL;
-
+		
         sourcePort++;
         xcol++;
-
     }
-    MPI_Finalize();
+        //cout << "Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
+        /* calculate the Vh part */
+#ifndef SKIP_VH
+    for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++){
+		// find the Vh eigenmodes
+        status = find_Vh(sys, u0, u0a, sourcePort);
 
-    /* Report the Z-parameters */
-    if (sys->nfreq > 1){
-        
-        for (int id = 0; id < sys->nfreq; id++){
-            double freq; // Initialize specific frequency (Hz)
-            if (id == 0)
-            {
-                // First frequency in sweep
-                freq = sys->freqStart * sys->freqUnit;
+        for (indi = 0; indi < sys->nfreq; indi++){
+			// this point's frequency
+			if (sys->nfreq == 1) {    // to avoid (sys->nfreq - 1)
+				freq = sys->freqStart * sys->freqUnit;
+			}
+			else {
+				if (sys->freqScale == 1) {
+					freq = (sys->freqStart + indi * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
+				}
+				else {
+					freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (indi * 1.0 / (sys->nfreq - 1)));
+				}
+			}
 
-                // Report the saved result
-                cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
-                for (indi = 0; indi < sys->numPorts; indi++) {
-                    for (j = 0; j < sys->numPorts; j++) {
-                        Zresult = sys->x[j + indi*sys->numPorts];
-                        cout << "  " << Zresult;
+			// Vh = Vh - u0*((u0a'*A*u0)\(u0a'*A*Vh))
+			lapack_complex_double* V_re2 = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * i_re * sizeof(lapack_complex_double));
+			for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++) {    // A*Vh
+				for (myint inde2 = 0; inde2 < i_re; inde2++) {
+					V_re2[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
+						- 2 * M_PI * freq * sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
+					V_re2[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (freq * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
+						- sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
+				}
+			}
+
+			y_re = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));    // u0a'*A*Vh
+			status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, V_re2, (sys->N_edge - 2 * sys->N_edge_s), i_re, y_re);
+
+			tmp3 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
+			for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++) {    // A*u0
+				for (myint inde2 = 0; inde2 < 2; inde2++) {
+					tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
+						- 2 * M_PI * freq * u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
+					tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (freq * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
+						- u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
+				}
+			}
+
+			tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
+			status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp3, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp4);    // u0a'*A*u0
+			ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
+			y_new = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));
+			/*outfile.open("ma.txt", std::ofstream::out | std::ofstream::trunc);
+			for (myint inde = 0; inde < 2; inde++){
+				for (myint inde1 = 0; inde1 < 2; inde1++){
+					outfile << tmp4[inde1 * 2 + inde].real << " " << tmp4[inde1 * 2 + inde].imag << " ";
+				}
+				outfile << endl;
+			}*/
+			info = LAPACKE_zcgesv(LAPACK_COL_MAJOR, 2, i_re, tmp4, 2, ipiv, y_re, 2, y_new, 2, &iter);    // (u0a'*A*u0)\(u0a'*A*V_re)
+			m_new = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_re, sizeof(lapack_complex_double));
+			status = matrix_multi('N', u0, (sys->N_edge - 2 * sys->N_edge_s), 2, y_new, 2, i_re, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
+			for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++) {
+				for (myint inde2 = 0; inde2 < i_re; inde2++) {
+					sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real - m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
+					sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag - m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
+				}
+			}
+
+
+            // Vh'*(A+C)*Vh
+            tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
+            for (j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
+                i = 0;
+                while (i < sys->leng_S){
+                    start = sys->SRowId[i];
+                    while (i < sys->leng_S && sys->SRowId[i] == start){
+
+                        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].real += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].real;
+                        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[i]].imag += sys->Sval[i] * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[i]].imag;
+
+
+                        i++;
                     }
-                    cout << endl;
                 }
-                continue;
-            }
-            else if (id == sys->nfreq - 1)
-            {
-                // Last frequency in sweep
-                freq = sys->freqEnd * sys->freqUnit;
-            }
-            else
-            {
-                // All other frequencies in sweep
-                if (sys->freqScale == 1)
-                {
-                    // Linear interpolation of frequency sweep
-                    freq = (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
-                }
-                else
-                {
-                    // Logarithmic interpolation of frequency sweep
-                    freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (id * 1.0 / (sys->nfreq - 1))); // Should be most numerically stable calculated like this
-                    cout << "Log freq interp: " << freq << " Hz" << endl;
+
+                for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+                    if (sys->markEdge[i + sys->N_edge_s] != 0){
+                        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real += -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real
+                            - freq * 2 * M_PI * SIGMA * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag;
+                        tmp[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag += -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].imag
+                            + freq * 2 * M_PI * SIGMA * sys->Vh[j * (sys->N_edge - 2 * sys->N_edge_s) + i].real;
+                    }
                 }
             }
 
-            // Report the results beyond the first and append to storage object
-            cout << "Z-parameters at frequency " << freq << " Hz:" << endl;
-            for (indi = 0; indi < sys->numPorts; indi++){
-                for (j = 0; j < sys->numPorts; j++){
-                    Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart * sys->freqUnit / freq;
-                    cout << "  " << Zresult;
-                    sys->x.push_back(Zresult);
-                }
-                cout << endl;
+
+            m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
+            status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, tmp, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
+
+
+            rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
+            J = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
+            for (i = sys->N_edge_s; i < sys->N_edge - sys->N_edge_s; i++){
+                J[i - sys->N_edge_s].imag = -sys->J[i] * freq * 2 * M_PI;
             }
+            status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - 2 * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
+
+            /* V_re1'*A*u */
+            free(tmp);
+            tmp = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
+            for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+                if (sys->markEdge[i + sys->N_edge_s] != 0){
+                    tmp[i].real = -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[i + sys->N_edge_s].real() - freq * 2 * M_PI * SIGMA * yd[i + sys->N_edge_s].imag();
+                    tmp[i].imag = freq * 2 * M_PI * SIGMA * yd[i + sys->N_edge_s].real() - pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(i + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[i + sys->N_edge_s].imag();
+                }
+            }
+            rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
+            status = matrix_multi('T', sys->Vh, sys->N_edge - 2 * sys->N_edge_s, sys->leng_Vh, tmp, sys->N_edge - 2 * sys->N_edge_s, 1, rhs_h0);    // V_re1'*A*u
+            for (i = 0; i < sys->leng_Vh; i++){
+                rhs_h[i].real = rhs_h[i].real - rhs_h0[i].real;
+                rhs_h[i].imag = rhs_h[i].imag - rhs_h0[i].imag;
+            }
+
+            ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
+            info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
+
+            y_h = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
+            status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
+
+            //[comment out below to save matrix solve time vvvvvv]
+            final_x = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(lapack_complex_double));
+            for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+                final_x[i].real = yd[i + sys->N_edge_s].real() + y_h[i].real;
+                final_x[i].imag = yd[i + sys->N_edge_s].imag() + y_h[i].imag;
+            }
+            //[comment out above to save matrix solve time ^^^^^^]
+
+            /*outfile.open("x.txt", std::ofstream::out | std::ofstream::trunc);
+            for (i = 0; i < sys->N_edge - 2 * sys->N_edge_s; i++){
+            outfile << final_x[i].real << " " << final_x[i].imag << endl;
+            }
+            outfile.close();*/
+
+
         }
     }
-    else{
-        cout << "Z-parameters at single frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
-        for (indi = 0; indi < sys->numPorts; indi++){
-            for (j = 0; j < sys->numPorts; j++){
-                Zresult = sys->x[j + indi*sys->numPorts];
-                cout << Zresult << " ";
-                //cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " ";
+#endif
+    cout << "markEdge is shown below: " << endl;
+    for (indi = 0; indi < sys->N_edge; indi++){
+        cout << sys->markEdge[indi] << " ";
+    }
+    cout << endl;
+
+        // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
+#ifndef SKIP_STIFF_REFERENCE
+
+	double freq;
+	sys->x.clear();
+	for (indi = 0; indi < sys->nfreq; indi++) {
+		if (sys->nfreq == 1) {    // to avoid (sys->nfreq - 1)
+			freq = sys->freqStart * sys->freqUnit;
+			}
+		else {
+			if (sys->freqScale == 1) {
+				freq = (sys->freqStart + indi * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
+			}
+			else {
+				freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (indi * 1.0 / (sys->nfreq - 1)));
+			}
+		}
+        
+		for (int indj = 0; indj < sys->numPorts; indj++) {
+			status = reference(sys, freq, indj, sys->SRowId, sys->SColId, sys->Sval);
+		}
+        cout << "Frequency " << freq << "'s z parameter matrix is shown below as" << endl;
+        for (int indj = 0; indj < sys->numPorts; indj++){
+            for (int indk = 0; indk < sys->numPorts; indk++){
+                cout << sys->x[indi * (sys->numPorts * sys->numPorts) + indj * sys->numPorts + indk] << " ";
             }
             cout << endl;
         }
-    }
+	}
+    
+#endif
+    
+    MPI_Finalize();
+
+    /* Report the Z-parameters for V0 part */
+    //if (sys->nfreq > 1){
+    //    
+    //    for (int id = 0; id < sys->nfreq; id++){
+    //        double freq; // Initialize specific frequency (Hz)
+    //        if (id == 0)
+    //        {
+    //            // First frequency in sweep
+    //            freq = sys->freqStart * sys->freqUnit;
+
+    //            // Report the saved result
+    //            cout << "Z-parameters at frequency " << (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit << " Hz:" << endl;
+    //            for (indi = 0; indi < sys->numPorts; indi++) {
+    //                for (j = 0; j < sys->numPorts; j++) {
+    //                    Zresult = sys->x[j + indi*sys->numPorts];
+    //                    cout << "  " << Zresult;
+    //                }
+    //                cout << endl;
+    //            }
+    //            continue;
+    //        }
+    //        else if (id == sys->nfreq - 1)
+    //        {
+    //            // Last frequency in sweep
+    //            freq = sys->freqEnd * sys->freqUnit;
+    //        }
+    //        else
+    //        {
+    //            // All other frequencies in sweep
+    //            if (sys->freqScale == 1)
+    //            {
+    //                // Linear interpolation of frequency sweep
+    //                freq = (sys->freqStart + id * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
+    //            }
+    //            else
+    //            {
+    //                // Logarithmic interpolation of frequency sweep
+    //                freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (id * 1.0 / (sys->nfreq - 1))); // Should be most numerically stable calculated like this
+    //                cout << "Log freq interp: " << freq << " Hz" << endl;
+    //            }
+    //        }
+
+    //        // Report the results beyond the first and append to storage object
+    //        cout << "Z-parameters at frequency " << freq << " Hz:" << endl;
+    //        for (indi = 0; indi < sys->numPorts; indi++){
+    //            for (j = 0; j < sys->numPorts; j++){
+    //                Zresult = sys->x[j + indi*sys->numPorts].real() + (1i) * sys->x[j + indi*sys->numPorts].imag() * sys->freqStart * sys->freqUnit / freq;
+    //                cout << "  " << Zresult;
+    //                sys->x.push_back(Zresult);
+    //            }
+    //            cout << endl;
+    //        }
+    //    }
+    //}
+    //else{
+    //    cout << "Z-parameters at single frequency " << (sys->freqStart) * sys->freqUnit << " Hz:" << endl;
+    //    for (indi = 0; indi < sys->numPorts; indi++){
+    //        for (j = 0; j < sys->numPorts; j++){
+    //            Zresult = sys->x[j + indi*sys->numPorts];
+    //            cout << Zresult << " ";
+    //            //cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " ";
+    //        }
+    //        cout << endl;
+    //    }
+    //}
 
     sys->cindex.clear();
     sys->acu_cnno.clear();

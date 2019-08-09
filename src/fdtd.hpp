@@ -66,7 +66,9 @@ using namespace std;
 //#define PRINT_V0D_BLOCKS
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
-#define SKIP_STIFF_REFERENCE 
+//#define SKIP_GENERATE_STIFF
+//#define SKIP_STIFF_REFERENCE 
+//#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
 
 
 // Function-like macros
@@ -467,7 +469,7 @@ int generateStiff(fdtdMesh *sys);
 int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval);
 int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort);
 int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint acol, lapack_complex_double *b, myint brow, myint bcol, lapack_complex_double *tmp3);
-int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val);
+int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *ColId, double *val);
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
 #endif
