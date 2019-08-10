@@ -507,60 +507,16 @@ int generateStiff(fdtdMesh *sys){
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));
     Shvaln = (double*)malloc(Shnum * sizeof(double));
-    ofstream out;
-    out.open("Sh.txt", std::ofstream::out | std::ofstream::trunc);
-    for (ind = 0; ind < Shnum; ind++){
-        ShColIdo[ind] = ShColId[ind];
-        ShRowIdn[ind] = ShRowId[ind];
-        Shvaln[ind] = Shval[ind];
-        out << ShColId[ind] << " " << ShRowId[ind] << " " << Shval[ind] << endl;
-    }
-    out.close();
+    
     free(ShRowId); ShRowId = NULL;
     free(Shval); Shval = NULL;
     free(ShColId); ShColId = (myint*)malloc((leng_Sh + 1) * sizeof(myint));
     status = COO2CSR_malloc(ShColIdo, ShRowIdn, Shvaln, Shnum, leng_Sh, ShColId);
 
 
-    /* generate the matrix (-w^2*D_eps+iw*D_sig+S) */
+    /* generate the matrix (-w^2*D_eps+iw*D_sig+S), alreayd decide the boundary condition as lower boundary PEC */
     status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln);    // matrix multiplication first matrix keep the same second matrix transpose
   
-    //cout << "Length of S is " << sys->leng_S << endl;
-    //cout << "S generation is done!\n";
-
-#ifndef SKIP_PARDISO
-    /* use pardiso to solve (-w^2*D_eps+iw*D_sig+S)\(-1i*w*J) */
-    int sourcePort = 0;
-    double leng;
-    complex<double> *J;
-    complex<double> *Yr = (complex<double>*)malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
-    while (sourcePort < sys->numPorts){
-        J = (complex<double>*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(complex<double>));
-        complex<double> *xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
-        for (int i = 0; i < sys->portEdge[sourcePort].size(); i++){
-            J[sys->portEdge[sourcePort][i] - sys->N_edge_s] = -1i * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->portCoor[sourcePort].portDirection;
-        }
-        
-        status = pardisoSolve_r(sys, J, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sys->N_edge - 2 * sys->N_edge_s, xr);
-        
-
-        for (int i = 0; i < sys->numPorts; i++){
-            Yr[i + sys->numPorts * sourcePort] = 0 + 1i * 0;
-            for (int j = 0; j < sys->portEdge[i].size(); j++){
-                leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3]), 2);
-                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 1]), 2);
-                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 2]), 2);
-                leng = sqrt(leng);
-                Yr[i + sys->numPorts * sourcePort] = Yr[i + sys->numPorts * sourcePort].real() + xr[sys->portEdge[i][j] - sys->N_edge_s].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + 1i * (xr[sys->portEdge[i][j] - sys->N_edge_s].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + Yr[i + sys->numPorts * sourcePort].imag());
-
-            }
-            cout << Yr[i + sys->numPorts * sourcePort] << endl;
-        }
-
-        sourcePort++;
-        free(J); J = NULL;
-        free(xr); xr = NULL;
-    }
 #endif
 
     free(dxa); dxa = NULL;

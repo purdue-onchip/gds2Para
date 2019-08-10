@@ -1011,11 +1011,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
     }
 #endif
-    cout << "markEdge is shown below: " << endl;
+    /*cout << "markEdge is shown below: " << endl;
     for (indi = 0; indi < sys->N_edge; indi++){
         cout << sys->markEdge[indi] << " ";
     }
-    cout << endl;
+    cout << endl;*/
 
         // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
 #ifndef SKIP_STIFF_REFERENCE

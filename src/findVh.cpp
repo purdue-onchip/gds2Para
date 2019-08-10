@@ -1107,24 +1107,6 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 
     ofstream out;
     
-    /*out.open("Vh.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-        for (myint inde2 = 0; inde2 < i_re; inde2++){
-            out << sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real << " " << sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag << " ";
-        }
-        out << endl;
-    }
-    out.close();*/
-
-    /*out.open("u0.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-        for (myint inde2 = 0; inde2 < 2; inde2++){
-            out << u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real << " " << u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag << " ";
-        }
-        out << endl;
-    }
-    out.close();*/
-
 
     sys->leng_Vh = i_re;
 

@@ -67,7 +67,6 @@ using namespace std;
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define SKIP_VH // Turn on to save a lot of time
 //#define SKIP_GENERATE_STIFF
-//#define SKIP_STIFF_REFERENCE 
 //#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
 
 

@@ -142,7 +142,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(xOrigOld, xOrigOld + count_xOrigOld);
     
     sys->nx = 1;
-    double disMaxx = 0.0002;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
+    double disMaxx = 0.00002;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     int xMaxInd = (xmax - xmin) / disMaxx;
 
     if (dis_surx < disMin){
@@ -214,7 +214,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the y-direction */
     sort(yOrigOld, yOrigOld + count_yOrigOld);
     sys->ny = 1;
-    double disMaxy = 0.00005;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
+    double disMaxy = 0.0007;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     int yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < count_yOrigOld; i++){
@@ -1250,7 +1250,7 @@ for (i = 0; i < sys->N_node; i++) {
     for (i = 0; i < sys->numPorts; i++){
         indPortNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         indPortNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
-        cout << "Port 1 conductor is " << indPortNode1 << " and Port 2 conductor is " << indPortNode2 << endl;
+        
         if (cond.find(indPortNode1) == cond.end()){
             cond.insert(indPortNode1);
             for (j = 0; j < sys->cdtNumNode[indPortNode1 - 1]; j++){
