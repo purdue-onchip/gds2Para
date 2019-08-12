@@ -142,7 +142,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(xOrigOld, xOrigOld + count_xOrigOld);
     
     sys->nx = 1;
-    double disMaxx = 0.0002;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
+    double disMaxx = 0.0005;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     int xMaxInd = (xmax - xmin) / disMaxx;
 
     if (dis_surx < disMin){
@@ -214,7 +214,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the y-direction */
     sort(yOrigOld, yOrigOld + count_yOrigOld);
     sys->ny = 1;
-    double disMaxy = 0.00005;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
+    double disMaxy = 0.0001;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     int yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < count_yOrigOld; i++){
