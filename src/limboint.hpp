@@ -321,6 +321,7 @@ class boundary
 private:
     vector<double> bounds;         // Coordinates of boundary
     int layer;                     // Layer of boundary
+    int datatype;                  // Datatype (standards-compliant means identically equal to 0)
     vector<std::string> props;     // Properties of boundary
 public:
     // Default constructor
@@ -328,6 +329,7 @@ public:
     {
         this->bounds = {};
         this->layer = 0;
+        this->datatype = 0;
         this->props = {};
     }
 
@@ -336,6 +338,7 @@ public:
     {
         this->bounds = bounds;
         this->layer = layer;
+        this->datatype = 0;
         this->props = props;
     }
 
@@ -349,6 +352,12 @@ public:
     int getLayer() const
     {
         return this->layer;
+    }
+
+    // Get datatype
+    int getDataType() const
+    {
+        return this->datatype;
     }
 
     // Get boundary properties
@@ -367,6 +376,12 @@ public:
     void setLayer(int layer)
     {
         this->layer = layer;
+    }
+
+    // Set datatype
+    void setDataType(int dataType)
+    {
+        this->datatype = dataType;
     }
 
     // Set boundary properties
@@ -484,6 +499,7 @@ public:
         //this->bounds = {};
         //(this->bounds).clear();
         //this->layer = 0;
+        //this->datatype = 0;
         //this->props = {};
     }
 };
@@ -493,6 +509,7 @@ class path
 private:
     vector<double> paths;          // Coordinates of path
     int layer;                     // Layer of path
+    int datatype;                  // Datatype (standards-compliant means identically equal to 0)
     vector<std::string> props;     // Properties of path
     int type;                      // Endcap type of path
     double width;                  // Width of path (m)
@@ -502,6 +519,7 @@ public:
     {
         this->paths = {};
         this->layer = 0;
+        this->datatype = 0;
         this->props = {};
         this->type = 2;
         this->width = 0.;
@@ -512,6 +530,7 @@ public:
     {
         this->paths = paths;
         this->layer = layer;
+        this->datatype = 0;
         this->props = props;
         if ((type >= 0) || (type <= 2))
         {
@@ -537,6 +556,12 @@ public:
         return this->layer;
     }
 
+    // Get datatype
+    int getDataType() const
+    {
+        return this->datatype;
+    }
+
     // Get path properties
     vector<std::string> getProps() const
     {
@@ -544,7 +569,7 @@ public:
     }
 
     // Get path type
-    // 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+    // 0 = square ends flush at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
     int getType() const
     {
         return this->type;
@@ -569,6 +594,12 @@ public:
         this->layer = layer;
     }
 
+    // Set datatype
+    void setDataType(int dataType)
+    {
+        this->datatype = dataType;
+    }
+
     // Set path properties
     void setProps(vector<std::string> props)
     {
@@ -576,7 +607,7 @@ public:
     }
 
     // Set path type
-    // 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+    // 0 = square ends flushat vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
     void setType(int type)
     {
         if ((type == 0) || (type == 1) || (type == 2))
@@ -628,6 +659,7 @@ public:
     {
         //this->paths = {};
         //this->layer = 0;
+        //this->datatype = 0;
         //this->type = 2;
         //this->width = 0.;
     }
@@ -1683,11 +1715,11 @@ public:
         {
             if (((this->boundaries)[indi]).getProps().size() != 0) // Check if property vector has nonzero length
             {
-                cout << "   #" << indi + 1 << " on Layer " << ((this->boundaries)[indi]).getLayer() << " with " << (((this->boundaries)[indi]).getProps())[0] << " as Property " << 1 << endl;
+                cout << "   #" << indi + 1 << " on Layer " << ((this->boundaries)[indi]).getLayer() << " with datatype #" << ((this->boundaries)[indi]).getDataType() << " and " << ((this->boundaries)[indi]).getProps()[0] << " as Property " << 1 << endl;
             }
             else
             {
-                cout << "   #" << indi + 1 << " on Layer " << ((this->boundaries)[indi]).getLayer() << endl;
+                cout << "   #" << indi + 1 << " on Layer " << ((this->boundaries)[indi]).getLayer() << " with datatype #" << ((this->boundaries)[indi]).getDataType() << endl;
             }
             char point[128];
             string strPoints;
@@ -1705,11 +1737,11 @@ public:
         {
             if (((this->paths)[indi]).getProps().size() != 0) // Check if property vector has nonzero length
             {
-                cout << "   #" << indi + 1 << " on Layer " << ((this->paths)[indi]).getLayer() << " with path type #" << ((this->paths)[indi]).getType() << " and width " << ((this->paths)[indi]).getWidth() << " with " << (((this->paths)[indi]).getProps())[0] << " as Property " << 1 << endl;
+                cout << "   #" << indi + 1 << " on Layer " << ((this->paths)[indi]).getLayer() << " with datatype #" << ((this->paths)[indi]).getDataType() << ", path type #" << ((this->paths)[indi]).getType() << ", and width " << ((this->paths)[indi]).getWidth() << " and with " << (((this->paths)[indi]).getProps())[0] << " as Property " << 1 << endl;
             }
             else
             {
-                cout << "   #" << indi + 1 << " on Layer " << ((this->paths)[indi]).getLayer() << " with path type #" << ((this->paths)[indi]).getType() << " and width " << ((this->paths)[indi]).getWidth() << endl;
+                cout << "   #" << indi + 1 << " on Layer " << ((this->paths)[indi]).getLayer() << " with datatype #" << ((this->paths)[indi]).getDataType() << ", path type #" << ((this->paths)[indi]).getType() << ", and width " << ((this->paths)[indi]).getWidth() << endl;
             }
             char point[128];
             string strPoints;
@@ -2747,6 +2779,10 @@ public:
         // Set conductor information from all elements in this geometric cell
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
+            if ((cell.boundaries)[indi].getDataType() != 0)
+            {
+                continue; // Treat all boundaries with nonzero datatype as nonphysical
+            }
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
             this->numCdtIn++;
             sys->conductorIn.push_back(fdtdOneCondct());
@@ -2782,6 +2818,10 @@ public:
         }
         for (size_t indi = 0; indi < numPath; indi++) // Handle each path
         {
+            if ((cell.paths)[indi].getDataType() != 0)
+            {
+                continue; // Treat all paths with nonzero datatype as nonphysical
+            }
             vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
             double width = ((cell.paths)[indi]).getWidth();
             int type = (cell.paths[indi]).getType();
@@ -2917,6 +2957,10 @@ public:
         }
         for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
         {
+            if ((cell.boxes)[indi].getType() != 0)
+            {
+                continue; // Treat all box outlines with nonzero box type as nonphysical
+            }
             vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
             this->numCdtIn++;
             sys->conductorIn.push_back(fdtdOneCondct());
@@ -3034,7 +3078,7 @@ public:
                 // Write the boundary to file
                 gw.gds_write_boundary();
                 gw.gds_write_layer((((this->cells)[indCell]).boundaries)[indBound].getLayer());
-                gw.gds_write_datatype(0);
+                gw.gds_write_datatype((((this->cells)[indCell]).boundaries)[indBound].getDataType());
                 gw.gds_write_xy(xcoord, ycoord, numPt, has_last);
                 gw.gds_write_endel();
             }
@@ -3059,7 +3103,7 @@ public:
                 // Write the path to file
                 gw.gds_write_path();
                 gw.gds_write_layer((((this->cells)[indCell]).paths)[indPath].getLayer());
-                gw.gds_write_datatype(0);
+                gw.gds_write_datatype((((this->cells)[indCell]).paths)[indPath].getLayer());
                 gw.gds_write_pathtype((((this->cells)[indCell]).paths)[indPath].getType());
                 gw.gds_write_width(width);
                 gw.gds_write_xy(xcoord, ycoord, numPt);
@@ -3419,9 +3463,17 @@ public:
                 ((this->cells)[this->numCell]).areferences.back().setARefs(coord);
             }
         }
-        else if (ascii_record_type == "DATATYPE") // Unimplemented in the GDSII standard and custom boundary and path classes
+        else if (ascii_record_type == "DATATYPE") // Unimplemented in the GDSII standard, but part of custom boundary and path classes
         {
             //cout << "Datatype for " << (this->element) << ": " << data[0] << endl;
+            if (this->getElement() == 'b')
+            {
+                ((this->cells)[this->numCell]).boundaries.back().setDataType(data[0]); // Use setter to update datatype of last boundary
+            }
+            else if (this->getElement() == 'p')
+            {
+                ((this->cells)[this->numCell]).paths.back().setDataType(data[0]);
+            }
         }
         else if (ascii_record_type == "PATHTYPE") // Necessary record in the GDSII standard to determine how path segments terminate
         {

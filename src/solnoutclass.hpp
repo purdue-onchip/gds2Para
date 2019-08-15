@@ -4470,8 +4470,6 @@ struct SolverDataBase
         // Use port information in parasitics data member to set fields
         data->numPorts = (this->para).getNPort();
         data->portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data->numPorts);
-        //data->portArea; // Is this needed from SolverDataBase to set current from current density?
-        //data->portEdge; // Is this needed from SolverDataBase since it depends on edges in the discretization?
         for (size_t indi = 0; indi < data->numPorts; indi++)
         {
             Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation
