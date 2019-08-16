@@ -2448,7 +2448,7 @@ struct SolverDataBase
                         multSI = 0.0254;
                     }
                     // Units are in millimeters
-                    if (fileLine.compare(3, 2, "MM") == 0)
+                    else if (fileLine.compare(3, 2, "MM") == 0)
                     {
                         multSI = 1e-3;
                     }
@@ -3590,6 +3590,1280 @@ struct SolverDataBase
             // File could not be opened
             cerr << "Unable to open Gerber outline file" << endl;
             return { };
+        }
+    }
+
+    // Read Excellon Numeric Control drill file (extension must be included)
+    AsciiDataBase readHoles(std::string drillName)
+    {
+        // Attempt to open Excellon Numeric Control drill file
+        ifstream drillFile(drillName.c_str());
+        if (drillFile.is_open())
+        {
+            // Build single geometric cell from limboint.h to store information (forget about timestamps)
+            GeoCell cellDrill;
+            cellDrill.cellName = "drill";
+
+            // Build ASCII database from limboint.h (forget about timestamps)
+            AsciiDataBase adbDrill;
+            adbDrill.setFileName(drillName.substr(0, drillName.find_last_of(".")) + ".gds");
+
+            // Excellon NC drill file is barely readable line-by-line
+            std::string fileLine;
+            getline(drillFile, fileLine);
+
+            // Skip all comment lines (starting with ";" in IPC-NC-349)
+            while (fileLine.compare(0, 1, ";") == 0)
+            {
+                getline(drillFile, fileLine);
+            }
+
+            // Initialize file-scope variables
+            bool leadingZeros = true; // true = leading zeros in coordinate date, false = trailing zeros in coordinate data
+            bool incrementalInput = false; // true = incremental (relative) input of part program coordinates, false = absolute input of part program coordinates (unimplemented)
+            int axisVersion = 2; // Should be 1 or 2
+            int commandsFormat = 2; // Should be 1 or 2
+            int intPart = 2; // Constrained to be 2 (iff "INCH"), 3 ("METRIC"), or 4 ("METRIC" in unimplemented CNC-7 machine)
+            int fracPart = 4; // Constrained to be 2 ("METRIC"), 3 ("METRIC"), or 4 (iff "INCH")
+            bool drillMode = true; // true = drill mode, false = rout mode
+            bool routToolDown = false; // Tool down for routing in true and in rout mode
+            int graphicsMode = 0; // Active routing modes are "G00" (rout mode rapid positioning), "G01" (linear interpolation), "G02" (CW circular interp.), and "G03" (CCW circular interp.)
+            double defaultRadius = 0.; // Default radius for circular interpolations in rout mode
+            vector<double> currentPt = { 0., 0. }; // Coordinates of current point
+            vector<Aperture> customTool = {}; // Custom tool bits
+            Aperture currentTool = Aperture(); // Current tool bit in use
+
+            // Read rest of file line-by-line with very rough parser
+            while (!drillFile.eof())
+            {
+                // Handle header beginning (starting with command "M48" in IPC-NC-349)
+                if (fileLine.compare(0, 3, "M48") == 0)
+                {
+                    //cout << "Begin reading Excellon NC drill file header" << endl;
+                }
+                // Handle SI metric units (starting with command "METRIC" in IPC-NC-349)
+                else if (fileLine.compare(0, 6, "METRIC") == 0)
+                {
+                    double multSI = 1.e-3; // Units are in millimeters
+                    intPart = 3; // 3 places before the implied decimal (assumed for this CNC-& machine over possible 4 places in other precision)
+                    fracPart = 3; // Precision to 0.001 mm (assumed for this CNC-7 machine over precision of 0.01 mm)
+
+                    if (fileLine.length() >= 9)
+                    {
+                        // Coordinate data has leading zeros
+                        if (fileLine.compare(7, 2, "LZ") == 0)
+                        {
+                            leadingZeros = true;
+                        }
+                        // Coordinate data has trailing zeros
+                        else if (fileLine.compare(7, 2, "TZ") == 0)
+                        {
+                            leadingZeros = false;
+                        }
+                    }
+
+                    // Propagate units information to ASCII database now
+                    adbDrill.setdbUserUnits(1000.);
+                    adbDrill.setdbUnits(multSI);
+                }
+                // Handle US customary units (starting with command "INCH" in IPC-NC-349)
+                else if (fileLine.compare(0, 4, "INCH") == 0)
+                {
+                    double multSI = 0.0254; // Units are in inches
+                    intPart = 2; // 2 places before the implied decimal
+                    fracPart = 4; // Precision to 0.0001 in.
+
+                    if (fileLine.length() >= 7)
+                    {
+                        // Coordinate data has leading zeros
+                        if (fileLine.compare(5, 2, "LZ") == 0)
+                        {
+                            leadingZeros = true;
+                        }
+                        // Coordinate data has trailing zeros
+                        else if (fileLine.compare(5, 2, "TZ") == 0)
+                        {
+                            leadingZeros = false;
+                        }
+                    }
+
+                    // Propagate units information to ASCII database now
+                    adbDrill.setdbUserUnits(10000.);
+                    adbDrill.setdbUnits(multSI);
+                }
+                // Handle part program coordinates input (starting with command "ICI" in IPC-NC-349)
+                else if (fileLine.compare(0, 3, "ICI") == 0)
+                {
+                    incrementalInput = true;
+                }
+                // Handle axis layout version (starting with command "VER" in IPC-NC-349)
+                else if (fileLine.compare(0, 4, "VER,") == 0)
+                {
+                    axisVersion = stoi(fileLine.substr(4, string::npos));
+                }
+                // Handle commands format (starting with command "FMAT" in IPC-NC-349)
+                else if (fileLine.compare(0, 5, "FMAT,") == 0)
+                {
+                    commandsFormat = stoi(fileLine.substr(5, string::npos));
+                }
+                // Define a tool or select a tool (declared with command "T" in IPC-NC-349)
+                else if (fileLine.compare(0, 1, "T") == 0)
+                {
+                    // See if any additional information on this line (header or body determination)
+                    fileLine = fileLine.substr(0, fileLine.find(";")); // Trim off any comment
+                    if (fileLine.length() > 2)
+                    {
+                        // Find delimiters
+                        size_t indFeed = fileLine.find("F"); // Z-axis worktable infeed rate (in./min or mm/ss, Excellon only)
+                        size_t indBRet = fileLine.find("B"); // Spindle retract rate (in./min or mm/ss, Excellon only)
+                        size_t indSSpd = fileLine.find("S"); // Spindle rotational speed (thousands of RPM, Excellon only)
+                        size_t indCDia = fileLine.find("C"); // Hole diameter after any plating (thousandths of in. or micrometers)
+                        size_t indHitN = fileLine.find("H"); // Maximum hit count before tool bit replaced (Excellon only)
+                        size_t indZOff = fileLine.find("Z"); // Depth offset for tools compared to mean depth (thousandths of in. or 0.01 mm, Excellon only)
+
+                        // Extract numbers (default feeds and speeds would be loaded from tool diameter table on CNC-7 machine)
+                        size_t indToolNumEnd = min(indFeed, min(indBRet, min(indSSpd, min(indCDia, min(indHitN, indZOff))))) - 1; // Tool number ends right before the first delimiter
+                        int toolNum = stoi(fileLine.substr(1, indToolNumEnd)); // Tool number
+                        size_t indToolDiaEnd = min(((indFeed > indCDia) ? indFeed : string::npos), min(((indBRet > indCDia) ? indBRet : string::npos), min(((indSSpd > indCDia) ? indSSpd : string::npos), min(((indHitN > indCDia) ? indHitN : string::npos), ((indZOff > indCDia) ? indZOff : string::npos))))) - 1; // Tool diameter ends right before the first delimeter found after its own delimeter (ternary operator ensures minimum index truly is after indCDia)
+                        double toolDia = stod(fileLine.substr(indCDia + 1, indToolDiaEnd - indCDia)) * adbDrill.getdbUnits(); // Hole diameter is index difference minus zero included characters with fractional part correction
+
+                        // Repurpose standard aperture template for a circular aperture without a hole
+                        customTool.emplace_back(Aperture(toolNum, toolDia, 0.0));
+                    }
+                    else
+                    {
+                        // Find number of current tool to select
+                        int toolNum = stoi(fileLine.substr(1, string::npos));
+
+                        // Look up the tool among already defined tools in Aperture class
+                        for (size_t indTool = 0; indTool < customTool.size(); indTool++)
+                        {
+                            if (toolNum == customTool[indTool].getAperNum())
+                            {
+                                // Switch to tool
+                                currentTool = customTool[indTool];
+                            }
+                        }
+                    }
+                }
+                // Handle header override (starting with command "OM48" in IPC-NC-349)
+                else if (fileLine.compare(0, 4, "OM48") == 0)
+                {
+                    //cout << "Override the Excellon NC drill file header" << endl;
+                }
+                // Handle header ending (starting with rewind stop command "%" in IPC-NC-349 or command "M95" in Excellon)
+                else if ((fileLine.compare(0, 1, "%") == 0) || (fileLine.compare(0, 3, "M95") == 0))
+                {
+                    //cout << "Done reading Excellon NC drill file header" << endl;
+                }
+                // Switch graphics mode to rout mode and position tool bit (starting with G-code "G00" in Excellon)
+                else if (fileLine.compare(0, 3, "G00") == 0)
+                {
+                    drillMode = false;
+                    graphicsMode = 0;
+
+                    // See if any additional information on this line
+                    size_t indComment = fileLine.find(";");
+                    if (indComment > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indYEnd - indXEnd) - intPart); // The number of digits given minus the expected integer part is the power of ten in the correction factor in leading zeros mode
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart); // Correction factor in trailing zeros mode is just the precision of the given number
+                            }
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, fileLine.substr(indXEnd + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indYEnd != string::npos)
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                yEnd *= pow(10.0, fileLine.substr(indYEnd + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                yEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+
+                        // Perform rapid positioning
+                        currentPt = { xEnd, yEnd }; // Update current point
+                    }
+                }
+                // Switch graphics mode to linear interpolation (starting with G-code "G01" in IPC-NC-349)
+                else if (fileLine.compare(0, 3, "G01") == 0)
+                {
+                    graphicsMode = 1;
+
+                    // See if any additional information on this line
+                    size_t indComment = fileLine.find(";");
+                    if (indComment > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indYEnd - indXEnd) - intPart); // The number of digits given minus the expected integer part is the power of ten in the correction factor in leading zeros mode
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart); // Correction factor in trailing zeros mode is just the precision of the given number
+                            }
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, fileLine.substr(indXEnd + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indYEnd != string::npos)
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                yEnd *= pow(10.0, fileLine.substr(indYEnd + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                yEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+
+                        // Perform full rout interpolation operation
+                        if (!drillMode && routToolDown)
+                        {
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+                            cellDrill.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                    }
+                }
+                // Switch graphics mode to clockwise circular interpolation (starting with G-code "G02" in IPC-NC-349)
+                else if (fileLine.compare(0, 3, "G02") == 0)
+                {
+                    graphicsMode = 2;
+
+                    // See if any additional information on this line
+                    size_t indComment = fileLine.find(";");
+                    if (indComment > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                        size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction (Excellon only)
+                        size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction (Excellon only)
+                        size_t indARad = fileLine.find("A"); // Arc radius
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        double iOff = 0.; // Initialize as zero offset from starting point to arc center
+                        double jOff = 0.;
+                        double aRad = 0.; // Initialize as zero arc radius
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indYEnd - indXEnd) - intPart); // The number of digits given minus the expected integer part is the power of ten in the correction factor in leading zeros mode
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart); // Correction factor in trailing zeros mode is just the precision of the given number
+                            }
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indIOff - indXEnd) - intPart);
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        else
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indARad - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indARad - indXEnd) - intPart);
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if ((indYEnd != string::npos) && (indIOff != string::npos))
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                yEnd *= pow(10.0, (indIOff - indYEnd) - intPart);
+                            }
+                            else
+                            {
+                                yEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        else
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indARad - indYEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                yEnd *= pow(10.0, (indARad - indYEnd) - intPart);
+                            }
+                            else
+                            {
+                                yEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indIOff != string::npos)
+                        {
+                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                iOff *= pow(10.0, (indJOff - indIOff) - intPart);
+                            }
+                            else
+                            {
+                                iOff *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indJOff != string::npos)
+                        {
+                            jOff = stod(fileLine.substr(indJOff + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                jOff *= pow(10.0, fileLine.substr(indJOff + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                jOff *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indARad != string::npos)
+                        {
+                            aRad = stod(fileLine.substr(indARad + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                aRad *= pow(10.0, fileLine.substr(indARad + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                aRad *= pow(10.0, -fracPart);
+                            }
+                            defaultRadius = aRad; // Update the default radius
+                        }
+
+                        // Perform full rout interpolation operation
+                        if (!drillMode && routToolDown)
+                        {
+                            // Interpolate operation (movement rate of 100 in./min at 100% feed rate by default)
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0; // Initialize to zero arc radius to interpolate
+                            if ((aRad != 0.) && (indIOff == string::npos) && (indJOff == string::npos))
+                            {
+                                arcRad = aRad; // Use the radius read from this line in the file
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                xCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated -pi/2 rad
+                                yCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (xEnd - xStart);
+                            }
+                            else if ((aRad == 0.) && (indIOff != string::npos) && (indJOff != string::npos))
+                            {
+                                xCent -= iOff; // Use offset coord = arc start coord - arc center coord
+                                yCent -= jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                            }
+                            else
+                            {
+                                arcRad = defaultRadius; // Use the radius from a previous operation
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                xCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated -pi/2 rad
+                                yCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (xEnd - xStart);
+                            }
+                            double startAngle = atan2(yStart - yCent, xStart - xCent);
+                            if (startAngle < 0)
+                            {
+                                startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                            if (endAngle < 0)
+                            {
+                                endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double arcAngle = startAngle - endAngle; // Difference of angles CW
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            for (size_t indi = 1; indi < nArcPt; indi++)
+                            {
+                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Finish interpolation by updating records and state
+                            cellDrill.paths.emplace_back(path(paths, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                    }
+                }
+                // Switch graphics mode to counterclockwise circular interpolation (starting with G-code "G03" in IPC-NC-349)
+                else if (fileLine.compare(0, 3, "G03") == 0)
+                {
+                    graphicsMode = 3;
+
+                    // See if any additional information on this line
+                    size_t indComment = fileLine.find(";");
+                    if (indComment > 3)
+                    {
+                        // Find delimiters
+                        size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                        size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                        size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction (Excellon only)
+                        size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction (Excellon only)
+                        size_t indARad = fileLine.find("A"); // Arc radius
+
+                        // Extract numbers
+                        double xEnd = currentPt[0]; // Initialize ending point to current point
+                        double yEnd = currentPt[1];
+                        double iOff = 0.; // Initialize as zero offset from starting point to arc center
+                        double jOff = 0.;
+                        double aRad = 0.; // Initialize as zero arc radius
+                        if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indYEnd - indXEnd) - intPart); // The number of digits given minus the expected integer part is the power of ten in the correction factor in leading zeros mode
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart); // Correction factor in trailing zeros mode is just the precision of the given number
+                            }
+                        }
+                        else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indIOff - indXEnd) - intPart);
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        else
+                        {
+                            xEnd = stod(fileLine.substr(indXEnd + 1, indARad - indXEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                xEnd *= pow(10.0, (indARad - indXEnd) - intPart);
+                            }
+                            else
+                            {
+                                xEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if ((indYEnd != string::npos) && (indIOff != string::npos))
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                yEnd *= pow(10.0, (indIOff - indYEnd) - intPart);
+                            }
+                            else
+                            {
+                                yEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        else
+                        {
+                            yEnd = stod(fileLine.substr(indYEnd + 1, indARad - indYEnd - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                yEnd *= pow(10.0, (indARad - indYEnd) - intPart);
+                            }
+                            else
+                            {
+                                yEnd *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indIOff != string::npos)
+                        {
+                            iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                iOff *= pow(10.0, (indJOff - indIOff) - intPart);
+                            }
+                            else
+                            {
+                                iOff *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indJOff != string::npos)
+                        {
+                            jOff = stod(fileLine.substr(indJOff + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                jOff *= pow(10.0, fileLine.substr(indJOff + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                jOff *= pow(10.0, -fracPart);
+                            }
+                        }
+                        if (indARad != string::npos)
+                        {
+                            aRad = stod(fileLine.substr(indARad + 1, indComment)) * adbDrill.getdbUnits();
+                            if (leadingZeros)
+                            {
+                                aRad *= pow(10.0, fileLine.substr(indARad + 1, indComment).length() - intPart);
+                            }
+                            else
+                            {
+                                aRad *= pow(10.0, -fracPart);
+                            }
+                            defaultRadius = aRad; // Update the default radius
+                        }
+
+                        // Perform full rout interpolation operation
+                        if (!drillMode && routToolDown)
+                        {
+                            // Interpolate operation (movement rate of 100 in./min at 100% feed rate by default)
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0; // Initialize to zero arc radius to interpolate
+                            if ((aRad != 0.) && (indIOff == string::npos) && (indJOff == string::npos))
+                            {
+                                arcRad = aRad; // Use the radius read from this line in the file
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                xCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated +pi/2 rad
+                                yCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (xEnd - xStart);
+                            }
+                            else if ((aRad == 0.) && (indIOff != string::npos) && (indJOff != string::npos))
+                            {
+                                xCent -= iOff; // Use offset coord = arc start coord - arc center coord
+                                yCent -= jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                            }
+                            else
+                            {
+                                arcRad = defaultRadius; // Use the radius from a previous operation
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                xCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated +pi/2 rad
+                                yCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (xEnd - xStart);
+                            }
+                            double startAngle = atan2(yStart - yCent, xStart - xCent);
+                            if (startAngle < 0)
+                            {
+                                startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                            if (endAngle < 0)
+                            {
+                                endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double arcAngle = endAngle - startAngle; // Difference of angles CCW
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            for (size_t indi = 1; indi < nArcPt; indi++)
+                            {
+                                paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Finish interpolation by updating records and state
+                            cellDrill.paths.emplace_back(path(paths, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                    }
+                }
+                // Switch graphics mode to simple drill cycle (starting with G-code "G05" in IPC-NC-349/Excellon Format 2 or G-code "G81" in Excellon Format 1/RS-274X)
+                else if ((fileLine.compare(0, 3, "G05") == 0) || (fileLine.compare(0, 3, "G81") == 0))
+                {
+                    drillMode = true;
+                }
+                // Handle drill or route operations with current tool bit and settings starting with x-coordinate of end point
+                else if (fileLine.compare(0, 1, "X") == 0)
+                {
+                    // Find delimiters
+                    size_t indXEnd = fileLine.find("X"); // Ending x-coordinate delimiter
+                    size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                    size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction (Excellon only)
+                    size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction (Excellon only)
+                    size_t indARad = fileLine.find("A"); // Arc radius
+                    size_t indComment = fileLine.find(";");
+
+                    // Extract numbers
+                    double xEnd = currentPt[0]; // Initialize ending point to current point
+                    double yEnd = currentPt[1];
+                    double iOff = 0.; // Initialize as zero offset from starting point to arc center
+                    double jOff = 0.;
+                    double aRad = 0.; // Initialize as zero arc radius
+                    if ((indXEnd != string::npos) && (indYEnd != string::npos))
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indYEnd - indXEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            xEnd *= pow(10.0, (indYEnd - indXEnd) - intPart); // The number of digits given minus the expected integer part is the power of ten in the correction factor in leading zeros mode
+                        }
+                        else
+                        {
+                            xEnd *= pow(10.0, -fracPart); // Correction factor in trailing zeros mode is just the precision of the given number
+                        }
+                    }
+                    else if ((indXEnd != string::npos) && (indYEnd == string::npos) && (indIOff != string::npos))
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indIOff - indXEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            xEnd *= pow(10.0, (indIOff - indXEnd) - intPart);
+                        }
+                        else
+                        {
+                            xEnd *= pow(10.0, -fracPart);
+                        }
+                    }
+                    else
+                    {
+                        xEnd = stod(fileLine.substr(indXEnd + 1, indARad - indXEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            xEnd *= pow(10.0, (indARad - indXEnd) - intPart);
+                        }
+                        else
+                        {
+                            xEnd *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if ((indYEnd != string::npos) && (indIOff != string::npos))
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            yEnd *= pow(10.0, (indIOff - indYEnd) - intPart);
+                        }
+                        else
+                        {
+                            yEnd *= pow(10.0, -fracPart);
+                        }
+                    }
+                    else
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indARad - indYEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            yEnd *= pow(10.0, (indARad - indYEnd) - intPart);
+                        }
+                        else
+                        {
+                            yEnd *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indIOff != string::npos)
+                    {
+                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            iOff *= pow(10.0, (indJOff - indIOff) - intPart);
+                        }
+                        else
+                        {
+                            iOff *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indJOff != string::npos)
+                    {
+                        jOff = stod(fileLine.substr(indJOff + 1, indComment)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            jOff *= pow(10.0, fileLine.substr(indJOff + 1, indComment).length() - intPart);
+                        }
+                        else
+                        {
+                            jOff *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indARad != string::npos)
+                    {
+                        aRad = stod(fileLine.substr(indARad + 1, indComment)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            aRad *= pow(10.0, fileLine.substr(indARad + 1, indComment).length() - intPart);
+                        }
+                        else
+                        {
+                            aRad *= pow(10.0, -fracPart);
+                        }
+                        defaultRadius = aRad; // Update the default radius
+                    }
+
+                    // Perform drill mode operation
+                    if (drillMode)
+                    {
+                        // Position tool bit and update records with tool bit image
+                        currentPt = { xEnd, yEnd }; // Update current point
+                        cellDrill.boundaries.emplace_back(currentTool.drawAsBound(xEnd, yEnd)); // Push new polygon boundary to geometric cell
+                    }
+                    // Perform rout mode operation
+                    else
+                    {
+                        if (graphicsMode == 0)
+                        {
+                            // Perform rapid positioning
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                        else if ((graphicsMode == 1) && routToolDown)
+                        {
+                            // Perform full rout linear interpolation operation
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+                            cellDrill.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                        else if (((graphicsMode == 2) || (graphicsMode == 3)) && routToolDown)
+                        {
+                            // Interpolate operation (movement rate of 100 in./min at 100% feed rate by default)
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0; // Initialize to zero arc radius to interpolate
+                            if ((aRad != 0.) && (indIOff == string::npos) && (indJOff == string::npos))
+                            {
+                                arcRad = aRad; // Use the radius read from this line in the file
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                if (graphicsMode == 2)
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated -pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                                else
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated +pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                            }
+                            else if ((aRad == 0.) && (indIOff != string::npos) && (indJOff != string::npos))
+                            {
+                                xCent -= iOff; // Use offset coord = arc start coord - arc center coord
+                                yCent -= jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                            }
+                            else
+                            {
+                                arcRad = defaultRadius; // Use the radius from a previous operation
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                if (graphicsMode == 2)
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated -pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                                else
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated +pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                            }
+                            double startAngle = atan2(yStart - yCent, xStart - xCent);
+                            if (startAngle < 0)
+                            {
+                                startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                            if (endAngle < 0)
+                            {
+                                endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double arcAngle = 0.0;
+                            if (graphicsMode == 2)
+                            {
+                                arcAngle = startAngle - endAngle; // Difference of angles CW
+                            }
+                            else
+                            {
+                                arcAngle = endAngle - startAngle; // Difference of angles CCW
+                            }
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            for (size_t indi = 1; indi < nArcPt; indi++)
+                            {
+                                if (graphicsMode == 2)
+                                {
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                }
+                                else
+                                {
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                }
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Finish interpolation by updating records and state
+                            cellDrill.paths.emplace_back(path(paths, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                    }
+                }
+                // Handle drill or route operations with current tool bit and settings starting with y-coordinate of end point
+                else if (fileLine.compare(0, 1, "Y") == 0)
+                {
+                    // Find delimiters
+                    size_t indYEnd = fileLine.find("Y"); // Ending y-coordinate delimiter
+                    size_t indIOff = fileLine.find("I"); // Arc offset distance in x-direction (Excellon only)
+                    size_t indJOff = fileLine.find("J"); // Arc offset distance in y-direction (Excellon only)
+                    size_t indARad = fileLine.find("A"); // Arc radius
+                    size_t indComment = fileLine.find(";");
+
+                    // Extract numbers
+                    double xEnd = currentPt[0]; // Initialize ending point to current point
+                    double yEnd = currentPt[1];
+                    double iOff = 0.; // Initialize as zero offset from starting point to arc center
+                    double jOff = 0.;
+                    double aRad = 0.; // Initialize as zero arc radius
+                    if ((indYEnd != string::npos) && (indIOff != string::npos))
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indIOff - indYEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            yEnd *= pow(10.0, (indIOff - indYEnd) - intPart);
+                        }
+                        else
+                        {
+                            yEnd *= pow(10.0, -fracPart);
+                        }
+                    }
+                    else
+                    {
+                        yEnd = stod(fileLine.substr(indYEnd + 1, indARad - indYEnd - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            yEnd *= pow(10.0, (indARad - indYEnd) - intPart);
+                        }
+                        else
+                        {
+                            yEnd *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indIOff != string::npos)
+                    {
+                        iOff = stod(fileLine.substr(indIOff + 1, indJOff - indIOff - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            iOff *= pow(10.0, (indJOff - indIOff) - intPart);
+                        }
+                        else
+                        {
+                            iOff *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indJOff != string::npos)
+                    {
+                        jOff = stod(fileLine.substr(indJOff + 1, indComment)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            jOff *= pow(10.0, fileLine.substr(indJOff + 1, indComment).length() - intPart);
+                        }
+                        else
+                        {
+                            jOff *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indARad != string::npos)
+                    {
+                        aRad = stod(fileLine.substr(indARad + 1, indComment)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            aRad *= pow(10.0, fileLine.substr(indARad + 1, indComment).length() - intPart);
+                        }
+                        else
+                        {
+                            aRad *= pow(10.0, -fracPart);
+                        }
+                        defaultRadius = aRad; // Update the default radius
+                    }
+
+                    // Perform drill mode operation
+                    if (drillMode)
+                    {
+                        // Position tool bit and update records with tool bit image
+                        currentPt = { xEnd, yEnd }; // Update current point
+                        cellDrill.boundaries.emplace_back(currentTool.drawAsBound(xEnd, yEnd)); // Push new polygon boundary to geometric cell
+                    }
+                    // Perform rout mode operation
+                    else
+                    {
+                        if (graphicsMode == 0)
+                        {
+                            // Perform rapid positioning
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                        else if ((graphicsMode == 1) && routToolDown)
+                        {
+                            // Perform full rout linear interpolation operation
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+                            cellDrill.paths.emplace_back(path({ currentPt[0], currentPt[1], xEnd, yEnd }, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                        else if (((graphicsMode == 2) || (graphicsMode == 3)) && routToolDown)
+                        {
+                            // Interpolate operation (movement rate of 100 in./min at 100% feed rate by default)
+                            int pathType = 1; // Round ends on GDSII path element
+                            double width = currentTool.getCircumDia(); // Width of path will be diameter of tool bit
+
+                            // Calculate center of circular arc, radius, and angle covered
+                            double xStart = currentPt[0];
+                            double yStart = currentPt[1];
+                            double xCent = xStart; // Initialize to no offset from starting point
+                            double yCent = yStart;
+                            double arcRad = 0.0; // Initialize to zero arc radius to interpolate
+                            if ((aRad != 0.) && (indIOff == string::npos) && (indJOff == string::npos))
+                            {
+                                arcRad = aRad; // Use the radius read from this line in the file
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                if (graphicsMode == 2)
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated -pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                                else
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated +pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                            }
+                            else if ((aRad == 0.) && (indIOff != string::npos) && (indJOff != string::npos))
+                            {
+                                xCent -= iOff; // Use offset coord = arc start coord - arc center coord
+                                yCent -= jOff;
+                                arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean because rounding errors prevent perfect circle
+                            }
+                            else
+                            {
+                                arcRad = defaultRadius; // Use the radius from a previous operation
+                                double aSemi = 0.5 * hypot(xEnd - xStart, yEnd - yStart); // Semidiagonal a (connecting arc points) of the rhombus connecting the start point, end point, and two possible circle centers
+                                double bSemi = 0.0; // Semidiagonal b (connecting possible circle centers) of the same rhombus
+                                if (arcRad > aSemi)
+                                {
+                                    bSemi = sqrt(pow(arcRad, 2.) - pow(aSemi, 2.)); // Valid radius
+                                }
+                                else
+                                {
+                                    arcRad = 2.0 * aSemi; // CNC-7 minimal adjusted radius
+                                }
+                                if (graphicsMode == 2)
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated -pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                                else
+                                {
+                                    xCent += 0.5 * (xEnd - xStart) - bSemi / aSemi * 0.5 * (yEnd - yStart); // Center is start arc point + midpoint of arc points + scaled walk rotated +pi/2 rad
+                                    yCent += 0.5 * (xEnd - xStart) + bSemi / aSemi * 0.5 * (xEnd - xStart);
+                                }
+                            }
+                            double startAngle = atan2(yStart - yCent, xStart - xCent);
+                            if (startAngle < 0)
+                            {
+                                startAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double endAngle = atan2(yEnd - yCent, xEnd - xCent);
+                            if (endAngle < 0)
+                            {
+                                endAngle += 2.0 * M_PI; // Have to work entirely with angles between 0 and 2*pi
+                            }
+                            double arcAngle = 0.0;
+                            if (graphicsMode == 2)
+                            {
+                                arcAngle = startAngle - endAngle; // Difference of angles CW
+                            }
+                            else
+                            {
+                                arcAngle = endAngle - startAngle; // Difference of angles CCW
+                            }
+
+                            // Calculate points along arc with irregular 24-gon approximation
+                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            vector<double> paths; // Initialize vector of path coordinates
+                            paths.push_back(xStart); // x-coordinate of current point
+                            paths.push_back(yStart); // y-coordinate of current point
+                            for (size_t indi = 1; indi < nArcPt; indi++)
+                            {
+                                if (graphicsMode == 2)
+                                {
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                }
+                                else
+                                {
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                }
+                            }
+                            paths.push_back(xEnd); // x-coordinate of end point
+                            paths.push_back(yEnd); // y-coordinate of end point
+
+                            // Finish interpolation by updating records and state
+                            cellDrill.paths.emplace_back(path(paths, 1, {}, pathType, width)); // Push new path to geometric cell
+                            currentPt = { xEnd, yEnd }; // Update current point
+                        }
+                    }
+                }
+                // Repeat drill operations with given separation (starting with command "R" in Excellon)
+                else if (fileLine.compare(0, 1, "R") == 0)
+                {
+                    // Find delimiters
+                    size_t indRepN = fileLine.find("R"); // Number of repititions after the first
+                    size_t indXSep = fileLine.find("X"); // Separation x-coordinate delimiter
+                    size_t indYSep = fileLine.find("Y"); // Separation y-coordinate delimiter
+                    size_t indComment = fileLine.find(";");
+
+                    // Extract numbers
+                    int nRep = 0; // Initialize to zero repititions
+                    double xSep = 0.0; // Initialize separation amount to zero
+                    double ySep = 0.0;
+                    if ((indRepN != string::npos) && (indXSep != string::npos))
+                    {
+                        nRep = stoi(fileLine.substr(indRepN + 1, indXSep - indRepN - 1));
+                    }
+                    else if ((indRepN != string::npos) && (indXSep == string::npos) && (indYSep != string::npos))
+                    {
+                        nRep = stoi(fileLine.substr(indRepN + 1, indYSep - indRepN - 1));
+                    }
+                    if ((indXSep != string::npos) && (indYSep != string::npos))
+                    {
+                        xSep = stod(fileLine.substr(indXSep + 1, indYSep - indXSep - 1)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            xSep *= pow(10.0, (indYSep - indXSep) - intPart); // The number of digits given minus the expected integer part is the power of ten in the correction factor in leading zeros mode
+                        }
+                        else
+                        {
+                            xSep *= pow(10.0, -fracPart); // Correction factor in trailing zeros mode is just the precision of the given number
+                        }
+                    }
+                    else if ((indXSep != string::npos) && (indYSep == string::npos))
+                    {
+                        xSep = stod(fileLine.substr(indXSep + 1, indComment)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            xSep *= pow(10.0, fileLine.substr(indXSep + 1, indComment).length() - intPart);
+                        }
+                        else
+                        {
+                            xSep *= pow(10.0, -fracPart);
+                        }
+                    }
+                    if (indYSep != string::npos)
+                    {
+                        ySep = stod(fileLine.substr(indYSep + 1, indComment)) * adbDrill.getdbUnits();
+                        if (leadingZeros)
+                        {
+                            ySep *= pow(10.0, fileLine.substr(indYSep + 1, indComment).length() - intPart);
+                        }
+                        else
+                        {
+                            ySep *= pow(10.0, -fracPart);
+                        }
+                    }
+
+                    // Repeat drill mode operations
+                    if (drillMode)
+                    {
+                        // Position tool bit and update records with tool bit image repeatedly
+                        for (size_t indRep = 0; indRep < nRep; indRep++)
+                        {
+                            currentPt = { currentPt[0] + xSep, currentPt[1] + ySep }; // Update current point
+                            cellDrill.boundaries.emplace_back(currentTool.drawAsBound(currentPt[0], currentPt[1])); // Push new polygon boundary to geometric cell
+                        }
+                    }
+                }
+                // Move tool bit down for routing (starting with command "M15" in Excellon)
+                else if (fileLine.compare(0, 3, "M15") == 0)
+                {
+                    routToolDown = true;
+                }
+                // Move tool bit up to stop routing (starting with command "M16" in Excellon)
+                else if (fileLine.compare(0, 3, "M16") == 0)
+                {
+                    routToolDown = false;
+                }
+                // End of file rewind (starting with command "M30" in IPC-NC-349)
+                else if (fileLine.compare(0, 3, "M30") == 0)
+                {
+                    break;
+                }
+
+                // Keep reading new lines in file, skipping comments
+                getline(drillFile, fileLine);
+                while (fileLine.compare(0, 1, ";") == 0)
+                {
+                    getline(drillFile, fileLine);
+                }
+            }
+
+            // Close file
+            drillFile.close();
+
+            // Update ASCII database of drill holes
+            adbDrill.setLibName("drill");
+            adbDrill.appendCell(cellDrill);
+            adbDrill.setdbUnits(adbDrill.getdbUnits() * 1.); // Rescale Gerber file units 1x to allow integer representation in GDSII
+
+            // Print and dump the ASCII database of drill holes
+            //adbDrill.print({ });
+            adbDrill.dump();
+
+            // Return ASCII database of drill holes
+            return adbDrill;
+        }
+        else
+        {
+            // File could not be opened
+            cerr << "Unable to open Excellon NC drill file" << endl;
+            return AsciiDataBase();
         }
     }
 
