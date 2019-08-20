@@ -2263,6 +2263,10 @@ public:
             vector<double> boundCoord = (cell.boundaries[indi]).getBounds();
             for (size_t indj = 0; indj < boundCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising boundary except repeated point
             {
+                if ((cell.boundaries[indi]).getDataType() != 0)
+                {
+                    continue; // Treat all boundaries with nonzero datatype as nonphysical
+                }
                 vector<double> boundPt = transform.applyTranform({ boundCoord[2 * indj], boundCoord[2 * indj + 1] }); // Apply the linear transformation of this cell reference
                 complex<double> zBound(boundPt[0] + xo, boundPt[ 1] + yo);
                 allPt.push_back(zBound); // Complex number with x- and y-coordinates (m)
@@ -2273,6 +2277,10 @@ public:
             vector<double> pathCoord = (cell.paths[indi]).getPaths();
             for (size_t indj = 0; indj < pathCoord.size() / 2; indj++) // Handle each coordinate comprising path
             {
+                if ((cell.paths[indi]).getDataType() != 0)
+                {
+                    continue; // Treat all paths with nonzero datatype as nonphysical
+                }
                 vector<double> pathPt = transform.applyTranform({ pathCoord[2 * indj], pathCoord[2 * indj + 1] }); // Apply the linear transformation of this cell reference
                 complex<double> zPath(pathPt[0] + xo, pathPt[1] + yo);
                 allPt.push_back(zPath); // Complex number with x- and y-coordinates (m)
@@ -2283,6 +2291,10 @@ public:
             vector<double> boxCoord = (cell.boxes[indi]).getBoxes();
             for (size_t indj = 0; indj < boxCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising box outline except repeated point
             {
+                if ((cell.boxes[indi]).getType() != 0)
+                {
+                    continue; // Treat all box outlines with nonzero box type as nonphysical
+                }
                 vector<double> boxPt = transform.applyTranform({ boxCoord[2 * indj], boxCoord[2 * indj + 1] }); // Apply the linear transformation of this cell reference
                 complex<double> zBox(boxPt[0] + xo, boxPt[1] + yo);
                 allPt.push_back(zBox); // Complex number with x- and y-coordinates (m)
@@ -2749,7 +2761,7 @@ public:
     }
 
     // Save to fdtdMesh conductor information
-    void saveToMesh(std::string name, vector<double> center, strans transform, fdtdMesh *sys)
+    void saveToMesh(std::string name, vector<double> center, strans transform, fdtdMesh *sys, vector<int> gdsiiLayerIgnore)
     {
         // Error checking on input point
         double xo, yo; // Coordinate offsets
@@ -2779,10 +2791,26 @@ public:
         // Set conductor information from all elements in this geometric cell
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
+            // Determine if boundary is worth saving as conductor
             if ((cell.boundaries)[indi].getDataType() != 0)
             {
                 continue; // Treat all boundaries with nonzero datatype as nonphysical
             }
+            int gdsiiNum = (cell.boundaries)[indi].getLayer(); // GDSII layer number of boundary
+            bool physicalLayer = true; // Boundary lies on a physical layer
+            for (size_t indIgnore = 0; indIgnore < gdsiiLayerIgnore.size(); indIgnore++)
+            {
+                if (gdsiiNum == gdsiiLayerIgnore[indIgnore])
+                {
+                    physicalLayer = false; // Have to use a flag since checking condition in a loop
+                }
+            }
+            if (!physicalLayer)
+            {
+                continue;
+            }
+
+            // Save boundary as conductor
             vector<double> boundCoord = ((cell.boundaries)[indi]).getBounds();
             this->numCdtIn++;
             sys->conductorIn.push_back(fdtdOneCondct());
@@ -2794,7 +2822,7 @@ public:
             sys->conductorIn[si].ymin = DOUBLEMAX;
             sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
             sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
-            sys->conductorIn[si].layer = ((cell.boundaries)[indi]).getLayer();
+            sys->conductorIn[si].layer = gdsiiNum;
             condj = 0;
             for (size_t indj = 0; indj < boundCoord.size() - 2; indj += 2) // Iterate over each ordered pair, -2 because the last point is the starting point
             {
@@ -2818,10 +2846,26 @@ public:
         }
         for (size_t indi = 0; indi < numPath; indi++) // Handle each path
         {
+            // Determine if path is worth saving as conductor
             if ((cell.paths)[indi].getDataType() != 0)
             {
                 continue; // Treat all paths with nonzero datatype as nonphysical
             }
+            int gdsiiNum = (cell.paths)[indi].getLayer(); // GDSII layer number of path
+            bool physicalLayer = true; // Path lies on a physical layer
+            for (size_t indIgnore = 0; indIgnore < gdsiiLayerIgnore.size(); indIgnore++)
+            {
+                if (gdsiiNum == gdsiiLayerIgnore[indIgnore])
+                {
+                    physicalLayer = false; // Have to use a flag since checking condition in a loop
+                }
+            }
+            if (!physicalLayer)
+            {
+                continue;
+            }
+
+            // Save path as conductor
             vector<double> pathCoord = ((cell.paths)[indi]).getPaths();
             double width = ((cell.paths)[indi]).getWidth();
             int type = (cell.paths[indi]).getType();
@@ -2849,7 +2893,7 @@ public:
                 sys->conductorIn[si].ymin = DOUBLEMAX;
                 sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
                 sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
-                sys->conductorIn[si].layer = ((cell.paths)[indi]).getLayer();
+                sys->conductorIn[si].layer = gdsiiNum;
                 condj = 0;
                 if (pathCoord[indj] == pathCoord[indj + 2]) // Path segment along y-axis
                 {
@@ -2957,22 +3001,38 @@ public:
         }
         for (size_t indi = 0; indi < numBox; indi++) // Handle each box outline
         {
+            // Determine if box outline is worth saving as conductor
             if ((cell.boxes)[indi].getType() != 0)
             {
                 continue; // Treat all box outlines with nonzero box type as nonphysical
             }
+            int gdsiiNum = (cell.boxes)[indi].getLayer(); // GDSII layer number of box outline
+            bool physicalLayer = true; // Box outline lies on a physical layer
+            for (size_t indIgnore = 0; indIgnore < gdsiiLayerIgnore.size(); indIgnore++)
+            {
+                if (gdsiiNum == gdsiiLayerIgnore[indIgnore])
+                {
+                    physicalLayer = false; // Have to use a flag since checking condition in a loop
+                }
+            }
+            if (!physicalLayer)
+            {
+                continue;
+            }
+
+            // Save box outline as conductor
             vector<double> boxCoord = ((cell.boxes)[indi]).getBoxes();
             this->numCdtIn++;
             sys->conductorIn.push_back(fdtdOneCondct());
             si = sys->conductorIn.size() - 1;
             sys->conductorIn[si].numVert = ((cell.boxes)[indi]).getNBoxPt() - 1;
-            sys->conductorIn[si].layer = ((cell.boxes)[indi]).getLayer();
             sys->conductorIn[si].xmax = DOUBLEMIN;
             sys->conductorIn[si].xmin = DOUBLEMAX;
             sys->conductorIn[si].ymax = DOUBLEMIN;
             sys->conductorIn[si].ymin = DOUBLEMAX;
             sys->conductorIn[si].x = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
             sys->conductorIn[si].y = (double*)calloc(sys->conductorIn[si].numVert, sizeof(double));
+            sys->conductorIn[si].layer = gdsiiNum;
             condj = 0;
             for (size_t indj = 0; indj < boxCoord.size() - 2; indj += 2) // Iterate over each ordered pair, -2 because the last point is the starting point
             {
@@ -2998,7 +3058,7 @@ public:
         for (size_t indi = 0; indi < numSRef; indi++) // Handle each structure reference recursively
         {
             vector<double> refPt = transform.applyTranform(((cell.sreferences)[indi]).getSRefs()); // Apply the linear transformation of this cell reference
-            saveToMesh((cell.sreferences)[indi].getSRefName(), { refPt[0] + xo, refPt[1] + yo }, (cell.sreferences)[indi].getTransform().composeTransform(transform), sys);
+            saveToMesh((cell.sreferences)[indi].getSRefName(), { refPt[0] + xo, refPt[1] + yo }, (cell.sreferences)[indi].getTransform().composeTransform(transform), sys, gdsiiLayerIgnore);
         }
         for (size_t indi = 0; indi < cell.getNumARef(); indi++) // Handle each array reference instance
         {
@@ -3006,7 +3066,7 @@ public:
             for (size_t indj = 0; indj < instanceCoord.size(); indj++) // Handle each instance in array reference recursively
             {
                 vector<double> centPt = transform.applyTranform(instanceCoord[indj]); // Apply the linear transformation of this cell reference
-                saveToMesh((cell.areferences)[indi].getARefName(), { centPt[0] + xo, centPt[1] + yo }, (cell.areferences)[indi].getTransform().composeTransform(transform), sys);
+                saveToMesh((cell.areferences)[indi].getARefName(), { centPt[0] + xo, centPt[1] + yo }, (cell.areferences)[indi].getTransform().composeTransform(transform), sys, gdsiiLayerIgnore);
             }
         }
     }

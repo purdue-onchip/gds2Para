@@ -261,9 +261,7 @@ int main(int argc, char** argv)
             adbIsGood = adbReader(inGDSIIFile.c_str());
             if (adbIsGood)
             {
-                string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
                 vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
-                adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys); // Recursively save GDSII conductor information to sys
                 adb.print(indCellPrint);
                 cout << "GDSII file read" << endl;
             }
@@ -289,7 +287,9 @@ int main(int argc, char** argv)
 
             // Append information so far to fdtdMesh
             unordered_set<double> portCoorx, portCoory;
-            sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory);
+            string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
+            adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys, sdb.findLayerIgnore()); // Recursively save GDSII conductor information to sys
+            sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory); // Save simulation input information to sys
 
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;

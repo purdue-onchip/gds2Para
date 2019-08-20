@@ -684,6 +684,12 @@ class Layer
         this->gdsiiNum = gdsiiNum;
     }
 
+    // Return if the layer is valid and physical
+    bool isValid() const
+    {
+        return ((this->zHeight > 0.0) && (this->epsilon_r >= 1.0) && (this->sigma >= 0.0)); // Positive height, permittivity that of free space or greater, and nonnegative conductivity
+    }
+
     // Print the layer information
     void print() const
     {
@@ -2231,6 +2237,20 @@ struct SolverDataBase
         return this->layers;
     }
 
+    // Get vector of information for valid, physical layers
+    vector<Layer> getValidLayers() const
+    {
+        vector<Layer> validLayers;
+        for (size_t indLayer = 0; indLayer < this->getNumLayer(); indLayer++)
+        {
+            if (this->layers[indLayer].isValid())
+            {
+                validLayers.push_back(this->layers[indLayer]);
+            }
+        }
+        return validLayers;
+    }
+
     // Get waveforms
     Waveforms getWaveforms() const
     {
@@ -2382,6 +2402,20 @@ struct SolverDataBase
             names.push_back(((this->layers)[indi]).getLayerName());
         }
         return names;
+    }
+
+    // Find layers that solver should ignore
+    vector<int> findLayerIgnore() const
+    {
+        vector<int> gdsiiLayerIgnore;
+        for (size_t indLayer = 0; indLayer < this->getNumLayer(); indLayer++)
+        {
+            if (!this->getLayer(indLayer).isValid())
+            {
+                gdsiiLayerIgnore.push_back(this->getLayer(indLayer).getGDSIINum()); // Ignore layers of zero height
+            }
+        }
+        return gdsiiLayerIgnore;
     }
 
     // Read outline (or unmarked dimension) Gerber file (extension must be included)
@@ -5715,11 +5749,13 @@ struct SolverDataBase
         data->zlim2 = (this->settings).getLimits()[5] / (this->settings).getLengthUnit();
 
         // Use layer stack-up information to set fields
-        data->numStack = this->getNumLayer();
-        for (size_t indi = 0; indi < data->numStack; indi++)
+        vector<Layer> physicalLayers = this->getValidLayers(); // Work with only physically valid layers
+        data->numStack = physicalLayers.size();
+        for (size_t indLayer = 0; indLayer < data->numStack; indLayer++)
         {
-            Layer thisLayer = this->getLayer(indi); // Get copy of layer for this iteration
+            Layer thisLayer = physicalLayers[indLayer]; // Get copy of layer for this iteration
             data->stackEps.push_back(thisLayer.getEpsilonR()); // Relative permittivity of the layers
+            data->stackSig.push_back(thisLayer.getSigma()); // (Real) conductivity of the conductors in the layers
             data->stackBegCoor.push_back(thisLayer.getZStart());
             data->stackEndCoor.push_back(thisLayer.getZStart() + thisLayer.getZHeight());
             data->stackName.push_back(thisLayer.getLayerName());
@@ -5732,7 +5768,7 @@ struct SolverDataBase
             for (size_t indj = 0; indj < data->numStack; indj++)
             {
                 // See if conductor layer numbers being built correspond to GDSII layer number
-                if (data->conductorIn[indi].layer == this->getLayer(indj).getGDSIINum())
+                if (data->conductorIn[indi].layer == physicalLayers[indj].getGDSIINum())
                 {
                     data->conductorIn[indi].zmin = data->stackBegCoor[indj];
                     data->conductorIn[indi].zmax = data->stackEndCoor[indj];

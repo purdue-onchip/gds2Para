@@ -41,7 +41,7 @@ using namespace std;
 #define EPSILON0 (1./(CSPED*CSPED*MU))
 
 // Solver discretization control macros
-#define SIGMA (5.8e+7)
+#define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 #define DOUBLEMAX (1.e+30)
@@ -217,11 +217,13 @@ public:
     /* Layer stack up parameters */
     int numStack;
     vector<double> stackEps;
+    vector<double> stackSig;
     vector<double> stackBegCoor;
     vector<double> stackEndCoor;
     vector<string> stackName;
     double *eps;
     vector<double> stackEpsn;
+    vector<double> stackSign;
     double *stackCdtMark;
 
     /* Conductor parameters */

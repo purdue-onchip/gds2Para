@@ -287,14 +287,16 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->nz = j + 1;
     free(zn); zn = NULL;
     
-    // Putting the layer permittivities in order of increasing z-coordinate?
+    // Putting the layer relative permittivities and conductivities in order of increasing z-coordinate
     i = 0;
     if (sys->stackBegCoor[0] == sys->zn[0]){
         j = 0;
         sys->stackEpsn.push_back(sys->stackEps[j]);    // the stack eps with i < sys->N_edge_s
+        sys->stackSign.push_back(sys->stackSig[j]);    // the stack sig with i < sys->N_edge_s
         while (i < sys->nz - 1) {
             if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]) {
                 sys->stackEpsn.push_back(sys->stackEps[j]);
+                sys->stackSign.push_back(sys->stackSig[j]);
                 i++;
             }
             else {
@@ -305,9 +307,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     else {
         j = sys->numStack - 1;
         sys->stackEpsn.push_back(sys->stackEps[j]);
+        sys->stackSign.push_back(sys->stackSig[j]);
         while (i < sys->nz - 1) {
             if ((sys->zn[i] + sys->zn[i + 1]) / 2 >= sys->stackBegCoor[j] && (sys->zn[i] + sys->zn[i + 1]) / 2 <= sys->stackEndCoor[j]) {
                 sys->stackEpsn.push_back(sys->stackEps[j]);
+                sys->stackSign.push_back(sys->stackSig[j]);
                 i++;
             }
             else {
@@ -324,21 +328,21 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 #ifdef PRINT_NODE_COORD
     /*for (i = 0; i < sys->nz - 1; i++){
-    cout << sys->stackEpsn[i] << endl;
+        cout << sys->stackEpsn[i] << endl;
     }*/
     
     for (i = 0; i < sys->nx; i++){
-    cout << sys->xn[i] << " ";
+        cout << sys->xn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << endl << endl;
     for (i = 0; i < sys->ny; i++){
-    cout << sys->yn[i] << " ";
+        cout << sys->yn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << endl << endl;
     for (i = 0; i < sys->nz; i++){
-    cout << sys->zn[i] << " ";
+        cout << sys->zn[i] << " ";
     }
-    cout << "\n" << endl;
+    cout << endl << endl;
 #endif
     
     /***********************************************************************************************/
@@ -1166,9 +1170,11 @@ for (i = 0; i < sys->N_node; i++) {
 
     tt = clock();
     for (i = 0; i < sys->numPorts; i++){
+        //cout << " Checking port" << i + 1 << endl;
         indPortNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         indPortNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
-        
+        //cout << "  indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
+
         if (cond.find(indPortNode1) == cond.end()){
             cond.insert(indPortNode1);
             for (j = 0; j < sys->cdtNumNode[indPortNode1 - 1]; j++){
@@ -1215,10 +1221,11 @@ for (i = 0; i < sys->N_node; i++) {
                 }
             }
         }
-        
+        //cout << "  Checked indPortNode1 against final conductor, and now checking indPortNode2" << endl;
         if (cond.find(indPortNode2) == cond.end()){
             cond.insert(indPortNode2);
             for (j = 0; j < sys->cdtNumNode[indPortNode2 - 1]; j++){
+                //cout << "  Checking indPortNode2 against conductor " << j << " out of " << sys->cdtNumNode[indPortNode2 - 1] << endl;
                 inz = sys->conductor[indPortNode2 - 1].node[j] / sys->N_node_s;
                 inx = ((sys->conductor[indPortNode2 - 1].node[j]) % sys->N_node_s) / (sys->N_cell_y + 1);
                 iny = ((sys->conductor[indPortNode2 - 1].node[j]) % sys->N_node_s) % (sys->N_cell_y + 1);
@@ -1994,7 +2001,8 @@ void fdtdMesh::print()
     cout << "  Boundary edge array exists (" << (this->bd_edge != nullptr) << ")" << endl;
     cout << " Layer stack up parameters:" << endl;
     cout << "  Number of layers in stack: " << this->numStack << endl;
-    cout << "  Permittivity vector has size " << this->stackEps.size() << endl;
+    cout << "  Relative permittivity vector has size " << this->stackEps.size() << endl;
+    cout << "  Conductivity vector has size " << this->stackSig.size() << endl;
     cout << "  Beginning z-coordinate vector has size " << this->stackBegCoor.size() << endl;
     cout << "  Ending z-coordinate vector has size " << this->stackEndCoor.size() << endl;
     cout << "  Layer name vector has size " << this->stackName.size() << endl;
@@ -2006,7 +2014,8 @@ void fdtdMesh::print()
     {
         cout << "  Edge permittivity array D_eps has size " << NELEMENT(this->eps) << endl;
     }
-    cout << "  stackEpsn vector has size " << this->stackEpsn.size() << endl;
+    cout << "  Ordered stackEpsn vector has size " << this->stackEpsn.size() << endl;
+    cout << "  Ordered stackSign vector has size " << this->stackSign.size() << endl;
     if (this->stackCdtMark == nullptr)
     {
         cout << "  Stack conductor marker array exists (" << (this->stackCdtMark != nullptr) << ")" << endl;
