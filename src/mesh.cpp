@@ -24,10 +24,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         numNode += sys->conductorIn[i].numVert;
     }
 
-    int n_surx = 1, n_sury = 0, n_surz = 1;    // The surrounding discretized points around the conductors
-    double dis_surx = 5e-6, dis_sury = 1e-5, dis_surz = 1e-6;
-    xOrigOld = (double*)calloc((n_surx * 2 + 1) * (numNode + 2 * sys->numPorts), sizeof(double));
-    yOrigOld = (double*)calloc((n_sury * 2 + 1) * (numNode + 2 * sys->numPorts), sizeof(double));
+    int n_surx = 0, n_sury = 1, n_surz = 1;    // The surrounding discretized points around the conductors
+    double dis_surx = 5e-6, dis_sury = 3e-6, dis_surz = 5e-6;
+    xOrigOld = (double*)calloc((n_surx * 2 + 1) * (numNode + 2 * sys->numPorts) + 2, sizeof(double));   // +2 is for xmin and xmax
+    yOrigOld = (double*)calloc((n_sury * 2 + 1) * (numNode + 2 * sys->numPorts) + 2, sizeof(double));   // +2 is for ymin and ymax
     zOrigOld = (double*)calloc((n_surz * 2 + 1) * (2 * sys->numStack + 2 * sys->numPorts), sizeof(double));
     double minLayerDist = sys->zlim2 - sys->zlim1;// Initialize smallest distance between layers as entire domain height (units included)
     xmin = sys->xlim1 * sys->lengthUnit;
@@ -86,6 +86,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         jtx++;
         jty++;
     }
+	xOrigOld[jtx] = xmin;
+	jtx++;
+	xOrigOld[jtx] = xmax;
+	jtx++;
+	yOrigOld[jty] = ymin;
+	jty++;
+	yOrigOld[jty] = ymax;
+	jty++;
     int count_xOrigOld = jtx;
     int count_yOrigOld = jty;
     
@@ -142,7 +150,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(xOrigOld, xOrigOld + count_xOrigOld);
     
     sys->nx = 1;
-    double disMaxx = 0.00002;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
+    double disMaxx = 0.0005;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     int xMaxInd = (xmax - xmin) / disMaxx;
 
     if (dis_surx < disMin){
@@ -214,7 +222,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the y-direction */
     sort(yOrigOld, yOrigOld + count_yOrigOld);
     sys->ny = 1;
-    double disMaxy = 0.0007;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
+    double disMaxy = 0.0005;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     int yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < count_yOrigOld; i++){
@@ -289,7 +297,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the z-direction */
     sort(zOrigOld, zOrigOld + count_zOrigOld);
     sys->nz = 1;
-    double disMinz = 1e-7;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
+    double disMinz = 1e-9;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
     //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
     double *zn = (double*)calloc(count_zOrigOld, sizeof(double));
     zn[0] = zOrigOld[0];
@@ -1229,13 +1237,11 @@ for (i = 0; i < sys->N_node; i++) {
         if (visited[i] != 0){
             sys->conductor[visited[i] - 1].node[sys->conductor[visited[i] - 1].cdtNodeind] = i;
             if ((i < sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -1){
-                /*portground_count++;
-                if (portground_count <= 1)*/
                 sys->conductor[visited[i] - 1].markPort = -1;    // this conductor connects to the lower PEC
             }
-            else if ((i >= sys->N_node - sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -2 && sys->conductor[visited[i] - 1].markPort != -1){
-                sys->conductor[visited[i] - 1].markPort = -2;    // this conductor connects to the upper PEC
-            }
+            //else if ((i >= sys->N_node - sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -2 && sys->conductor[visited[i] - 1].markPort != -1){
+            //    sys->conductor[visited[i] - 1].markPort = -2;    // this conductor connects to the upper PEC
+            //}
             sys->conductor[visited[i] - 1].cdtNodeind++;
         }
     }
@@ -1565,6 +1571,13 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
         myint indMarkNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         myint indMarkNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
         
+        if (sys->portCoor[i].portDirection > 0){
+            sys->GNDcond.insert(indMarkNode1);
+        }
+        else{
+            sys->GNDcond.insert(indMarkNode2);
+        }
+
         if ((indMarkNode1 != 0) && (sys->conductor[indMarkNode1 - 1].markPort > -1)){ // Only supply end of port not on PEC
             sys->portCoor[i].portCnd = indMarkNode1;
             sys->conductor[indMarkNode1 - 1].markPort = i + 1;    // markPort start from 1

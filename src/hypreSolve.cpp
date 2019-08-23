@@ -31,7 +31,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     /* Initialize MPI */
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-
+    
     N = leng_v0;
     local_size = N / num_procs; // Integer division
     extra = N - local_size * num_procs;
@@ -42,7 +42,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     iupper = local_size * (myid + 1);
     iupper += hypre_min(myid + 1, extra);
     iupper -= 1;
-
+    
     /* How many rows do I have? */
     local_size = iupper - ilower + 1;
     
@@ -50,13 +50,13 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     Note that this is a square matrix, so we indicate the row partition
     size twice (since number of rows = number of cols) */
     HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
-
+    
     /* Choose a parallel CSR format storage (see the User's Manual) */
     HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
-
+    
     /* Initialize before setting coefficients */
     HYPRE_IJMatrixInitialize(A);
-
+    
     HYPRE_Int nnz;
     vector<double> values;
     vector<HYPRE_Int> cols;

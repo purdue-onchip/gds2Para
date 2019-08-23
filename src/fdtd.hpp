@@ -41,7 +41,7 @@ using namespace std;
 #define EPSILON0 (1./(CSPED*CSPED*MU))
 
 // Solver discretization control macros
-#define SIGMA (5.8e+7)
+#define SIGMA (4.5e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 #define DOUBLEMAX (1.e+30)
@@ -51,7 +51,7 @@ using namespace std;
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (1.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-16)
+#define DT (1.e-15)
 
 // HYPRE control macros
 #define HYPRE_METHOD (3) // 1 = AMG, 2 = PCG with AMG Preconditioner, 3 = Flexible GMRES with AMG Preconditioner
@@ -65,8 +65,9 @@ using namespace std;
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
 #define SKIP_PARDISO // Remove PARDISO solver code
-#define SKIP_VH // Turn on to save a lot of time
+#define SKIP_VH
 //#define SKIP_GENERATE_STIFF
+//#define SKIP_STIFF_REFERENCE
 //#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
 
 
@@ -225,6 +226,7 @@ public:
 
     /* Conductor parameters */
     vector<fdtdOneCondct> conductorIn;
+    set<int> GNDcond;    // the conductor # acting as port and GND
     myint numCdtRow;    // how many input rows
     myint numCdt;       // number of isolated conductors in design
     int *markEdge;    // mark if this edge is inside a conductor
@@ -469,6 +471,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
 int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort);
 int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint acol, lapack_complex_double *b, myint brow, myint bcol, lapack_complex_double *tmp3);
 int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *ColId, double *val);
+int reference1(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *ColId, double *val, complex<double> *xr);
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
 #endif
