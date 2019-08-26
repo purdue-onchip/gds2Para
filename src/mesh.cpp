@@ -24,8 +24,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         numNode += sys->conductorIn[i].numVert;
     }
 
-    int n_surx = 0, n_sury = 1, n_surz = 1;    // The surrounding discretized points around the conductors
-    double dis_surx = 5e-6, dis_sury = 3e-6, dis_surz = 5e-6;
+    int n_surx = 1, n_sury = 1, n_surz = 0;    // The surrounding discretized points around the conductors
+    double dis_surx = 1e-6, dis_sury = 1e-6, dis_surz = 5e-8;
     xOrigOld = (double*)calloc((n_surx * 2 + 1) * (numNode + 2 * sys->numPorts) + 2, sizeof(double));   // +2 is for xmin and xmax
     yOrigOld = (double*)calloc((n_sury * 2 + 1) * (numNode + 2 * sys->numPorts) + 2, sizeof(double));   // +2 is for ymin and ymax
     zOrigOld = (double*)calloc((n_surz * 2 + 1) * (2 * sys->numStack + 2 * sys->numPorts), sizeof(double));
@@ -150,7 +150,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(xOrigOld, xOrigOld + count_xOrigOld);
     
     sys->nx = 1;
-    double disMaxx = 0.0005;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
+    double disMaxx = 0.00001;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     int xMaxInd = (xmax - xmin) / disMaxx;
 
     if (dis_surx < disMin){
@@ -222,7 +222,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the y-direction */
     sort(yOrigOld, yOrigOld + count_yOrigOld);
     sys->ny = 1;
-    double disMaxy = 0.0005;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
+    double disMaxy = 0.00001;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     int yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < count_yOrigOld; i++){
@@ -269,25 +269,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	
 
     int county = j;
-    //sort(yn, yn + county + 1);
-
-    //sys->ynu = (double*)calloc(sys->ny, sizeof(double));
-
     j = 0;
-    //sys->ynu[0] = yn[0];
-    //yi[sys->ynu[0]] = j;
     temp = yn[0];
     for (i = 1; i <= county; i++){    // set the discretization length around port to be equal
 
         if (abs(yn[i] - temp) > disMin){
             j++;
             temp = yn[i];
-            //sys->ynu[j] = yn[i];
-            //yi[sys->ynu[j]] = j;
 
-        }
-        else {
-            //yi[yn[i]] = j;
         }
     }
     sys->ny = j + 1;
@@ -295,22 +284,75 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /********************************************************************************/
     /* Discretize domain in the z-direction */
+
+    /* Start of Original Code */
+    //sort(zOrigOld, zOrigOld + count_zOrigOld);
+    //sys->nz = 1;
+    //double disMinz = 1e-9;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
+    ////double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
+    //double *zn = (double*)calloc(count_zOrigOld, sizeof(double));
+    //zn[0] = zOrigOld[0];
+    //j = 0;
+    //for (i = 1; i < count_zOrigOld; i++){
+    //    if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMinz){
+    //        sys->nz++;
+    //    }
+    //    j++;
+    //    zn[j] = zOrigOld[i];
+    //}
+    //int countz = j;
+    /* End of Original Code */
+
     sort(zOrigOld, zOrigOld + count_zOrigOld);
     sys->nz = 1;
     double disMinz = 1e-9;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
-    //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
-    double *zn = (double*)calloc(count_zOrigOld, sizeof(double));
+    double disMaxz = 1.2e-7;// minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
+    int zMaxInd = (zmax - zmin) / disMaxz;
+    double *zn = (double*)calloc(count_zOrigOld + zMaxInd, sizeof(double));
     zn[0] = zOrigOld[0];
     j = 0;
+    temp = zn[0];
+    
+
+    /* Start of new z assignment with disMaxz */
     for (i = 1; i < count_zOrigOld; i++){
-        if (abs(zOrigOld[i] - zOrigOld[i - 1]) > disMinz){
+        if (abs(zOrigOld[i] - temp) > disMinz && abs(zOrigOld[i] - temp) <= disMaxz){
+            j++;
+            zn[j] = zOrigOld[i];
+            temp = zn[j];
             sys->nz++;
         }
-        j++;
-        zn[j] = zOrigOld[i];
+        else if (abs(zOrigOld[i] - temp) > disMinz && abs(zOrigOld[i] - temp) > disMaxz){
+            while (abs(zOrigOld[i] - temp) > disMaxz){
+                j++;
+                zn[j] = zn[j - 1] + disMaxz;
+                temp = zn[j];
+                sys->nz++;
+            }
+            
+            if (abs(zOrigOld[i] - temp) > disMinz){
+                sys->nz++;
+                temp = zOrigOld[i];
+            }
+            j++;
+            zn[j] = zOrigOld[i];
+        }
+        else {
+            j++;
+            zn[j] = zOrigOld[i];
+        }
     }
-    int countz = j;
 
+    int countz = j;    // Record the number of points along the z direction
+    j = 0;
+    temp = zn[0];
+    for (i = 1; i <= countz; i++){
+        if (abs(zn[i] - temp) > disMinz){
+            j++;
+            temp = zn[i];
+        }
+    }
+    sys->nz = j + 1;   // Record the number of valid points along the z direction and used to assign sys->zn
 
     /*************************************************************************************/
 

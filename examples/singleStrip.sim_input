@@ -1,12 +1,12 @@
 TOTAL SIZE
-0.000 +300.0 0.000 +200.1 -0.296 +2.896
+0.000 +300.0 -50 2050 -0.296 +2.896
 lengthUnit = 1.e-6
 
 FREQUENCY
 freqUnit = 1.0e+6
-freqStart = 100000
-freqEnd = 100000
-nfreq = 1
+freqStart = 45
+freqEnd = 49000.9
+nfreq = 20
 freqScale = 1
 
 DIELECTRIC STACK
@@ -23,5 +23,5 @@ ILD2      z = +1.140 h = 0.308 e = 4.1 TanD = 0
 PORT
 numPort = 2
 #149.999 0.049 0.296 149.999 0.049 0.416 1
-+149.999 +0.000 +0.12 +149.999 +0.000 0.00 +1 # Near side on fixture
-+149.999 +200.04 +0.12 +149.999 +200.04 0.00 -1 # Far side left open
++155 +0.000 +0.12 +155 +0.000 0.00 +1 # Near side on fixture
++155 +2000 +0.12 +155 +2000 0.00 +1 # Far side left open

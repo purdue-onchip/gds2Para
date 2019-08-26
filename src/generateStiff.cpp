@@ -434,23 +434,35 @@ int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *C
     valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
     complex<double> *J;
     J = (complex<double>*)calloc((sys->N_edge - bdn * sys->N_edge_s), sizeof(complex<double>));
-    int indx, indy, temp;
+    int indz, indy, temp;
     for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
-        // start hard code, add the function of multiple current injections
-        //indx = (sys->portEdge[sourcePort][indi] % (sys->N_edge_s + sys->N_edge_v) - sys->N_edge_s) / (sys->N_cell_y + 1);
-        //indy = (sys->portEdge[sourcePort][indi] % (sys->N_edge_s + sys->N_edge_v) - sys->N_edge_s) % (sys->N_cell_y + 1);
-        // end hard code
+        /* start hard code, add the function of multiple current injections */
+        //indz = (sys->portEdge[sourcePort][indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v);
+        //indy = (sys->portEdge[sourcePort][indi] % (sys->N_edge_s + sys->N_edge_v) - sys->N_cell_y * (sys->N_cell_x + 1)) % (sys->N_cell_y + 1);
+        /* end hard code */
         J[sys->portEdge[sourcePort][indi] - sys->N_edge_s] = 0. - (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
-        // start hard code
+        /* start hard code */
         //indy++;
         //temp = sys->portEdge[sourcePort][indi] - sys->N_edge_s;
         //while (sys->yn[indy] <= -sys->portCoor[sourcePort].y1*1.01){
         //    temp++;
+        //    //cout << sys->yn[indy] << endl;
         //    J[temp] = 0. - (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
         //    indy++;
         //}
-        // end hard code
+        /* end hard code */
     }
+
+    /* Used in plasma2D for upper and lower excitation */
+    myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
+    
+    while (current_edge < sys->N_edge - sys->N_edge_s){
+        if (sys->markEdge[current_edge] == 0){
+            J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
+        }
+        current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
+    }
+	/* end of Used in plasma2D for upper and lower excitation */
     
     RowId1[k] = 0;
     k++;
@@ -547,9 +559,9 @@ int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *C
             
             complex<double> addedPart((xr[sys->portEdge[indi][j] - sys->N_edge_s].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))), (xr[sys->portEdge[indi][j] - sys->N_edge_s].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))));
             
-            // start hard code
-            //complex<double> addedPart((xr[sys->portEdge[indi][j] - sys->N_edge_s].real() * leng / ((1.5e-4 * (sys->xn[indx + 1] - sys->xn[indx - 1]) / 2) * (-sys->portCoor[sourcePort].portDirection))), (xr[sys->portEdge[indi][j] - sys->N_edge_s].imag() * leng / ((1.5e-4 * (sys->xn[indx + 1] - sys->xn[indx - 1]) / 2) * (-sys->portCoor[sourcePort].portDirection))));
-            // end hard code
+            /* start hard code */
+            //complex<double> addedPart((xr[sys->portEdge[indi][j] - sys->N_edge_s].real() * leng / ((1.5e-4 * (sys->zn[indz + 1] - sys->zn[indz - 1]) / 2) * (-sys->portCoor[sourcePort].portDirection))), (xr[sys->portEdge[indi][j] - sys->N_edge_s].imag() * leng / ((1.5e-4 * (sys->zn[indz + 1] - sys->zn[indz - 1]) / 2) * (-sys->portCoor[sourcePort].portDirection))));
+            /* end hard code */
 
             sys->x[sys->x.size() - 1] += addedPart;
 
@@ -563,190 +575,6 @@ int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *C
     return 0;
 }
 
-//int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *ColId, double *val){    // with the GND conductor edges removed
-//    int bdn;
-//#ifdef UPPER_BOUNDARY_PEC
-//    bdn = 2;
-//#else
-//    bdn = 1;
-//#endif
-//
-//    int count = 0;
-//    myint *map = (myint*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(myint));    // map the original edges to the new removed system edges
-//    for (int i = sys->N_edge_s; i < sys->N_edge - (bdn - 1) * sys->N_edge_s; i++){
-//        if (sys->GNDcond.find(sys->markEdge[i]) != sys->GNDcond.end()){
-//            map[i - sys->N_edge_s] = -1;
-//            continue;
-//        }
-//        else{
-//            map[i - sys->N_edge_s] = count;
-//            count++;
-//        }
-//    }
-//
-//    myint size = count;
-//    
-//    int indi = 0;
-//    int k = 0;
-//    complex<double> *valc;
-//    complex<double> *J;
-//    J = (complex<double>*)calloc(size, sizeof(complex<double>));
-//    for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
-//        J[map[sys->portEdge[sourcePort][indi] - sys->N_edge_s]] = 0. - (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
-//    }
-//
-//
-//    /* Used in plasma2D for upper and lower excitation */
-//    //myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
-//    //
-//    //while (current_edge < sys->N_edge - sys->N_edge_s){
-//    //    if (sys->markEdge[current_edge] == 0){
-//    //        J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
-//    //    }
-//    //    current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
-//    //}
-//
-//
-//    myint start;
-//    myint nnz = sys->leng_S;
-//    //cout << "Start to generate CSR form for S!\n";
-//    indi = 0;
-//    count = 0;
-//    while (indi < nnz){
-//        start = RowId[indi];
-//        if (sys->GNDcond.find(sys->markEdge[RowId[indi] + sys->N_edge_s]) != sys->GNDcond.end()){    // if this row's edge is in the GND conductor, remove this row
-//            indi++;
-//            continue;
-//        }
-//        else{
-//            while (indi < nnz && RowId[indi] == start) {
-//                if (sys->GNDcond.find(sys->markEdge[ColId[indi] + sys->N_edge_s]) != sys->GNDcond.end()){    // if this column's edge is in the GND conductor, remove this column
-//                    indi++;
-//                    continue;
-//                }
-//                count++;
-//                indi++;
-//            }
-//        }
-//    }
-//
-//    valc = (complex<double>*)calloc(count, sizeof(complex<double>));
-//    myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
-//    myint *ColId1 = (myint*)malloc(count * sizeof(myint));
-//    count = 0;
-//    indi = 0;
-//    RowId1[k] = 0;
-//    k++;
-//    while (indi < nnz){
-//        start = RowId[indi];
-//        if (map[RowId[indi]] == -1){    // if this row's edge is in the GND conductor, remove this row
-//            indi++;
-//            continue;
-//        }
-//        else{
-//            while (indi < nnz && RowId[indi] == start) {
-//                if (map[ColId[indi]] == -1){    // if this column's edge is in the GND conductor, remove this column
-//                    indi++;
-//                    continue;
-//                }
-//                ColId1[count] = map[ColId[indi]];
-//                valc[count] += val[indi]; // val[indi] is real
-//                if (RowId[indi] == ColId[indi]){
-//                    if (sys->markEdge[RowId[indi] + sys->N_edge_s] != 0) {
-//                        complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
-//                        valc[count] += (2. * M_PI * freq) * addedPart;
-//                    }
-//                    else {
-//                        complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
-//                        valc[count] += (2. * M_PI * freq) * addedPart;
-//                    }
-//                }
-//                count++;
-//                indi++;
-//            }
-//        }
-//        RowId1[k] = (count);
-//        k++;
-//    }
-//
-//    myint mtype = 13;    /* Real complex unsymmetric matrix */
-//    myint nrhs = 1;    /* Number of right hand sides */
-//    void *pt[64];
-//
-//    /* Pardiso control parameters */
-//    myint iparm[64];
-//    myint maxfct, mnum, phase, error, msglvl, solver;
-//    double dparm[64];
-//    int v0csin;
-//    myint perm;
-//
-//    /* Number of processors */
-//    int num_procs;
-//
-//    /* Auxiliary variables */
-//    char *var;
-//
-//    msglvl = 0;    /* print statistical information */
-//    solver = 0;    /* use sparse direct solver */
-//    error = 0;
-//    maxfct = 1;
-//    mnum = 1;
-//    phase = 13;
-//
-//    pardisoinit(pt, &mtype, iparm);
-//    iparm[38] = 1;
-//    iparm[34] = 1;    // 0-based indexing
-//    //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
-//    
-//    //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
-//    complex<double> *xr;
-//    xr = (complex<double>*)calloc(size, sizeof(complex<double>));
-//
-//    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId1, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
-//    if (error != 0){
-//        printf("\nERROR during numerical factorization: %d", error);
-//        exit(2);
-//    }
-//
-//
-//	// Just for debug purpose
-//	
-//	int inz, inx, iny;
-//	double leng;
-//	for (indi = 0; indi < sys->numPorts; indi++) {
-//		sys->x.push_back((0, 0));
-//		for (int j = 0; j < sys->portEdge[indi].size(); j++) {
-//			if (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // this edge is along z axis
-//				inz = sys->portEdge[indi][j] / (sys->N_edge_s + sys->N_edge_v);
-//				leng = sys->zn[inz + 1] - sys->zn[inz];
-//			}
-//			else if (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // this edge is along x axis
-//				inx = ((sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
-//				leng = sys->xn[inx + 1] - sys->xn[inx];
-//			}
-//			else {    // this edge is along y axis
-//				iny = (sys->portEdge[indi][j] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
-//				leng = sys->yn[iny + 1] - sys->yn[iny];
-//			}
-//
-//			/*leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3]), 2);
-//			leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 1]), 2);
-//			leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[indi][j] * 2 + 1] * 3 + 2]), 2);
-//			leng = sqrt(leng);*/
-//			complex<double> addedPart((xr[map[sys->portEdge[indi][j] - sys->N_edge_s]].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))), (xr[map[sys->portEdge[indi][j] - sys->N_edge_s]].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection))));
-//			
-//			sys->x[sys->x.size() - 1] += addedPart;
-//
-//		}
-//	}
-//
-//    
-//    free(xr); xr = NULL;
-//    free(RowId1); RowId1 = NULL;
-//    free(ColId1); ColId1 = NULL;
-//    free(valc); valc = NULL;
-//    return 0;
-//}
 
 int reference1(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *ColId, double *val, complex<double> *xr){   // to check the accuracy of the result from the inverse model
     int bdn;

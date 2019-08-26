@@ -294,9 +294,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             }
         }
         v.clear();
+        v.shrink_to_fit();    // free all the memory in v
     }
     Ad1.clear();
-    //cout << "Time to generate Ad is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 
     //cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
     int *argc;
@@ -658,13 +658,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         u0a = (lapack_complex_double*)calloc((sys->N_edge - bdn * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
         nn = 0;
         nna = 0;
-        for (indi = sys->N_edge_s; indi < sys->N_edge; indi++){
+        for (indi = sys->N_edge_s; indi < sys->N_edge - (bdn - 1) * sys->N_edge_s; indi++){
             nn += ydt[indi] * ydt[indi];
             nna += ydat[indi] * ydat[indi];
         }
         nn = sqrt(nn);
         nna = sqrt(nna);
-        for (indi = sys->N_edge_s; indi < sys->N_edge; indi++){
+        for (indi = sys->N_edge_s; indi < sys->N_edge - (bdn - 1) * sys->N_edge_s; indi++){
             u0[indi - sys->N_edge_s].real = ydt[indi] / nn;    // u0d is one vector in V0
             u0a[indi - sys->N_edge_s].real = ydat[indi] / nna;    // u0da
         }
@@ -805,7 +805,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(y0d2); y0d2 = NULL;
         nn = 0;
         nna = 0;
-        for (indi = sys->N_edge_s; indi < sys->N_edge; indi++){
+        for (indi = sys->N_edge_s; indi < sys->N_edge - (bdn - 1) * sys->N_edge_s; indi++){
             nn += (yd2[indi] + yc[indi]) * (yd2[indi] + yc[indi]);
             nna += (yd2a[indi] + yca[indi]) * (yd2a[indi] + yca[indi]);
         }
@@ -813,19 +813,20 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         nn = sqrt(nn);
         nna = sqrt(nna);
-        for (indi = sys->N_edge_s; indi < sys->N_edge; indi++){
+        for (indi = sys->N_edge_s; indi < sys->N_edge - (bdn - 1) * sys->N_edge_s; indi++){
             u0[sys->N_edge - bdn * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2[indi] + yc[indi]) / nn;    // u0c is the other vector in u0
             u0a[sys->N_edge - bdn * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2a[indi] + yca[indi]) / nna;    // u0ca
         }
 
         cout << " Time to generate u0d and u0c up to port" << sourcePort + 1 << " is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
+
         for (int id = 0; id < sys->N_edge; id++){
             yd[id] = yd2[id] - (1i)*(yd1[id]);
         }
 
-        free(yd2); yd2 = NULL;
         free(yd1); yd1 = NULL;
+        free(yd2); yd2 = NULL;
 
         //sys->y = (complex<double>*)malloc(sys->N_edge*sizeof(complex<double>));
         for (indi = 0; indi < sys->N_edge; indi++){
@@ -1042,7 +1043,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
 #endif
 
-
         free(yd); yd = NULL;
         free(sys->J); sys->J = NULL;
         free(v0daJ); v0daJ = NULL;
@@ -1050,6 +1050,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         sourcePort++;
         xcol++;
+        
     }
         //cout << "Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
         /* calculate the Vh part */

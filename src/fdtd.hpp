@@ -41,7 +41,7 @@ using namespace std;
 #define EPSILON0 (1./(CSPED*CSPED*MU))
 
 // Solver discretization control macros
-#define SIGMA (4.5e+7)
+#define SIGMA (5.8e+7)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 #define DOUBLEMAX (1.e+30)
@@ -68,7 +68,7 @@ using namespace std;
 #define SKIP_VH
 //#define SKIP_GENERATE_STIFF
 //#define SKIP_STIFF_REFERENCE
-//#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
+#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
 
 
 // Function-like macros

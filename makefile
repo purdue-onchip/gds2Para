@@ -54,27 +54,27 @@ LayoutAnalyzer: $(OBJS)
 
 $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboint.hpp $(SRCDIR)/solnoutclass.hpp
 	@$(MKDIR)
-	mpicxx -std=c++17 -g -lstdc++fs -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
+	mpicxx -std=c++17 -g -O1 -lstdc++fs -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o -I $(MKL_ROOT_DIR)/include
+	mpicxx -g -O1 -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o -I $(MKL_ROOT_DIR)/include
 
 $(OBJDIR)/matrixCon.o: $(SRCDIR)/matrixCon.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -O1 -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
 $(OBJDIR)/hypreSolve.o: $(SRCDIR)/hypreSolve.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -O1 -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_ROOT_DIR)/include -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
 $(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o -I $(MKL_ROOT_DIR)/include
+	mpicxx -g -O1 -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o -I $(MKL_ROOT_DIR)/include
 
 $(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o -I $(MKL_ROOT_DIR)/include
+	mpicxx -g -O1 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o -I $(MKL_ROOT_DIR)/include
 
 
 .PHONY: clean
