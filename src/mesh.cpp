@@ -390,7 +390,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     cout << " disMinz  = " << disMinz << " m" << endl;
     cout << " disMaxx  = " << disMaxx << " m" << endl;
     cout << " disMaxy  = " << disMaxy << " m" << endl;
-    //cout << " disMaxz  = " << disMaxz << " indm" << endl;
+    //cout << " disMaxz  = " << disMaxz << " m" << endl;
     cout << endl;
     cout << " N_edge   = " << sys->N_edge << endl;
     cout << " N_node   = " << sys->N_node << endl;
