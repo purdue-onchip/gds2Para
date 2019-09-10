@@ -5,7 +5,7 @@ static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b)
     return (pow(a.first.real(), 2) + pow(a.first.imag(), 2)) < (pow(b.first.real(), 2) + pow(b.first.imag(), 2));
 };
 
-int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort){
+int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort, int sourcePortSide){
     // upper and lower plane is PEC
     int t0n = 3;
     double dt = DT;
@@ -79,8 +79,8 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     double scale = 1.e+12;
     lapack_complex_double *RR;
     for (int ind = 1; ind <= nt; ind++){    // time marching to find the repeated eigenvectors
-        for (int inde = 0; inde < sys->portEdge[sourcePort].size(); inde++){
-            rsc[sys->portEdge[sourcePort][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
+        for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
+            rsc[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
             
         }
 

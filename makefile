@@ -54,7 +54,7 @@ LayoutAnalyzer: $(OBJS)
 
 $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboint.hpp $(SRCDIR)/solnoutclass.hpp
 	@$(MKDIR)
-	mpicxx -std=c++17 -g -lstdc++fs -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
+	mpicxx -std=c++17 -g -lstdc++fs -O0 -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(MKL_ROOT_DIR)/include
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
@@ -70,11 +70,11 @@ $(OBJDIR)/hypreSolve.o: $(SRCDIR)/hypreSolve.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hy
 
 $(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o -I $(MKL_ROOT_DIR)/include
+	mpicxx -g -O1 -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o -I $(MKL_ROOT_DIR)/include
 
 $(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o -I $(MKL_ROOT_DIR)/include
+	mpicxx -g -O1 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o -I $(MKL_ROOT_DIR)/include
 
 
 .PHONY: clean

@@ -37,7 +37,7 @@ int main(int argc, char** argv)
         if (strcmp(argv[1], "--help") == 0)
         {
             cout << "Help for LayoutAnalyzer binary (with main testing features)" << endl;
-            cout << "Usage: LayoutAnalyzer options file1 [file2..file3]" << endl;
+            cout << "Usage: mpirun LayoutAnalyzer options file1 [file2..file3]" << endl;
             cout << "Options:" << endl;
             cout << "  --help                Display this information." << endl;
             cout << "  --version             Print the version number." << endl;
@@ -107,19 +107,19 @@ int main(int argc, char** argv)
 
             // Setup the port information vector
             vector<Port> ports = {};
-            ports.emplace_back(Port("inp1", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u1:a", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("inp2", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u1:b", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("out", 'O', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u3:o", 'O', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u1:o", 'O', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u4:a", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u4:o", 'O', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("f1:d", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("f1:a", 'O', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u2:a", 'I', 50., vector<double>(6, 0), -1));
-            ports.emplace_back(Port("u4:b", 'I', 50., vector<double>(6, 0), -1));
+            ports.emplace_back(Port("inp1", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u1:a", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("inp2", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u1:b", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("out", 'O', 50.0, 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u3:o", 'O', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u1:o", 'O', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u4:a", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u4:o", 'O', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("f1:d", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("f1:a", 'O', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u2:a", 'I', 50., 1, vector<double>(6, 0), -1));
+            ports.emplace_back(Port("u4:b", 'I', 50., 1, vector<double>(6, 0), -1));
 
             // Setup the Eigen sparse conductance matrix
             spMat matG(13, 13); // Initialize sparse conductance matrix (S)
@@ -306,7 +306,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-            cout << endl;
+
             // Set D_eps and D_sig
             clock_t t3 = clock();
             status = matrixConstruction(&sys);
@@ -320,7 +320,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-            cout << endl;
+
             // Set port
             clock_t t4 = clock();
             status = portSet(&sys, xi, yi, zi);
@@ -335,7 +335,7 @@ int main(int argc, char** argv)
                 return status;
             }
             //sys.print();
-            cout << endl;
+
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();

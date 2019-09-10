@@ -42,8 +42,6 @@ using namespace std;
 
 // Solver discretization control macros
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
-#define FDTD_MAXC (256*6)
-#define STACKNUM (20)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
 #define MINDISFRACXY (1.0e-4) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
@@ -51,7 +49,7 @@ using namespace std;
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (1.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-16)
+#define DT (1.e-16) // Time step for finding high-frequency modes (s)
 
 // HYPRE control macros
 #define HYPRE_METHOD (3) // 1 = AMG, 2 = PCG with AMG Preconditioner, 3 = Flexible GMRES with AMG Preconditioner
@@ -127,33 +125,43 @@ public:
 class fdtdPort{
     /* Port information */
 public:
-    double *x;
-    double *y;
-    double *z;
-    double x1, x2;
-    double y1, y2;
-    double z1, z2;
-    int portDirection;
+    double *x, *y, *z;
+    int multiplicity;
+    vector<double> x1, x2, y1, y2, z1, z2;
+    vector<int> portCnd;
+    vector<vector<myint>> portEdge;
+    vector<double> portArea;
+    vector<int> portDirection;
     int *node;
-    int portCnd;
 
     /* Default Constructor */
-    fdtdPort(){
-        x = NULL;
-        y = NULL;
-        z = NULL;
-        portDirection = 0;
-        node = NULL;
-        portCnd = 0;
+    fdtdPort() {
+        this->x = NULL;
+        this->y = NULL;
+        this->z = NULL;
+        this->multiplicity = 0;
+        this->x1 = { };
+        this->y1 = { };
+        this->z1 = { };
+        this->x2 = { };
+        this->y2 = { };
+        this->z2 = { };
+        this->portCnd = { };
+        this->portEdge = { };
+        this->portArea = { };
+        this->portDirection = { };
+        this->node = NULL;
     }
 
     /* Print Function */
     void print();
 
     /* Destructor */
-    ~fdtdPort(){
-        portDirection = 0;
-        portCnd = 0;
+    ~fdtdPort() {
+        free(this->x);
+        free(this->y);
+        free(this->z);
+        free(this->node);
     }
 };
 
@@ -221,28 +229,28 @@ public:
     vector<double> stackBegCoor;
     vector<double> stackEndCoor;
     vector<string> stackName;
-    double *eps;
+    vector<double> eps;
     vector<double> stackEpsn;
     vector<double> stackSign;
     double *stackCdtMark;
 
     /* Conductor parameters */
     vector<fdtdOneCondct> conductorIn;
-    myint numCdtRow;    // how many input rows
-    myint numCdt;       // number of isolated conductors in design
-    int *markEdge;    // mark if this edge is inside a conductor
-    int *markCell;
+    myint numCdtRow;                      // how many input rows
+    myint numCdt;                         // number of isolated conductors in design
+    myint *markEdge;                      // mark if this edge is inside a conductor
+    myint *markCell;
     myint *cdtNumNode;
     double *sig;
     fdtdCdt *conductor;
-    int *markNode;    // mark this node if it is inside the conductor
-    vector<vector<int>> edgeCell;    // for each cell which edge is around it
-    vector<vector<double>> edgeCellArea;    // for each cell the area of the perpendicular rectangle
-    vector<int> acu_cnno; // accumulated conductor number of nodes
+    myint *markNode;                      // mark this node if it is inside the conductor
+    vector<vector<int>> edgeCell;         // for each cell which edge is around it
+    vector<vector<double>> edgeCellArea;  // for each cell the area of the perpendicular rectangle
+    vector<int> acu_cnno;                 // accumulated conductor number of nodes
     vector<int> cindex;
     int *exciteCdtLayer;
-    unordered_set<int> cond2condIn;    // put the active conductors' corresponding conductorIn #
-    int *markProSide;
+    unordered_set<int> cond2condIn;       // put the active conductors' corresponding conductorIn #
+    vector<bool> markProSide;             // mark nodes near excited conductors for less aggressive node merging in rapid field change area
 
     /* Patch information */
     fdtdPatch *patch;
@@ -313,7 +321,8 @@ public:
     myint leng_Vh;
 
     /* Se and Sh */
-    myint *SRowId, *SColId;
+    myint *SRowId;
+    myint *SColId;
     double *Sval;
     myint leng_S;
 
@@ -321,11 +330,9 @@ public:
     complex<double> *y;
     vector<complex<double>> x;    // the solution involving all the sourcePorts
 
-    /* Port coordinates */
+    /* Port information */
     int numPorts;
-    fdtdPort *portCoor;
-    vector<vector<int>> portEdge;
-    vector<double> portArea;
+    vector<fdtdPort> portCoor;
 
     /* Current sources */
     double *J;
@@ -336,88 +343,112 @@ public:
 
     /* Default Constructor */
     fdtdMesh(){
-        numCdtRow = (myint)0;
-        leng_S = (myint)0;
+        // Set some important numbers to zero
+        this->numCdtRow = (myint)0;
+        this->leng_Vh = (myint)0;
+        this->leng_S = (myint)0;
 
         // Set all pointers to NULL for safety
-        xn = NULL;
-        yn = NULL;
-        zn = NULL;
-        xnu = NULL;
-        ynu = NULL;
-        znu = NULL;
-        nodepos = NULL;
-        Epoints = NULL;
-        edgelink = NULL;
-        Hpoints = NULL;
-        bd_node1 = NULL;
-        bd_node2 = NULL;
-        bd_edge = NULL;
-        eps = NULL;
-        stackCdtMark = NULL;
-        markEdge = NULL;
-        markCell = NULL;
-        cdtNumNode = NULL;
-        sig = NULL;
-        conductor = NULL;
-        markNode = NULL;
-        exciteCdtLayer = NULL;
-        markProSide = NULL;
-        patch = NULL;
-        bound = NULL;
-        v0cRowId = NULL;
-        v0cColId = NULL;
-        v0cColIdo = NULL;
-        v0cval = NULL;
-        v0cvalo = NULL;
-        v0caRowId = NULL;
-        v0caColId = NULL;
-        v0caColIdo = NULL;
-        v0caval = NULL;
-        v0cavalo = NULL;
-        v0c2y0c2 = NULL;
-        v0c2y0c2o = NULL;
-        yc = NULL;
-        v0cy0c = NULL;
-        AcRowId = NULL;
-        AcRowId1 = NULL;
-        AcColId = NULL;
-        Acval = NULL;
-        AdRowId = NULL;
-        AdRowId1 = NULL;
-        AdColId = NULL;
-        Adval = NULL;
-        crhs = NULL;
-        v0d1RowId = NULL;
-        v0d1ColId = NULL;
-        v0d1ColIdo = NULL;
-        v0d1val = NULL;
-        v0d1valo = NULL;
-        v0d1aRowId = NULL;
-        v0d1aColId = NULL;
-        v0d1aColIdo = NULL;
-        v0d1aval = NULL;
-        v0d1avalo = NULL;
-        v0d2RowId = NULL;
-        v0d2ColId = NULL;
-        v0d2ColIdo = NULL;
-        v0d2val = NULL;
-        v0d2valo = NULL;
-        v0d2aRowId = NULL;
-        v0d2aColId = NULL;
-        v0d2aColIdo = NULL;
-        v0d2aval = NULL;
-        v0d2avalo = NULL;
-        yd = NULL;
-        Vh = NULL;
-        SRowId = NULL;
-        SColId = NULL;
-        Sval = NULL;
-        y = NULL;
-        portCoor = NULL;
-        J = NULL;
-        v0csJ = NULL;
-        Y = NULL;
+        this->xn = NULL;
+        this->yn = NULL;
+        this->zn = NULL;
+        this->xnu = NULL;
+        this->ynu = NULL;
+        this->znu = NULL;
+        this->nodepos = NULL;
+        this->Epoints = NULL;
+        this->edgelink = NULL;
+        this->Hpoints = NULL;
+        this->bd_node1 = NULL;
+        this->bd_node2 = NULL;
+        this->bd_edge = NULL;
+        this->stackCdtMark = NULL;
+        this->markEdge = NULL;
+        this->markCell = NULL;
+        this->cdtNumNode = NULL;
+        this->sig = NULL;
+        this->conductor = NULL;
+        this->markNode = NULL;
+        this->exciteCdtLayer = NULL;
+        this->patch = NULL;
+        this->bound = NULL;
+        this->v0cRowId = NULL;
+        this->v0cColId = NULL;
+        this->v0cColIdo = NULL;
+        this->v0cval = NULL;
+        this->v0cvalo = NULL;
+        this->v0caRowId = NULL;
+        this->v0caColId = NULL;
+        this->v0caColIdo = NULL;
+        this->v0caval = NULL;
+        this->v0cavalo = NULL;
+        this->v0c2y0c2 = NULL;
+        this->v0c2y0c2o = NULL;
+        this->yc = NULL;
+        this->v0cy0c = NULL;
+        this->AcRowId = NULL;
+        this->AcRowId1 = NULL;
+        this->AcColId = NULL;
+        this->Acval = NULL;
+        this->AdRowId = NULL;
+        this->AdRowId1 = NULL;
+        this->AdColId = NULL;
+        this->Adval = NULL;
+        this->crhs = NULL;
+        this->v0d1RowId = NULL;
+        this->v0d1ColId = NULL;
+        this->v0d1ColIdo = NULL;
+        this->v0d1val = NULL;
+        this->v0d1valo = NULL;
+        this->v0d1aRowId = NULL;
+        this->v0d1aColId = NULL;
+        this->v0d1aColIdo = NULL;
+        this->v0d1aval = NULL;
+        this->v0d1avalo = NULL;
+        this->v0d2RowId = NULL;
+        this->v0d2ColId = NULL;
+        this->v0d2ColIdo = NULL;
+        this->v0d2val = NULL;
+        this->v0d2valo = NULL;
+        this->v0d2aRowId = NULL;
+        this->v0d2aColId = NULL;
+        this->v0d2aColIdo = NULL;
+        this->v0d2aval = NULL;
+        this->v0d2avalo = NULL;
+        this->yd = NULL;
+        this->Vh = NULL;
+        this->SRowId = NULL;
+        this->SColId = NULL;
+        this->Sval = NULL;
+        this->y = NULL;
+        this->J = NULL;
+        this->v0csJ = NULL;
+        this->Y = NULL;
+
+        // Set all vectors to empty vectors
+        this->nodeEdge = { };
+        this->nodeEdgea = { };
+        this->numStack = 0;
+        this->stackEps = { };
+        this->stackSig = { };
+        this->stackBegCoor = { };
+        this->stackEndCoor = { };
+        this->stackName = { };
+        this->eps = { };
+        this->stackEpsn = { };
+        this->stackSign = { };
+        this->conductorIn = { };
+        this->edgeCell = { };
+        this->edgeCellArea = { };
+        this->acu_cnno = { };
+        this->cindex = { };
+        this->markProSide = { };
+        this->x = { };
+        this->numPorts = 0;
+        this->portCoor = { };
+
+        // Set all other collection data types as empty
+        this->cond2condIn = unordered_set<int>();
     }
 
     /* Print Function */
@@ -425,8 +456,87 @@ public:
 
     /* Destructor */
     ~fdtdMesh(){
-        numCdtRow = (myint)0;
-        leng_S = (myint)0;
+        // Set some important numbers to zero
+        this->numCdtRow = (myint)0;
+        this->leng_Vh = (myint)0;
+        this->leng_S = (myint)0;
+
+        // Free all the pointers
+        free(this->xn);
+        free(this->yn);
+        free(this->zn);
+        free(this->xnu);
+        free(this->ynu);
+        free(this->znu);
+        free(this->nodepos);
+        free(this->Epoints);
+        free(this->edgelink);
+        free(this->Hpoints);
+        free(this->bd_node1);
+        free(this->bd_node2);
+        free(this->bd_edge);
+        free(this->stackCdtMark);
+        free(this->markEdge);
+        free(this->markCell);
+        free(this->cdtNumNode);
+        free(this->sig);
+        free(this->conductor);
+        free(this->markNode);
+        free(this->exciteCdtLayer);
+        free(this->patch);
+        free(this->bound);
+        free(this->v0cRowId);
+        free(this->v0cColId);
+        free(this->v0cColIdo);
+        free(this->v0cval);
+        free(this->v0cvalo);
+        free(this->v0caRowId);
+        free(this->v0caColId);
+        free(this->v0caColIdo);
+        free(this->v0caval);
+        free(this->v0cavalo);
+        free(this->v0c2y0c2);
+        free(this->v0c2y0c2o);
+        free(this->yc);
+        free(this->v0cy0c);
+        free(this->AcRowId);
+        free(this->AcRowId1);
+        free(this->AcColId);
+        free(this->Acval);
+        free(this->AdRowId);
+        free(this->AdRowId1);
+        free(this->AdColId);
+        free(this->Adval);
+        free(this->crhs);
+        free(this->v0d1RowId);
+        free(this->v0d1ColId);
+        free(this->v0d1ColIdo);
+        free(this->v0d1val);
+        free(this->v0d1valo);
+        free(this->v0d1aRowId);
+        free(this->v0d1aColId);
+        free(this->v0d1aColIdo);
+        free(this->v0d1aval);
+        free(this->v0d1avalo);
+        free(this->v0d2RowId);
+        free(this->v0d2ColId);
+        free(this->v0d2ColIdo);
+        free(this->v0d2val);
+        free(this->v0d2valo);
+        free(this->v0d2aRowId);
+        free(this->v0d2aColId);
+        free(this->v0d2aColIdo);
+        free(this->v0d2aval);
+        free(this->v0d2avalo);
+        free(this->yd);
+        free(this->Vh);
+        free(this->SRowId);
+        free(this->SColId);
+        free(this->Sval);
+        free(this->y);
+        free(this->J);
+        free(this->v0csJ);
+        free(this->Y);
     }
 };
 
@@ -437,10 +547,6 @@ int meshAndMark(fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<dou
 int compute_edgelink(fdtdMesh *sys, myint eno, myint &node1, myint &node2);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
-int fdtdStringWord(char*, char *word[]);
-double fdtdGetValue(char *str);
-int compareString(char *a, char *b);
-//int nodeAddAvg(vector<int> &rowId, vector<int> &colId, vector<double> &val, int index, int size, fdtdMesh *sys);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
 int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);

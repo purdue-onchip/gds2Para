@@ -719,7 +719,8 @@ class Port
     std::string portName; // Name of port
     char portDir;         // Direction of port
     double Z_source;      // Impedance of source attached to port (ohm)
-    vector<double> coord; // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m)
+    int multiplicity;     // Number of simultaneous excitations needed for the port
+    vector<double> coord; // Supply and return coordinates: xsup, ysup, zsup, xret, yret, zret (m, repeated multiplicity times)
     int gdsiiNum;         // Layer number in GDSII file on which port exists
   public:
     // Default constructor
@@ -728,12 +729,13 @@ class Port
         this->portName = "";
         this->portDir = 'B';
         this->Z_source = 0.;
+        this->multiplicity = 1;
         this->coord = {0., 0., 0., 0., 0., 0.};
         this->gdsiiNum = -1;
     }
 
     // Parametrized constructor
-    Port(std::string portName, char portDir, double Z_source, vector<double> coord, int gdsiiNum)
+    Port(std::string portName, char portDir, double Z_source, int multiplicity, vector<double> coord, int gdsiiNum)
     {
         this->portName = portName;
         if ((portDir != 'I') && (portDir != 'O') && (portDir != 'B'))
@@ -746,17 +748,26 @@ class Port
             this->portDir = portDir;
         }
         this->Z_source = Z_source;
-        if (coord.size() != 6)
+        if (multiplicity < 1)
         {
-            cerr << "Must give supply then return coordinates in vector of length 6. Defaulting to origin for both." << endl;
-            this->coord = {0., 0., 0., 0., 0., 0.};
+            cerr << "Multiplicity of simultaenous port excitations must be at least 1. Defaulting to 1." << endl;
+            this->multiplicity = 1;
+        }
+        else
+        {
+            this->multiplicity = multiplicity;
+        }
+        if (coord.size() != 6 * this->multiplicity)
+        {
+            cerr << "Must give supply then return coordinates in vector of length 6 * multiplicity for each side of the port. Defaulting to origin for all points." << endl;
+            this->coord = vector<double>(this->multiplicity, 0.);
         }
         else
         {
             this->coord = coord;
-            if (!validateCoord())
+            if (!this->validateCoord())
             {
-                cerr << "Warning: Supply and return should only differ by a single coordinate. The program will run but may behave unusually." << endl;
+                cerr << "Warning: Supply and return should only differ by a single coordinate for each port side. The program will run but may behave unusually." << endl;
             }
         }
         this->gdsiiNum = gdsiiNum;
@@ -781,8 +792,14 @@ class Port
         return this->Z_source;
     }
 
+    // Get number of simultaneous excitations needed for the port
+    int getMultiplicity() const
+    {
+        return this->multiplicity;
+    }
+
     // Get supply and return coordinates
-    // xsup, ysup, zsup, xret, yret, zret (m)
+    // xsup, ysup, zsup, xret, yret, zret (m, repeated multiplicity times)
     vector<double> getCoord() const
     {
         return this->coord;
@@ -805,7 +822,7 @@ class Port
     // ('I' = input, 'O' = output, 'B' = bidirectional)
     void setPortDir(char dir)
     {
-        if ((dir != 'I') || (dir != 'O') || (dir != 'B'))
+        if ((dir != 'I') && (dir != 'O') && (dir != 'B'))
         {
             cerr << "Port direction must be assigned as 'I' (input), 'O' (output), or 'B' (bidirectional). Defaulting to 'B'." << endl;
             this->portDir = 'B';
@@ -822,21 +839,35 @@ class Port
         this->Z_source = Z_source;
     }
 
+    // Set the port balanced condition
+    void setMultiplicity(int multiplicity)
+    {
+        if (multiplicity < 1)
+        {
+            cerr << "Multiplicity of simultaenous port excitations must be at least 1. Defaulting to 1." << endl;
+            this->multiplicity = 1;
+        }
+        else
+        {
+            this->multiplicity = multiplicity;
+        }
+    }
+
     // Set supply and return coordinates
-    // xsup, ysup, zsup, xret, yret, zret (m)
+    // xsup, ysup, zsup, xret, yret, zret (m, repeated multiplicity times)
     void setCoord(vector<double> coord)
     {
-        if (coord.size() != 6)
+        if (coord.size() != 6 * this->multiplicity)
         {
-            cerr << "Must give supply then return coordinates in vector of length 6. Defaulting to origin for both." << endl;
-            this->coord = {0., 0., 0., 0., 0., 0.};
+            cerr << "Must give supply then return coordinates in vector of length 6 * multiplicity for each side of the port. Defaulting to origin for all points." << endl;
+            this->coord = vector<double>(this->multiplicity, 0.);
         }
         else
         {
             this->coord = coord;
-            if (!validateCoord())
+            if (!this->validateCoord())
             {
-                cerr << "Warning: Supply and return should only differ by a single coordinate. The program will run but may behave unusually." << endl;
+                cerr << "Warning: Supply and return should only differ by a single coordinate for each port side. The program will run but may behave unusually." << endl;
             }
         }
     }
@@ -851,49 +882,83 @@ class Port
     // Validate port coordinates (supply and return change EXACTLY one Cartesian coordinate)
     bool validateCoord() const
     {
-        bool xEqual = this->coord[0] == this->coord[3];
-        bool yEqual = this->coord[1] == this->coord[4];
-        bool zEqual = this->coord[2] == this->coord[5];
-        return (xEqual && yEqual && !zEqual) || (xEqual && !yEqual && zEqual) || (!xEqual && yEqual && zEqual);
+        bool validPort = true;
+        for (size_t indMult = 0; indMult < this->getMultiplicity(); indMult++)
+        {
+            bool xEqual = this->coord[6 * indMult + 0] == this->coord[6 * indMult + 3];
+            bool yEqual = this->coord[6 * indMult + 1] == this->coord[6 * indMult + 4];
+            bool zEqual = this->coord[6 * indMult + 2] == this->coord[6 * indMult + 5];
+            bool singleChange = (xEqual && yEqual && !zEqual) || (xEqual && !yEqual && zEqual) || (!xEqual && yEqual && zEqual); // Port side only changes one Cartesian coordinate from supply to return
+            validPort = validPort && singleChange;
+        }
+        return validPort; // Port valid iff every port side only changes one Cartesian coordinate from supply to return
     }
 
     // Does the current flow in direction of increasing coordinate WITHIN the source? (+1 for yes, -1 for no, and 0 for bidirectional)
-    int positiveCoordFlow() const
+    vector<int> positiveCoordFlow() const
     {
-        // Logic: (xsup > xret) || (ysup > yret) || (zsup > zret) == TRUE means that at least one supply coordinate is strictly greater than the corresponding return coordinate
-        // Logic: (xsup > xret) || (ysup > yret) || (zsup > zret) == FALSE means that all return coordinates are greater than or equal to the supply coordinates
-        bool xSupGreater = this->coord[0] > this->coord[3];
-        bool ySupGreater = this->coord[1] > this->coord[4];
-        bool zSupGreater = this->coord[2] > this->coord[5];
-        bool coordEffect = xSupGreater || ySupGreater || zSupGreater;
-
-        switch (this->portDir) // Decipher port direction effect with ternary operator trickery
+        // Keep track of cumulative port directionality effects
+        vector<int> sideDir;
+        int netPortEffect = 0;
+        for (size_t indMult = 0; indMult < this->getMultiplicity(); indMult++)
         {
-        case 'O':
-            // Output pin means that current flows out of source and FROM return TO supply within source
-            // Logic for output pins: coord == TRUE means current flows in positive direction:   ret o------->-------o sup
-            // Logic for output pins: coord == FALSE means current flows in negative direction:   sup o-------<-------o ret
-            return (coordEffect ? +1 : -1);
-            break;
-        case 'I':
-            // Input pin means that current flows into source and FROM supply TO return within source
-            // Logic for input pins: coord == TRUE means current flows in negative direction:   ret o-------<-------o sup
-            // Logic for input pins: coord == FALSE means current flows in positive direction:   sup o------->-------o ret
-            return (coordEffect ? -1 : +1);
-            break;
-        case 'B':
-            // Bidirectional pin means current can flow EITHER direction within source
-            // Logic for bidirectional pins: match input pins since Z-parameters will be same for those ports
-            return (coordEffect ? -1 : +1);
-            break;
-        default:
-            return 0;
+            // Logic: (xsup > xret) || (ysup > yret) || (zsup > zret) == TRUE means that at least one supply coordinate is strictly greater than the corresponding return coordinate
+            // Logic: (xsup > xret) || (ysup > yret) || (zsup > zret) == FALSE means that all return coordinates are greater than or equal to the supply coordinates for the port side
+            bool xSupGreater = this->coord[6 * indMult + 0] > this->coord[6 * indMult + 3];
+            bool ySupGreater = this->coord[6 * indMult + 1] > this->coord[6 * indMult + 4];
+            bool zSupGreater = this->coord[6 * indMult + 2] > this->coord[6 * indMult + 5];
+            bool coordEffect = xSupGreater || ySupGreater || zSupGreater;
+
+            switch (this->portDir) // Decipher port side direction effect with ternary operator trickery
+            {
+            case 'O':
+                // Output pin means that current flows out of source and FROM return TO supply within source
+                // Logic for output pins: coord == TRUE means current flows in positive direction:   ret o------->-------o sup
+                // Logic for output pins: coord == FALSE means current flows in negative direction:   sup o-------<-------o ret
+                sideDir.push_back(coordEffect ? +1 : -1);
+                netPortEffect += (coordEffect ? +1 : -1);
+                break;
+            case 'I':
+                // Input pin means that current flows into source and FROM supply TO return within source
+                // Logic for input pins: coord == TRUE means current flows in negative direction:   ret o-------<-------o sup
+                // Logic for input pins: coord == FALSE means current flows in positive direction:   sup o------->-------o ret
+                sideDir.push_back(coordEffect ? -1 : +1);
+                netPortEffect += (coordEffect ? -1 : +1);
+                break;
+            case 'B':
+                // Bidirectional pin means current can flow EITHER direction within source
+                // Logic for bidirectional pins: match input pins since Z-parameters will be same for those ports
+                sideDir.push_back(coordEffect ? -1 : +1);
+                netPortEffect += (coordEffect ? -1 : +1);
+                break;
+            default:
+                sideDir.push_back(0);
+                netPortEffect += 0;
+            }
         }
+
+        // Return port side directionality for each side individually
+        return sideDir;
+
+        // // Interpret cumulative port directionality effects regardless of multiplicity
+        // if (netPortEffect > 0)
+        // {
+        //     return +1;
+        // }
+        // else if (netPortEffect < 0)
+        // {
+        //     return -1;
+        // }
+        // else
+        // {
+        //     return 0;
+        // }
     }
 
-    // Print the layer information
+    // Print the port information
     void print() const
     {
+        int mult = this->getMultiplicity();
         cout << "   ------" << endl;
         cout << "   Details for port " << this->portName << ":" << endl;
         cout << "    Port direction: ";
@@ -912,8 +977,19 @@ class Port
             cout << "Bidirectional" << endl; // Treat as bidirectional if direction unclear
         }
         cout << "    Attached source impedance: " << this->Z_source << " ohm" << endl;
-        cout << "    Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
-        cout << "    Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
+        if (mult == 1)
+        {
+            cout << "    Supply coordinates: (" << (this->coord)[0] << ", " << (this->coord)[1] << ", " << (this->coord)[2] << ") m" << endl;
+            cout << "    Return coordinates: (" << (this->coord)[3] << ", " << (this->coord)[4] << ", " << (this->coord)[5] << ") m" << endl;
+        }
+        else
+        {
+            for (size_t indMult = 0; indMult < mult; indMult++)
+            {
+                cout << "    Supply coordinates of side " << indMult + 1 << ": (" << (this->coord)[6 * indMult + 0] << ", " << (this->coord)[6 * indMult + 1] << ", " << (this->coord)[6 * indMult + 2] << ") m" << endl;
+                cout << "    Return coordinates of side " << indMult + 1 << ": (" << (this->coord)[6 * indMult + 3] << ", " << (this->coord)[6 * indMult + 4] << ", " << (this->coord)[6 * indMult + 5] << ") m" << endl;
+            }
+        }
         cout << "    GDSII layer number: " << this->gdsiiNum << endl;
         cout << "   ------" << endl;
     }
@@ -921,10 +997,7 @@ class Port
     // Destructor
     ~Port()
     {
-        /*this->portName = "";
-        this->portDir = 'B';
-        this->Z_source = 0.;
-        this->coord = { 0., 0., 0., 0., 0., 0. };*/
+        // Nothing
     }
 };
 
@@ -1139,9 +1212,9 @@ class Parasitics
     }
 
     // Return all port names
-    vector<string> findPortNames() const
+    vector<std::string> findPortNames() const
     {
-        vector<string> names;
+        vector<std::string> names;
         for (size_t indi = 0; indi < this->getNPort(); indi++)
         {
             names.push_back(((this->ports)[indi]).getPortName());
@@ -1195,7 +1268,7 @@ class Parasitics
         {
             textbox thisTextBox = thisCell.textboxes[indi];
             vector<double> coords = { thisTextBox.getTexts()[0] + xo, thisTextBox.getTexts()[1] + yo, 0., thisTextBox.getTexts()[0] + xo, 0., 0. }; // Assume: xret = xsup, yret = 0, zret = zsup = 0 until layer heights set
-            portList.emplace_back(Port(thisTextBox.getTextStr(), 'B', 50.0, thisTextBox.getTexts(), thisTextBox.getLayer()));
+            portList.emplace_back(Port(thisTextBox.getTextStr(), 'B', 50.0, 1, coords, thisTextBox.getLayer())); // Assume all ports have multiplicity 1
         }
 
         // Return vector of port information
@@ -5275,7 +5348,7 @@ struct SolverDataBase
                                 indLayer = this->locateLayerGDSII((cellIMP.boxes[indCond]).getLayer());                                      // Index of layer in structure field
                                 portSupRet = {boxCoord[0], boxCoord[1], (this->layers)[indLayer].getZStart(), boxCoord[0], boxCoord[1], 0.}; // xsup = LR xcoord, ysup = LR ycoord, zsup = layer zStart, xret = xsup, yret = ysup, zret = 0.
                             }
-                            ports.emplace_back(Port(groupName, 'B', Z_near, portSupRet, (this->layers)[indLayer].getGDSIINum()));
+                            ports.emplace_back(Port(groupName, 'B', Z_near, 1, portSupRet, (this->layers)[indLayer].getGDSIINum())); // Assume port has unit multiplicity
                         }
                         // Keep moving down the port table
                         getline(impFile, fileLine);
@@ -5625,19 +5698,23 @@ struct SolverDataBase
 
                     // Read each line in the port list
                     vector<Port> ports;
-                    for (size_t indPort = 0; indPort < numPort; indPort++)
+                    size_t indPort = 0; // Initialize port index
+                    while ((fileLine.length() >= 3) && !(inputFile.eof()))
                     {
                         // Port information recorded differently based on how many numbers appear
                         std::string noComment = fileLine.substr(0, fileLine.find(" #"));
                         size_t nSpace = count(noComment.begin(), noComment.end(), ' ');
 
                         // Obtain limits of IC design size
-                        double xsup, ysup, zsup, xret, yret, zret;
-                        int sourceDir;
+                        std::string portName; // Placeholder for port name
+                        double xsup, ysup, zsup, xret, yret, zret; // Coordinates of a port side (m)
+                        int multiplicity = 1; // Number of simultaneous excitations
+                        int sourceDir = 0;
                         char portDir;
                         int portLayer = -1;
                         if (nSpace == 4)
                         {
+                            portName = "port" + to_string(indPort + 1); // Port has no official name
                             size_t indCoordStart = 0;
                             size_t indCoordEnd = fileLine.find(" ", indCoordStart);
                             xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
@@ -5658,8 +5735,9 @@ struct SolverDataBase
                             zsup = (this->layers)[this->locateLayerGDSII(portLayer)].getZStart();
                             zret = zsup + (this->layers)[this->locateLayerGDSII(portLayer)].getZHeight(); // Return assumed to be on same layer but on upper end
                         }
-                        else if (nSpace >= 6)
+                        else if (nSpace == 6)
                         {
+                            portName = "port" + to_string(indPort + 1); // Port has no official name
                             size_t indCoordStart = 0;
                             size_t indCoordEnd = fileLine.find(" ", indCoordStart);
                             xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
@@ -5681,25 +5759,86 @@ struct SolverDataBase
                             indCoordStart = indCoordEnd + 1;
                             indCoordEnd = fileLine.find(" ", indCoordStart);
                             sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
-                            portLayer = (this->layers)[this->locateLayerZStart(zsup)].getGDSIINum();
+                            portLayer = (this->layers)[this->locateLayerZStart(zsup)].getGDSIINum();// Only use supply point to determine layer
+                        }
+                        else if (nSpace >= 6)
+                        {
+                            size_t indCoordStart = 0;
+                            size_t indCoordEnd = fileLine.find(" ", indCoordStart);
+                            portName = fileLine.substr(indCoordStart, indCoordEnd - indCoordStart); // Save the port name
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            xsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            ysup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            zsup = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            xret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            yret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            zret = stod(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)) * (this->settings).getLengthUnit();
+                            indCoordStart = indCoordEnd + 1;
+                            indCoordEnd = fileLine.find(" ", indCoordStart);
+                            sourceDir = stoi(fileLine.substr(indCoordStart, indCoordEnd - indCoordStart)); // Neglect comments
+                            portLayer = (this->layers)[this->locateLayerZStart(zsup)].getGDSIINum(); // Only use supply point to determine layer
                         }
 
-                        // Append port information to vectors (all ports officially unnamed, so use number)
-                        switch (sourceDir) // Assign port direction
+                        // Assign unbalanced port direction
+                        if (sourceDir == -1)
                         {
-                        case -1:
                             portDir = 'O';
-                            break;
-                        case +1:
-                            portDir = 'I';
-                            break;
-                        case 0:
-                            portDir = 'B';
-                            break;
-                        default:
-                            portDir = 'B'; // Treat as bidirectional if direction unclear
                         }
-                        ports.emplace_back(Port("port" + to_string(indPort + 1), portDir, 50., {xsup, ysup, zsup, xret, yret, zret}, portLayer));
+                        else if (sourceDir == +1)
+                        {
+                            portDir = 'I';
+                        }
+                        else
+                        {
+                            portDir = 'B'; // Treat as bidirectional if given or direction unclear
+                        }
+
+                        // Overwrite or append port information to vector
+                        //cout << " Port side belongs to port: " << portName << endl;
+                        bool portFound = false; // Does the port already exist?
+                        vector<double> coord = { xsup, ysup, zsup, xret, yret, zret }; // Put coordinates into a vector (m)
+                        if (ports.size() > 0) // Only check port side against previous port if previous ports exist
+                        {
+                            for (size_t indi = 0; indi < ports.size(); indi++)
+                            {
+                                //cout << "  Port side """ << portName << """ being compared with " << ports[indi].getPortName() << endl;
+                                if (portName.compare(ports[indi].getPortName()) == 0)
+                                {
+                                    // Port found to exist already
+                                    Port oldPort = ports[indi]; // Obtain copy of old port
+                                    char newPortDir = oldPort.getPortDir(); // Determine effective port direction
+                                    if ((portDir != newPortDir) && (portDir != 'B') && (newPortDir != 'B'))
+                                    {
+                                        newPortDir = 'B'; // Conflicting input/output sets port to bidirectional overall
+                                    }
+                                    else if ((portDir != newPortDir) && (portDir != 'B') && (newPortDir == 'B'))
+                                    {
+                                        newPortDir = portDir; // Previous bidirectional state replaced with direction from this line
+                                    } // No work needed for agreement or if bidirectional state on this line would be replaced with old state anyway
+                                    vector<double> newCoord = oldPort.getCoord();
+                                    newCoord.insert(newCoord.end(), coord.begin(), coord.end()); // Append 6 more coordinates to the end of the coordinate list
+                                    ports[indi] = Port(portName, newPortDir, 50., oldPort.getMultiplicity() + 1, newCoord, portLayer); // Overwrite port with updated multiplicity, assuming port on layer of final port side supply point
+                                    portFound = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!portFound)
+                        {
+                            //cout << " Creating brand new port for " << portName << endl;
+                            ports.emplace_back(Port(portName, portDir, 50., 1, coord, portLayer));
+                        }
 
                         // Move down one line in port list, skipping comments
                         getline(inputFile, fileLine);
@@ -5779,20 +5918,26 @@ struct SolverDataBase
 
         // Use port information in parasitics data member to set fields
         data->numPorts = (this->para).getNPort();
-        data->portCoor = (fdtdPort*)malloc(sizeof(fdtdPort) * data->numPorts);
+        data->portCoor.reserve(data->numPorts);
         for (size_t indi = 0; indi < data->numPorts; indi++)
         {
             Port thisPort = (this->para).getPort(indi); // Get copy of port information for this interation
+            int mult = thisPort.getMultiplicity(); // Multiplicity of the port
+            data->portCoor.emplace_back(fdtdPort()); // Create an empty port in fdtdMesh
 
             // Save coordinates of the port (portCoor must have x1 < x2, y1 < y2, and z1 < z2)
-            data->portCoor[indi].x1 = min(thisPort.getCoord()[0], thisPort.getCoord()[3]);
-            data->portCoor[indi].y1 = min(thisPort.getCoord()[1], thisPort.getCoord()[4]);
-            data->portCoor[indi].z1 = min(thisPort.getCoord()[2], thisPort.getCoord()[5]);
-            data->portCoor[indi].x2 = max(thisPort.getCoord()[0], thisPort.getCoord()[3]);
-            data->portCoor[indi].y2 = max(thisPort.getCoord()[1], thisPort.getCoord()[4]);
-            data->portCoor[indi].z2 = max(thisPort.getCoord()[2], thisPort.getCoord()[5]);
+            for (size_t indMult = 0; indMult < mult; indMult++)
+            {
+                data->portCoor[indi].x1.push_back(min(thisPort.getCoord()[6 * indMult + 0], thisPort.getCoord()[6 * indMult + 3]));
+                data->portCoor[indi].y1.push_back(min(thisPort.getCoord()[6 * indMult + 1], thisPort.getCoord()[6 * indMult + 4]));
+                data->portCoor[indi].z1.push_back(min(thisPort.getCoord()[6 * indMult + 2], thisPort.getCoord()[6 * indMult + 5]));
+                data->portCoor[indi].x2.push_back(max(thisPort.getCoord()[6 * indMult + 0], thisPort.getCoord()[6 * indMult + 3]));
+                data->portCoor[indi].y2.push_back(max(thisPort.getCoord()[6 * indMult + 1], thisPort.getCoord()[6 * indMult + 4]));
+                data->portCoor[indi].z2.push_back(max(thisPort.getCoord()[6 * indMult + 2], thisPort.getCoord()[6 * indMult + 5]));
+            }
 
-            // Save direction of the port (portCoor uses +1 to denote in direction of increasing coordinates)
+            // Save multiplicity and direction of the port (portCoor uses +1 to denote in direction of increasing coordinates)
+            data->portCoor[indi].multiplicity = mult;
             data->portCoor[indi].portDirection = thisPort.positiveCoordFlow();
 
             // Add coordinates of port to unordered maps if need be

@@ -22,6 +22,9 @@ ILD2      z = +1.140 h = 0.308 e = 4.1 TanD = 0
 
 PORT
 numPort = 2
-#149.999 0.049 0.296 149.999 0.049 0.416 1
-+155. +0.06 +0.12 +155. +0.06 0.00 +1 # Near side on fixture
-+155. +200.04 +0.12 +155. +200.04 0.00 -1 # Far side left open
+near +155. +0.06 +0.12 +155. +0.06 0.00 +1 # Near side on fixture
+far +155. +200.04 +0.12 +155. +200.04 0.00 -1 # Far side left open
+#near +151. +0.0600 +0.12 +99.0 +0.0600 +0.12 +1 # Near side on fixture, left side
+#near +159. +0.0600 +0.12 +211. +0.0600 +0.12 +1 # Near side on fixture, right side
+#far +151. +200.04 +0.12 +99.0 +200.04 +0.12 -1 # Far side left open, left side
+#far +159. +200.04 +0.12 +211. +200.04 +0.12 -1 # Far side left open, right side

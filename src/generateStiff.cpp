@@ -482,8 +482,8 @@ int generateStiff(fdtdMesh *sys){
         }
     }
     /* End of the generation of Sh */
-    /*for (int i = 0; i < Shnum; i++){
-        cout << ShRowId[i] << " " << ShColId[i] << " " << Shval[i] << endl;
+    /*for (int indi = 0; indi < Shnum; indi++){
+        cout << ShRowId[indi] << " " << ShColId[indi] << " " << Shval[indi] << endl;
     }*/
     /* Multiply Sh and Se */
     myint *ShColIdo, *SeColIdo, *ShRowIdn, *SeRowIdn;
@@ -529,35 +529,47 @@ int generateStiff(fdtdMesh *sys){
     //cout << "S generation is done!\n";
 
 #ifndef SKIP_PARDISO
-    /* use pardiso to solve (-w^2*D_eps+iw*D_sig+S)\(-1i*w*J) */
-    int sourcePort = 0;
-    double leng;
+    /* Initialize variables for Pardiso */
+    double leng = 0.;
     complex<double> *J;
-    complex<double> *Yr = (complex<double>*)malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
-    while (sourcePort < sys->numPorts){
+    //complex<double> *Yr = (complex<double>*)malloc(sys->numPorts * sys->numPorts * sizeof(complex<double>));
+    myint numPortSides = 0; // Total number of port sides (excitations counting port multiplicities)
+    for (indi = 0; indi < sys->numPorts; indi++) {
+        numPortSides += sys->portCoor[indi].multiplicity;
+    }
+    vector<complex<double>> Yr = 0 + 1i * 0;
+    Yr.reserve(numPortSides * numPortSides);
+    myint sourceSidesVisited = 0;
+
+    /* Use Pardiso to solve (-w^2*D_eps+iw*D_sig+S)\(-1i*w*J) */
+    for (myint sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
         J = (complex<double>*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(complex<double>));
         complex<double> *xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
-        for (int i = 0; i < sys->portEdge[sourcePort].size(); i++){
-            J[sys->portEdge[sourcePort][i] - sys->N_edge_s] = -1i * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->portCoor[sourcePort].portDirection;
-        }
-        
-        status = pardisoSolve_r(sys, J, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sys->N_edge - 2 * sys->N_edge_s, xr);
-        
-
-        for (int i = 0; i < sys->numPorts; i++){
-            Yr[i + sys->numPorts * sourcePort] = 0 + 1i * 0;
-            for (int j = 0; j < sys->portEdge[i].size(); j++){
-                leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3]), 2);
-                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 1]), 2);
-                leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[i][j] * 2 + 1] * 3 + 2]), 2);
-                leng = sqrt(leng);
-                Yr[i + sys->numPorts * sourcePort] = Yr[i + sys->numPorts * sourcePort].real() + xr[sys->portEdge[i][j] - sys->N_edge_s].real() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + 1i * (xr[sys->portEdge[i][j] - sys->N_edge_s].imag() * leng / (sys->portArea[sourcePort] * (-sys->portCoor[sourcePort].portDirection)) + Yr[i + sys->numPorts * sourcePort].imag());
-
+        for (myint sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+            /* Assign current density for each edge in the source port side */
+            for (myint indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+                J[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge] - sys->N_edge_s] = -1i * (2 * M_PI * sys->freqStart * sys->freqUnit) * sys->portCoor[sourcePort].portDirection[sourcePortSide];
             }
-            cout << Yr[i + sys->numPorts * sourcePort] << endl;
+            status = pardisoSolve_r(sys, J, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sys->N_edge - 2 * sys->N_edge_s, xr);
+
+            /* Use port side edge length to assign Yr */
+            for (myint indPort = 0; indPort < sys->numPorts; indPort++) {
+                for (myint indPortSide = 0; indPortSide < sys->portCoor[indPort]; indPortSide++) {
+                    Yr[indi + numPortSides * sourceSidesVisited] = 0 + 1i * 0; // Index math to get correct NPortSides x NPortSides matrix entry
+                    for (myint indEdge = 0; indEdge < sys->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
+                        int thisEdge = sys->portCoor[indPort].portEdge[indPortSide][indEdge];
+                        leng = pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3]), 2);
+                        leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
+                        leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 2] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
+                        leng = sqrt(leng);
+                        Yr[indi + numPortSides * sourceSidesVisited] += xr[thisEdge - sys->N_edge_s] * leng / (sys->portCoor[sourcePort].portArea[sourcePortSide] * (-sys->portCoor[sourcePort].portDirection[sourcePortSide]));
+                    }
+                    cout << Yr[indi + numPortSides * sourceSidesVisited] << endl;
+                }
+            }
+            sourceSidesVisited++;
         }
 
-        sourcePort++;
         free(J); J = NULL;
         free(xr); xr = NULL;
     }
@@ -575,48 +587,45 @@ int generateStiff(fdtdMesh *sys){
     free(ShColIdo); ShColIdo = NULL;
     free(Shval); Shval = NULL;
 
-    /*for (int i = 0; i < sys->numPorts; i++){
-        for (int j = 0; j < sys->numPorts; j++){
-            cout << Yr[i * sys->numPorts + j].real() << " " << Yr[i * sys->numPorts + j].imag() << endl;
+    /*for (int indi = 0; indi < sys->numPorts; indi++){
+        for (int indj = 0; indj < sys->numPorts; indj++){
+            cout << Yr[indi * sys->numPorts + indj].real() << " " << Yr[indi * sys->numPorts + indj].imag() << endl;
         }
     }*/
 
     return 0;
 }
 
-int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val){
+int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val) {
     myint size = sys->N_edge - 2 * sys->N_edge_s;
     myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
-    int count = 0;
-    int indi = 0;
-    int k = 0;
+    myint count = 0;
+    myint indi = 0;
+    myint k = 0;
     complex<double> *valc;
     valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
+    //valc.assign(sys->leng_S, complex<double>(0., 0.));
+    //valc.shrink_to_fit();
     complex<double> *J;
     J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
-    for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++){
+    for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++) {
         J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2. * M_PI;
-        //J[i - sys->N_edge_s].i = -sys->J[i] * sys->freqEnd * sys->freqUnit * 2 * M_PI;
-        //J[i - sys->N_edge_s].re = 0;
     }
     
     RowId1[k] = 0;
     k++;
     myint start;
     myint nnz = sys->leng_S;
-    cout << "Start to generate CSR form for S!\n";
+    cout << "Start to generate CSR form for S!" << endl;
     indi = 0;
-    while (indi < nnz){
+    while (indi < nnz) {
         start = RowId[indi];
         while (indi < nnz && RowId[indi] == start) {
             valc[indi] += val[indi]; // val[indi] is real
-            if (RowId[indi] == ColId[indi]){
-                // valc[indi] needs omega * (-omega * epsilon  + j * sigma) added to it
+            if (RowId[indi] == ColId[indi]) {
+                // valc[indi] needs omega * (-omega * epsilon  + indj * sigma) added to it
                 complex<double> addedPart(-(2. * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
                 valc[indi] += (2. * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
-                //valc[indi] += -std::complex::pow((2 * M_PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[indi] + sys->N_edge_s] + (1i) * (2 * M_PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[indi] + sys->N_edge_s];
-                //valc[i].re += - pow((2 * M_PI*sys->freqEnd * sys->freqUnit), 2) * sys->eps[RowId[i] + sys->N_edge_s];
-                //valc[i].i += (2 * M_PI*sys->freqEnd * sys->freqUnit) * sys->sig[RowId[i] + sys->N_edge_s];
             }
             count++;
             indi++;
@@ -655,17 +664,17 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     iparm[34] = 1;    // 0-based indexing
     //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
     
-    cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
+    cout << "Begin to solve (-w^2*D_eps + iwD_sig + S)x = -iwJ" << endl;
     complex<double> *xr;
     xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
-    if (error != 0){
-        printf("\nERROR during numerical factorization: %d", error);
+    if (error != 0) {
+        cout << endl << "Error During numerical factorization: " << error << endl;
         exit(2);
     }
 
-    cout << "Solving (-w^2*D_eps+iwD_sig+S)x=-iwJ is complete!\n";
+    cout << "Solving (-w^2*D_eps+ i wD_sig + S)x = -iwJ is complete!" << endl;
     double nn = 0.;
     double nnn = 0.;
     double nn0 = 0.;    // the norm of y0-xr
@@ -673,27 +682,14 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
         nn += pow((xr[indi].real() - x[indi].real), 2) + pow((xr[indi].imag() - x[indi].imag), 2);
         nnn += pow(xr[indi].real(), 2) + pow(xr[indi].imag(), 2);
         nn0 += pow((sys->y[indi + sys->N_edge_s].real() - xr[indi].real()), 2) + pow((sys->y[indi + sys->N_edge_s].imag() - xr[indi].imag()), 2);
-        //nn += pow((xr[i].re - x[i].real), 2) + pow((xr[i].i - x[i].imag), 2);
-        //nnn += pow(xr[i].re, 2) + pow(xr[i].i, 2);
+        //nn += pow((xr[indi].re - x[indi].real), 2) + pow((xr[indi].indi - x[indi].imag), 2);
+        //nnn += pow(xr[indi].re, 2) + pow(xr[indi].indi, 2);
     }
-    ofstream out;
-    /* out.open("x.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge - sys->N_edge_s * 2; i++){
-        out << x[i].real << " " << x[i].imag << endl;
-    }
-    out.close();*/
-
-    /*out.open("xr.txt", std::ofstream::out | std::ofstream::trunc);
-    for (i = 0; i < sys->N_edge - sys->N_edge_s * 2; i++){
-        out << xr[i].re << " " << xr[i].i << endl;
-    }
-    out.close();*/
 
     nn = sqrt(nn);
     nnn = sqrt(nnn);
     nn0 = sqrt(nn0);
-    /*cout << "Relative residual of xr is " << numeratorr / denominator << endl;*/
-    cout << "Relative residual  is " << nn / nnn << endl;
+    cout << "Relative residual is " << nn / nnn << endl;
     cout << "y0 relative residual is " << nn0 / nnn << endl;
 
     free(RowId1); RowId1 = NULL;
@@ -701,7 +697,7 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     return 0;
 }
 
-int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
+int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, double *u0c){
 
     clock_t t1 = clock();
     int t0n = 3;
@@ -738,8 +734,8 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
     double *yr = (double*)calloc(nt, sizeof(double));
     double nn;
     for (int ind = 1; ind <= 10; ind++){    // time marching to find the repeated eigenvectors
-        /*for (int inde = 0; inde < sys->portEdge[sourcePort].size(); inde++){
-            rsc[sys->portEdge[sourcePort][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
+        /*for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
+            rsc[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
         }*/
         //for (myint inde = 0; inde < sys->leng_Vh; inde++){
         //    temp2[inde].real = yh1[inde].real - 2 * yh2[inde].real;
@@ -813,16 +809,16 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
         //    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
         //}
         
-        /*for (myint j = 0; j < sys->portEdge[sourcePort].size(); j++){
-            
-            leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2 + 1] * 3]), 2);
-            leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2 + 1] * 3 + 1]), 2);
-            leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2 + 1] * 3 + 2]), 2);
+        /*for (myint indj = 0; indj < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indj++){
+            int thisEdge = sys->portCoor[sourcePort].portEdge[sourcePortSide][indj];
+            leng = pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3]), 2);
+            leng = leng + pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
+            leng = leng + pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 2] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
             leng = sqrt(leng);
-            y[ind - 1].real += (temp7[sys->portEdge[sourcePort][j] - sys->N_edge_s].real * leng) + y0n[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
-            y[ind - 1].imag += (temp7[sys->portEdge[sourcePort][j] - sys->N_edge_s].imag * leng);
-            y0[ind - 1] += y0n[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
-            yr[ind - 1] += xr[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
+            y[ind - 1].real += (temp7[thisEdge - sys->N_edge_s].real * leng) + y0n[thisEdge - sys->N_edge_s] * leng;
+            y[ind - 1].imag += (temp7[thisEdge - sys->N_edge_s].imag * leng);
+            y0[ind - 1] += y0n[thisEdge - sys->N_edge_s] * leng;
+            yr[ind - 1] += xr[thisEdge - sys->N_edge_s] * leng;
         }
         
         free(temp3);temp3 =NULL;
@@ -921,8 +917,8 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SRowId[j] = i - sys->N_edge_s;
             sys->SColId[j] = v[count].first - sys->N_edge_s;
             sys->Sval[j] = v[count].second / MU;
-            //if (sys->SRowId[j] == sys->SColId[j]){
-            //    sys->Sval[j] = sys->Sval[j].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[i + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[i + sys->N_edge_s] + sys->Sval[j].imag());
+            //if (sys->SRowId[indj] == sys->SColId[indj]){
+            //    sys->Sval[indj] = sys->Sval[indj].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[indi + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[indi + sys->N_edge_s] + sys->Sval[indj].imag());
             //}
             j++;
             count++;
