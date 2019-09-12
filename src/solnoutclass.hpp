@@ -897,7 +897,7 @@ class Port
     // Does the current flow in direction of increasing coordinate WITHIN the source? (+1 for yes, -1 for no, and 0 for bidirectional)
     vector<int> positiveCoordFlow() const
     {
-        // Keep track of cumulative port directionality effects
+        // Keep track of port side directionality effects
         vector<int> sideDir;
         int netPortEffect = 0;
         for (size_t indMult = 0; indMult < this->getMultiplicity(); indMult++)
@@ -909,32 +909,33 @@ class Port
             bool zSupGreater = this->coord[6 * indMult + 2] > this->coord[6 * indMult + 5];
             bool coordEffect = xSupGreater || ySupGreater || zSupGreater;
 
-            switch (this->portDir) // Decipher port side direction effect with ternary operator trickery
+            sideDir.push_back(coordEffect ? -1 : +1); // The solver class just needs to know if Jx, Jy, or Jz is positive or negative within domain
+            /*switch (this->portDir) // Decipher port side direction effect with ternary operator trickery
             {
             case 'O':
-                // Output pin means that current flows out of source and FROM return TO supply within source
-                // Logic for output pins: coord == TRUE means current flows in positive direction:   ret o------->-------o sup
-                // Logic for output pins: coord == FALSE means current flows in negative direction:   sup o-------<-------o ret
-                sideDir.push_back(coordEffect ? +1 : -1);
-                netPortEffect += (coordEffect ? +1 : -1);
-                break;
-            case 'I':
-                // Input pin means that current flows into source and FROM supply TO return within source
-                // Logic for input pins: coord == TRUE means current flows in negative direction:   ret o-------<-------o sup
-                // Logic for input pins: coord == FALSE means current flows in positive direction:   sup o------->-------o ret
+                // Output pin means that current flows out of source and FROM supply TO return within source
+                // Logic for output pins: coord == TRUE means current flows in negative direction:   ret o-------<-------o sup
+                // Logic for output pins: coord == FALSE means current flows in positive direction:   sup o------->-------o ret
                 sideDir.push_back(coordEffect ? -1 : +1);
                 netPortEffect += (coordEffect ? -1 : +1);
+                break;
+            case 'I':
+                // Input pin means that current flows into source and FROM return TO supply within source
+                // Logic for input pins: coord == TRUE means current flows in positive direction:   ret o------->-------o sup
+                // Logic for input pins: coord == FALSE means current flows in negative direction:   sup o-------<-------o ret
+                sideDir.push_back(coordEffect ? +1 : -1);
+                netPortEffect += (coordEffect ? +1 : -1);
                 break;
             case 'B':
                 // Bidirectional pin means current can flow EITHER direction within source
                 // Logic for bidirectional pins: match input pins since Z-parameters will be same for those ports
-                sideDir.push_back(coordEffect ? -1 : +1);
-                netPortEffect += (coordEffect ? -1 : +1);
+                sideDir.push_back(coordEffect ? +1 : -1);
+                netPortEffect += (coordEffect ? +1 : -1);
                 break;
             default:
                 sideDir.push_back(0);
                 netPortEffect += 0;
-            }
+            }*/
         }
 
         // Return port side directionality for each side individually
