@@ -640,7 +640,7 @@ class Layer
     }
 
     // Get GDSII file layer number
-    // Metallic layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for dielectric, substrates, and undescribed planes
+    // Metallic and dielectric layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for substrates and undescribed or nonphysical planes
     int getGDSIINum() const
     {
         return this->gdsiiNum;
@@ -678,7 +678,7 @@ class Layer
     }
 
     // Set GDSII file layer number
-    // Metallic layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for dielectric, substrates, and undescribed planes
+    // Metallic and dielectric layers are nonnegative, bottom plane is 0, top plane is MAX, and -1 is used for substrates and undescribed or nonphysical planes
     void setGDSIINum(int gdsiiNum)
     {
         this->gdsiiNum = gdsiiNum;
@@ -5168,7 +5168,7 @@ struct SolverDataBase
 
                             // Save layer information to variables
                             std::string layerName = fileLine.substr(0, indLayNam);
-                            int gdsiiNum = -1;
+                            /*int gdsiiNum = -1;
                             if (layerName.find('M') != string::npos)
                             {
                                 size_t indNumber = layerName.find("M");
@@ -5177,6 +5177,19 @@ struct SolverDataBase
                                 {
                                     maxGDSIILayer = gdsiiNum;
                                 }
+                            }*/
+                            int gdsiiNum = -1;
+                            if (this->layers.size() == 0)
+                            {
+                                gdsiiNum = 0; // Start assigning layers from layer 0
+                            }
+                            else
+                            {
+                                gdsiiNum = this->layers.back().getGDSIINum() + 1; // Assign subsequent layers in order
+                            }
+                            if (gdsiiNum > maxGDSIILayer)
+                            {
+                                maxGDSIILayer = gdsiiNum;
                             }
                             double zStart = 0.;
                             if (indZStart != string::npos)
@@ -5202,6 +5215,9 @@ struct SolverDataBase
 
                             // Push new layer to class vector
                             (this->layers).emplace_back(Layer(layerName, gdsiiNum, zStart, zHeight, epsilon_r, lossTan, sigma));
+
+                            // Put text box on GDSII layer
+                            cellIMP.textboxes.emplace_back(textbox({ 0., 0. }, gdsiiNum, { }, 0, 0, { 1, 1 }, -10., strans(), layerName)); // Absolute width of 10 pixels
                         }
                         // Keep moving down the layer stack
                         getline(impFile, fileLine);
