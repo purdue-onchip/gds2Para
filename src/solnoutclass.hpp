@@ -909,7 +909,7 @@ class Port
             bool zSupGreater = this->coord[6 * indMult + 2] > this->coord[6 * indMult + 5];
             bool coordEffect = xSupGreater || ySupGreater || zSupGreater;
 
-            sideDir.push_back(coordEffect ? -1 : +1); // The solver class just needs to know if Jx, Jy, or Jz is positive or negative within domain
+            sideDir.push_back(coordEffect ? +1 : -1); // The solver class just needs to know if Jx, Jy, or Jz is positive or negative within domain
             /*switch (this->portDir) // Decipher port side direction effect with ternary operator trickery
             {
             case 'O':

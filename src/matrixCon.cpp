@@ -559,7 +559,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     complex<double> *yd;
     double *yd1, *yd2, *yd2a;
     double *v0caJ, *v0daJ, *y0d, *ydt, *y0d2, *ydat;
-    double leng;
+    double leng = 0.;
     lapack_complex_double *u0, *u0a;
     double *u0d, *u0c;
     double nn, nna;
@@ -824,11 +824,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         free(yc); yc = NULL;
 
-        /* Build final network parameters matrix for this sourcePort by looping over response ports and adding contributions from each sourcePortSide */
+        /* Build final network parameters matrix for this sourcePort by looping over response ports and adding contributions from each response port edge */
+        /* Z_ij = V_i / I_j = - integ[(grad V_i - part A_i / part t) * dl_i] / iinteg[(J_j) * dS_j] = - sum[(yd + yh)_respedge * leng_respedge] / sum[1 * area_source_edge] */
         for (int indPort = 0; indPort < sys->numPorts; indPort++) {
             for (int indPortSide = 0; indPortSide < sys->portCoor[indPort].multiplicity; indPortSide++) {
                 for (int indEdge = 0; indEdge < sys->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
-                    int thisEdge = sys->portCoor[indPort].portEdge[indPortSide][indEdge];
+                    myint thisEdge = sys->portCoor[indPort].portEdge[indPortSide][indEdge];
                     if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // This edge is along the z-axis
                         inz = thisEdge / (sys->N_edge_s + sys->N_edge_v);
                         leng = sys->zn[inz + 1] - sys->zn[inz];
@@ -846,14 +847,19 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
                     leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 2] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
                     leng = sqrt(leng);*/
-                    sys->x[indPort + sys->numPorts * xcol] += yd[thisEdge]; // Accumulating responses due to each response edge
+                    sys->x[indPort + sys->numPorts * xcol] -= yd[thisEdge] * leng; // Accumulating responses due to each response edge line integral (V)
                 }
             }
 
             /* Only scale matrix entry at end of response port calculation */
-            complex<double> xMatScaling = leng / sys->portCoor[sourcePort].portArea[0]; // Assume each sourcePortSide is identical to each other when scaling to find voltage
-            complex<double> xMatSign = -sys->portCoor[sourcePort].portDirection[0]; // Explicit negative sign from E = -grad(phi)
-            sys->x[indPort + sys->numPorts * xcol] *= xMatScaling * xMatSign;
+            //cout << "  leng = " << leng << ", first side portArea = " << sys->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << sys->portCoor[sourcePort].portDirection[0] << endl;
+            double sourceCurrent = 0.; // In-phase current from unit source port edge current densities (A)
+            for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++)
+            {
+                sourceCurrent += sys->portCoor[sourcePort].portArea[sourcePortSide];
+            }
+            //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
+            sys->x[indPort + sys->numPorts * xcol] /= sourceCurrent; // Final matrix entry (ohm)
         }
 #ifdef PRINT_VERBOSE_TIMING
         cout << " Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
