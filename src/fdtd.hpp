@@ -51,11 +51,6 @@ using namespace std;
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16) // Time step for finding high-frequency modes (s)
 
-// HYPRE control macros
-#define HYPRE_METHOD (3) // 1 = AMG, 2 = PCG with AMG Preconditioner, 3 = Flexible GMRES with AMG Preconditioner
-#define HYPRE_CONV_TOL (1.e-4) // Convergence relative tolerance for HYPRE
-#define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
-
 // Debug testing macros (comment out if not necessary)
 //#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
@@ -126,12 +121,12 @@ class fdtdPort{
     /* Port information */
 public:
     double *x, *y, *z;
-    int multiplicity;
-    vector<double> x1, x2, y1, y2, z1, z2;
-    vector<int> portCnd;
-    vector<vector<myint>> portEdge;
-    vector<double> portArea;
-    vector<int> portDirection;
+    int multiplicity;                        // Number of port sides to excite
+    vector<double> x1, x2, y1, y2, z1, z2;   // Supply/return coordinates for each port side
+    vector<myint> portCnd;                   // Conductor index of supply point for each port side
+    vector<vector<myint>> portEdge;          // Edge indices from return to supply with nonzero current density for each port side
+    vector<double> portArea;                 // Area of each port side (m^2)
+    vector<int> portDirection;               // Sign of current density component for each port side
     int *node;
 
     /* Default Constructor */
@@ -210,9 +205,9 @@ public:
     myint N_patch_s;
     myint N_patch_v;
 
-    double *nodepos;
+    //double *nodepos;
     double *Epoints;
-    myint *edgelink;
+    //myint *edgelink;
     double *Hpoints;
     vector<vector<pair<myint,double>>> nodeEdge;    // for each node which edge is connected with this node
     vector<vector<pair<myint, double>>> nodeEdgea;    // for each node which edge is connected with this node
@@ -355,9 +350,9 @@ public:
         this->xnu = NULL;
         this->ynu = NULL;
         this->znu = NULL;
-        this->nodepos = NULL;
+        //this->nodepos = NULL;
         this->Epoints = NULL;
-        this->edgelink = NULL;
+        //this->edgelink = NULL;
         this->Hpoints = NULL;
         this->bd_node1 = NULL;
         this->bd_node2 = NULL;
@@ -468,9 +463,9 @@ public:
         free(this->xnu);
         free(this->ynu);
         free(this->znu);
-        free(this->nodepos);
+        //free(this->nodepos);
         free(this->Epoints);
-        free(this->edgelink);
+        //free(this->edgelink);
         free(this->Hpoints);
         free(this->bd_node1);
         free(this->bd_node2);

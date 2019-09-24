@@ -8,88 +8,6 @@ static bool comp(pair<double, int> a, pair<double, int> b) {
     return a.first <= b.first;
 };
 
-int setHYPREMatrix(myint *ARowId, myint *AColId, double *Aval, myint leng_v0, HYPRE_IJMatrix &a, HYPRE_ParCSRMatrix &parcsr_a) {
-    HYPRE_Int i;
-    int myid, num_procs;
-    HYPRE_Int N, n;
-
-    HYPRE_Int ilower, iupper;
-    HYPRE_Int local_size, extra;
-
-    int solver_id;
-    HYPRE_Int vis, print_system;
-
-    double h, h2;
-
-    HYPRE_IJMatrix A;
-    HYPRE_ParCSRMatrix parcsr_A;
-
-    /* Initialize MPI */
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-
-    N = leng_v0;
-    local_size = N / num_procs;
-    extra = N - local_size * num_procs;
-
-    ilower = local_size * myid;
-    ilower += hypre_min(myid, extra);
-
-    iupper = local_size * (myid + 1);
-    iupper += hypre_min(myid + 1, extra);
-    iupper = iupper - 1;
-
-    /* How many rows do I have? */
-    local_size = iupper - ilower + 1;
-
-    /* Create the matrix.
-    Note that this is a square matrix, so we indicate the row partition
-    size twice (since number of rows = number of cols) */
-    HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
-
-    /* Choose a parallel csr format storage (see the User's Manual) */
-    HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
-
-    /* Initialize before setting coefficients */
-    HYPRE_IJMatrixInitialize(A);
-
-    {
-        HYPRE_Int nnz;
-        vector<double> values;
-        vector<HYPRE_Int> cols;
-        int index = 0;
-
-        for (i = ilower; i <= iupper; i++) {
-            nnz = 0;   // Number of non-zeros on row indi
-
-            while (ARowId[index] == i) {
-                cols.push_back(AColId[index]);
-                values.push_back(Aval[index]);
-                //cout << ARowId[index] << " " << cols[nnz] << " " << values[nnz] << endl;
-                nnz++;
-                index++;
-            }
-
-            /* Set the values for row indi */
-            HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
-
-            cols.clear();
-            values.clear();
-        }
-    }
-
-    /* Assemble after setting the coefficients */
-    HYPRE_IJMatrixAssemble(A);
-
-    /* Get the parcsr matrix object to use */
-    HYPRE_IJMatrixGetObject(A, (void**)&parcsr_A);
-
-    a = A;
-    parcsr_a = parcsr_A;
-
-    return 0;
-}
-
 int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi) {
     myint indi, indj, mark, k, l, n;
     int status = 0;
@@ -824,36 +742,35 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         free(yc); yc = NULL;
 
-        /* Build final network parameters matrix for this sourcePort by looping over response ports and adding contributions from each response port edge */
-        /* Z_ij = V_i / I_j = - integ[(grad V_i - part A_i / part t) * dl_i] / iinteg[(J_j) * dS_j] = - sum[(yd + yh)_respedge * leng_respedge] / sum[1 * area_source_edge] */
+        /* Build final network parameters matrix for this sourcePort by looping over response ports and adding contributions from each response port edge on first side */
+        /* Z_ij = V_i / I_j = - integ[(grad V_i - part A_i / part t) * dl_i] / iinteg[(J_j) * dS_j] = - sum[(yd + yh)_respedge * leng_respedge]_oneside / sum[1 * area_source_side] */
         for (int indPort = 0; indPort < sys->numPorts; indPort++) {
-            for (int indPortSide = 0; indPortSide < sys->portCoor[indPort].multiplicity; indPortSide++) {
-                for (int indEdge = 0; indEdge < sys->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
-                    myint thisEdge = sys->portCoor[indPort].portEdge[indPortSide][indEdge];
-                    if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // This edge is along the z-axis
-                        inz = thisEdge / (sys->N_edge_s + sys->N_edge_v);
-                        leng = sys->zn[inz + 1] - sys->zn[inz];
-                    }
-                    else if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // This edge is along the x-axis
-                        inx = ((thisEdge % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
-                        leng = sys->xn[inx + 1] - sys->xn[inx];
-                    }
-                    else {    // This edge is along the y-axis
-                        iny = (thisEdge % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
-                        leng = sys->yn[iny + 1] - sys->yn[iny];
-                    }
-
-                    /*leng = pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3]), 2);
-                    leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
-                    leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 2] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
-                    leng = sqrt(leng);*/
-                    sys->x[indPort + sys->numPorts * xcol] -= yd[thisEdge] * leng; // Accumulating responses due to each response edge line integral (V)
+            int indPortSide = 0; // Only deal with first port side to get response edge line integral
+            for (int indEdge = 0; indEdge < sys->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
+                myint thisEdge = sys->portCoor[indPort].portEdge[indPortSide][indEdge];
+                if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // This edge is along the z-axis
+                    inz = thisEdge / (sys->N_edge_s + sys->N_edge_v);
+                    leng = sys->zn[inz + 1] - sys->zn[inz];
                 }
+                else if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // This edge is along the x-axis
+                    inx = ((thisEdge % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
+                    leng = sys->xn[inx + 1] - sys->xn[inx];
+                }
+                else {    // This edge is along the y-axis
+                    iny = (thisEdge % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
+                    leng = sys->yn[iny + 1] - sys->yn[iny];
+                }
+
+                /*leng = pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3]), 2);
+                leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
+                leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 2] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
+                leng = sqrt(leng);*/
+                sys->x[indPort + sys->numPorts * xcol] -= yd[thisEdge] * leng; // Accumulating responses due to each response edge line integral (V)
             }
 
-            /* Only scale matrix entry at end of response port calculation */
+            /* Only divide matrix entry by current at end of response port calculation */
             //cout << "  leng = " << leng << ", first side portArea = " << sys->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << sys->portCoor[sourcePort].portDirection[0] << endl;
-            double sourceCurrent = 0.; // In-phase current from unit source port edge current densities (A)
+            double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
             for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++)
             {
                 sourceCurrent += sys->portCoor[sourcePort].portArea[sourcePortSide];

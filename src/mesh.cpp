@@ -2006,7 +2006,7 @@ void fdtdMesh::print()
     cout << "  Epoints array exists (" << (this->Epoints != nullptr) << ")" << endl;
     //cout << "  edgelink array exists (" << (this->edgelink != nullptr) << ")" << endl;
     cout << "  Hpoints array exists (" << (this->Hpoints != nullptr) << ")" << endl;
-    //cout << "  nodeEdge vector has size " << this->nodeEdge.size() << endl;
+    cout << "  nodeEdge vector has size " << this->nodeEdge.size() << endl;
     cout << "  nodeEdgea vector has size " << this->nodeEdgea.size() << endl;
     cout << " PEC information:" << endl;
     cout << "  Boundary node 1 array exists (" << (this->bd_node1 != nullptr) << ")" << endl;

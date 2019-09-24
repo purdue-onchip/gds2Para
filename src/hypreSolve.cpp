@@ -5,125 +5,101 @@
 #include "vis.c"
 
 
-//int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution){
-int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution){
-    HYPRE_Int i;
-    int myid, num_procs;
-    int N, n;
-
-    HYPRE_Int ilower, iupper;
-    HYPRE_Int local_size, extra;
-
-    int solver_id;
-    int vis, print_system;
-
-    double h, h2;
-
-    HYPRE_IJMatrix A;
-    HYPRE_ParCSRMatrix parcsr_A;
-    HYPRE_IJVector b;
-    HYPRE_ParVector par_b;
-    HYPRE_IJVector x;
-    HYPRE_ParVector par_x;
-
-    HYPRE_Solver solver, precond;
-
+//int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution) {
+int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution) {
     /* Initialize MPI */
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    int num_procs, myid;
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
-    N = leng_v0;
-    local_size = N / num_procs; // Integer division
-    extra = N - local_size * num_procs;
+    /* Initialize HYPRE for multiple processes */
+    HYPRE_Int indi = 0;
+    int N = leng_v0;
+    HYPRE_Int local_size = N / num_procs; // Integer division
+    HYPRE_Int extra = N - local_size * num_procs; // Remaining length of matrix row not evenly given to processes
 
-    ilower = local_size * myid;
+    HYPRE_Int ilower = local_size * myid; // Index of matrix row where this process starts
     ilower += hypre_min(myid, extra);
-
-    iupper = local_size * (myid + 1);
+    HYPRE_Int iupper = local_size * (myid + 1); // Index of matrix row where this process ends
     iupper += hypre_min(myid + 1, extra);
     iupper -= 1;
 
-    /* How many rows do I have? */
-    local_size = iupper - ilower + 1;
-    
-    /* Create the matrix.
-    Note that this is a square matrix, so we indicate the row partition
-    size twice (since number of rows = number of cols) */
+    local_size = iupper - ilower + 1; // Corrected number of rows in process
+
+    /* Create the square matrix. [Square matrix => indicate the
+    row partition size twice (since N_rows = N_cols)] */
+    HYPRE_IJMatrix A;
+    HYPRE_ParCSRMatrix parcsr_A;
     HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &A);
 
     /* Choose a parallel CSR format storage (see the User's Manual) */
     HYPRE_IJMatrixSetObjectType(A, HYPRE_PARCSR);
 
-    /* Initialize before setting coefficients */
+    /* Initialize before setting coefficients matrix values */
     HYPRE_IJMatrixInitialize(A);
 
-    HYPRE_Int nnz;
     vector<double> values;
     vector<HYPRE_Int> cols;
     HYPRE_Int index = 0;
-    
-    for (i = ilower; i <= iupper; i++)
-    {
-        nnz = 0;   // Number of non-zeros on row i
-        while (index < leng_A && ARowId[index] == i){
+    for (indi = ilower; indi <= iupper; indi++) {
+        HYPRE_Int nnz = 0;   // Number of non-zeros on row indi
+        while (index < leng_A && ARowId[index] == indi) {
             cols.push_back(AColId[index]);
             values.push_back(Aval[index]);
             nnz++;
             index++;
         }
-        
 
-        /* Set the values for row i */
-        HYPRE_IJMatrixSetValues(A, 1, &nnz, &i, &cols[0], &values[0]);
+        /* Set the values for row indi */
+        HYPRE_IJMatrixSetValues(A, 1, &nnz, &indi, &cols[0], &values[0]);
         cols.clear();
         values.clear();
     }
 
-    /* Assemble after setting the coefficients */
+    /* Assemble after setting the coefficients matrix */
     HYPRE_IJMatrixAssemble(A);
 
     /* Get the parcsr matrix object to use */
     HYPRE_IJMatrixGetObject(A, (void**)&parcsr_A);
 
-    /* Create the rhs and solution */
+    /* Create the rhs vector and solution vector */
+    HYPRE_IJVector b;
+    HYPRE_ParVector par_b;
     HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &b);
     HYPRE_IJVectorSetObjectType(b, HYPRE_PARCSR);
     HYPRE_IJVectorInitialize(b);
 
+    HYPRE_IJVector x;
+    HYPRE_ParVector par_x;
     HYPRE_IJVectorCreate(MPI_COMM_WORLD, ilower, iupper, &x);
     HYPRE_IJVectorSetObjectType(x, HYPRE_PARCSR);
     HYPRE_IJVectorInitialize(x);
 
-    /* Set the rhs values to h^2 and the solution to zero */
-    {
-        double *rhs_values, *x_values;
-        HYPRE_Int    *rows;
+    /* Set the RHS values to vector bin and the initial solution to zero vector */
+    double *rhs_values = (double*)calloc(local_size, sizeof(double));
+    double *x_values = (double*)calloc(local_size, sizeof(double));
+    HYPRE_Int *rows = (HYPRE_Int*)calloc(local_size, sizeof(HYPRE_Int));
 
-        rhs_values = (double*)calloc(local_size, sizeof(double));
-        x_values = (double*)calloc(local_size, sizeof(double));
-        rows = (HYPRE_Int*)calloc(local_size, sizeof(HYPRE_Int));
-
-        for (i = 0; i<local_size; i++)
-        {
-            rhs_values[i] = bin[i];
-            x_values[i] = 0.0;
-            rows[i] = ilower + i;
-        }
-
-        HYPRE_IJVectorSetValues(b, local_size, rows, rhs_values);
-        HYPRE_IJVectorSetValues(x, local_size, rows, x_values);
-
-        free(x_values);
-        free(rhs_values);
-        free(rows);
+    for (indi = 0; indi < local_size; indi++) {
+        rhs_values[indi] = bin[indi];
+        x_values[indi] = 0.0;
+        rows[indi] = ilower + indi;
     }
-    
+    HYPRE_IJVectorSetValues(b, local_size, rows, rhs_values);
+    HYPRE_IJVectorSetValues(x, local_size, rows, x_values);
+
+    /* Release heap memory for the two vectors */
+    free(x_values);
+    free(rhs_values);
+    free(rows);
+
+    /* Assemble and get par vector objects after setting the RHS vector and solution vector*/
     HYPRE_IJVectorAssemble(b);
     HYPRE_IJVectorGetObject(b, (void **)&par_b);
-
     HYPRE_IJVectorAssemble(x);
     HYPRE_IJVectorGetObject(x, (void **)&par_x);
 
+    /* Call the appropriate preconditioner and solver */
 #if HYPRE_METHOD == 1
     /* AMG */
     {
@@ -131,6 +107,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         double final_res_norm;
 
         /* Create solver */
+        HYPRE_Solver solver;
         HYPRE_BoomerAMGCreate(&solver);
 
         /* Set some parameters (See Reference Manual for more parameters) */
@@ -158,9 +135,9 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         /* Output the final solution */
         HYPRE_Complex v;
-        for (i = ilower; i <= iupper; i++){
-            HYPRE_IJVectorGetValues(x, 1, &i, &v);
-            solution[i] = v;
+        for (indi = ilower; indi <= iupper; indi++) {
+            HYPRE_IJVectorGetValues(x, 1, &indi, &v);
+            solution[indi] = v;
         }
 
         /* Destroy solver */
@@ -172,8 +149,10 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         int num_iterations;
         double final_res_norm;
 
-        /* Create solver */
-        HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
+        /* Create solver and preconditioner */
+        HYPRE_Solver solver, precond;
+        HYPRE_ParCSRPCGCreate(MPI_COM_WORLD, &solver);
+        HYPRE_BoomerAMGCreate(&precond);
 
         /* Set some parameters (See Reference Manual for more parameters) */
         HYPRE_PCGSetMaxIter(solver, HYPRE_MAX_ITER); /* max iterations */
@@ -183,7 +162,6 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_PCGSetLogging(solver, 1);              /* needed to get run info later */
 
         /* Now set up the AMG preconditioner and specify any parameters */
-        HYPRE_BoomerAMGCreate(&precond);
         HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
         HYPRE_BoomerAMGSetCoarsenType(precond, 6);
         HYPRE_BoomerAMGSetOldDefault(precond);
@@ -192,7 +170,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_BoomerAMGSetTol(precond, 0.0); /* conv. tolerance zero for preconditioner */
         HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
 
-        /* Set the PCG preconditioner */
+        /* Set the AMG preconditioner for the PCG solver */
         HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
 
@@ -211,9 +189,9 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         /* Output the final solution */
         HYPRE_Complex v;
-        for (i = ilower; i <= iupper; i++){
-            HYPRE_IJVectorGetValues(x, 1, &i, &v);
-            solution[i] = v;
+        for (indi = ilower; indi <= iupper; indi++) {
+            HYPRE_IJVectorGetValues(x, 1, &indi, &v);
+            solution[indi] = v;
         }
 
         /* Destroy solver and preconditioner */
@@ -226,10 +204,12 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_Int    num_iterations;
         double final_res_norm;
         HYPRE_Int    restart = 10;
-        HYPRE_Int    modify = 1;
+        bool modify = true;
 
         /* Create solver */
+        HYPRE_Solver solver, precond;
         HYPRE_ParCSRFlexGMRESCreate(MPI_COMM_WORLD, &solver);
+        HYPRE_BoomerAMGCreate(&precond);
 
         /* Set some parameters (See Reference Manual for more parameters) */
         HYPRE_FlexGMRESSetKDim(solver, restart);
@@ -239,7 +219,6 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_FlexGMRESSetLogging(solver, 1);              /* needed to get run info later */
 
         /* Now set up the AMG preconditioner and specify any parameters */
-        HYPRE_BoomerAMGCreate(&precond);
         HYPRE_BoomerAMGSetPrintLevel(precond, 0); /* print AMG solution info */
         HYPRE_BoomerAMGSetCoarsenType(precond, 6);
         HYPRE_BoomerAMGSetOldDefault(precond);
@@ -250,18 +229,16 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         //HYPRE_EuclidCreate(MPI_COMM_WORLD, &precond);
         //HYPRE_EuclidSetMem(precond, 1);
 
-        /* Set the FlexGMRES preconditioner */
+        /* Set the AMG preconditioner for the Flexible GMRES solver */
         HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
         //HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSolve, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSetup, precond);
 
-        if (modify)
-        {
-            /* this is an optional call  - if you don't call it, hypre_FlexGMRESModifyPCDefault
-            is used - which does nothing.  Otherwise, you can define your own, similar to
-            the one used here */
-            HYPRE_FlexGMRESSetModifyPC(solver,
-                (HYPRE_PtrToModifyPCFcn)hypre_FlexGMRESModifyPCAMGExample);
+        /* Modify AMG parameters at runtime if needed and allowed */
+        if (modify) {
+            /* Optional call: if not called, hypre_FlexGMRESModifyPCDefault is used, which does nothing.
+            Otherwise, the custom defined hypre_FlexGMRESModifyPCAMG() is called. */
+            HYPRE_FlexGMRESSetModifyPC(solver, (HYPRE_PtrToModifyPCFcn)hypre_FlexGMRESModifyPCAMG);
         }
 
         /* Now setup and solve! */
@@ -282,12 +259,12 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         /* Output the final solution */
         HYPRE_Complex v;
-        for (i = ilower; i <= iupper; i++){
-            HYPRE_IJVectorGetValues(x, 1, &i, &v);
-            solution[i] = v;
+        for (indi = ilower; indi <= iupper; indi++) {
+            HYPRE_IJVectorGetValues(x, 1, &indi, &v);
+            solution[indi] = v;
         }
 
-        /* Destory solver and preconditioner */
+        /* Destroy solver and preconditioner */
         HYPRE_ParCSRFlexGMRESDestroy(solver);
         HYPRE_BoomerAMGDestroy(precond);
     }
@@ -297,21 +274,15 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     HYPRE_IJMatrixDestroy(A);
     HYPRE_IJVectorDestroy(b);
     HYPRE_IJVectorDestroy(x);
-
     return(0);
 }
 
-int hypre_FlexGMRESModifyPCAMGExample(void *precond_data, HYPRE_Int iterations,
-    double rel_residual_norm)
-{
-    if (rel_residual_norm > .1)
-    {
-        HYPRE_BoomerAMGSetNumSweeps((HYPRE_Solver)precond_data, 10);
+int hypre_FlexGMRESModifyPCAMG(void *precond_data, HYPRE_Int iterations, double rel_residual_norm) {
+    if (rel_residual_norm > HYPRE_PC_TOL) {
+        HYPRE_BoomerAMGSetNumSweeps((HYPRE_Solver)precond_data, HYPRE_PC_MOD_SWEEPS);
     }
-    else
-    {
+    else {
         HYPRE_BoomerAMGSetNumSweeps((HYPRE_Solver)precond_data, 1);
     }
-
     return 0;
 }
