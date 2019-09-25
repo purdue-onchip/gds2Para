@@ -29,6 +29,9 @@
 // PSLG macro
 #define REL_INTERIOR_PRECISION (0.001) // Relative preceision to set interior points of a PSLG region
 
+// GDSII datatype checking
+//#define CHECK_DATATYPE // Turn off to treat all GDSII file boundaries, paths, and box outlines as physical conductors (on means only those with datatype == 0)
+
 // Structure for convex hull comparison
 struct compareObj {
     complex<double> p0; // Reference point
@@ -2263,10 +2266,12 @@ public:
             vector<double> boundCoord = (cell.boundaries[indi]).getBounds();
             for (size_t indj = 0; indj < boundCoord.size() / 2 - 1; indj++) // Handle each coordinate comprising boundary except repeated point
             {
+#ifdef CHECK_DATATYPE
                 if ((cell.boundaries[indi]).getDataType() != 0)
                 {
                     continue; // Treat all boundaries with nonzero datatype as nonphysical
                 }
+#endif
                 vector<double> boundPt = transform.applyTranform({ boundCoord[2 * indj], boundCoord[2 * indj + 1] }); // Apply the linear transformation of this cell reference
                 complex<double> zBound(boundPt[0] + xo, boundPt[ 1] + yo);
                 allPt.push_back(zBound); // Complex number with x- and y-coordinates (m)
@@ -2277,10 +2282,12 @@ public:
             vector<double> pathCoord = (cell.paths[indi]).getPaths();
             for (size_t indj = 0; indj < pathCoord.size() / 2; indj++) // Handle each coordinate comprising path
             {
+#ifdef CHECK_DATATYPE
                 if ((cell.paths[indi]).getDataType() != 0)
                 {
                     continue; // Treat all paths with nonzero datatype as nonphysical
                 }
+#endif
                 vector<double> pathPt = transform.applyTranform({ pathCoord[2 * indj], pathCoord[2 * indj + 1] }); // Apply the linear transformation of this cell reference
                 complex<double> zPath(pathPt[0] + xo, pathPt[1] + yo);
                 allPt.push_back(zPath); // Complex number with x- and y-coordinates (m)
@@ -2792,10 +2799,12 @@ public:
         for (size_t indi = 0; indi < numBound; indi++) // Handle each boundary
         {
             // Determine if boundary is worth saving as conductor
+#ifdef CHECK_DATATYPE
             if ((cell.boundaries)[indi].getDataType() != 0)
             {
                 continue; // Treat all boundaries with nonzero datatype as nonphysical
             }
+#endif
             int gdsiiNum = (cell.boundaries)[indi].getLayer(); // GDSII layer number of boundary
             bool physicalLayer = true; // Boundary lies on a physical layer
             for (size_t indIgnore = 0; indIgnore < gdsiiLayerIgnore.size(); indIgnore++)
@@ -2847,10 +2856,12 @@ public:
         for (size_t indi = 0; indi < numPath; indi++) // Handle each path
         {
             // Determine if path is worth saving as conductor
+#ifdef CHECK_DATATYPE
             if ((cell.paths)[indi].getDataType() != 0)
             {
                 continue; // Treat all paths with nonzero datatype as nonphysical
             }
+#endif
             int gdsiiNum = (cell.paths)[indi].getLayer(); // GDSII layer number of path
             bool physicalLayer = true; // Path lies on a physical layer
             for (size_t indIgnore = 0; indIgnore < gdsiiLayerIgnore.size(); indIgnore++)

@@ -15,8 +15,8 @@ OBJDIR = $(realpath ./)/obj
 MKDIR = if [ ! -d $(@D) ]; then mkdir -p $(@D); fi
 
 # Compilation Flags (MKL is serial xor threaded with Intel BLACS and debug options)
-#MKL_LINK_FLAGS =-Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group -lm -pthread -ldl
-MKL_LINK_FLAGS =-Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_blacs_openmpi_ilp64.a -Wl,--end-group -L $(INTEL_LIB_DIR) -liomp5 -lpthread -lm -ldl
+MKL_LINK_FLAGS =-Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_sequential.a -Wl,--end-group -lm -pthread -ldl
+#MKL_LINK_FLAGS =-Wl,--start-group $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_core.a $(MKL_ROOT_DIR)/lib/intel64/libmkl_blacs_openmpi_ilp64.a -Wl,--end-group -L $(INTEL_LIB_DIR) -liomp5 -lpthread -lm -ldl
 MKL_COMP_FLAGS =-m64 -I $(MKL_ROOT_DIR)/include
 DBG =0 # Off by default
 #include $(LIMBO_LIB_DIR)/../Include.mk # Include environ config

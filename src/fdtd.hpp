@@ -44,7 +44,7 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACXY (1.0e-4) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
+#define MINDISFRACXY (5.0e-5) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
 #define MINDISFRACZ (0.1) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
@@ -94,7 +94,7 @@ public:
     int markPort;
     int *portNode;
     int portind;
-    int cdtNodeind;
+    myint cdtNodeind;
 };
 
 class fdtdBound {
@@ -235,9 +235,9 @@ public:
     myint numCdt;                         // number of isolated conductors in design
     myint *markEdge;                      // mark if this edge is inside a conductor
     myint *markCell;
-    myint *cdtNumNode;
+    myint *cdtNumNode;                    // number of nodes along each isolated conductor
     double *sig;
-    fdtdCdt *conductor;
+    fdtdCdt *conductor;                   // information about isolated conductors
     myint *markNode;                      // mark this node if it is inside the conductor
     vector<vector<int>> edgeCell;         // for each cell which edge is around it
     vector<vector<double>> edgeCellArea;  // for each cell the area of the perpendicular rectangle
@@ -339,6 +339,8 @@ public:
     /* Default Constructor */
     fdtdMesh(){
         // Set some important numbers to zero
+        this->outedge = (myint)0;
+        this->inedge = (myint)0;
         this->numCdtRow = (myint)0;
         this->leng_Vh = (myint)0;
         this->leng_S = (myint)0;

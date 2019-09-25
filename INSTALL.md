@@ -124,7 +124,7 @@ Please follow these instructions for a general deployment on Linux machines. The
     * If nothing shows up for "tcsh" users, run `cp .cshrc .tcshrc` in the home directory, exit the shell, log back in, and try again
     * For all other errors, contact the primary maintainer
 10. Enter the directory "Limbo" from the working location
-11. Run `git checkout 3.3.0` to revert to an earlier version of the repository
+11. Run `git reset --hard 3.3.0` to revert to an earlier version of the repository
     * The partial installation of Limbo components needed to run gds2Para is feasible only before CMake was introduced as the way to build the entirety of Limbo
     * Only the necessary parsers will be built from Limbo using these instructions, and users wanting to use other Limbo features should follow the installation instructions given in that repository
     * (Optional) It is believed that the necessary components and most other components of Limbo can be built using `make` in the top directory of Limbo following these instructions, but this has not been tested
@@ -142,7 +142,7 @@ Please follow these instructions for a general deployment on Linux machines. The
     * The files optionally added may be used in place of the examples in the rest of the instructions
 18. Run `make` in shell to compile executable **LayoutAnalyzer**
 19. Run `LayoutAnalyzer --help` to get a list of the available control modes which the executable supports
-20. Run `LayoutAnalyser -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file
+20. Run `LayoutAnalyzer -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file
 21. Perform a complete parameter extraction by running `mpirun LayoutAnalyzer -s examples/SDFFRS_X2.gds examples/SDFFRS_X2.sim_input examples/SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a Xyce (SPICE-compatible) subcircuit
     * It is necessary to use `mpirun` to guarantee memory integrity in the parallelized portions of the software.
 
