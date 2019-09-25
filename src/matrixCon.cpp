@@ -2749,7 +2749,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
                 if (iz != 0) {    // this node is not on the bottom plane
                     eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                    if (sys->markEdge[eno] == 0) {    // this edge is in the dielectric
+                    if (sys->markEdge[eno] == 0 && sys->markNode[(iz - 1) * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
                         v0d1num++;
                         v0d1anum++;
                         mark = 1;
@@ -2757,7 +2757,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 }
                 if (iz != sys->nz - 1) {   // this node is not on the top plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                    if (sys->markEdge[eno] == 0) {
+                    if (sys->markEdge[eno] == 0 && sys->markNode[(iz + 1) * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                         v0d1num++;
                         v0d1anum++;
                         mark = 1;
@@ -2765,7 +2765,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 }
                 if (ix != 0) {    // this node is not on the left plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                    if (sys->markEdge[eno] == 0) {
+                    if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + (ix - 1) * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                         v0d1num++;
                         v0d1anum++;
                         mark = 1;
@@ -2773,7 +2773,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 }
                 if (ix != sys->nx - 1) {    // this node is not on the right plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                    if (sys->markEdge[eno] == 0) {
+                    if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + (ix + 1) * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                         v0d1num++;
                         v0d1anum++;
                         mark = 1;
@@ -2781,7 +2781,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 }
                 if (iy != 0) {    // this node is not on the front plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                    if (sys->markEdge[eno] == 0) {
+                    if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy - 1] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                         v0d1num++;
                         v0d1anum++;
                         mark = 1;
@@ -2789,7 +2789,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
                 }
                 if (iy != sys->ny - 1) {   // this node is not on the back plane
                     eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                    if (sys->markEdge[eno] == 0) {
+                    if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy + 1] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                         v0d1num++;
                         v0d1anum++;
                         mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
@@ -2984,7 +2984,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             status = avg_length(sys, iz, iy, ix, lx_avg, ly_avg, lz_avg);
             if (iz != 0) {    // this node is not on the bottom plane
                 eno = (iz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the lower edge
-                if (sys->markEdge[eno] == 0) {    // this edge is in the dielectric
+                if (sys->markEdge[eno] == 0 && sys->markNode[(iz - 1) * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
                     sys->v0d1RowId[v0d1num] = eno;
                     sys->v0d1ColId[v0d1num] = leng_v0d1;
                     sys->v0d1val[v0d1num] = -1 / (sys->zn[iz] - sys->zn[iz - 1]);
@@ -2996,7 +2996,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             }
             if (iz != sys->nz - 1) {   // this node is not on the top plane
                 eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + ix * (sys->N_cell_y + 1) + iy;    // the upper edge
-                if (sys->markEdge[eno] == 0) {
+                if (sys->markEdge[eno] == 0 && sys->markNode[(iz + 1) * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                     sys->v0d1RowId[v0d1num] = eno;
                     sys->v0d1ColId[v0d1num] = leng_v0d1;
                     sys->v0d1val[v0d1num] = 1 / (sys->zn[iz + 1] - sys->zn[iz]);
@@ -3008,7 +3008,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             }
             if (ix != 0) {    // this node is not on the left plane
                 eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (ix - 1) * (sys->N_cell_y + 1) + iy;    // the left edge
-                if (sys->markEdge[eno] == 0) {
+                if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + (ix - 1) * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                     sys->v0d1RowId[v0d1num] = eno;
                     sys->v0d1ColId[v0d1num] = leng_v0d1;
                     sys->v0d1val[v0d1num] = -1 / (sys->xn[ix] - sys->xn[ix - 1]);
@@ -3020,7 +3020,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             }
             if (ix != sys->nx - 1) {    // this node is not on the right plane
                 eno = iz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + ix * (sys->N_cell_y + 1) + iy;    // the right edge
-                if (sys->markEdge[eno] == 0) {
+                if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + (ix + 1) * (sys->N_cell_y + 1) + iy] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                     sys->v0d1RowId[v0d1num] = eno;
                     sys->v0d1ColId[v0d1num] = leng_v0d1;
                     sys->v0d1val[v0d1num] = 1 / (sys->xn[ix + 1] - sys->xn[ix]);
@@ -3032,7 +3032,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             }
             if (iy != 0) {    // this node is not on the front plane
                 eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy - 1;    // the front edge
-                if (sys->markEdge[eno] == 0) {
+                if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy - 1] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                     sys->v0d1RowId[v0d1num] = eno;
                     sys->v0d1ColId[v0d1num] = leng_v0d1;
                     sys->v0d1val[v0d1num] = -1 / (sys->yn[iy] - sys->yn[iy - 1]);
@@ -3044,7 +3044,7 @@ int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x,
             }
             if (iy != sys->ny - 1) {   // this node is not on the back plane
                 eno = iz * (sys->N_edge_s + sys->N_edge_v) + ix * sys->N_cell_y + iy;    // the back edge
-                if (sys->markEdge[eno] == 0) {
+                if (sys->markEdge[eno] == 0 && sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy + 1] != sys->markNode[iz * sys->N_node_s + ix * (sys->N_cell_y + 1) + iy]) {
                     sys->v0d1RowId[v0d1num] = eno;
                     sys->v0d1ColId[v0d1num] = leng_v0d1;
                     sys->v0d1val[v0d1num] = 1 / (sys->yn[iy + 1] - sys->yn[iy]);
