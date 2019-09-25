@@ -164,7 +164,7 @@ Please direct all questions, bug reports, and issues relating to installing or r
     * Files created from the software will be added directly to the present working directory, which is "gds2Para" for this point in these instructions
 18. Run `make` in shell to compile executable **LayoutAnalyzer**
 19. Run `LayoutAnalyzer --help` to get a list of the available control modes which the executable supports
-20. Run `LayoutAnalyser -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
+20. Run `LayoutAnalyzer -r examples/nand2.gds` in shell to produce terminal output describing the GDSII file ("nand2.gds" may be replaced with any GDSII file available)
 21. Perform a complete parameter extraction by running `mpirun LayoutAnalyzer -s examples/SDFFRS_X2.gds examples/SDFFRS_X2.sim_input examples/SDFFRS_X2.cir` to read in the design and simulation input file, do all analysis, and return the results in a Xyce (SPICE-compatible) subcircuit
     * It is necessary to use `mpirun` to guarantee memory integrity in the parallelized portions of the software.
 
