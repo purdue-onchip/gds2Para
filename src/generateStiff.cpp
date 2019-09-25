@@ -408,11 +408,12 @@ int generateStiff(fdtdMesh *sys){
     free(ShColIdo); ShColIdo = NULL;
     free(Shval); Shval = NULL;
 
-    /*for (int i = 0; i < sys->numPorts; i++){
-        for (int j = 0; j < sys->numPorts; j++){
-            cout << Yr[i * sys->numPorts + j].real() << " " << Yr[i * sys->numPorts + j].imag() << endl;
-        }
-    }*/
+    /*ofstream out;
+    out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
+    for (int index = 0; index < sys->leng_S; index++){
+        out << sys->SRowId[index] << " " << sys->SColId[index] << " " << sys->Sval[index] << endl;
+    }
+    out.close();*/
 
     return 0;
 }
@@ -454,14 +455,14 @@ int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *C
     }
 
     /* Used in plasma2D for upper and lower excitation */
-    myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
+    /*myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
     
     while (current_edge < sys->N_edge - sys->N_edge_s){
         if (sys->markEdge[current_edge] == 0){
             J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
         }
         current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
-    }
+    }*/
 	/* end of Used in plasma2D for upper and lower excitation */
     
     RowId1[k] = 0;
@@ -476,7 +477,7 @@ int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *C
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
                 if (sys->markEdge[RowId[indi] + sys->N_edge_s] != 0) {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA * sys->sig[RowId[indi] + sys->N_edge_s]);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
                 else {
@@ -518,6 +519,7 @@ int reference(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *C
     pardisoinit(pt, &mtype, iparm);
     iparm[38] = 1;
     iparm[34] = 1;    // 0-based indexing
+    //iparm[59] = 2;    // out of core version to solve very large problem
     //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
 
     //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
@@ -593,7 +595,8 @@ int reference1(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *
     complex<double> *J;
     J = (complex<double>*)calloc((sys->N_edge - bdn * sys->N_edge_s), sizeof(complex<double>));
     for (indi = 0; indi < sys->portEdge[sourcePort].size(); indi++){
-        J[sys->portEdge[sourcePort][indi] - sys->N_edge_s] = 0. - (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
+        J[sys->portEdge[sourcePort][indi] - sys->N_edge_s] = 0. - (1i) * 1 * freq * 2. * M_PI;    // portDirection is -1
+        
     }
 
     RowId1[k] = 0;
@@ -668,8 +671,260 @@ int reference1(fdtdMesh *sys, double freq, int sourcePort, myint *RowId, myint *
     return 0;
 }
 
+//int V0_reference(fdtdMesh *sys, int sourcePort, double freq) {
+//    int bdn;
+//#ifdef UPPER_BOUNDARY_PEC
+//    bdn = 2;
+//#else
+//    bdn = 1;
+//#endif
+//    V0aTDV0 M;
+//    myint k = 0;
+//    int inz, inx, iny;
+//    myint indi;
+//    double *dxa, *dya, *dza;
+//    dxa = (double*)calloc(sys->nx, sizeof(double));
+//    dya = (double*)calloc(sys->ny, sizeof(double));
+//    dza = (double*)calloc(sys->nz, sizeof(double));
+//    
+//    dxa[0] = sys->xn[1] - sys->xn[0];
+//    dxa[sys->nx - 1] = sys->xn[sys->nx - 1] - sys->xn[sys->nx - 2];
+//    for (indi = 1; indi < sys->nx - 1; indi++) {
+//        dxa[indi] = (sys->xn[indi + 1] - sys->xn[indi - 1]) / 2;
+//    }
+//    dya[0] = sys->yn[1] - sys->yn[0];
+//    dya[sys->ny - 1] = sys->yn[sys->ny - 1] - sys->yn[sys->ny - 2];
+//    for (indi = 1; indi < sys->ny - 1; indi++) {
+//        dya[indi] = (sys->yn[indi + 1] - sys->yn[indi - 1]) / 2;
+//    }
+//    dza[0] = sys->zn[1] - sys->zn[0];
+//    dza[sys->nz - 1] = sys->zn[sys->nz - 1] - sys->zn[sys->nz - 2];
+//    for (indi = 1; indi < sys->nz - 1; indi++) {
+//        dza[indi] = (sys->zn[indi + 1] - sys->zn[indi - 1]) / 2;
+//    }
+//
+//    myint count = 0;    // count the number of unknowns in M
+//    for (indi = sys->N_node_s; indi < sys->N_node - (bdn - 1) * sys->N_node_s; indi++){
+//        inz = indi / (sys->N_node_s);
+//        inx = (indi % sys->N_node_s) / (sys->N_cell_y + 1);
+//        iny = (indi % sys->N_node_s) % (sys->N_cell_y + 1);
+//        
+//        if (inz == 1 || inz == sys->nz - (bdn)) {
+//            count += 1;
+//        }
+//        else {
+//            count += 2;
+//        }
+//
+//        if (inx == 0 || inx == sys->nx - 1) {
+//            count += 1;
+//        }
+//        else {
+//            count += 2;
+//        }
+//
+//        if (iny == 0 || iny == sys->ny - 1) {
+//            count += 1;
+//        }
+//        else {
+//            count += 2;
+//        }
+//        count += 1;
+//    }
+//
+//    M.RowId = (myint*)calloc(count, sizeof(myint));
+//    M.RowId1 = (myint*)calloc(sys->N_node - bdn * sys->N_node_s + 1, sizeof(myint));
+//    M.ColId = (myint*)calloc(count, sizeof(myint));
+//    M.val = (complex<double>*)calloc(count, sizeof(complex<double>));
+//	M.rhs = (complex<double>*)calloc(sys->N_node - bdn * sys->N_node_s, sizeof(complex<double>));
+//
+//    indi = 0;
+//    M.RowId1[k] = 0;
+//    k++;
+//    myint start;
+//    myint leng = 0;
+//	for (indi = sys->N_node_s; indi < sys->N_node - (bdn - 1) * sys->N_node_s; indi++) {    // generate V0a'*D*V0
+//		inz = indi / (sys->N_node_s);
+//		inx = (indi % sys->N_node_s) / (sys->N_cell_y + 1);
+//		iny = (indi % sys->N_node_s) % (sys->N_cell_y + 1);
+//
+//		if (inz == 1) {
+//
+//		}
+//		else {
+//			M.RowId[leng] = indi - sys->N_node_s;
+//			M.ColId[leng] = indi - sys->N_node_s * 2;
+//			if (sys->markEdge[(inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny] != 0) {
+//				M.val[leng] = -1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] = -1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//			leng++;
+//			M.rhs[indi - sys->N_egde_s].imag += -1 * freq * 2 * M_PI * (-1 / dza[inz]) * sys->J[(inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny];
+//		}
+//
+//
+//
+//		if (inx == 0) {
+//
+//		}
+//		else {
+//			M.RowId[leng] = indi - sys->N_node_s;
+//			M.ColId[leng] = indi - sys->N_node_s - sys->N_cell_y - 1;
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx - 1) + iny] != 0) {
+//				M.val[leng] = -1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx - 1) + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] = -1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx - 1) + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//			leng++;
+//		}
+//
+//		if (iny > 0) {
+//			M.RowId[leng] = indi - sys->N_node_s;
+//			M.ColId[leng] = indi - sys->N_node_s - 1;
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny - 1] != 0) {
+//				M.val[leng] = -1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / dyz[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny - 1 + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] = -1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / dya[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny - 1 + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//			leng++;
+//		}
+//
+//		// Row: this node to Col: this node
+//		M.RowId[leng] = indi - sys->N_node_s;
+//		M.ColId[leng] = indi - sys->N_node_s;
+//		if (inz > 0) {
+//			if (sys->markEdge[(inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny] != 0) {
+//				M.val[leng] += 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += 1 / (sys->zn[inz] - sys->zn[inz - 1]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//		}
+//		if (inz < sys->nz - 1) {
+//			if (sys->markEdge[(inz) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny] != 0) {
+//				M.val[leng] += 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz + 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += 1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz + 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//		}
+//		if (inx > 0) {
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx - 1) + iny] != 0) {
+//				M.val[leng] += 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx - 1) + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += 1 / (sys->xn[inx] - sys->xn[inx - 1]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx - 1) + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//		}
+//		if (inx < sys->nx - 1) {
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx)+iny] != 0) {
+//				M.val[leng] += 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx)+iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += 1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx)+iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//		}
+//		if (iny > 0) {
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny - 1] != 0) {
+//				M.val[leng] += 1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / dyz[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny - 1 + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += 1 / (sys->yn[iny] - sys->yn[iny - 1]) * 1 / dya[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny - 1 + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//		}
+//		if (iny < sys->ny - 1) {
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny] != 0) {
+//				M.val[leng] += 1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / dyz[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += 1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / dya[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//		}
+//
+//		leng++;
+//
+//
+//		// Row: this node, Col: y+1 node
+//		if (iny < sys->ny - 1) {
+//			M.RowId[leng] = indi - sys->N_node_s;
+//			M.ColId[leng] = indi - sys->N_node_s + 1;
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny] != 0) {
+//				M.val[leng] += -1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / dya[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += -1 / (sys->yn[iny + 1] - sys->yn[iny]) * 1 / dya[iny] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//			leng++;
+//		}
+//
+//		// Row: this node, Col: x+1 node
+//		if (inx < sys->nx - 1) {
+//			M.RowId[leng] = indi - sys->N_node_s;
+//			M.ColId[leng] = indi - sys->N_node_s + sys->N_cell_y + 1;
+//			if (sys->markEdge[inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx)+iny] != 0) {
+//				M.val[leng] += -1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx)+iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += -1 / (sys->xn[inx + 1] - sys->xn[inx]) * 1 / dxa[inx] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (sys->N_cell_y + 1) * (inx)+iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//			leng++;
+//		}
+//
+//		// Row: this node, Col: z+1 node
+//		if (inz < sys->nz - bdn) {
+//			M.RowId[leng] = indi - sys->N_node_s;
+//			M.ColId[leng] = indi - sys->N_node_s + sys->N_node_s;
+//			if (sys->markEdge[(inz) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny] != 0) {
+//				M.val[leng] += -1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * freq * 2 * M_PI * SIGMA);
+//			}
+//			else {
+//				M.val[leng] += -1 / (sys->zn[inz + 1] - sys->zn[inz]) * 1 / dza[inz] * (-pow(freq * 2 * M_PI, 2) * sys->stackEpsn[((inz) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (sys->N_cell_y + 1) * inx + iny + sys->N_edge_v) % (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+//					+ 1i * 0);
+//			}
+//			leng++;
+//		}
+//
+//		k++;
+//		M.RowId1[k] = leng;
+//	}
+//
+//    return 0;
+//}
 
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
+    int bdn;
+#ifdef UPPER_BOUNDARY_PEC
+    bdn = 2;
+#else
+    bdn = 1;
+#endif
 
     clock_t t1 = clock();
     int t0n = 3;
@@ -677,25 +932,25 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
     double tau = 1.e-11;
     double t0 = t0n * tau;
     myint nt = 2 * t0 / dt;
-    double *rsc = (double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(double));
-    double *xr = (double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 3, sizeof(double));
+    double *rsc = (double*)calloc((sys->N_edge - bdn * sys->N_edge_s), sizeof(double));
+    double *xr = (double*)calloc((sys->N_edge - bdn * sys->N_edge_s) * 3, sizeof(double));
     myint start;
     myint index;
     double leng;
-    double *y0np1 = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
-    double *y0n = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
-    double *y0nm1 = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
-    double *temp = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
-    double *temp1 = (double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(double));
+    double *y0np1 = (double*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(double));
+    double *y0n = (double*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(double));
+    double *y0nm1 = (double*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(double));
+    double *temp = (double*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(double));
+    double *temp1 = (double*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(double));
     lapack_complex_double *yh1 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
     lapack_complex_double *yh2 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
     lapack_complex_double *yh3 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
-    lapack_complex_double *y_h = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
+    lapack_complex_double *y_h = (lapack_complex_double*)calloc(sys->N_edge - bdn * sys->N_edge_s, sizeof(lapack_complex_double));
     lapack_complex_double *temp2 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
     lapack_complex_double *temp3;
     lapack_complex_double *temp4;
     lapack_complex_double *temp5;
-    lapack_complex_double *temp6 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
+    lapack_complex_double *temp6 = (lapack_complex_double*)calloc((sys->N_edge - bdn * sys->N_edge_s) * sys->leng_Vh, sizeof(lapack_complex_double));
     lapack_complex_double *temp7;
     lapack_complex_double *m_h;
     int status;
@@ -705,10 +960,12 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
     double *y0 = (double*)calloc(nt, sizeof(double));
     double *yr = (double*)calloc(nt, sizeof(double));
     double nn;
-    for (int ind = 1; ind <= 10; ind++){    // time marching to find the repeated eigenvectors
-        /*for (int inde = 0; inde < sys->portEdge[sourcePort].size(); inde++){
+    int inx, iny, inz;
+    for (int ind = 1; ind <= nt; ind++){    // time marching to find the repeated eigenvectors
+        for (int inde = 0; inde < sys->portEdge[sourcePort].size(); inde++){
             rsc[sys->portEdge[sourcePort][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
-        }*/
+        }
+        
         //for (myint inde = 0; inde < sys->leng_Vh; inde++){
         //    temp2[inde].real = yh1[inde].real - 2 * yh2[inde].real;
         //    temp2[inde].imag = yh1[inde].imag - 2 * yh2[inde].imag;
@@ -719,8 +976,8 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, temp2, sys->leng_Vh, 1, temp3);    // V_re1*(yh(:,1)-2*yh(:,2))
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, yh1, sys->leng_Vh, 1, temp4);    // V_re1*(yh(:,1))
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, yh2, sys->leng_Vh, 1, temp5);    // V_re1*yh(:,2)
-        //
-        for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++)
+        cout << "Step " << ind << endl;
+        for (myint inde = 0; inde < sys->N_edge - bdn * sys->N_edge_s; inde++)
         {
             //y0np1[inde] = 1000 * pow(tau, 2) * (exp(-pow(t0, 2) / pow(tau, 2)) - exp(-pow((dt * (ind + 1) - t0) / tau, 2))) * u0d[inde] + 2000 * ((ind + 1) * dt - t0) * exp(-pow(((ind + 1) * dt - t0) / tau, 2)) * u0c[inde];
             y0n[inde] = 1000 * pow(tau, 2) * (exp(-pow(t0, 2) / pow(tau, 2)) - exp(-pow((dt * (ind)-t0) / tau, 2))) * u0d[inde] + 2000 * ((ind)* dt - t0) * exp(-pow(((ind)* dt - t0) / tau, 2)) * u0c[inde];
@@ -731,8 +988,10 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
         //        temp6[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (dt * sys->sig[inde + sys->N_edge_s] + 2 * sys->eps[inde + sys->N_edge_s]);
         //        temp6[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (dt * sys->sig[inde + sys->N_edge_s] + 2 * sys->eps[inde + sys->N_edge_s]);
         //    }
+            
         }
-        //
+        
+        
         //m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
         //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, temp6, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);
         //index = 0;
@@ -761,44 +1020,64 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
         //    yh3[inde].imag = 0;
         //}
         
-        // central difference
-        //index = 0;
-        ////nn = 0;
-        //while (index < sys->leng_S){
-        //    start = sys->SRowId[index];
-        //    while (index < sys->leng_S && sys->SRowId[index] == start){
-        //        xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[index]] += sys->Sval[index] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[index]] * (-2) * pow(dt, 2);
-        //        index++;
-        //    }
-        //    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + start] += -rsc[start] * 2 * pow(dt, 2) + dt * sys->sig[start + sys->N_edge_s] * xr[start] - 2 * sys->eps[start + sys->N_edge_s] * xr[start] + 4 * sys->eps[start + sys->N_edge_s] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + start];
-        //    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + start] /= (2 * sys->eps[start + sys->N_edge_s] + dt * sys->sig[start + sys->N_edge_s]);
-        //    //nn += pow(xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + start], 2);
-        //}
-        ////cout << "The norm of xr is " << sqrt(nn) << endl;
-        //for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-        //    xr[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-        //    xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-        //    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
-        //}
-        
-        /*for (myint j = 0; j < sys->portEdge[sourcePort].size(); j++){
+        /* central difference */
+        index = 0;
+        nn = 0;
+        while (index < sys->leng_S){
+            start = sys->SRowId[index];
+            while (index < sys->leng_S && sys->SRowId[index] == start){
+                xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + sys->SRowId[index]] += sys->Sval[index] * xr[1 * (sys->N_edge - bdn * sys->N_edge_s) + sys->SColId[index]] * (-2) * pow(dt, 2);
+                index++;
+            }
+           
+            if (sys->markEdge[start + sys->N_edge_s] != 0) {
+                xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + start] += -rsc[start] * 2 * pow(dt, 2) + dt * SIGMA * xr[start] - 2 * sys->stackEpsn[(start + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(start + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * xr[1 * (sys->N_edge - bdn * sys->N_edge_s) + start];
+                xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + start] /= (2 * sys->stackEpsn[(start + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 + dt * SIGMA);
+                nn += pow(xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + start], 2);
+                
+            }
+            else {
+                xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + start] += -rsc[start] * 2 * pow(dt, 2) - 2 * sys->stackEpsn[(start + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(start + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * xr[1 * (sys->N_edge - bdn * sys->N_edge_s) + start];
+                xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + start] /= (2 * sys->stackEpsn[(start + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
+                nn += pow(xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + start], 2);
+                
+            }
             
-            leng = pow((sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2] * 3] - sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2 + 1] * 3]), 2);
-            leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2] * 3 + 1] - sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2 + 1] * 3 + 1]), 2);
-            leng = leng + pow((sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2] * 3 + 2] - sys->nodepos[sys->edgelink[sys->portEdge[sourcePort][j] * 2 + 1] * 3 + 2]), 2);
-            leng = sqrt(leng);
-            y[ind - 1].real += (temp7[sys->portEdge[sourcePort][j] - sys->N_edge_s].real * leng) + y0n[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
-            y[ind - 1].imag += (temp7[sys->portEdge[sourcePort][j] - sys->N_edge_s].imag * leng);
+        }
+        cout << "The norm of xr is " << sqrt(nn) << endl;
+        for (myint inde = 0; inde < (sys->N_edge - bdn * sys->N_edge_s); inde++){
+            xr[inde] = xr[1 * (sys->N_edge - bdn * sys->N_edge_s) + inde];
+            xr[1 * (sys->N_edge - bdn * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + inde];
+            xr[2 * (sys->N_edge - bdn * sys->N_edge_s) + inde] = 0;
+        }
+        
+        for (myint j = 0; j < sys->portEdge[sourcePort].size(); j++){
+            
+            if (sys->portEdge[sourcePort][j] % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // this edge is along z axis
+                inz = sys->portEdge[sourcePort][j] / (sys->N_edge_s + sys->N_edge_v);
+                leng = sys->zn[inz + 1] - sys->zn[inz];
+            }
+            else if (sys->portEdge[sourcePort][j] % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // this edge is along x axis
+                inx = ((sys->portEdge[sourcePort][j] % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
+                leng = sys->xn[inx + 1] - sys->xn[inx];
+            }
+            else {    // this edge is along y axis
+                iny = (sys->portEdge[sourcePort][j] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
+                leng = sys->yn[iny + 1] - sys->yn[iny];
+            }
+            
+            //y[ind - 1].real += (temp7[sys->portEdge[sourcePort][j] - sys->N_edge_s].real * leng) + y0n[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
+            //y[ind - 1].imag += (temp7[sys->portEdge[sourcePort][j] - sys->N_edge_s].imag * leng);
             y0[ind - 1] += y0n[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
             yr[ind - 1] += xr[sys->portEdge[sourcePort][j] - sys->N_edge_s] * leng;
         }
         
-        free(temp3);temp3 =NULL;
-        free(temp4); temp4 = NULL;
-        free(temp5); temp5 = NULL;
-        free(temp7); temp7 = NULL;
-        free(ipiv); ipiv = NULL;
-        free(m_h); m_h = NULL;*/
+        //free(temp3);temp3 =NULL;
+        //free(temp4); temp4 = NULL;
+        //free(temp5); temp5 = NULL;
+        //free(temp7); temp7 = NULL;
+        //free(ipiv); ipiv = NULL;
+        //free(m_h); m_h = NULL;
         
     }
     
@@ -814,13 +1093,12 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
     free(yh3); yh3 = NULL;
     free(xr); xr = NULL;
     free(rsc); rsc = NULL;
-    cout << "Time for 10 steps our proposed time marching is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    /*ofstream out;
-    out.open("y1.txt", std::ofstream::out | std::ofstream::trunc);
+    ofstream out;
+    /*out.open("y1.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint ind = 0; ind < nt; ind++){
         out << y[ind].real << " " << y[ind].imag << endl;
     }
-    out.close();
+    out.close();*/
 
     out.open("y01.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint ind = 0; ind < nt; ind++){
@@ -832,7 +1110,7 @@ int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c){
     for (myint ind = 0; ind < nt; ind++){
         out << yr[ind] << endl;
     }
-    out.close();*/
+    out.close();
 
     return 0;
 }

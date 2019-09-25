@@ -864,21 +864,21 @@ class Port
         switch (this->portDir) // Decipher port direction effect with ternary operator trickery
         {
         case 'O':
-            // Output pin means that current flows out of source and FROM return TO supply within source
-            // Logic for output pins: coord == TRUE means current flows in positive direction:   ret o------->-------o sup
-            // Logic for output pins: coord == FALSE means current flows in negative direction:   sup o-------<-------o ret
-            return (coordEffect ? +1 : -1);
+            // Output pin means that current flows out of source and FROM supply TO return within source
+            // Logic for output pins: coord == TRUE means current flows in positive direction:   ret o-------<-------o sup
+            // Logic for output pins: coord == FALSE means current flows in negative direction:   sup o------->-------o ret
+            return (coordEffect ? -1 : +1);
             break;
         case 'I':
-            // Input pin means that current flows into source and FROM supply TO return within source
-            // Logic for input pins: coord == TRUE means current flows in negative direction:   ret o-------<-------o sup
-            // Logic for input pins: coord == FALSE means current flows in positive direction:   sup o------->-------o ret
-            return (coordEffect ? -1 : +1);
+            // Input pin means that current flows into source and FROM return TO supply within source
+            // Logic for input pins: coord == TRUE means current flows in negative direction:   ret o------->-------o sup
+            // Logic for input pins: coord == FALSE means current flows in positive direction:   sup o-------<-------o ret
+            return (coordEffect ? +1 : -1);
             break;
         case 'B':
             // Bidirectional pin means current can flow EITHER direction within source
             // Logic for bidirectional pins: match input pins since Z-parameters will be same for those ports
-            return (coordEffect ? -1 : +1);
+            return (coordEffect ? +1 : -1);
             break;
         default:
             return 0;

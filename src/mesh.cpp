@@ -18,13 +18,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int numNode = 0;
     double *xOrigOld, *yOrigOld, *zOrigOld;
 
-    double disMin = 1e-8;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = 1e-7;// MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
 
     for (i = 0; i < sys->numCdtRow; i++) {
         numNode += sys->conductorIn[i].numVert;
     }
 
-    int n_surx = 1, n_sury = 1, n_surz = 0;    // The surrounding discretized points around the conductors
+    int n_surx = 0, n_sury = 0, n_surz = 0;    // The surrounding discretized points around the conductors
     double dis_surx = 1e-6, dis_sury = 1e-6, dis_surz = 5e-8;
     xOrigOld = (double*)calloc((n_surx * 2 + 1) * (numNode + 2 * sys->numPorts) + 2, sizeof(double));   // +2 is for xmin and xmax
     yOrigOld = (double*)calloc((n_sury * 2 + 1) * (numNode + 2 * sys->numPorts) + 2, sizeof(double));   // +2 is for ymin and ymax
@@ -150,7 +150,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(xOrigOld, xOrigOld + count_xOrigOld);
     
     sys->nx = 1;
-    double disMaxx = 0.00001;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
+    double disMaxx = 0.14854e-3;//0.000008;// MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     int xMaxInd = (xmax - xmin) / disMaxx;
 
     if (dis_surx < disMin){
@@ -222,7 +222,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the y-direction */
     sort(yOrigOld, yOrigOld + count_yOrigOld);
     sys->ny = 1;
-    double disMaxy = 0.00001;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
+    double disMaxy = 10e-5;// MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     int yMaxInd = (ymax - ymin) / disMaxy;
 
     for (i = 1; i < count_yOrigOld; i++){
@@ -306,7 +306,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sort(zOrigOld, zOrigOld + count_zOrigOld);
     sys->nz = 1;
     double disMinz = 1e-9;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
-    double disMaxz = 1.2e-7;// minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
+    double disMaxz = 5e-6; //1.2e-7// minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
     int zMaxInd = (zmax - zmin) / disMaxz;
     double *zn = (double*)calloc(count_zOrigOld + zMaxInd, sizeof(double));
     zn[0] = zOrigOld[0];
@@ -1281,9 +1281,9 @@ for (i = 0; i < sys->N_node; i++) {
             if ((i < sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -1){
                 sys->conductor[visited[i] - 1].markPort = -1;    // this conductor connects to the lower PEC
             }
-            //else if ((i >= sys->N_node - sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -2 && sys->conductor[visited[i] - 1].markPort != -1){
-            //    sys->conductor[visited[i] - 1].markPort = -2;    // this conductor connects to the upper PEC
-            //}
+            else if ((i >= sys->N_node - sys->N_node_s) && sys->conductor[visited[i] - 1].markPort != -2 && sys->conductor[visited[i] - 1].markPort != -1){
+                sys->conductor[visited[i] - 1].markPort = -2;    // this conductor connects to the upper PEC
+            }
             sys->conductor[visited[i] - 1].cdtNodeind++;
         }
     }
@@ -1429,7 +1429,7 @@ for (i = 0; i < sys->N_node; i++) {
     sys->markCell = (int*)calloc(sys->N_cell_x * sys->N_cell_y * sys->N_cell_z, sizeof(int));
     for (i = 0; i < sys->N_edge; i++)
     {
-        sys->edgeCell.push_back(aa);
+        sys->edgeCell.push_back(aa);    // this edge's surrounding cells
         sys->edgeCellArea.push_back(bb);
     }
     int cell;
@@ -1522,7 +1522,17 @@ for (i = 0; i < sys->N_node; i++) {
         }
     }
 #endif
-
+    /*ofstream out;
+    out.open("D_sig.txt", std::ofstream::out | std::ofstream::trunc);
+    for (int index = 0; index < sys->N_edge; index++) {
+        out << sys->markEdge[index] << endl;
+    }
+    out.close();
+    out.open("D_eps.txt", std::ofstream::out | std::ofstream::trunc);
+    for (int index = 0; index < sys->N_edge; index++) {
+        out << sys->stackEpsn[(index + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl; 
+    }
+    out.close();*/
     return 0;
 }
 
@@ -1568,7 +1578,7 @@ int matrixConstruction(fdtdMesh *sys){
     }*/
     
     /* construct D_sig */
-    /*sys->sig = (double*)calloc(sys->N_edge, sizeof(double));
+    sys->sig = (double*)calloc(sys->N_edge, sizeof(double));
     double a, b;
     for (i = 0; i < sys->N_edge; i++){
         if (sys->markEdge[i] != 0){
@@ -1579,12 +1589,12 @@ int matrixConstruction(fdtdMesh *sys){
                 a += sys->markCell[sys->edgeCell[i][j]] * sys->edgeCellArea[i][j];
                 b += sys->edgeCellArea[i][j];
             }
-            sys->sig[i] = a / b * SIGMA;
+            sys->sig[i] = a / b;
 #else
-            sys->sig[i] = SIGMA;
+            sys->sig[i] = 1;
 #endif
         }
-    }*/
+    }
     
 
     sys->edgeCell.clear();
@@ -1612,7 +1622,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
         //cout << "Reminder to send error if sys->portCoor[i] == 0 because program will fail later" << endl;
         myint indMarkNode1 = sys->markNode[zi[sys->portCoor[i].z1] * sys->N_node_s + xi[sys->portCoor[i].x1] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y1]];
         myint indMarkNode2 = sys->markNode[zi[sys->portCoor[i].z2] * sys->N_node_s + xi[sys->portCoor[i].x2] * (sys->N_cell_y + 1) + yi[sys->portCoor[i].y2]];
-        
         if (sys->portCoor[i].portDirection > 0){
             sys->GNDcond.insert(indMarkNode1);
         }

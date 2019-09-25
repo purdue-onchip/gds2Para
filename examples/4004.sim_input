@@ -4,9 +4,9 @@ lengthUnit = 1
 
 FREQUENCY
 freqUnit = 1.0e+6
-freqStart = 0.740
-freqEnd = 74.0
-nfreq = 101
+freqStart = 10000
+freqEnd = 100
+nfreq = 10
 freqScale = 1
 
 DIELECTRIC STACK
@@ -25,11 +25,11 @@ numPorts = 7
 #1.86e-3 1.04e-4 2.00e-4 1.86e-3 1.04e-4 0.00 0  # d1; pin 2
 #2.75e-3 3.90e-4 2.00e-4 2.75e-3 3.90e-4 0.00 0  # d2; pin 3
 #2.75e-3 1.05e-3 2.00e-4 2.75e-3 1.05e-3 0.00 0  # d3; pin 4
-2.75e-3 3.03e-3 2.00e-4 2.75e-3 3.03e-3 0.00 -1 # GND (VSS); pin 5
+2.75e-3 3.03e-3 2.00e-4 2.75e-3 3.03e-3 0.00 +1 # GND (VSS); pin 5
 2.75e-3 3.47e-3 2.00e-4 2.75e-3 3.47e-3 0.00 +1 # clk1 (clock phase 1); pin 6
 2.32e-3 3.80e-3 2.00e-4 2.32e-3 3.80e-3 0.00 +1 # clk2 (clock phase 2); pin 7
 #1.84e-3 3.80e-3 2.00e-4 1.84e-3 3.80e-3 0.00 -1 # GND (disconnected); no pin
-1.53e-3 3.80e-3 2.00e-4 1.53e-3 3.80e-3 0.00 -1 # sync (sync-out); pin 8
+1.53e-3 3.80e-3 2.00e-4 1.53e-3 3.80e-3 0.00 +1 # sync (sync-out); pin 8
 9.18e-4 3.80e-3 2.00e-4 9.18e-4 3.80e-3 0.00 +1 # reset (clear); pin 9
 4.00e-4 3.80e-3 2.00e-4 4.00e-4 3.80e-3 0.00 +1 # test; pin 10
 #1.00e-4 3.30e-3 2.00e-4 1.00e-4 3.30e-3 0.00 -1 # cm_rom (memory control output); pin 11

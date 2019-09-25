@@ -41,7 +41,7 @@ using namespace std;
 #define EPSILON0 (1./(CSPED*CSPED*MU))
 
 // Solver discretization control macros
-#define SIGMA (5.8e+7)
+#define SIGMA (4.5e+8)
 #define FDTD_MAXC (256*6)
 #define STACKNUM (20)
 #define DOUBLEMAX (1.e+30)
@@ -51,11 +51,11 @@ using namespace std;
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (1.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-15)
+#define DT (1.e-16)
 
 // HYPRE control macros
 #define HYPRE_METHOD (3) // 1 = AMG, 2 = PCG with AMG Preconditioner, 3 = Flexible GMRES with AMG Preconditioner
-#define HYPRE_CONV_TOL (1.e-4) // Convergence relative tolerance for HYPRE
+#define HYPRE_CONV_TOL (1.e-8) // Convergence relative tolerance for HYPRE
 #define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
 
 // Debug testing macros (comment out if not necessary)
@@ -68,7 +68,9 @@ using namespace std;
 #define SKIP_VH
 //#define SKIP_GENERATE_STIFF
 //#define SKIP_STIFF_REFERENCE
-#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
+//#define UPPER_BOUNDARY_PEC    // the upper boundary is also PEC
+//#define PRINT_V0_Z
+//#define PLOT_TIME_DOMAIN
 
 
 // Function-like macros
@@ -93,6 +95,8 @@ public:
     myint *cdtInNode;
     int *markCdtInNode;
     int layer;
+
+
 };
 
 class fdtdCdt {
@@ -102,6 +106,16 @@ public:
     int *portNode;
     int portind;
     int cdtNodeind;
+
+    fdtdCdt() {
+        node = NULL;
+    }
+    
+    ~fdtdCdt() {
+        if (node != NULL) {
+            free(node);
+        }
+    }
 };
 
 class fdtdBound {
@@ -429,6 +443,61 @@ public:
     }
 };
 
+class v0solution {   // store u0d and u0c
+public:
+    double *u0d;
+    double *u0c;
+
+    v0solution() {
+        u0d = NULL;
+        u0c = NULL;
+    }
+
+    ~v0solution() {
+        if (u0d != NULL) {
+            free(u0d);
+        }
+        if (u0c != NULL) {
+            free(u0c);
+        }
+    }
+};
+
+class V0aTDV0{    // store V0 matrix
+public:
+    myint *RowId;    // rowId of this matrix
+    myint *RowId1;    //
+    myint *ColId;
+    complex<double> *val;
+
+	complex<double>* rhs;
+
+    V0aTDV0() {
+        RowId = NULL;
+        RowId1 = NULL;
+        ColId = NULL;
+        val = NULL;
+		rhs = NULL;
+    }
+
+    ~V0aTDV0() {
+        if (RowId != NULL) {
+            free(RowId);
+        }
+        if (RowId1 != NULL) {
+            free(RowId1);
+        }
+        if (ColId != NULL) {
+            free(ColId);
+        }
+        if (val != NULL) {
+            free(val);
+        }
+		if (rhs != NULL) {
+			free(rhs);
+		}
+    }
+};
 
 
 
