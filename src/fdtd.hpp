@@ -46,7 +46,7 @@ using namespace std;
 #define DOUBLEMIN (-1.e+30)
 #define MINDISFRACXY (5.0e-5) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
 #define MINDISFRACZ (0.1) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16) // Time step for finding high-frequency modes (s)
@@ -55,7 +55,7 @@ using namespace std;
 //#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
-//#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
+#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
 //#define PRINT_Z_PARAM // Terminal output with raw Z-parameters from solver

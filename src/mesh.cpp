@@ -13,7 +13,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /* Generate the mesh nodes based on conductorIn information */
     myint numNode = 0;
-    double disMin = 1e-5; //MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
+    double disMin = MINDISFRACXY * fmin(sys->xlim2 - sys->xlim1, sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent
     for (indi = 0; indi < sys->numCdtRow; indi++) {
         numNode += sys->conductorIn[indi].numVert;
     }
@@ -217,7 +217,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /* Discretize domain in the z-direction */
     sort(zOrigOld.begin(), zOrigOld.end());
     sys->nz = 1;
-    double disMinz = 1e-6;// minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
+    double disMinz = minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
     //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
     double *zn = (double*)calloc(2 * sys->numStack + 6 * numPortSides, sizeof(double));
     zn[0] = zOrigOld[0];

@@ -207,8 +207,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
     Ad1.clear();
 #ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to generate Ad is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-    cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
+    //cout << "Time to generate Ad is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+    //cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
 #endif
 
     int *argc;
@@ -354,8 +354,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
     sys->cindex.push_back(indj - 1);
 #ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to generate Ac is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-    cout << "Number of non-zeros in Ac is " << leng_Ac << endl;
+    //cout << "Time to generate Ac is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+    //cout << "Number of non-zeros in Ac is " << leng_Ac << endl;
 #endif
     Ac.clear();
     free(sys->markNode); sys->markNode = NULL;
@@ -528,18 +528,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < leng_v0d1; indi++) {
             v0daJ[indi] *= -1.0;
         }
-#ifdef PRINT_VERBOSE_TIMING
-        //cout << "The non-zero entry in v0da'J is " << count << endl; // Line modified because count_non not defined yet in function
-        cout << " Time before the first HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
         /* solve V0d system */
 
         t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
-#ifdef PRINT_VERBOSE_TIMING
-        cout << "HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
         /* End of solving */
 
 #ifndef SKIP_PARDISO
@@ -547,7 +540,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
         cout << " Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
-        t1 = clock();
+        
         for (indi = 0; indi < leng_v0d1; indi++) {
             y0d[indi] /= (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
         }
@@ -616,7 +609,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         //cout << "Time between the first and the second HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
         /*solve c system block by block*/
-        t1 = clock();
+        
         for (indi = 1; indi <= 1; indi++) {
 #ifndef SKIP_PARDISO
             //pardisoSolve_c(sys, &v0caJ[sys->acu_cnno[indi - 1]], &y0c[sys->acu_cnno[indi - 1]], sys->acu_cnno[indi - 1], sys->acu_cnno[indi] - 1, sys->cindex[indi - 1] + 1, sys->cindex[indi]);
@@ -662,11 +655,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
 
         free(v0caJ); v0caJ = NULL;
-#ifdef PRINT_VERBOSE_TIMING
-        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
 
-        t1 = clock();
 
         /* V0cy0c */
         yc = (double*)calloc(sys->N_edge, sizeof(double));
@@ -691,20 +680,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, yccp, beta, dRhs2);
-#ifdef PRINT_VERBOSE_TIMING
-        cout << " Time between the second and the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
         free(yccp); yccp = NULL;
 
-        t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, dRhs2, leng_v0d1, y0d2);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
-
         free(dRhs2); dRhs2 = NULL;
-#ifdef PRINT_VERBOSE_TIMING
-        cout << " HYPRE solve time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
-        t1 = clock();
+
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
         //yd2a = (double*)calloc(sys->N_edge, sizeof(double));
 
@@ -778,9 +759,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
             sys->x[indPort + sys->numPorts * xcol] /= sourceCurrent; // Final matrix entry (ohm)
         }
-#ifdef PRINT_VERBOSE_TIMING
-        cout << " Time after the third HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
+
 
         /* Calculate the Vh part */
 #ifndef SKIP_VH
