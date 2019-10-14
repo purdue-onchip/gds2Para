@@ -291,6 +291,11 @@ int main(int argc, char** argv)
             adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys, sdb.findLayerIgnore()); // Recursively save GDSII conductor information to sys
             sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory); // Save simulation input information to sys
 
+			// Write object sys (class fdtdMesh) in file
+			ofstream file_obj;
+			file_obj.open("fdtdMesh.txt", ios::out);
+			file_obj.write((char*)&sys, sizeof(sys));
+
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;
             clock_t t2 = clock();
@@ -373,11 +378,6 @@ int main(int argc, char** argv)
             Parasitics newPara = sdb.getParasitics(); // Start with outdated parastics to update
             newPara.saveNetworkParam('Z', sdb.getSimSettings().getFreqsHertz(), sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
             sdb.setParasitics(newPara);
-
-			// Write object sys (class fdtdMesh) in file
-			ofstream file_obj;
-			file_obj.open("fdtdMesh.txt", ios::out);
-			file_obj.write((char*)&sys, sizeof(sys));
 
             // Select Output File Based on Control Mode
             cout << endl;

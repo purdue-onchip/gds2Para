@@ -26,10 +26,25 @@ int main(void) {
 	// Reset the loaded invalid pointers (part of them, only obvious ones) 
 	sys.ResetPtr();
 
+	// Mesh the domain and mark conductors
+	unordered_set<double> portCoorx, portCoory;
+	unordered_map<double, int> xi, yi, zi;
+	clock_t t2 = clock();
+	int status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+	if (status == 0)
+	{
+		cout << "meshAndMark Success!" << endl;
+		cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+	}
+	else
+	{
+		cerr << "meshAndMark Fail!" << endl;
+		return status;
+	}
+
 	// Generate Stiffness Matrix
-#ifndef SKIP_GENERATE_STIFF
 	clock_t t5 = clock();
-	int status = generateStiff(&sys);
+	status = generateStiff(&sys);
 	if (status == 0)
 	{
 		cout << "generateStiff Success!" << endl;
@@ -40,7 +55,6 @@ int main(void) {
 		cerr << "generateStiff Fail!" << endl;
 		return status;
 	}
-#endif
 
 	return 0;
 }
