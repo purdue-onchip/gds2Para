@@ -211,8 +211,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     //cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
 #endif
 
-    int *argc;
-    char ***argv;
+    int *argc = nullptr;
+    char ***argv = nullptr;
     /*  trial of first set HYPRE matrix Ad */
     //HYPRE_IJMatrix ad;
     //HYPRE_ParCSRMatrix parcsr_ad;
@@ -1588,6 +1588,8 @@ int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val) {
     return 0;
 }
 
+#ifndef SKIP_COO2CSR_MALLOC
+#define SKIP_COO2CSR_MALLOC
 int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1) {    // totalnum is the total number of entries, leng is the row number
     int i;
     int *rowId2;
@@ -1617,6 +1619,7 @@ int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myin
     free(rowId2); rowId2 = NULL;
     return 0;
 }
+#endif
 
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> &bRowId, vector<int> &bColId, vector<double> &bval, double *index_val, int size) {
     //the same sequence in aColId and index

@@ -1,3 +1,4 @@
+#include <ctime>
 #include "fdtd.hpp"
 
 static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b)
@@ -32,7 +33,7 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     vector<double> Cr_base;
     double *Ar, *Br, *BBr;
     vector<pair<complex<double>, myint>> dp, dp1;
-    double *vl, *vr, *vl1;
+    double *vl, *vr = nullptr, *vl1;
     double *vr1;
     lapack_int info;
     lapack_int n, m;

@@ -374,6 +374,11 @@ int main(int argc, char** argv)
             newPara.saveNetworkParam('Z', sdb.getSimSettings().getFreqsHertz(), sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
             sdb.setParasitics(newPara);
 
+			// Write object sys (class fdtdMesh) in file
+			ofstream file_obj;
+			file_obj.open("fdtdMesh.txt", ios::out);
+			file_obj.write((char*)&sys, sizeof(sys));
+
             // Select Output File Based on Control Mode
             cout << endl;
             if ((strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))

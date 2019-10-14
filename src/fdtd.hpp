@@ -336,15 +336,46 @@ public:
     complex<double> *v0csJ;
     complex<double> *Y;
 
-    /* Default Constructor */
-    fdtdMesh(){
-        // Set some important numbers to zero
-        this->outedge = (myint)0;
-        this->inedge = (myint)0;
-        this->numCdtRow = (myint)0;
-        this->leng_Vh = (myint)0;
-        this->leng_S = (myint)0;
+	/* Default Constructor */
+	fdtdMesh() {
+		// Set some important numbers to zero
+		this->outedge = (myint)0;
+		this->inedge = (myint)0;
+		this->numCdtRow = (myint)0;
+		this->leng_Vh = (myint)0;
+		this->leng_S = (myint)0;
 
+		// Set all pointers to NULL for safety
+		this->ResetPtr();
+
+		// Set all vectors to empty vectors
+		this->nodeEdge = {};
+		this->nodeEdgea = {};
+		this->numStack = 0;
+		this->stackEps = {};
+		this->stackSig = {};
+		this->stackBegCoor = {};
+		this->stackEndCoor = {};
+		this->stackName = {};
+		this->eps = {};
+		this->stackEpsn = {};
+		this->stackSign = {};
+		this->conductorIn = {};
+		this->edgeCell = {};
+		this->edgeCellArea = {};
+		this->acu_cnno = {};
+		this->cindex = {};
+		this->markProSide = {};
+		this->x = {};
+		this->numPorts = 0;
+		this->portCoor = {};
+
+		// Set all other collection data types as empty
+		this->cond2condIn = unordered_set<int>();
+	};
+
+    /* Set all pointers to NULL for safety */
+	void ResetPtr(){
         // Set all pointers to NULL for safety
         this->xn = NULL;
         this->yn = NULL;
@@ -421,31 +452,6 @@ public:
         this->J = NULL;
         this->v0csJ = NULL;
         this->Y = NULL;
-
-        // Set all vectors to empty vectors
-        this->nodeEdge = { };
-        this->nodeEdgea = { };
-        this->numStack = 0;
-        this->stackEps = { };
-        this->stackSig = { };
-        this->stackBegCoor = { };
-        this->stackEndCoor = { };
-        this->stackName = { };
-        this->eps = { };
-        this->stackEpsn = { };
-        this->stackSign = { };
-        this->conductorIn = { };
-        this->edgeCell = { };
-        this->edgeCellArea = { };
-        this->acu_cnno = { };
-        this->cindex = { };
-        this->markProSide = { };
-        this->x = { };
-        this->numPorts = 0;
-        this->portCoor = { };
-
-        // Set all other collection data types as empty
-        this->cond2condIn = unordered_set<int>();
     }
 
     /* Print Function */
@@ -535,8 +541,8 @@ public:
         free(this->v0csJ);
         free(this->Y);
     }
-};
 
+};
 
 
 
