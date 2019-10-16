@@ -17,6 +17,7 @@
 #include <Eigen/Sparse>
 #include "limboint.hpp"
 #include "solnoutclass.hpp"
+#include "MainTestFdtdMesh.hpp"
 
 // Debug testing macros (comment out if not necessary)
 #define SKIP_GENERATE_STIFF
@@ -291,10 +292,11 @@ int main(int argc, char** argv)
             adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys, sdb.findLayerIgnore()); // Recursively save GDSII conductor information to sys
             sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory); // Save simulation input information to sys
 
-			// Write object sys (class fdtdMesh) in file
-			ofstream file_obj;
+			// Write object sys (class fdtdMesh) to file
+			WriteSysToFile(sys);
+			/*ofstream file_obj;
 			file_obj.open("fdtdMesh.txt", ios::out);
-			file_obj.write((char*)&sys, sizeof(sys));
+			file_obj.write((char*)&sys, sizeof(sys));*/
 
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;
