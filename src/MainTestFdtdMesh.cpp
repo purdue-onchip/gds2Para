@@ -37,6 +37,33 @@ int main(void) {
 		return status;
 	}
 
+	// Set D_eps and D_sig
+	clock_t t3 = clock();
+	status = matrixConstruction(&sys);
+	if (status == 0)
+	{
+		cout << "matrixConstruction Success!" << endl;
+		cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+	}
+	else {
+		cerr << "matrixConstruction Fail!" << endl;
+		return status;
+	}
+
+	// Set port
+	clock_t t4 = clock();
+	status = portSet(&sys, xi, yi, zi);
+	if (status == 0)
+	{
+		cout << "portSet Success!" << endl;
+		cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+	}
+	else
+	{
+		cerr << "portSet Fail!" << endl;
+		return status;
+	}
+
 	// Generate Stiffness Matrix
 	clock_t t5 = clock();
 	status = generateStiff(&sys);

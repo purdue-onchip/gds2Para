@@ -524,10 +524,10 @@ int generateStiff(fdtdMesh *sys){
 
 
     /* generate the matrix (-w^2*D_eps+iw*D_sig+S) */
-    //status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln);    // matrix multiplication first matrix keep the same second matrix transpose
+    status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln);    // matrix multiplication first matrix keep the same second matrix transpose
   
-    //cout << "Length of S is " << sys->leng_S << endl;
-    //cout << "S generation is done!\n";
+    cout << "Length of S is " << sys->leng_S << endl;
+    cout << "S generation is done!\n";
 
 #ifndef SKIP_PARDISO
     /* Initialize variables for Pardiso */
@@ -597,106 +597,106 @@ int generateStiff(fdtdMesh *sys){
     return 0;
 }
 
-//int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val) {
-//    myint size = sys->N_edge - 2 * sys->N_edge_s;
-//    myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
-//    myint count = 0;
-//    myint indi = 0;
-//    myint k = 0;
-//    complex<double> *valc;
-//    valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
-//    //valc.assign(sys->leng_S, complex<double>(0., 0.));
-//    //valc.shrink_to_fit();
-//    complex<double> *J;
-//    J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
-//    for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++) {
-//        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2. * M_PI;
-//    }
-//    
-//    RowId1[k] = 0;
-//    k++;
-//    myint start;
-//    myint nnz = sys->leng_S;
-//    cout << "Start to generate CSR form for S!" << endl;
-//    indi = 0;
-//    while (indi < nnz) {
-//        start = RowId[indi];
-//        while (indi < nnz && RowId[indi] == start) {
-//            valc[indi] += val[indi]; // val[indi] is real
-//            if (RowId[indi] == ColId[indi]) {
-//                // valc[indi] needs omega * (-omega * epsilon  + indj * sigma) added to it
-//                complex<double> addedPart(-(2. * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
-//                valc[indi] += (2. * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
-//            }
-//            count++;
-//            indi++;
-//        }
-//        RowId1[k] = (count);
-//        k++;
-//    }
-//    cout << endl;
-//
-//    myint mtype = 13;    /* Real complex unsymmetric matrix */
-//    myint nrhs = 1;    /* Number of right hand sides */
-//    void *pt[64];
-//
-//    /* Pardiso control parameters */
-//    myint iparm[64];
-//    myint maxfct, mnum, phase, error, msglvl, solver;
-//    double dparm[64];
-//    int v0csin;
-//    myint perm;
-//
-//    /* Number of processors */
-//    int num_procs;
-//
-//    /* Auxiliary variables */
-//    char *var;
-//
-//    msglvl = 0;    /* print statistical information */
-//    solver = 0;    /* use sparse direct solver */
-//    error = 0;
-//    maxfct = 1;
-//    mnum = 1;
-//    phase = 13;
-//
-//    pardisoinit(pt, &mtype, iparm);
-//    iparm[38] = 1;
-//    iparm[34] = 1;    // 0-based indexing
-//    //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
-//    
-//    cout << "Begin to solve (-w^2*D_eps + iwD_sig + S)x = -iwJ" << endl;
-//    complex<double> *xr;
-//    xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
-//
-//    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
-//    if (error != 0) {
-//        cout << endl << "Error During numerical factorization: " << error << endl;
-//        exit(2);
-//    }
-//
-//    cout << "Solving (-w^2*D_eps+ i wD_sig + S)x = -iwJ is complete!" << endl;
-//    double nn = 0.;
-//    double nnn = 0.;
-//    double nn0 = 0.;    // the norm of y0-xr
-//    for (indi = 0; indi < sys->N_edge - 2 * sys->N_edge_s; indi++){
-//        nn += pow((xr[indi].real() - x[indi].real), 2) + pow((xr[indi].imag() - x[indi].imag), 2);
-//        nnn += pow(xr[indi].real(), 2) + pow(xr[indi].imag(), 2);
-//        nn0 += pow((sys->y[indi + sys->N_edge_s].real() - xr[indi].real()), 2) + pow((sys->y[indi + sys->N_edge_s].imag() - xr[indi].imag()), 2);
-//        //nn += pow((xr[indi].re - x[indi].real), 2) + pow((xr[indi].indi - x[indi].imag), 2);
-//        //nnn += pow(xr[indi].re, 2) + pow(xr[indi].indi, 2);
-//    }
-//
-//    nn = sqrt(nn);
-//    nnn = sqrt(nnn);
-//    nn0 = sqrt(nn0);
-//    cout << "Relative residual is " << nn / nnn << endl;
-//    cout << "y0 relative residual is " << nn0 / nnn << endl;
-//
-//    free(RowId1); RowId1 = NULL;
-//    free(valc); valc = NULL;
-//    return 0;
-//}
+int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val) {
+    myint size = sys->N_edge - 2 * sys->N_edge_s;
+    myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
+    myint count = 0;
+    myint indi = 0;
+    myint k = 0;
+    complex<double> *valc;
+    valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
+    //valc.assign(sys->leng_S, complex<double>(0., 0.));
+    //valc.shrink_to_fit();
+    complex<double> *J;
+    J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
+    for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++) {
+        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2. * M_PI;
+    }
+    
+    RowId1[k] = 0;
+    k++;
+    myint start;
+    myint nnz = sys->leng_S;
+    cout << "Start to generate CSR form for S!" << endl;
+    indi = 0;
+    while (indi < nnz) {
+        start = RowId[indi];
+        while (indi < nnz && RowId[indi] == start) {
+            valc[indi] += val[indi]; // val[indi] is real
+            if (RowId[indi] == ColId[indi]) {
+                // valc[indi] needs omega * (-omega * epsilon  + indj * sigma) added to it
+                complex<double> addedPart(-(2. * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
+                valc[indi] += (2. * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
+            }
+            count++;
+            indi++;
+        }
+        RowId1[k] = (count);
+        k++;
+    }
+    cout << endl;
+
+    myint mtype = 13;    /* Real complex unsymmetric matrix */
+    myint nrhs = 1;    /* Number of right hand sides */
+    void *pt[64];
+
+    /* Pardiso control parameters */
+    myint iparm[64];
+    myint maxfct, mnum, phase, error, msglvl, solver;
+    double dparm[64];
+    int v0csin;
+    myint perm;
+
+    /* Number of processors */
+    int num_procs;
+
+    /* Auxiliary variables */
+    char *var;
+
+    msglvl = 0;    /* print statistical information */
+    solver = 0;    /* use sparse direct solver */
+    error = 0;
+    maxfct = 1;
+    mnum = 1;
+    phase = 13;
+
+    pardisoinit(pt, &mtype, iparm);
+    iparm[38] = 1;
+    iparm[34] = 1;    // 0-based indexing
+    //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
+    
+    cout << "Begin to solve (-w^2*D_eps + iwD_sig + S)x = -iwJ" << endl;
+    complex<double> *xr;
+    xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
+
+    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
+    if (error != 0) {
+        cout << endl << "Error During numerical factorization: " << error << endl;
+        exit(2);
+    }
+
+    cout << "Solving (-w^2*D_eps+ i wD_sig + S)x = -iwJ is complete!" << endl;
+    double nn = 0.;
+    double nnn = 0.;
+    double nn0 = 0.;    // the norm of y0-xr
+    for (indi = 0; indi < sys->N_edge - 2 * sys->N_edge_s; indi++){
+        nn += pow((xr[indi].real() - x[indi].real), 2) + pow((xr[indi].imag() - x[indi].imag), 2);
+        nnn += pow(xr[indi].real(), 2) + pow(xr[indi].imag(), 2);
+        nn0 += pow((sys->y[indi + sys->N_edge_s].real() - xr[indi].real()), 2) + pow((sys->y[indi + sys->N_edge_s].imag() - xr[indi].imag()), 2);
+        //nn += pow((xr[indi].re - x[indi].real), 2) + pow((xr[indi].indi - x[indi].imag), 2);
+        //nnn += pow(xr[indi].re, 2) + pow(xr[indi].indi, 2);
+    }
+
+    nn = sqrt(nn);
+    nnn = sqrt(nnn);
+    nn0 = sqrt(nn0);
+    cout << "Relative residual is " << nn / nnn << endl;
+    cout << "y0 relative residual is " << nn0 / nnn << endl;
+
+    free(RowId1); RowId1 = NULL;
+    free(valc); valc = NULL;
+    return 0;
+}
 
 int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, double *u0c){
 
@@ -868,72 +868,72 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
     return 0;
 }
 
-//int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval){
-//    // ArowId, AcolId, and Aval should be in the COO format
-//    sparse_status_t s0;
-//    sparse_matrix_t a, a_csr;
-//    sparse_index_base_t indexing1 = SPARSE_INDEX_BASE_ZERO;
-//    myint row, col;
-//    myint *cols, *cole, *rowi;
-//    double *val;
-//    MKL_INT *AcolId;
-//    double *Aval;
-//    myint k;
-//    s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, acol, arow, &aColId[0], &aColId[1], aRowId, aval);
-//    
-//    sparse_matrix_t b, b_csr;
-//    s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, acol, arow, &bColId[0], &bColId[1], bRowId, bval);
-//    
-//    sparse_matrix_t A;
-//    s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, a, b, &A);
-//    sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
-//    myint ARows, ACols;
-//    MKL_INT *ArowStart, *ArowEnd;
-//        
-//    s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
-//    leng_A = ArowEnd[ARows - 1];    // how many non-zeros are in S
-//
-//    sys->SRowId = (myint*)malloc(leng_A * sizeof(myint));
-//    sys->SColId = (myint*)malloc(leng_A * sizeof(myint));
-//    sys->Sval = (double*)calloc(leng_A, sizeof(double));
-//    myint count, num, j;
-//    j = 0;
-//    vector<pair<myint, double>> col_val;
-//    for (myint i = 0; i < leng_A; i++){
-//        col_val.push_back(make_pair(AcolId[i], Aval[i]));
-//    }
-//    for (myint i = 0; i < ARows; i++){
-//        if (i < sys->N_edge_s || i >= sys->N_edge - sys->N_edge_s){
-//            continue;
-//        }
-//        num = ArowEnd[i] - ArowStart[i];
-//        count = 0;
-//        vector<pair<myint, double>> v(col_val.begin() + ArowStart[i], col_val.begin() + ArowEnd[i]);
-//        sort(v.begin(), v.end());
-//        while (count < num){
-//            if (v[count].first < sys->N_edge_s || v[count].first >= sys->N_edge - sys->N_edge_s){
-//                count++;
-//                continue;
-//            }
-//            sys->SRowId[j] = i - sys->N_edge_s;
-//            sys->SColId[j] = v[count].first - sys->N_edge_s;
-//            sys->Sval[j] = v[count].second / MU;
-//            //if (sys->SRowId[indj] == sys->SColId[indj]){
-//            //    sys->Sval[indj] = sys->Sval[indj].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[indi + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[indi + sys->N_edge_s] + sys->Sval[indj].imag());
-//            //}
-//            j++;
-//            count++;
-//        }
-//        v.clear();
-//    }
-//    leng_A = j;
-//    
-//
-//    mkl_sparse_destroy(a);
-//    mkl_sparse_destroy(b);
-//    mkl_sparse_destroy(A);
-//    return 0;
-//}
+int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval){
+    // ArowId, AcolId, and Aval should be in the COO format
+    sparse_status_t s0;
+    sparse_matrix_t a, a_csr;
+    sparse_index_base_t indexing1 = SPARSE_INDEX_BASE_ZERO;
+    myint row, col;
+    myint *cols, *cole, *rowi;
+    double *val;
+    MKL_INT *AcolId;
+    double *Aval;
+    myint k;
+    s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, acol, arow, &aColId[0], &aColId[1], aRowId, aval);
+    
+    sparse_matrix_t b, b_csr;
+    s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, acol, arow, &bColId[0], &bColId[1], bRowId, bval);
+    
+    sparse_matrix_t A;
+    s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, a, b, &A);
+    sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+    myint ARows, ACols;
+    MKL_INT *ArowStart, *ArowEnd;
+        
+    s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+    leng_A = ArowEnd[ARows - 1];    // how many non-zeros are in S
+
+    sys->SRowId = (myint*)malloc(leng_A * sizeof(myint));
+    sys->SColId = (myint*)malloc(leng_A * sizeof(myint));
+    sys->Sval = (double*)calloc(leng_A, sizeof(double));
+    myint count, num, j;
+    j = 0;
+    vector<pair<myint, double>> col_val;
+    for (myint i = 0; i < leng_A; i++){
+        col_val.push_back(make_pair(AcolId[i], Aval[i]));
+    }
+    for (myint i = 0; i < ARows; i++){
+        if (i < sys->N_edge_s || i >= sys->N_edge - sys->N_edge_s){
+            continue;
+        }
+        num = ArowEnd[i] - ArowStart[i];
+        count = 0;
+        vector<pair<myint, double>> v(col_val.begin() + ArowStart[i], col_val.begin() + ArowEnd[i]);
+        sort(v.begin(), v.end());
+        while (count < num){
+            if (v[count].first < sys->N_edge_s || v[count].first >= sys->N_edge - sys->N_edge_s){
+                count++;
+                continue;
+            }
+            sys->SRowId[j] = i - sys->N_edge_s;
+            sys->SColId[j] = v[count].first - sys->N_edge_s;
+            sys->Sval[j] = v[count].second / MU;
+            //if (sys->SRowId[indj] == sys->SColId[indj]){
+            //    sys->Sval[indj] = sys->Sval[indj].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[indi + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[indi + sys->N_edge_s] + sys->Sval[indj].imag());
+            //}
+            j++;
+            count++;
+        }
+        v.clear();
+    }
+    leng_A = j;
+    
+
+    mkl_sparse_destroy(a);
+    mkl_sparse_destroy(b);
+    mkl_sparse_destroy(A);
+    return 0;
+}
 
 int matrix_multi_cd(char operation, lapack_complex_double *a, myint arow, myint acol, double *b, myint brow, myint bcol, lapack_complex_double *tmp3){    //complex multiply double
     /* operation = 'T' is first matrix conjugate transpose, operation = 'N' is first matrix non-conjugate-transpose*/
