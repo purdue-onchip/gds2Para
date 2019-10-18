@@ -8,6 +8,8 @@
 #include <cerrno>
 #include <cstring>
 #include <cmath>
+#include <ctime>
+#include <string>
 #include <iostream>
 #include <fstream>
 #include <complex>

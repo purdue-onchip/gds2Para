@@ -294,9 +294,6 @@ int main(int argc, char** argv)
 
 			// Write object sys (class fdtdMesh) to file
 			WriteSysToFile(sys);
-			/*ofstream file_obj;
-			file_obj.open("fdtdMesh.txt", ios::out);
-			file_obj.write((char*)&sys, sizeof(sys));*/
 
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;

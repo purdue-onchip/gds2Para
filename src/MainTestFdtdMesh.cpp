@@ -1,24 +1,15 @@
 #define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <ctime>
-
 #include "MainTestFdtdMesh.hpp"
-
-using namespace std;
-
 
 int main(void) {
 
 	fdtdMesh sys;
 
-	// Read object sys (class fdtdMesh) from file
+	// Read object sys (class fdtdMesh) from files
 	ReadSysFromFile(&sys);
 
-	// Write object sys (class fdtdMesh) to file
+	// Write object sys to files
 	WriteSysToFile(sys);
 
 	// Mesh the domain and mark conductors
@@ -77,6 +68,8 @@ int main(void) {
 		cerr << "generateStiff Fail!" << endl;
 		return status;
 	}
+
+	Solve_E_Zpara_InPardiso(&sys);
 
 	int i;
 	cin >> i;
