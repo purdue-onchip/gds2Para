@@ -1,8 +1,17 @@
-#define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
+#ifndef GDS2PARA_LAYERED_FDTD_H_
+#define GDS2PARA_LAYERED_FDTD_H_
 
-#include "MainTestFdtdMesh.hpp"
+#include <iostream> 
+#include <fstream> 
+#include <string>
 
-int main(void) {
+#include "fdtd.hpp"
+#include "sysInfoIO.hpp"              // IO object "sys"
+#include "pardisoSolver.hpp"          // Solve E and Z-para in pardiso
+
+using namespace std;
+
+int layeredFdtd(void) {
 
 	fdtdMesh sys;
 
@@ -35,7 +44,7 @@ int main(void) {
 	{
 		cout << "matrixConstruction Success!" << endl;
 		cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-	}
+}
 	else {
 		cerr << "matrixConstruction Fail!" << endl;
 		return status;
@@ -71,8 +80,40 @@ int main(void) {
 
 	Solve_E_Zpara_InPardiso(&sys);
 
-	int i;
-	cin >> i;
-
 	return 0;
 }
+
+#ifndef SKIP_LAYERED_FDTD
+int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1) {    // totalnum is the total number of entries, leng is the row number
+	int i;
+	int *rowId2;
+	int count, start;
+	int k;
+
+	rowId2 = (int*)malloc((leng + 1) * sizeof(int));
+	count = 0;
+	i = 0;
+	k = 0;
+	rowId2[k] = 0;
+	k++;
+	while (i < totalnum) {
+		start = rowId[i];
+		while (i < totalnum && rowId[i] == start) {
+			count++;
+			i++;
+		}
+		rowId2[k] = (count);
+		k++;
+	}
+
+	for (i = 0; i <= leng; i++) {
+		rowId1[i] = rowId2[i];
+	}
+
+	free(rowId2); rowId2 = NULL;
+	return 0;
+}
+#endif
+
+
+#endif  // GDS2PARA_MAINTESTFDTDMESH_H_

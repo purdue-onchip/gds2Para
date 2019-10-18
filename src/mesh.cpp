@@ -332,8 +332,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     vector<double>().swap(xOrigOld);
     vector<double>().swap(yOrigOld);
     vector<double>().swap(zOrigOld);
+#ifdef SKIP_WRITE_SYS_TO_FILE
     sys->stackEndCoor.clear(); // Note: this doesn't actually reduce memory usage, but the memory usage can be reduced by swapping into an empty vector
     sys->stackBegCoor.clear();
+#endif
 
 #ifdef PRINT_NODE_COORD
     /*for (indi = 0; indi < sys->nz - 1; indi++) {
@@ -1916,7 +1918,10 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
 
+#ifdef SKIP_WRITE_SYS_TO_FILE
     sys->conductorIn.clear(); // Using clear() does not reduce memory usage
+#endif
+
     return 0;
 }
 
