@@ -17,6 +17,7 @@
 #include <Eigen/Sparse>
 #include "limboint.hpp"
 #include "solnoutclass.hpp"
+#include "layeredFdtd.hpp"
 
 // Debug testing macros (comment out if not necessary)
 #define SKIP_GENERATE_STIFF
@@ -351,7 +352,10 @@ int main(int argc, char** argv)
                 return status;
             }
 #endif
-
+			// Write object sys to files
+#ifndef SKIP_WRITE_SYS_TO_FILE
+			WriteSysToFile(sys);
+#endif
             // Parameter generation
             clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
