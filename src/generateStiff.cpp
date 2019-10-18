@@ -1,5 +1,4 @@
 /* Generate the stiffness matrix */
-#include <ctime>
 #include "fdtd.hpp"
 using namespace std::complex_literals;
 
@@ -526,8 +525,8 @@ int generateStiff(fdtdMesh *sys){
     /* generate the matrix (-w^2*D_eps+iw*D_sig+S) */
     status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln);    // matrix multiplication first matrix keep the same second matrix transpose
   
-    cout << "Length of S is " << sys->leng_S << endl;
-    cout << "S generation is done!\n";
+    //cout << "Length of S is " << sys->leng_S << endl;
+    //cout << "S generation is done!\n";
 
 #ifndef SKIP_PARDISO
     /* Initialize variables for Pardiso */

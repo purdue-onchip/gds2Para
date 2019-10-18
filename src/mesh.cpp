@@ -1,5 +1,4 @@
 //#include "stdafx.h"
-#include <ctime>
 #include "fdtd.hpp"
 
 
