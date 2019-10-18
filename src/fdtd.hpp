@@ -44,7 +44,7 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACXY (5.0e-5) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
+#define MINDISFRACXY (5.0e-4) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
 #define MINDISFRACZ (0.1) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
@@ -58,9 +58,11 @@ using namespace std;
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
-//#define PRINT_Z_PARAM // Terminal output with raw Z-parameters from solver
+#define PRINT_V0_Z_PARAM
+//#define PRINT_V0_Vh_Z_PARAM
+#define PRINT_Z_PARAM // Terminal output with raw Z-parameters from solver
 #define SKIP_PARDISO // Remove PARDISO solver code
-#define SKIP_VH // Turn on to save a lot of time
+//#define SKIP_VH
 #define SKIP_STIFF_REFERENCE 
 
 
@@ -451,6 +453,2626 @@ public:
     /* Print Function */
     void print();
 
+    /* Generate V0d: both V0d1 and V0d2 are put into V0d1 */
+    void merge_v0d1(double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
+        int *visited;
+        clock_t t1;
+        double t, ta;
+        double ratio;
+        double startx, starty;    // the start coordinates of each block
+        queue<int> st;    // dfs stack
+        //vector<int> ind;
+        int indsize;
+        myint indi = 0;
+        int indx, indy;
+        int mark;
+        int indnum;
+        int *markLayerNode = (int*)calloc(this->N_node_s, sizeof(int));
+
+        /* Mark layer nodes from port sides */
+        for (int indPort = 0; indPort < this->numPorts; indPort++) {
+            for (int indPortSide = 0; indPortSide < this->portCoor[indPort].multiplicity; indPortSide++) {
+                myint indCdt = this->portCoor[indPort].portCnd[indPortSide] - 1; // Conductor index for this port side
+                for (int indCdtNode = 0; indCdtNode < this->cdtNumNode[indCdt]; indCdtNode++) {
+                    markLayerNode[this->conductor[indCdt].node[indCdtNode] % (this->N_node_s)] = 1;
+                }
+            }
+        }
+
+        leng_v0d1 = 0;
+        leng_v0d1a = 0;
+        v0d1num = 0;
+        v0d1anum = 0;
+
+        /* First assign a larger number of storage, don't need to calculate the entries twice */
+        //myint *v0d1RowId = (myint*)malloc(2 * this->outedge * sizeof(myint));
+        //myint *v0d1ColId = (myint*)malloc(2 * this->outedge * sizeof(myint));
+        //double *v0d1val = (double*)malloc(2 * this->outedge * sizeof(double));
+        ///*myint *v0d1aRowId = (myint*)malloc(this->N_edge * sizeof(myint));
+        //myint *v0d1aColId = (myint*)malloc(this->N_edge * sizeof(myint));*/
+        //double *v0d1aval = (double*)malloc(2 * this->outedge * sizeof(double));
+
+        /* V0d1 generation */
+        int count = 1;    /* count which box it is */
+        clock_t t2 = clock();
+        unordered_map<myint, double> va, v;
+        vector<set<myint>> node_group;
+        set<myint> base;
+        myint eno;
+        double lx_avg, ly_avg, lz_avg;
+        t = 0.;
+        ta = 0.;
+        myint node1, node2;
+        int nodegs;   // node group #
+        for (int iz = 1; iz < this->nz - 1; iz++) {    // merge on each layer, not in the conductor
+            visited = (int*)calloc(this->nx * this->ny, sizeof(int));
+            for (int ix = 0; ix < this->nx; ix++) {
+                for (int iy = 0; iy < this->ny; iy++) {
+                    if (visited[ix * (this->N_cell_y + 1) + iy] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] == 0) {
+                        if (markLayerNode[ix * (this->N_cell_y + 1) + iy] == 0 && !this->markProSide[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this point is not visited and it is outside the conductor, not in the projection of the excited conductor
+                            //if (!ind.empty())
+                            //    ind.clear();
+                            startx = this->xn[ix];
+                            starty = this->yn[iy];
+                            node_group.push_back(base);
+                            nodegs = node_group.size() - 1;
+                            node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+                            map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+                            //ind.push_back(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+                            st.push(ix * (this->N_cell_y + 1) + iy);
+                            visited[ix * (this->N_cell_y + 1) + iy] = 1;
+
+                            while (!st.empty()) {
+                                indx = (st.front()) / (this->N_cell_y + 1);
+                                indy = st.front() % (this->N_cell_y + 1);
+                                if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + this->N_cell_y + 1] == 0 && visited[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && !this->markProSide[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block1_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // it must have a left x edge, thus left x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - this->N_cell_y - 1] == 0 && visited[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && !this->markProSide[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block1_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + 1] == 0 && visited[indx * (this->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (this->N_cell_y + 1) + indy + 1] == 0 && !this->markProSide[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block1_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - 1] == 0 && visited[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && !this->markProSide[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block1_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        }
+                                    }
+                                }
+                                st.pop();
+                            }
+
+                            for (auto ndi : node_group[nodegs]) {
+                                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                                if (iz != 0) {    // this node is not on the bottom plane
+                                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (iz != this->nz - 1) {   // this node is not on the top plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // this node is not on the left plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != this->nx - 1) {    // this node is not on the right plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // this node is not on the front plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {   // this node is not on the back plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                            }
+
+                            count++;
+                        }
+
+                        else if (markLayerNode[ix * (this->N_cell_y + 1) + iy] == 1 && !this->markProSide[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {//&& this->exciteCdtLayer[iz] == 1) {    // this point is not visited and it is outside the conductor, in the projection of the excited conductor
+                            startx = this->xn[ix];
+                            starty = this->yn[iy];
+
+                            map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+                            st.push(ix * (this->N_cell_y + 1) + iy);
+                            visited[ix * (this->N_cell_y + 1) + iy] = 1;
+                            node_group.push_back(base);
+                            nodegs = node_group.size() - 1;
+                            node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+                            while (!st.empty()) {
+                                mark = 0;
+                                indx = (st.front()) / (this->N_cell_y + 1);
+                                indy = st.front() % (this->N_cell_y + 1);
+
+                                if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + this->N_cell_y + 1] == 0 && visited[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (this->N_cell_y + 1) + indy] == 1 && !this->markProSide[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block2_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+
+                                if (indx != 0) {    // it must have a left x edge, thus left x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - this->N_cell_y - 1] == 0 && visited[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (this->N_cell_y + 1) + indy] == 1 && !this->markProSide[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block2_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + 1] == 0 && visited[indx * (this->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (this->N_cell_y + 1) + indy + 1] == 1 && !this->markProSide[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block2_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - 1] == 0 && visited[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (this->N_cell_y + 1) + indy - 1] == 1 && !this->markProSide[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block2_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        }
+                                    }
+                                }
+                                st.pop();
+                            }
+
+                            for (auto ndi : node_group[nodegs]) {
+                                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                                if (iz != 0) {    // this node is not on the bottom plane
+                                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (iz != this->nz - 1) {   // this node is not on the top plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // this node is not on the left plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != this->nx - 1) {    // this node is not on the right plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // this node is not on the front plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {   // this node is not on the back plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                            }
+
+
+                            count++;
+
+                        }
+
+                        else {
+                            startx = this->xn[ix];
+                            starty = this->yn[iy];
+
+                            map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+                            st.push(ix * (this->N_cell_y + 1) + iy);
+                            visited[ix * (this->N_cell_y + 1) + iy] = 1;
+                            node_group.push_back(base);
+                            nodegs = node_group.size() - 1;
+                            node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+
+                            while (!st.empty()) {
+                                mark = 0;
+                                indx = (st.front()) / (this->N_cell_y + 1);
+                                indy = st.front() % (this->N_cell_y + 1);
+
+                                if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + this->N_cell_y + 1] == 0 && visited[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && this->markProSide[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy]) {    // this node is in the sideLen
+                                        if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block3_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // it must have a left x edge, thus left x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - this->N_cell_y - 1] == 0 && visited[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && this->markProSide[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block3_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + 1] == 0 && visited[indx * (this->N_cell_y + 1) + indy + 1] == 0 && this->markProSide[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block3_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - 1] == 0 && visited[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && this->markProSide[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block3_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        }
+                                    }
+                                }
+                                st.pop();
+                            }
+                            for (auto ndi : node_group[nodegs]) {
+                                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                                if (iz != 0) {    // this node is not on the bottom plane
+                                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (iz != this->nz - 1) {   // this node is not on the top plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // this node is not on the left plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != this->nx - 1) {    // this node is not on the right plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // this node is not on the front plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {   // this node is not on the back plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                            }
+
+                            count++;
+                        }
+                    }
+                }
+            }
+            free(visited); visited = NULL;
+        }
+
+        /* V0d2 generation */
+        myint indj;
+        myint inz, inx, iny;
+        myint iz, ix, iy;
+        queue<myint> qu;
+        visited = (int*)calloc(this->N_node, sizeof(int));
+        t2 = clock();
+        for (indi = 0; indi < this->numCdt; indi++) {
+            //cout << this->conductor[indi].markPort << " ";
+            if (this->conductor[indi].markPort == -1) {
+                continue;
+            }
+            else {
+                mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
+                //v.clear();
+                //va.clear();
+                for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+                    map[this->conductor[indi].node[indj]] = count;
+                    iz = this->conductor[indi].node[indj] / this->N_node_s;
+                    ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+                    iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+                    avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+                    if (iz != 0) {    // this node is not on the bottom plane
+                        eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+                        if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (iz != this->nz - 1) {   // this node is not on the top plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+                        if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (ix != 0) {    // this node is not on the left plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (ix != this->nx - 1) {    // this node is not on the right plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (iy != 0) {    // this node is not on the front plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (iy != this->ny - 1) {   // this node is not on the back plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+                        }
+                    }
+                }
+                if (mark == 1) {
+                    count++;
+                }
+
+            }
+        }
+
+        /* Sparse matrix construction for V0d1 */
+        this->v0d1RowId = (myint*)malloc(v0d1num * sizeof(myint));
+        this->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
+        this->v0d1val = (double*)malloc(v0d1num * sizeof(double));
+        this->v0d1aval = (double*)malloc(v0d1anum * sizeof(double));
+
+        double lx_whole_avg = 0;
+        double ly_whole_avg = 0;
+        double lz_whole_avg = 0;
+        lx_whole_avg = (this->xn[this->nx - 1] - this->xn[0]) / (this->nx - 1);
+        ly_whole_avg = (this->yn[this->ny - 1] - this->yn[0]) / (this->ny - 1);
+        lz_whole_avg = (this->zn[this->nz - 1] - this->zn[0]) / (this->nz - 1);
+        leng_v0d1 = 0;
+        leng_v0d1a = 0;
+        v0d1num = 0;
+        v0d1anum = 0;
+        for (nodegs = 0; nodegs < node_group.size(); nodegs++) {
+            for (auto ndi : node_group[nodegs]) {
+                iz = ndi / (this->N_node_s);
+                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                if (iz != 0) {    // this node is not on the bottom plane
+                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (iz != this->nz - 1) {   // this node is not on the top plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                    compute_edgelink( eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indx != 0) {    // this node is not on the left plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indx != this->nx - 1) {    // this node is not on the right plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indy != 0) {    // this node is not on the front plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indy != this->ny - 1) {   // this node is not on the back plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+            }
+            leng_v0d1++;
+            leng_v0d1a++;
+        }
+        for (indi = 0; indi < this->numCdt; indi++) {
+            if (this->conductor[indi].markPort == -1) {
+                continue;
+            }
+            for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+                iz = this->conductor[indi].node[indj] / this->N_node_s;
+                ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+                iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+                avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+                if (iz != 0) {    // this node is not on the bottom plane
+                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+                    if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (iz != this->nz - 1) {   // this node is not on the top plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+                    if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (ix != 0) {    // this node is not on the left plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (ix != this->nx - 1) {    // this node is not on the right plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (iy != 0) {    // this node is not on the front plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (iy != this->ny - 1) {   // this node is not on the back plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+                    }
+                }
+            }
+            if (mark == 1) {
+                leng_v0d1++;
+                leng_v0d1a++;
+            }
+        }
+
+        node_group.clear();
+    }
+
+    /* Generate V0d1 and V0d2: V0d1 is for dielectric nodes, V0d2 is for conductors
+       Used for finding the physical V0 */
+    void merge_v0d1_v0d2(double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
+        int *visited;
+        clock_t t1;
+        double t, ta;
+        double ratio;
+        double startx, starty;    // the start coordinates of each block
+        queue<int> st;    // dfs stack
+        //vector<int> ind;
+        int indsize;
+        myint indi = 0;
+        int indx, indy;
+        int mark;
+        int indnum;
+        int *markLayerNode = (int*)calloc(this->N_node_s, sizeof(int));
+
+        /* Mark layer nodes from port sides */
+        for (int indPort = 0; indPort < this->numPorts; indPort++) {
+            for (int indPortSide = 0; indPortSide < this->portCoor[indPort].multiplicity; indPortSide++) {
+                myint indCdt = this->portCoor[indPort].portCnd[indPortSide] - 1; // Conductor index for this port side
+                for (int indCdtNode = 0; indCdtNode < this->cdtNumNode[indCdt]; indCdtNode++) {
+                    markLayerNode[this->conductor[indCdt].node[indCdtNode] % (this->N_node_s)] = 1;
+                }
+            }
+        }
+
+        leng_v0d1 = 0;
+        leng_v0d1a = 0;
+        v0d1num = 0;
+        v0d1anum = 0;
+
+        /* V0d1 generation */
+        int count = 1;    /* count which box it is */
+        clock_t t2 = clock();
+        unordered_map<myint, double> va, v;
+        vector<set<myint>> node_group;
+        set<myint> base;
+        myint eno;
+        double lx_avg, ly_avg, lz_avg;
+        t = 0.;
+        ta = 0.;
+        myint node1, node2;
+        int nodegs;   // node group #
+        for (int iz = 1; iz < this->nz - 1; iz++) {    // merge on each layer, not in the conductor
+            visited = (int*)calloc(this->nx * this->ny, sizeof(int));
+            for (int ix = 0; ix < this->nx; ix++) {
+                for (int iy = 0; iy < this->ny; iy++) {
+                    if (visited[ix * (this->N_cell_y + 1) + iy] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] == 0) {
+                        if (markLayerNode[ix * (this->N_cell_y + 1) + iy] == 0 && !this->markProSide[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this point is not visited and it is outside the conductor, not in the projection of the excited conductor
+                            //if (!ind.empty())
+                            //    ind.clear();
+                            startx = this->xn[ix];
+                            starty = this->yn[iy];
+                            node_group.push_back(base);
+                            nodegs = node_group.size() - 1;
+                            node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+                            map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+                            //ind.push_back(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+                            st.push(ix * (this->N_cell_y + 1) + iy);
+                            visited[ix * (this->N_cell_y + 1) + iy] = 1;
+
+                            while (!st.empty()) {
+                                indx = (st.front()) / (this->N_cell_y + 1);
+                                indy = st.front() % (this->N_cell_y + 1);
+                                if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + this->N_cell_y + 1] == 0 && visited[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && !this->markProSide[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block1_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // it must have a left x edge, thus left x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - this->N_cell_y - 1] == 0 && visited[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && !this->markProSide[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block1_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + 1] == 0 && visited[indx * (this->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (this->N_cell_y + 1) + indy + 1] == 0 && !this->markProSide[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block1_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - 1] == 0 && visited[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && !this->markProSide[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block1_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block1_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        }
+                                    }
+                                }
+                                st.pop();
+                            }
+
+                            for (auto ndi : node_group[nodegs]) {
+                                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                                if (iz != 0) {    // this node is not on the bottom plane
+                                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (iz != this->nz - 1) {   // this node is not on the top plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // this node is not on the left plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != this->nx - 1) {    // this node is not on the right plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // this node is not on the front plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {   // this node is not on the back plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                            }
+
+                            count++;
+                        }
+
+                        else if (markLayerNode[ix * (this->N_cell_y + 1) + iy] == 1 && !this->markProSide[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {//&& this->exciteCdtLayer[iz] == 1) {    // this point is not visited and it is outside the conductor, in the projection of the excited conductor
+                            startx = this->xn[ix];
+                            starty = this->yn[iy];
+
+                            map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+                            st.push(ix * (this->N_cell_y + 1) + iy);
+                            visited[ix * (this->N_cell_y + 1) + iy] = 1;
+                            node_group.push_back(base);
+                            nodegs = node_group.size() - 1;
+                            node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+                            while (!st.empty()) {
+                                mark = 0;
+                                indx = (st.front()) / (this->N_cell_y + 1);
+                                indy = st.front() % (this->N_cell_y + 1);
+
+                                if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + this->N_cell_y + 1] == 0 && visited[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx + 1) * (this->N_cell_y + 1) + indy] == 1 && !this->markProSide[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block2_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+
+                                if (indx != 0) {    // it must have a left x edge, thus left x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - this->N_cell_y - 1] == 0 && visited[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && markLayerNode[(indx - 1) * (this->N_cell_y + 1) + indy] == 1 && !this->markProSide[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block2_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + 1] == 0 && visited[indx * (this->N_cell_y + 1) + indy + 1] == 0 && markLayerNode[indx * (this->N_cell_y + 1) + indy + 1] == 1 && !this->markProSide[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block2_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - 1] == 0 && visited[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && markLayerNode[(indx)* (this->N_cell_y + 1) + indy - 1] == 1 && !this->markProSide[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block2_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block2_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        }
+                                    }
+                                }
+                                st.pop();
+                            }
+
+                            for (auto ndi : node_group[nodegs]) {
+                                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                                if (iz != 0) {    // this node is not on the bottom plane
+                                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (iz != this->nz - 1) {   // this node is not on the top plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // this node is not on the left plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != this->nx - 1) {    // this node is not on the right plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // this node is not on the front plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {   // this node is not on the back plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                            }
+
+
+                            count++;
+
+                        }
+
+                        else {
+                            startx = this->xn[ix];
+                            starty = this->yn[iy];
+
+                            map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+                            st.push(ix * (this->N_cell_y + 1) + iy);
+                            visited[ix * (this->N_cell_y + 1) + iy] = 1;
+                            node_group.push_back(base);
+                            nodegs = node_group.size() - 1;
+                            node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+
+                            while (!st.empty()) {
+                                mark = 0;
+                                indx = (st.front()) / (this->N_cell_y + 1);
+                                indy = st.front() % (this->N_cell_y + 1);
+
+                                if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + this->N_cell_y + 1] == 0 && visited[(indx + 1) * (this->N_cell_y + 1) + indy] == 0 && this->markProSide[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy]) {    // this node is in the sideLen
+                                        if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block3_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // it must have a left x edge, thus left x node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - this->N_cell_y - 1] == 0 && visited[(indx - 1) * (this->N_cell_y + 1) + indy] == 0 && this->markProSide[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block3_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                            visited[(indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                            map[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy);
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() + 1] == 0 && visited[indx * (this->N_cell_y + 1) + indy + 1] == 0 && this->markProSide[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block3_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                    if (this->markNode[iz * this->N_node_s + st.front() - 1] == 0 && visited[(indx)* (this->N_cell_y + 1) + indy - 1] == 0 && this->markProSide[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1]) {    // this node is in dielectric and this node is not visited
+                                        if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block3_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block3_y) {    // this node is within the block area
+                                            st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                            visited[(indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                            map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = count;
+                                            node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        }
+                                    }
+                                }
+                                st.pop();
+                            }
+                            for (auto ndi : node_group[nodegs]) {
+                                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                                if (iz != 0) {    // this node is not on the bottom plane
+                                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (iz != this->nz - 1) {   // this node is not on the top plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != 0) {    // this node is not on the left plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indx != this->nx - 1) {    // this node is not on the right plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != 0) {    // this node is not on the front plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                                if (indy != this->ny - 1) {   // this node is not on the back plane
+                                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                    compute_edgelink(eno, node1, node2);
+                                    if (node1 != ndi) {
+                                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                    else if (node2 != ndi) {
+                                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                                            v0d1num++;
+                                            v0d1anum++;
+                                        }
+                                    }
+                                }
+                            }
+
+                            count++;
+                        }
+                    }
+                }
+            }
+            free(visited); visited = NULL;
+        }
+
+        /* V0d2 generation */
+        myint indj;
+        myint inz, inx, iny;
+        myint iz, ix, iy;
+        queue<myint> qu;
+        visited = (int*)calloc(this->N_node, sizeof(int));
+        t2 = clock();
+        for (indi = 0; indi < this->numCdt; indi++) {
+            //cout << this->conductor[indi].markPort << " ";
+            if (this->conductor[indi].markPort == -1) {
+                continue;
+            }
+            else {
+                mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
+                //v.clear();
+                //va.clear();
+                for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+                    map[this->conductor[indi].node[indj]] = count;
+                    iz = this->conductor[indi].node[indj] / this->N_node_s;
+                    ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+                    iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+                    avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+                    if (iz != 0) {    // this node is not on the bottom plane
+                        eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+                        if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (iz != this->nz - 1) {   // this node is not on the top plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+                        if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (ix != 0) {    // this node is not on the left plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (ix != this->nx - 1) {    // this node is not on the right plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (iy != 0) {    // this node is not on the front plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;
+                        }
+                    }
+                    if (iy != this->ny - 1) {   // this node is not on the back plane
+                        eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+                        if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                            v0d1num++;
+                            v0d1anum++;
+                            mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+                        }
+                    }
+                }
+                if (mark == 1) {
+                    count++;
+                }
+
+            }
+        }
+
+        /* Sparse matrix construction for V0d1 */
+        this->v0d1RowId = (myint*)malloc(v0d1num * sizeof(myint));
+        this->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
+        this->v0d1val = (double*)malloc(v0d1num * sizeof(double));
+        this->v0d1aval = (double*)malloc(v0d1anum * sizeof(double));
+
+        double lx_whole_avg = 0;
+        double ly_whole_avg = 0;
+        double lz_whole_avg = 0;
+        lx_whole_avg = (this->xn[this->nx - 1] - this->xn[0]) / (this->nx - 1);
+        ly_whole_avg = (this->yn[this->ny - 1] - this->yn[0]) / (this->ny - 1);
+        lz_whole_avg = (this->zn[this->nz - 1] - this->zn[0]) / (this->nz - 1);
+        leng_v0d1 = 0;
+        leng_v0d1a = 0;
+        v0d1num = 0;
+        v0d1anum = 0;
+        for (nodegs = 0; nodegs < node_group.size(); nodegs++) {
+            for (auto ndi : node_group[nodegs]) {
+                iz = ndi / (this->N_node_s);
+                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                if (iz != 0) {    // this node is not on the bottom plane
+                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (iz != this->nz - 1) {   // this node is not on the top plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indx != 0) {    // this node is not on the left plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indx != this->nx - 1) {    // this node is not on the right plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indy != 0) {    // this node is not on the front plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+                if (indy != this->ny - 1) {   // this node is not on the back plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0d1RowId[v0d1num] = eno;
+                            this->v0d1ColId[v0d1num] = leng_v0d1;
+                            this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+                            v0d1num++;
+                            this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0d1anum++;
+                        }
+                    }
+                }
+            }
+            leng_v0d1++;
+            leng_v0d1a++;
+        }
+        for (indi = 0; indi < this->numCdt; indi++) {
+            if (this->conductor[indi].markPort == -1) {
+                continue;
+            }
+            for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+                iz = this->conductor[indi].node[indj] / this->N_node_s;
+                ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+                iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+                avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+                if (iz != 0) {    // this node is not on the bottom plane
+                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+                    if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (iz != this->nz - 1) {   // this node is not on the top plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+                    if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (ix != 0) {    // this node is not on the left plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (ix != this->nx - 1) {    // this node is not on the right plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (iy != 0) {    // this node is not on the front plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;
+                    }
+                }
+                if (iy != this->ny - 1) {   // this node is not on the back plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+                    if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+                        this->v0d1RowId[v0d1num] = eno;
+                        this->v0d1ColId[v0d1num] = leng_v0d1;
+                        this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
+                        v0d1num++;
+                        this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d1anum++;
+                        mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+                    }
+                }
+            }
+            if (mark == 1) {
+                leng_v0d1++;
+                leng_v0d1a++;
+            }
+        }
+
+        node_group.clear();
+    }
+
+    /* Generate V0c */
+    void merge_v0c(double block_x, double block_y, double block2_x, double block2_y, myint &v0cnum, myint &leng_v0c, myint &v0canum, myint &leng_v0ca, myint *map) {
+
+        int *visited;
+        double ratio;
+        double startx, starty;    // the start coordinates of each block
+        queue<int> st;    // dfs stack
+        //vector<int> ind;
+        int indsize;
+        int indx, indy;
+        int mark;
+        int markcond;
+        int count = 0;
+        leng_v0c = 0;
+        leng_v0ca = 0;
+        v0cnum = 0;
+        v0canum = 0;
+        int indnum;
+        int ix, iy, iz;
+        int n;
+        int i, j;
+        int map_count = 1;
+        myint eno;
+        double lx_avg, ly_avg, lz_avg;
+        myint node1, node2;
+
+
+        unordered_map<myint, double> v, va;
+        visited = (int*)calloc(this->N_node, sizeof(int));
+        vector<set<myint>> node_group;
+        set<myint> base;
+        int nodegs;
+
+        for (int ic = 0; ic < this->numCdt; ic++) {
+            if (this->conductor[ic].markPort <= 0) {    // not excited conductors
+                markcond = ic + 1;
+                //visited = (int*)calloc(this->N_node, sizeof(int));
+                n = this->cdtNumNode[ic] - 1;
+                if (this->conductor[ic].markPort <= -1)
+                    n = this->cdtNumNode[ic];
+                for (int jc = 0; jc < n; jc++) {
+                    if (visited[this->conductor[ic].node[jc]] == 0 && this->conductor[ic].node[jc] >= this->N_node_s && this->conductor[ic].node[jc] < this->N_node - this->N_node_s) {
+
+
+                        //if (!ind.empty())
+                        //    ind.clear();
+                        iz = this->conductor[ic].node[jc] / (this->N_node_s);
+                        ix = (this->conductor[ic].node[jc] - iz * this->N_node_s) / (this->N_cell_y + 1);
+                        iy = this->conductor[ic].node[jc] % (this->N_cell_y + 1);
+                        startx = this->xn[ix];
+                        starty = this->yn[iy];
+                        //ind.push_back(this->conductor[ic].node[jc]);
+                        st.push(ix * (this->N_cell_y + 1) + iy);
+                        visited[this->conductor[ic].node[jc]] = 1;
+                        map[this->conductor[ic].node[jc]] = map_count;
+                        node_group.push_back(base);
+                        nodegs = node_group.size() - 1;
+                        node_group[nodegs].insert(this->conductor[ic].node[jc]);
+                        while (!st.empty()) {
+
+                            mark = 0;
+                            indx = (st.front()) / (this->N_cell_y + 1);
+                            indy = st.front() % (this->N_cell_y + 1);
+
+                            if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (this->N_cell_x + 1) * indx + indy] == markcond && visited[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] == 0 && (iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block_y) {    // this node is within the block area
+
+                                        st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                        visited[iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                        map[iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            if (indx != 0) {    // it must have a left x edge, thus left x node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (this->N_cell_x + 1) * (indx - 1) + indy] == markcond && visited[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] == 0 && (iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block_y) {    // this node is within the block area
+
+                                        st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                        visited[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                        map[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * indx + indy] == markcond && visited[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1] == 0 && (iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1 != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block_y) {    // this node is within the block area
+
+                                        st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                        visited[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                        map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * indx + indy - 1] == markcond && visited[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1] == 0 && (iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy - 1 != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block_y) {    // this node is within the block area
+
+                                        st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                        visited[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                        map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            //if (mark == 0) {
+                            st.pop();
+                            //}
+                        }
+                        for (auto ndi : node_group[nodegs]) {
+                            indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                            indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                            avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                            if (iz != 0) {    // this node is not on the bottom plane
+                                eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (iz != this->nz - 1) {   // this node is not on the top plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indx != 0) {    // this node is not on the left plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indx != this->nx - 1) {    // this node is not on the right plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indy != 0) {    // this node is not on the front plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indy != this->ny - 1) {   // this node is not on the back plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                        }
+
+                        map_count++;
+
+                    }
+                }
+
+                if (leng_v0c > this->acu_cnno.back())
+                    this->acu_cnno.push_back(leng_v0c);
+
+                //free(visited); visited = NULL;
+            }
+            else{
+
+
+                markcond = ic + 1;
+
+                //visited = (int*)calloc(this->N_node, sizeof(int));
+                n = this->cdtNumNode[ic] - 1;
+                for (int jc = 0; jc < n; jc++) {
+                    if (visited[this->conductor[ic].node[jc]] == 0 && this->conductor[ic].node[jc] >= this->N_node_s && this->conductor[ic].node[jc] < this->N_node - this->N_node_s) {
+
+                        iz = this->conductor[ic].node[jc] / (this->N_node_s);
+                        ix = (this->conductor[ic].node[jc] - iz * this->N_node_s) / (this->N_cell_y + 1);
+                        iy = this->conductor[ic].node[jc] % (this->N_cell_y + 1);
+                        startx = this->xn[ix];
+                        starty = this->yn[iy];
+                        //ind.push_back(this->conductor[ic].node[jc]);
+                        st.push(ix * (this->N_cell_y + 1) + iy);
+                        visited[this->conductor[ic].node[jc]] = 1;
+                        map[this->conductor[ic].node[jc]] = map_count;
+                        node_group.push_back(base);
+                        nodegs = node_group.size() - 1;
+                        node_group[nodegs].insert(this->conductor[ic].node[jc]);
+
+                        while (!st.empty()) {
+
+                            mark = 0;
+                            indx = (st.front()) / (this->N_cell_y + 1);
+                            indy = st.front() % (this->N_cell_y + 1);
+
+                            if (indx != this->nx - 1) {    // it must have a right x edge, thus right x node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (this->N_cell_x + 1) * indx + indy] == markcond && visited[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] == 0 && (iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx + 1] - startx) >= 0 && (this->xn[indx + 1] - startx) <= block2_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block2_y) {    // this node is within the block area
+
+                                        st.push((indx + 1)*(this->N_cell_y + 1) + indy);
+                                        visited[iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy] = 1;
+                                        map[iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx + 1)*(this->N_cell_y + 1) + indy);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            if (indx != 0) {    // it must have a left x edge, thus left x node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (this->N_cell_x + 1) * (indx - 1) + indy] == markcond && visited[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] == 0 && (iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx - 1] - startx) >= 0 && (this->xn[indx - 1] - startx) <= block2_x && (this->yn[indy] - starty) >= 0 && (this->yn[indy] - starty) <= block2_y) {    // this node is within the block area
+
+                                        st.push((indx - 1)*(this->N_cell_y + 1) + indy);
+                                        visited[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = 1;
+                                        map[iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx - 1)*(this->N_cell_y + 1) + indy);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            if (indy != this->ny - 1) {    // it must have a farther y edge, thus farther y node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * indx + indy] == markcond && visited[iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1] == 0 && (iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy + 1 != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block2_x && (this->yn[indy + 1] - starty) >= 0 && (this->yn[indy + 1] - starty) <= block2_y) {    // this node is within the block area
+
+                                        st.push((indx)*(this->N_cell_y + 1) + indy + 1);
+                                        visited[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = 1;
+                                        map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy + 1);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            if (indy != 0) {    // it must have a closer y edge, thus closer y node
+                                if (this->markEdge[iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * indx + indy - 1] == markcond && visited[iz * this->N_node_s + (indx)* (this->N_cell_y + 1) + indy - 1] == 0 && (iz * this->N_node_s + indx * (this->N_cell_y + 1) + indy - 1 != this->conductor[ic].node[this->cdtNumNode[ic] - 1] || this->conductor[ic].markPort == -1)) {    // this node is in conductor and this node is not visited
+                                    if ((this->xn[indx] - startx) >= 0 && (this->xn[indx] - startx) <= block2_x && (this->yn[indy - 1] - starty) >= 0 && (this->yn[indy - 1] - starty) <= block2_y) {    // this node is within the block area
+                                        st.push((indx)*(this->N_cell_y + 1) + indy - 1);
+                                        visited[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = 1;
+                                        map[iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1] = map_count;
+                                        node_group[nodegs].insert(iz * this->N_node_s + (indx)*(this->N_cell_y + 1) + indy - 1);
+                                        //mark = 1;
+
+                                        //continue;
+                                    }
+                                }
+                            }
+                            //if (mark == 0) {
+
+                            st.pop();
+
+                            //}
+                        }
+                        for (auto ndi : node_group[nodegs]) {
+                            indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                            indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                            avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                            if (iz != 0) {    // this node is not on the bottom plane
+                                eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (iz != this->nz - 1) {   // this node is not on the top plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indx != 0) {    // this node is not on the left plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indx != this->nx - 1) {    // this node is not on the right plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indy != 0) {    // this node is not on the front plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                            if (indy != this->ny - 1) {   // this node is not on the back plane
+                                eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                                compute_edgelink(eno, node1, node2);
+                                if (node1 != ndi) {
+                                    if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                                else if (node2 != ndi) {
+                                    if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+
+                                        v0cnum++;
+                                        v0canum++;
+                                    }
+                                }
+                            }
+                        }
+                        map_count++;
+
+
+                    }
+                }
+
+                if (leng_v0c > this->acu_cnno.back())
+                    this->acu_cnno.push_back(leng_v0c);
+
+                //free(visited); visited = NULL;
+
+            }
+        }
+        this->v0cRowId = (myint*)malloc(v0cnum * sizeof(myint));
+        this->v0cColId = (myint*)malloc(v0cnum * sizeof(myint));
+        this->v0cval = (double*)malloc(v0cnum * sizeof(double));
+        //this->v0caRowId = (myint*)malloc(v0canum * sizeof(myint));
+        //this->v0caColId = (myint*)malloc(v0canum * sizeof(myint));
+        this->v0caval = (double*)malloc(v0canum * sizeof(double));
+        v0cnum = 0;
+        v0canum = 0;
+        leng_v0c = 0;
+        leng_v0ca = 0;
+        double lx_whole_avg = 0;
+        double ly_whole_avg = 0;
+        double lz_whole_avg = 0;
+        lx_whole_avg = (this->xn[this->nx - 1] - this->xn[0]) / (this->nx - 1);
+        ly_whole_avg = (this->yn[this->ny - 1] - this->yn[0]) / (this->ny - 1);
+        lz_whole_avg = (this->zn[this->nz - 1] - this->zn[0]) / (this->nz - 1);
+
+        for (nodegs = 0; nodegs < node_group.size(); nodegs++) {
+            for (auto ndi : node_group[nodegs]) {
+                iz = ndi / (this->N_node_s);
+                indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+                indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+                avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+                if (iz != 0) {    // this node is not on the bottom plane
+                    eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                }
+                if (iz != this->nz - 1) {   // this node is not on the top plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                }
+                if (indx != 0) {    // this node is not on the left plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                }
+                if (indx != this->nx - 1) {    // this node is not on the right plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                }
+                if (indy != 0) {    // this node is not on the front plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+                    compute_edgelink(eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                }
+                if (indy != this->ny - 1) {   // this node is not on the back plane
+                    eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+                    compute_edgelink( eno, node1, node2);
+                    if (node1 != ndi) {
+                        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                    else if (node2 != ndi) {
+                        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+                            this->v0cRowId[v0cnum] = eno;
+                            this->v0cColId[v0cnum] = leng_v0c;
+                            this->v0cval[v0cnum] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+                            v0cnum++;
+                            this->v0caval[v0canum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            v0canum++;
+                        }
+                    }
+                }
+            }
+
+            leng_v0c++;
+            leng_v0ca++;
+        }
+
+    }
+
+    /* Calculate the averaged length */
+    void avg_length(int iz, int iy, int ix, double &lx, double &ly, double &lz) {    // given a node, we can know its averaged lengths along x, y, z directions
+        if (iz == 0) {
+            lz = this->zn[1] - this->zn[0];
+        }
+        else if (iz == this->nz - 1) {
+            lz = this->zn[iz] - this->zn[iz - 1];
+        }
+        else {
+            lz = (this->zn[iz + 1] - this->zn[iz - 1]) / 2;
+        }
+
+        if (iy == 0) {
+            ly = this->yn[1] - this->yn[0];
+        }
+        else if (iy == this->ny - 1) {
+            ly = this->yn[iy] - this->yn[iy - 1];
+        }
+        else {
+            ly = (this->yn[iy + 1] - this->yn[iy - 1]) / 2;
+        }
+
+        if (ix == 0) {
+            lx = this->xn[1] - this->xn[0];
+        }
+        else if (ix == this->nx - 1) {
+            lx = this->xn[ix] - this->xn[ix - 1];
+        }
+        else {
+            lx = (this->xn[ix + 1] - this->xn[ix - 1]) / 2;
+        }
+
+    }
+
+    /* Compute edgelink */
+    void compute_edgelink(myint eno, myint &node1, myint &node2) {
+        myint inz, inx, iny;
+        if (eno % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
+            inz = eno / (this->N_edge_s + this->N_edge_v);
+            inx = ((eno % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) / (this->N_cell_y + 1);
+            iny = ((eno % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) % (this->N_cell_y + 1);
+            node1 = inz * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
+            node2 = (inz + 1) * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
+        }
+        else if (eno % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
+            inz = eno / (this->N_edge_s + this->N_edge_v);
+            inx = ((eno % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+            iny = ((eno % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) % (this->N_cell_y + 1);
+            node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
+            node2 = inz * this->N_node_s + (inx + 1) * (this->N_cell_y + 1) + iny;
+        }
+        else {    // this edge is along y axis
+            inz = eno / (this->N_edge_s + this->N_edge_v);
+            inx = (eno % (this->N_edge_s + this->N_edge_v)) / this->N_cell_y;
+            iny = (eno % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+            node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
+            node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
+        }
+    }
+
+    /* Construct Z parameters with V0 and Vh */
+    void Construct_Z_V0_Vh(complex<double> *x, int freqNo, int sourcePort){
+        /* x: field distribution
+           freqNo: frequency no.
+           sourcePort: port no. */
+        int inz, inx, iny;
+        double leng;
+
+        for (int indPort = 0; indPort < this->numPorts; indPort++) {
+            int indPortSide = 0; // Only deal with first port side to get response edge line integral
+            for (int indEdge = 0; indEdge < this->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
+                myint thisEdge = this->portCoor[indPort].portEdge[indPortSide][indEdge];
+                if (thisEdge % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // This edge is along the z-axis
+                    inz = thisEdge / (this->N_edge_s + this->N_edge_v);
+                    leng = this->zn[inz + 1] - this->zn[inz];
+                }
+                else if (thisEdge % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // This edge is along the x-axis
+                    inx = ((thisEdge % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+                    leng = this->xn[inx + 1] - this->xn[inx];
+                }
+                else {    // This edge is along the y-axis
+                    iny = (thisEdge % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+                    leng = this->yn[iny + 1] - this->yn[iny];
+                }
+
+                this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] -= x[thisEdge] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
+            }
+
+            /* Only divide matrix entry by current at end of response port calculation */
+            //cout << "  leng = " << leng << ", first side portArea = " << sys->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << sys->portCoor[sourcePort].portDirection[0] << endl;
+            double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
+            for (int sourcePortSide = 0; sourcePortSide < this->portCoor[sourcePort].multiplicity; sourcePortSide++)
+            {
+                sourceCurrent += this->portCoor[sourcePort].portArea[sourcePortSide];
+            }
+            //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
+            this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] /= sourceCurrent; // Final matrix entry (ohm)
+        }
+    }
+
+    /* print Z for both V0 and Vh */
+    void print_z_V0_Vh(){
+        int indi, inde, indj;
+        double freq;
+
+        for (indi = 0; indi < this->nfreq; indi++){
+            // this point's frequency
+
+            if (this->nfreq == 1) {    // to avoid (sys->nfreq - 1)
+                freq = this->freqStart * this->freqUnit;
+            }
+            else {
+                if (this->freqScale == 1) {
+                    freq = (this->freqStart + indi * (this->freqEnd - this->freqStart) / (this->nfreq - 1)) * this->freqUnit;
+                }
+                else {
+                    freq = this->freqStart * this->freqUnit * pow(this->freqEnd / this->freqStart, (indi * 1.0 / (this->nfreq - 1)));
+                }
+            }
+            cout << "Z-parameters at frequency " << freq << " Hz:" << endl;
+
+            for (inde = 0; inde < this->numPorts; inde++){
+                for (indj = 0; indj < this->numPorts; indj++){   // One port excitation, different ports response as one row
+                    cout << this->x[indi * (this->numPorts * this->numPorts) + inde * this->numPorts + indj] << " ";
+                }
+                cout << endl;
+            }
+            cout << endl;
+        }
+    }
+
+    /* print Z for just V0 */
+    void print_z_V0(){
+        int indi, indj;
+        double freq;
+        complex<double> Zresult;
+
+        if (this->nfreq > 1) {
+
+            for (int id = 0; id < this->nfreq; id++) {
+                if (id == 0)
+                {
+                    // First frequency in sweep
+                    freq = this->freqStart * this->freqUnit;
+
+                    // Report the saved result
+                    cout << "Z-parameters at frequency " << (this->freqStart + id * (this->freqEnd - this->freqStart) / (this->nfreq - 1)) * this->freqUnit << " Hz:" << endl;
+                    for (indi = 0; indi < this->numPorts; indi++) {
+                        for (indj = 0; indj < this->numPorts; indj++) {
+                            Zresult = this->x[indj + indi*this->numPorts];
+                            cout << "  " << Zresult;
+                        }
+                        cout << endl;
+                    }
+                    continue;
+                }
+                else if (id == this->nfreq - 1)
+                {
+                    // Last frequency in sweep
+                    freq = this->freqEnd * this->freqUnit;
+                }
+                else
+                {
+                    // All other frequencies in sweep
+                    if (this->freqScale == 1)
+                    {
+                        // Linear interpolation of frequency sweep
+                        freq = (this->freqStart + id * (this->freqEnd - this->freqStart) / (this->nfreq - 1)) * this->freqUnit;
+                    }
+                    else
+                    {
+                        // Logarithmic interpolation of frequency sweep
+                        freq = this->freqStart * this->freqUnit * pow(this->freqEnd / this->freqStart, (id * 1.0 / (this->nfreq - 1))); // Should be most numerically stable calculated like this
+                        //cout << "Log freq interp: " << freq << " Hz" << endl;
+                    }
+                }
+
+                // Report the results beyond the first and append to storage object
+                cout << "Z-parameters at frequency " << freq << " Hz:" << endl;
+                for (indi = 0; indi < this->numPorts; indi++) {
+                    for (indj = 0; indj < this->numPorts; indj++) {
+                        Zresult = this->x[indj + indi*this->numPorts].real() + (1i) * this->x[indj + indi*this->numPorts].imag() * this->freqStart * this->freqUnit / freq;
+                        cout << "  " << Zresult;
+                        this->x.push_back(Zresult);
+                    }
+                    cout << endl;
+                }
+            }
+        }
+        else{
+            cout << "Z-parameters at single frequency " << (this->freqStart) * this->freqUnit << " Hz:" << endl;
+            for (indi = 0; indi < this->numPorts; indi++) {
+                for (indj = 0; indj < this->numPorts; indj++) {
+                    Zresult = this->x[indj + indi*this->numPorts];
+                    cout << Zresult << " ";
+                    //cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " "; // Alternative for copying and pasting into MATLAB
+                }
+                cout << endl;
+            }
+        }
+    }
+
     /* Destructor */
     ~fdtdMesh(){
         // Set some important numbers to zero
@@ -563,8 +3185,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 int yParaGenerator(fdtdMesh *sys);
 int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1);
 int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);
-int pardisoSolve_c(fdtdMesh *sys, double *rhs, double *solution, int nodestart, int nodeend, int indstart, int indend);
-int pardisoSolve_r(fdtdMesh *sys, complex<double> *rhs, int *RowId, int *ColId, complex<double> *val, int nnz, int size, complex<double> *solution);
 int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1);
 int generateStiff(fdtdMesh *sys);
 int merge_v0d1(fdtdMesh *sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen);
