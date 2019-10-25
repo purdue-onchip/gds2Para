@@ -44,26 +44,28 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACXY (5.0e-4) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
+#define MINDISFRACXY (3e-3) // Fraction setting minimum discretization retained in x- or y-directions after node merging in terms of smaller of x-extent or y-extent
 #define MINDISFRACZ (0.1) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-//#define PRINT_NODE_COORD
+#define UPPER_BOUNDARY_PEC
+#define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
-#define PRINT_V0_Z_PARAM
+//#define PRINT_V0_Z_PARAM
 //#define PRINT_V0_Vh_Z_PARAM
-#define PRINT_Z_PARAM // Terminal output with raw Z-parameters from solver
 #define SKIP_PARDISO // Remove PARDISO solver code
-//#define SKIP_VH
-#define SKIP_STIFF_REFERENCE 
+//#define GENERATE_V0_SOLUTION
+#define SKIP_VH
+#define SKIP_GENERATE_STIFF
+//#define SKIP_STIFF_REFERENCE 
 
 
 // Function-like macros
@@ -453,6 +455,406 @@ public:
     /* Print Function */
     void print();
 
+    /* Print conductorIn */
+    void printConductorIn(){
+        int i, j;
+        
+        cout << "Print conductorIn information: " << endl;
+        for (i = 0; i < this->numCdtRow; i++){
+            for (j = 0; j < this->conductorIn[i].numVert - 1; j++) {
+                if (this->conductorIn[i].layer == 5){
+                    cout << this->conductorIn[i].x[j] << " " << this->conductorIn[i].y[j] << " " << this->conductorIn[i].zmin << " " << this->conductorIn[i].zmax << endl;
+                }
+            }
+        }
+    }
+
+    /* Check whether the point's markNode */
+    void checkPoint(double x, double y, double z, unordered_map<double, int> & xi, unordered_map<double, int> & yi, unordered_map<double, int> & zi){
+        int inx, iny, inz;
+
+        inx = xi[x];
+        iny = yi[y];
+        inz = zi[z];
+        cout << "inx " << inx << " iny " << iny << " inz " << inz << endl;
+        cout << "x " << this->xn[inx] << " y " << this->yn[iny] << " z " << this->zn[inz] << endl;
+        cout << "This node's mark is " << this->markNode[inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny] << endl;
+    }
+
+    /* Find nodes inside conductors with linear complexity */
+    void findInsideCond(unordered_map<double, int> & xi, unordered_map<double, int> & yi, unordered_map<double, int> & zi){
+        /* Find all the x ranges and put all the shown up y in the x ranges */
+        int indi, indj, indl, indk;
+        myint xrange_max;
+        unordered_map<myint, myint> xrange;
+        vector<myint> xcoorv;
+        set<myint> xcoor;
+        unordered_map<myint, vector<myint>> xcoory;    // store the start coordinate of the range, the end can be checked from xrange
+        myint ss, ee;
+        myint x1, x2;
+        myint y1, y2;
+        double y3;
+        int mark1, mini_k, mark;
+        double mini;
+        
+
+
+        for (indi = 0; indi < this->numCdtRow; indi++) {
+            if (this->conductorIn[indi].zmax == this->conductorIn[indi].zmin)
+                continue;
+            xrange.clear();
+            xcoor.clear();
+            xcoorv.clear();
+            xcoory.clear();
+            mark1 = 0;
+            //cout << endl;
+            //cout << endl;
+            for (indj = 0; indj < this->conductorIn[indi].numVert - 1; indj++) {
+                //cout << this->conductorIn[indi].x[indj] << " " << this->conductorIn[indi].y[indj] << " ";
+                if (this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[indj + 1]) {   // line spanning across x
+
+                    if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+                        x1 = xi[this->conductorIn[indi].x[indj]];   // smaller x
+                        x2 = xi[this->conductorIn[indi].x[indj + 1]];    // larger x
+                    }
+                    else {
+                        x1 = xi[this->conductorIn[indi].x[indj + 1]];
+                        x2 = xi[this->conductorIn[indi].x[indj]];
+                    }
+
+                    for (indl = x1; indl <= x2; indl++) {
+                        xcoor.insert(indl);
+                    }
+                }
+                else {   // line along y direction
+                    xcoor.insert(xi[this->conductorIn[indi].x[indj]]);
+                }
+            }
+            if (this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[0]) {   // line spanning across x
+                if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
+                    x1 = xi[this->conductorIn[indi].x[indj]];   // smaller x
+                    x2 = xi[this->conductorIn[indi].x[0]];    // larger x
+                }
+                else {
+                    x1 = xi[this->conductorIn[indi].x[0]];
+                    x2 = xi[this->conductorIn[indi].x[indj]];
+                }
+                for (indl = x1; indl <= x2; indl++) {
+                    xcoor.insert(indl);
+                }
+            }
+            else {    // line along y direction
+                xcoor.insert(xi[this->conductorIn[indi].x[indj]]);
+            }
+
+            for (auto xcoori : xcoor) {
+                xcoorv.push_back(xcoori);
+            }
+            xrange_max = xcoorv.back();   // the maximal x coordinate
+
+            for (indj = 0; indj < xcoorv.size() - 1; indj++) {
+                mark1 = 1;    // the x coordinates are more than 1
+                xrange[xcoorv[indj]] = xcoorv[indj + 1];
+
+            }
+
+            if (xcoorv.size() == 1) {    // If it has only one value
+                xrange[xcoorv[0]] = xcoorv[0];
+            }
+
+            for (indj = 0; indj < this->conductorIn[indi].numVert - 1; indj++) {
+
+                if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[indj + 1]) {   // line along x direction
+                    if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+                        ss = xi[this->conductorIn[indi].x[indj]];
+                        ee = xi[this->conductorIn[indi].x[indj + 1]];
+                        if (ss == ee && mark1 == 1) {
+                            continue;
+                        }
+
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is the last point
+                            xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+                            if (mark1 == 0) {   // xrange only has one value, break
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                    else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[indj + 1]) {
+                        ss = xi[this->conductorIn[indi].x[indj + 1]];
+                        ee = xi[this->conductorIn[indi].x[indj]];
+                        if (ss == ee && mark1 == 1) {
+                            continue;
+                        }
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                            xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+                            if (mark1 == 0) {    // xrange only has one value, break
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                }
+                else if (this->conductorIn[indi].y[indj] != this->conductorIn[indi].y[indj + 1] && this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[indj + 1]) {   // this edge is with area slope
+                    if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+                        ss = xi[this->conductorIn[indi].x[indj]];
+                        ee = xi[this->conductorIn[indi].x[indj + 1]];
+                        if (ss == ee && mark1 == 1) {
+                            continue;
+                        }
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                            y3 = (this->conductorIn[indi].x[indj + 1] - this->xn[ss]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj + 1];
+                            if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
+                                y1 = yi[this->conductorIn[indi].y[indj + 1]];
+                                y2 = yi[this->conductorIn[indi].y[indj]];
+                            }
+                            else {
+                                y1 = yi[this->conductorIn[indi].y[indj]];
+                                y2 = yi[this->conductorIn[indi].y[indj + 1]];
+                            }
+                            mini = DOUBLEMAX;
+                            mini_k = -1;
+                            for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+                                if (mini > abs(this->yn[indl] - y3)) {    // if there is a yn that is closer to y3
+                                    mini = abs(this->yn[indl] - y3);
+                                    mini_k = indl;
+                                }
+                            }
+                            xcoory[ss].push_back(mini_k);
+                            if (mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
+
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                    else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[indj + 1]) {
+                        ss = xi[this->conductorIn[indi].x[indj + 1]];
+                        ee = xi[this->conductorIn[indi].x[indj]];
+                        if (ss == ee && mark1 == 1) {
+                            continue;
+                        }
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {
+                            y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj + 1] + (this->xn[ss] - this->conductorIn[indi].x[indj + 1]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj];
+                            if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
+                                y1 = yi[this->conductorIn[indi].y[indj + 1]];
+                                y2 = yi[this->conductorIn[indi].y[indj]];
+                            }
+                            else {
+                                y1 = yi[this->conductorIn[indi].y[indj]];
+                                y2 = yi[this->conductorIn[indi].y[indj + 1]];
+                            }
+                            mini = DOUBLEMAX;
+                            mini_k = -1;
+                            for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+                                if (mini > abs(this->yn[indl] - y3)) {
+                                    mini = abs(this->yn[indl] - y3);
+                                    mini_k = indl;
+                                }
+                            }
+                            xcoory[ss].push_back(mini_k);
+                            if (mark1 == 0) {
+
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                }
+            }
+
+            if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[0]) {
+                if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
+                    ss = xi[this->conductorIn[indi].x[indj]];
+                    ee = xi[this->conductorIn[indi].x[0]];
+                    if (!(ss == ee && mark1 == 1)) {
+
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                            xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+                            if (mark1 == 0) {
+
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                }
+                else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[0]) {
+                    ss = xi[this->conductorIn[indi].x[0]];
+                    ee = xi[this->conductorIn[indi].x[indj]];
+                    if (!(ss == ee && mark1 == 1)) {
+
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                            xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+                            if (mark1 == 0) {
+
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                }
+            }
+            else if (this->conductorIn[indi].y[indj] != this->conductorIn[indi].y[0] && this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[0]) {   // this edge is with area slope
+                if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
+                    ss = xi[this->conductorIn[indi].x[indj]];
+                    ee = xi[this->conductorIn[indi].x[0]];
+                    if (!(ss == ee && mark1 == 1)) {
+
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {   // if ss is not the last point, loop
+                            y3 = (this->conductorIn[indi].x[0] - this->xn[ss]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[0];
+                            if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
+                                y1 = yi[this->conductorIn[indi].y[0]];
+                                y2 = yi[this->conductorIn[indi].y[indj]];
+                            }
+                            else {
+                                y1 = yi[this->conductorIn[indi].y[indj]];
+                                y2 = yi[this->conductorIn[indi].y[0]];
+                            }
+                            mini = DOUBLEMAX;
+                            mini_k = -1;
+                            for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+                                if (mini > abs(this->yn[indl] - y3)) {
+                                    mini = abs(this->yn[indl] - y3);
+                                    mini_k = indl;
+                                }
+                            }
+                            xcoory[ss].push_back(mini_k);
+                            if (mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                }
+                else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[0]) {
+                    ss = xi[this->conductorIn[indi].x[0]];
+                    ee = xi[this->conductorIn[indi].x[indj]];
+                    if (!(ss == ee && mark1 == 1)) {
+
+                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                            y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[0] + (this->xn[ss] - this->conductorIn[indi].x[0]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[indj];
+                            if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
+                                y1 = yi[this->conductorIn[indi].y[0]];
+                                y2 = yi[this->conductorIn[indi].y[indj]];
+                            }
+                            else {
+                                y1 = yi[this->conductorIn[indi].y[indj]];
+                                y2 = yi[this->conductorIn[indi].y[0]];
+                            }
+                            mini = DOUBLEMAX;
+                            mini_k = -1;
+                            for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+                                if (mini > abs(this->yn[indl] - y3)) {
+                                    mini = abs(this->yn[indl] - y3);
+                                    mini_k = indl;
+                                }
+                            }
+                            xcoory[ss].push_back(mini_k);
+                            if (mark1 == 0) {
+
+                                break;
+                            }
+                            ss = xrange[ss];
+                        }
+                    }
+                }
+
+            }
+
+
+            if (mark1 == 0) {    // only has one x
+                for (auto xcooryi : xcoory) {    // only one xcooryi
+                    vector<myint> xcooryiv = xcooryi.second;
+                    sort(xcooryiv.begin(), xcooryiv.end());
+                    mark = 0;
+                    for (auto xrangey : xcooryiv) {
+                        mark++;
+                        if (mark % 2 == 1) {
+                            y1 = xrangey;
+                            continue;
+                        }
+                        if (mark % 2 == 0) {
+                            y2 = xrangey;
+                        }
+
+                        indj = xcooryi.first;
+                        for (indl = zi[this->conductorIn[indi].zmin]; indl <= zi[this->conductorIn[indi].zmax]; indl++) {
+                            for (indk = y1; indk < y2; indk++) {
+                                this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
+                                this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
+                                this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                if (indl != zi[this->conductorIn[indi].zmax]) {
+                                    this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                }
+                            }
+                            this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
+                            this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                            if (indl != zi[this->conductorIn[indi].zmax]) {
+                                this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                            }
+                        }
+
+                    }
+                }
+                continue;
+            }
+            for (auto xcooryi : xcoory) {
+                vector<myint> xcooryiv = xcooryi.second;
+                sort(xcooryiv.begin(), xcooryiv.end());
+                mark = 0;
+                x1 = xcooryi.first;
+                x2 = xrange[xcooryi.first];
+                /*cout << endl << endl;
+                cout << this->xn[x1] << " " << this->xn[x2] << endl;*/
+                mark = 0;
+                for (auto xrangey : xcooryiv) {
+                    mark++;
+                    if (mark % 2 == 1) {
+                        y1 = xrangey;
+                        continue;
+                    }
+                    else if (mark % 2 == 0) {
+                        y2 = xrangey;
+                       /* cout << this->yn[y1] << " " << this->yn[y2] << " ";*/
+                        for (indj = x1; indj < x2; indj++) {
+                            for (indl = zi[this->conductorIn[indi].zmin]; indl <= zi[this->conductorIn[indi].zmax]; indl++) {
+                                for (indk = y1; indk < y2; indk++) {
+                                    this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
+                                    this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
+                                    this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                    if (indl != zi[this->conductorIn[indi].zmax]) {
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                    }
+                                    if (x2 == xrange_max && indj == x2 - 1) {    // If this range is the rightmost range, include the rightmost point
+                                        this->markNode[indl * this->N_node_s + x2 * (this->N_cell_y + 1) + indk] = (myint)1;
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + x2 * (this->N_cell_y) + indk] = indi + (myint)1;
+                                        if (indl != zi[this->conductorIn[indi].zmax]) {
+                                            this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + x2 * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                        }
+                                    }
+                                }
+                                this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
+                                this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                if (indl != zi[this->conductorIn[indi].zmax]) {
+                                    this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                }
+                                if (x2 == xrange_max && indj == x2 - 1) {    // If this range is the rightmost range, include the rightmost point
+                                    this->markNode[indl * this->N_node_s + x2 * (this->N_cell_y + 1) + indk] = (myint)1;
+                                    if (indl != zi[this->conductorIn[indi].zmax]) {
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + x2 * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+
     /* Generate V0d: both V0d1 and V0d2 are put into V0d1 */
     void merge_v0d1(double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
         int *visited;
@@ -468,11 +870,13 @@ public:
         int mark;
         int indnum;
         int *markLayerNode = (int*)calloc(this->N_node_s, sizeof(int));
-
+        cout << "In V0d here!\n";
         /* Mark layer nodes from port sides */
         for (int indPort = 0; indPort < this->numPorts; indPort++) {
+            
             for (int indPortSide = 0; indPortSide < this->portCoor[indPort].multiplicity; indPortSide++) {
                 myint indCdt = this->portCoor[indPort].portCnd[indPortSide] - 1; // Conductor index for this port side
+                
                 for (int indCdtNode = 0; indCdtNode < this->cdtNumNode[indCdt]; indCdtNode++) {
                     markLayerNode[this->conductor[indCdt].node[indCdtNode] % (this->N_node_s)] = 1;
                 }
@@ -483,7 +887,7 @@ public:
         leng_v0d1a = 0;
         v0d1num = 0;
         v0d1anum = 0;
-
+        
         /* First assign a larger number of storage, don't need to calculate the entries twice */
         //myint *v0d1RowId = (myint*)malloc(2 * this->outedge * sizeof(myint));
         //myint *v0d1ColId = (myint*)malloc(2 * this->outedge * sizeof(myint));
@@ -1006,7 +1410,7 @@ public:
             }
             free(visited); visited = NULL;
         }
-
+        
         /* V0d2 generation */
         myint indj;
         myint inz, inx, iny;
@@ -1084,7 +1488,7 @@ public:
 
             }
         }
-
+        
         /* Sparse matrix construction for V0d1 */
         this->v0d1RowId = (myint*)malloc(v0d1num * sizeof(myint));
         this->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
@@ -1348,7 +1752,9 @@ public:
 
     /* Generate V0d1 and V0d2: V0d1 is for dielectric nodes, V0d2 is for conductors
        Used for finding the physical V0 */
-    void merge_v0d1_v0d2(double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
+    void merge_v0d1_v0d2(double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint& v0d2num, myint& leng_v0d2, myint& v0d2anum, myint& leng_v0d2a, myint *map, double sideLen, double * temp, int bdn){
+        /* temp : -sqrt(D_eps)*V0d2 
+           bdn : PEC boundary number */
         int *visited;
         clock_t t1;
         double t, ta;
@@ -1900,12 +2306,14 @@ public:
         queue<myint> qu;
         visited = (int*)calloc(this->N_node, sizeof(int));
         t2 = clock();
+		v0d2num = 0;
+		v0d2anum = 0;
         for (indi = 0; indi < this->numCdt; indi++) {
             //cout << this->conductor[indi].markPort << " ";
             if (this->conductor[indi].markPort == -1) {
                 continue;
             }
-            else {
+            else if (this->conductor[indi].markPort > 0) {    // excited conductors
                 mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
                 //v.clear();
                 //va.clear();
@@ -1918,48 +2326,48 @@ public:
                     if (iz != 0) {    // this node is not on the bottom plane
                         eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
                         if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
-                            v0d1num++;
-                            v0d1anum++;
+                            v0d2num++;
+                            v0d2anum++;
                             mark = 1;
                         }
                     }
                     if (iz != this->nz - 1) {   // this node is not on the top plane
                         eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
                         if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                            v0d1num++;
-                            v0d1anum++;
+                            v0d2num++;
+                            v0d2anum++;
                             mark = 1;
                         }
                     }
                     if (ix != 0) {    // this node is not on the left plane
                         eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
                         if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                            v0d1num++;
-                            v0d1anum++;
+                            v0d2num++;
+                            v0d2anum++;
                             mark = 1;
                         }
                     }
                     if (ix != this->nx - 1) {    // this node is not on the right plane
                         eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
                         if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                            v0d1num++;
-                            v0d1anum++;
+                            v0d2num++;
+                            v0d2anum++;
                             mark = 1;
                         }
                     }
                     if (iy != 0) {    // this node is not on the front plane
                         eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
                         if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                            v0d1num++;
-                            v0d1anum++;
+                            v0d2num++;
+                            v0d2anum++;
                             mark = 1;
                         }
                     }
                     if (iy != this->ny - 1) {   // this node is not on the back plane
                         eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
                         if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                            v0d1num++;
-                            v0d1anum++;
+                            v0d2num++;
+                            v0d2anum++;
                             mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
                         }
                     }
@@ -2141,8 +2549,16 @@ public:
             leng_v0d1++;
             leng_v0d1a++;
         }
+		this->v0d2RowId = (myint*)malloc(v0d2num * sizeof(myint));
+		this->v0d2ColId = (myint*)malloc(v0d2num * sizeof(myint));
+		this->v0d2val = (double*)malloc(v0d2num * sizeof(double));
+		this->v0d2aval = (double*)malloc(v0d2anum * sizeof(double));
+        v0d2num = 0;
+        v0d2anum = 0;
+        leng_v0d2 = 0;
+        leng_v0d2a = 0;
         for (indi = 0; indi < this->numCdt; indi++) {
-            if (this->conductor[indi].markPort == -1) {
+            if (this->conductor[indi].markPort <= 0) {
                 continue;
             }
             for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
@@ -2153,83 +2569,179 @@ public:
                 if (iz != 0) {    // this node is not on the bottom plane
                     eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
                     if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
-                        this->v0d1RowId[v0d1num] = eno;
-                        this->v0d1ColId[v0d1num] = leng_v0d1;
-                        this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
-                        v0d1num++;
-                        this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-                        v0d1anum++;
+                        this->v0d2RowId[v0d2num] = eno;
+                        this->v0d2ColId[v0d2num] = leng_v0d2;
+                        this->v0d2val[v0d2num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+                        temp[leng_v0d2 * (this->N_edge - bdn * this->N_edge_s) + eno - this->N_edge_s] = 1 / (this->zn[iz] - this->zn[iz - 1]) * sqrt(this->stackEpsn[(eno + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                        v0d2num++;
+                        this->v0d2aval[v0d2anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d2anum++;
                         mark = 1;
                     }
                 }
                 if (iz != this->nz - 1) {   // this node is not on the top plane
                     eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
                     if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                        this->v0d1RowId[v0d1num] = eno;
-                        this->v0d1ColId[v0d1num] = leng_v0d1;
-                        this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
-                        v0d1num++;
-                        this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-                        v0d1anum++;
+                        this->v0d2RowId[v0d2num] = eno;
+                        this->v0d2ColId[v0d2num] = leng_v0d2;
+                        this->v0d2val[v0d2num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+                        temp[leng_v0d2 * (this->N_edge - bdn * this->N_edge_s) + eno - this->N_edge_s] = -1 / (this->zn[iz + 1] - this->zn[iz]) * sqrt(this->stackEpsn[(eno + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                        v0d2num++;
+                        this->v0d2aval[v0d2anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d2anum++;
                         mark = 1;
                     }
                 }
                 if (ix != 0) {    // this node is not on the left plane
                     eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
                     if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                        this->v0d1RowId[v0d1num] = eno;
-                        this->v0d1ColId[v0d1num] = leng_v0d1;
-                        this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
-                        v0d1num++;
-                        this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-                        v0d1anum++;
+                        this->v0d2RowId[v0d2num] = eno;
+                        this->v0d2ColId[v0d2num] = leng_v0d2;
+                        this->v0d2val[v0d2num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
+                        temp[leng_v0d2 * (this->N_edge - bdn * this->N_edge_s) + eno - this->N_edge_s] = 1 / (this->xn[ix] - this->xn[ix - 1]) * sqrt(this->stackEpsn[(eno + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                        v0d2num++;
+                        this->v0d2aval[v0d2anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d2anum++;
                         mark = 1;
                     }
                 }
                 if (ix != this->nx - 1) {    // this node is not on the right plane
                     eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
                     if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                        this->v0d1RowId[v0d1num] = eno;
-                        this->v0d1ColId[v0d1num] = leng_v0d1;
-                        this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
-                        v0d1num++;
-                        this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-                        v0d1anum++;
+                        this->v0d2RowId[v0d2num] = eno;
+                        this->v0d2ColId[v0d2num] = leng_v0d2;
+                        this->v0d2val[v0d2num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
+                        temp[leng_v0d2 * (this->N_edge - bdn * this->N_edge_s) + eno - this->N_edge_s] = -1 / (this->xn[ix + 1] - this->xn[ix]) * sqrt(this->stackEpsn[(eno + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                        v0d2num++;
+                        this->v0d2aval[v0d2anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d2anum++;
                         mark = 1;
                     }
                 }
                 if (iy != 0) {    // this node is not on the front plane
                     eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
                     if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                        this->v0d1RowId[v0d1num] = eno;
-                        this->v0d1ColId[v0d1num] = leng_v0d1;
-                        this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
-                        v0d1num++;
-                        this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-                        v0d1anum++;
+                        this->v0d2RowId[v0d2num] = eno;
+                        this->v0d2ColId[v0d2num] = leng_v0d2;
+                        this->v0d2val[v0d2num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
+                        temp[leng_v0d2 * (this->N_edge - bdn * this->N_edge_s) + eno - this->N_edge_s] = 1 / (this->yn[iy] - this->yn[iy - 1]) * sqrt(this->stackEpsn[(eno + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                        v0d2num++;
+                        this->v0d2aval[v0d2anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d2anum++;
                         mark = 1;
                     }
                 }
                 if (iy != this->ny - 1) {   // this node is not on the back plane
                     eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
                     if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-                        this->v0d1RowId[v0d1num] = eno;
-                        this->v0d1ColId[v0d1num] = leng_v0d1;
-                        this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
-                        v0d1num++;
-                        this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-                        v0d1anum++;
+                        this->v0d2RowId[v0d2num] = eno;
+                        this->v0d2ColId[v0d2num] = leng_v0d2;
+                        this->v0d2val[v0d2num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
+                        temp[leng_v0d2 * (this->N_edge - bdn * this->N_edge_s) + eno - this->N_edge_s] = -1 / (this->yn[iy + 1] - this->yn[iy]) * sqrt(this->stackEpsn[(eno + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                        v0d2num++;
+                        this->v0d2aval[v0d2anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                        v0d2anum++;
                         mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
                     }
                 }
             }
             if (mark == 1) {
-                leng_v0d1++;
-                leng_v0d1a++;
+                leng_v0d2++;
+                leng_v0d2a++;
             }
         }
 
         node_group.clear();
+
+    }
+
+    /* Generate Ad */
+    void generateAd(myint *map, myint v0d1num, myint v0d1anum, myint leng_v0d1, myint& leng_Ad){
+        unordered_map<myint, unordered_map<myint, double>> Ad1;
+        myint indi, inz, inx, iny, node1, node2;
+
+        for (indi = 0; indi < v0d1anum; indi++) {    // the upper and lower planes are PEC
+            if (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
+                inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
+                inx = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) / (this->N_cell_y + 1);
+                iny = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) % (this->N_cell_y + 1);
+                node1 = inz * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
+                node2 = (inz + 1) * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
+                if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
+                    Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                }
+                else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
+                    Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                }
+                else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                }
+            }
+            else if (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
+                inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
+                inx = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+                iny = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) % (this->N_cell_y + 1);
+                node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
+                node2 = inz * this->N_node_s + (inx + 1) * (this->N_cell_y + 1) + iny;
+                if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
+                    Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                }
+                else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
+                    Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                }
+                else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                }
+            }
+            else{    // this edge is along y axis
+                inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
+                inx = (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) / this->N_cell_y;
+                iny = (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+                node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
+                node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
+                if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
+                    Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                }
+                else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
+                    Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+                }
+                else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
+                    Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+                }
+            }
+        }
+
+
+        for (indi = 0; indi < leng_v0d1; indi++) {
+            leng_Ad += Ad1[indi].size();
+        }
+
+        this->AdRowId = (myint*)calloc(leng_Ad, sizeof(myint));
+        this->AdColId = (myint*)calloc(leng_Ad, sizeof(myint));
+        this->Adval = (double*)calloc(leng_Ad, sizeof(double));
+        myint indj = 0;
+
+        for (indi = 0; indi < leng_v0d1; indi++) {
+            vector<pair<myint, double>> v(Ad1[indi].begin(), Ad1[indi].end());
+            sort(v.begin(), v.end());
+            for (auto adi : v) {
+                if (abs(adi.second) > 1e-8) {
+                    this->AdRowId[indj] = indi;
+                    this->AdColId[indj] = adi.first;
+                    this->Adval[indj] = adi.second;
+                    indj++;
+                }
+            }
+            v.clear();
+        }
+        Ad1.clear();
+
     }
 
     /* Generate V0c */
@@ -2935,9 +3447,59 @@ public:
     void Construct_Z_V0_Vh(complex<double> *x, int freqNo, int sourcePort){
         /* x: field distribution
            freqNo: frequency no.
-           sourcePort: port no. */
+           sourcePort: port no.
+           Note: portDirection is the relative position of the port to the ground. E.g., ground is on the top, then portDirection = -1 */
         int inz, inx, iny;
         double leng;
+
+        /* Only divide matrix entry by current at end of response port calculation */
+        //cout << "  leng = " << leng << ", first side portArea = " << sys->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << sys->portCoor[sourcePort].portDirection[0] << endl;
+        double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
+        for (int sourcePortSide = 0; sourcePortSide < this->portCoor[sourcePort].multiplicity; sourcePortSide++)
+        {
+            sourceCurrent += this->portCoor[sourcePort].portArea[sourcePortSide];
+        }
+        
+        for (int indPort = 0; indPort < this->numPorts; indPort++) {
+            int indPortSide = 0; // Only deal with first port side to get response edge line integral
+            for (int indEdge = 0; indEdge < this->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
+                myint thisEdge = this->portCoor[indPort].portEdge[indPortSide][indEdge];
+                if (thisEdge % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // This edge is along the z-axis
+                    inz = thisEdge / (this->N_edge_s + this->N_edge_v);
+                    leng = this->zn[inz + 1] - this->zn[inz];
+                }
+                else if (thisEdge % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // This edge is along the x-axis
+                    inx = ((thisEdge % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+                    leng = this->xn[inx + 1] - this->xn[inx];
+                }
+                else {    // This edge is along the y-axis
+                    iny = (thisEdge % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+                    leng = this->yn[iny + 1] - this->yn[iny];
+                }
+
+                this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] -= x[thisEdge - this->N_edge_s] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
+                
+            }
+
+            
+            //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
+            this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] /= sourceCurrent; // Final matrix entry (ohm)
+        }
+    }
+
+    /* Construct Z parameters with V0 */
+    void Construct_Z_V0(complex<double> *x, int sourcePort){
+        /* x: field distribution from V0 solution
+        sourcePort: port no. */
+        myint inz, inx, iny;
+        double leng;
+
+        /* Z_ij = V_i / I_j = - integ[(grad V_i - part A_i / part t) * dl_i] / iinteg[(J_j) * dS_j] = - sum[(yd + yh)_respedge * leng_respedge]_oneside / sum[1 * area_source_side] */
+        double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
+        for (int sourcePortSide = 0; sourcePortSide < this->portCoor[sourcePort].multiplicity; sourcePortSide++)
+        {
+            sourceCurrent += this->portCoor[sourcePort].portArea[sourcePortSide];
+        }
 
         for (int indPort = 0; indPort < this->numPorts; indPort++) {
             int indPortSide = 0; // Only deal with first port side to get response edge line integral
@@ -2956,18 +3518,17 @@ public:
                     leng = this->yn[iny + 1] - this->yn[iny];
                 }
 
-                this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] -= x[thisEdge] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
+                /*leng = pow((this->nodepos[this->edgelink[thisEdge * 2] * 3] - this->nodepos[this->edgelink[thisEdge * 2 + 1] * 3]), 2);
+                leng += pow((this->nodepos[this->edgelink[thisEdge * 2] * 3 + 1] - this->nodepos[this->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
+                leng += pow((this->nodepos[this->edgelink[thisEdge * 2] * 3 + 2] - this->nodepos[this->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
+                leng = sqrt(leng);*/
+                this->x[indPort + this->numPorts * sourcePort] -= x[thisEdge] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
             }
 
             /* Only divide matrix entry by current at end of response port calculation */
-            //cout << "  leng = " << leng << ", first side portArea = " << sys->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << sys->portCoor[sourcePort].portDirection[0] << endl;
-            double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
-            for (int sourcePortSide = 0; sourcePortSide < this->portCoor[sourcePort].multiplicity; sourcePortSide++)
-            {
-                sourceCurrent += this->portCoor[sourcePort].portArea[sourcePortSide];
-            }
-            //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
-            this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] /= sourceCurrent; // Final matrix entry (ohm)
+            //cout << "  leng = " << leng << ", first side portArea = " << this->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << this->portCoor[sourcePort].portDirection[0] << endl;
+            //cout << "  Response port voltage = " << this->x[indPort + this->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
+            this->x[indPort + this->numPorts * sourcePort] /= sourceCurrent; // Final matrix entry (ohm)
         }
     }
 
@@ -3054,7 +3615,7 @@ public:
                     for (indj = 0; indj < this->numPorts; indj++) {
                         Zresult = this->x[indj + indi*this->numPorts].real() + (1i) * this->x[indj + indi*this->numPorts].imag() * this->freqStart * this->freqUnit / freq;
                         cout << "  " << Zresult;
-                        this->x.push_back(Zresult);
+                        this->x[id * (this->numPorts * this->numPorts) + indi + indj * this->numPorts] = Zresult;
                     }
                     cout << endl;
                 }
@@ -3071,6 +3632,24 @@ public:
                 cout << endl;
             }
         }
+    }
+
+    /* freqNo to freq */
+    double freqNo2freq(int freqNo){
+        double freq;
+
+        if (this->nfreq == 1) {    // to avoid (sys->nfreq - 1)
+            freq = this->freqStart * this->freqUnit;
+        }
+        else {
+            if (this->freqScale == 1) {
+                freq = (this->freqStart + freqNo * (this->freqEnd - this->freqStart) / (this->nfreq - 1)) * this->freqUnit;
+            }
+            else {
+                freq = this->freqStart * this->freqUnit * pow(this->freqEnd / this->freqStart, (freqNo * 1.0 / (this->nfreq - 1)));
+            }
+        }
+        return freq;
     }
 
     /* Destructor */
@@ -3194,7 +3773,7 @@ int generateStiff(fdtdMesh *sys);
 int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval);
 int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort);
 int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint acol, lapack_complex_double *b, myint brow, myint bcol, lapack_complex_double *tmp3);
-int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val);
+int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val); 
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
 #endif

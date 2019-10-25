@@ -9,7 +9,12 @@
 int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution) {
     /* Initialize MPI */
     int num_procs, myid;
+
+    // Get the number of processors
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    cout << "Number of processors is " << num_procs << endl;
+
+    // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
     /* Initialize HYPRE for multiple processes */

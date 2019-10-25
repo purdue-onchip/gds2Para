@@ -507,15 +507,11 @@ int generateStiff(fdtdMesh *sys){
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));
     Shvaln = (double*)malloc(Shnum * sizeof(double));
-    ofstream out;
-    out.open("Sh.txt", std::ofstream::out | std::ofstream::trunc);
     for (ind = 0; ind < Shnum; ind++){
         ShColIdo[ind] = ShColId[ind];
         ShRowIdn[ind] = ShRowId[ind];
         Shvaln[ind] = Shval[ind];
-        out << ShColId[ind] << " " << ShRowId[ind] << " " << Shval[ind] << endl;
     }
-    out.close();
     free(ShRowId); ShRowId = NULL;
     free(Shval); Shval = NULL;
     free(ShColId); ShColId = (myint*)malloc((leng_Sh + 1) * sizeof(myint));
@@ -596,36 +592,66 @@ int generateStiff(fdtdMesh *sys){
     return 0;
 }
 
-int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColId, double *val) {
-    myint size = sys->N_edge - 2 * sys->N_edge_s;
+int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val){
+    int bdn;
+#ifdef UPPER_BOUNDARY_PEC
+    bdn = 2;
+#else
+    bdn = 1;
+#endif
+    
+    double freq = sys->freqNo2freq(freqNo);
+    myint size = sys->N_edge - bdn * sys->N_edge_s;
     myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
-    myint count = 0;
-    myint indi = 0;
-    myint k = 0;
+    int count = 0;
+    int indi = 0;
+    int k = 0;
     complex<double> *valc;
     valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
-    //valc.assign(sys->leng_S, complex<double>(0., 0.));
-    //valc.shrink_to_fit();
     complex<double> *J;
-    J = (complex<double>*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(complex<double>));
-    for (indi = sys->N_edge_s; indi < sys->N_edge - sys->N_edge_s; indi++) {
-        J[indi - sys->N_edge_s] = 0. + (1i) * -sys->J[indi] * sys->freqStart * sys->freqUnit * 2. * M_PI;
+    J = (complex<double>*)calloc((sys->N_edge - bdn * sys->N_edge_s) * sys->numPorts, sizeof(complex<double>));
+    int indz, indy, temp;
+    int sourcePort;
+
+    for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++){
+        for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+            for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
+                J[sourcePort * (sys->N_edge - bdn * sys->N_edge_s) + sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - sys->N_edge_s] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
+
+            }
+        }
     }
     
+    /* Used in plasma2D for upper and lower excitation */
+    /*myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
+
+    while (current_edge < sys->N_edge - sys->N_edge_s){
+    if (sys->markEdge[current_edge] == 0){
+    J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
+    }
+    current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
+    }*/
+    /* end of Used in plasma2D for upper and lower excitation */
+
     RowId1[k] = 0;
     k++;
     myint start;
     myint nnz = sys->leng_S;
-    cout << "Start to generate CSR form for S!" << endl;
+    //cout << "Start to generate CSR form for S!\n";
     indi = 0;
-    while (indi < nnz) {
+    while (indi < nnz){
         start = RowId[indi];
         while (indi < nnz && RowId[indi] == start) {
             valc[indi] += val[indi]; // val[indi] is real
-            if (RowId[indi] == ColId[indi]) {
-                // valc[indi] needs omega * (-omega * epsilon  + indj * sigma) added to it
-                complex<double> addedPart(-(2. * M_PI * sys->freqStart * sys->freqUnit) * sys->eps[RowId[indi] + sys->N_edge_s], sys->sig[RowId[indi] + sys->N_edge_s]);
-                valc[indi] += (2. * M_PI * sys->freqStart * sys->freqUnit) * addedPart;
+            if (RowId[indi] == ColId[indi]){
+                if (sys->markEdge[RowId[indi] + sys->N_edge_s] != 0) {
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
+                    valc[indi] += (2. * M_PI * freq) * addedPart;
+                }
+                else {
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
+                    valc[indi] += (2. * M_PI * freq) * addedPart;
+                }
             }
             count++;
             indi++;
@@ -633,10 +659,9 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
         RowId1[k] = (count);
         k++;
     }
-    cout << endl;
-
+    //cout << "(-w^2*D_eps+iw*D_sig+S) is generated!\n" << endl;
     myint mtype = 13;    /* Real complex unsymmetric matrix */
-    myint nrhs = 1;    /* Number of right hand sides */
+    myint nrhs = sys->numPorts;    /* Number of right hand sides */
     void *pt[64];
 
     /* Pardiso control parameters */
@@ -645,9 +670,6 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     double dparm[64];
     int v0csin;
     myint perm;
-
-    /* Number of processors */
-    int num_procs;
 
     /* Auxiliary variables */
     char *var;
@@ -662,38 +684,36 @@ int reference(fdtdMesh *sys, lapack_complex_double *x, myint *RowId, myint *ColI
     pardisoinit(pt, &mtype, iparm);
     iparm[38] = 1;
     iparm[34] = 1;    // 0-based indexing
+    iparm[3] = 2;    // number of processors
+    //iparm[59] = 2;    // out of core version to solve very large problem
     //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
-    
-    cout << "Begin to solve (-w^2*D_eps + iwD_sig + S)x = -iwJ" << endl;
+
+    //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
     complex<double> *xr;
-    xr = (complex<double>*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(complex<double>));
+    complex<double> * ddum;
+    xr = (complex<double>*)calloc((sys->N_edge - bdn * sys->N_edge_s) * sys->numPorts, sizeof(complex<double>));
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
-    if (error != 0) {
-        cout << endl << "Error During numerical factorization: " << error << endl;
+    if (error != 0){
+        printf("\nERROR during numerical factorization: %d", error);
         exit(2);
     }
+    
+    for (indi = 0; indi < sourcePort; indi++)
+        sys->Construct_Z_V0_Vh(&xr[indi * (sys->N_edge - bdn * sys->N_edge_s)], freqNo, indi);
 
-    cout << "Solving (-w^2*D_eps+ i wD_sig + S)x = -iwJ is complete!" << endl;
-    double nn = 0.;
-    double nnn = 0.;
-    double nn0 = 0.;    // the norm of y0-xr
-    for (indi = 0; indi < sys->N_edge - 2 * sys->N_edge_s; indi++){
-        nn += pow((xr[indi].real() - x[indi].real), 2) + pow((xr[indi].imag() - x[indi].imag), 2);
-        nnn += pow(xr[indi].real(), 2) + pow(xr[indi].imag(), 2);
-        nn0 += pow((sys->y[indi + sys->N_edge_s].real() - xr[indi].real()), 2) + pow((sys->y[indi + sys->N_edge_s].imag() - xr[indi].imag()), 2);
-        //nn += pow((xr[indi].re - x[indi].real), 2) + pow((xr[indi].indi - x[indi].imag), 2);
-        //nnn += pow(xr[indi].re, 2) + pow(xr[indi].indi, 2);
-    }
+    phase = -1;     // Release internal memory
+    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
 
-    nn = sqrt(nn);
-    nnn = sqrt(nnn);
-    nn0 = sqrt(nn0);
-    cout << "Relative residual is " << nn / nnn << endl;
-    cout << "y0 relative residual is " << nn0 / nnn << endl;
+    //cout << "Solving (-w^2*D_eps+iwD_sig+S)x=-iwJ is complete!\n";
 
+    
+
+
+    free(xr); xr = NULL;    
     free(RowId1); RowId1 = NULL;
     free(valc); valc = NULL;
+    free(J); J = NULL;
     return 0;
 }
 
@@ -901,6 +921,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     for (myint i = 0; i < leng_A; i++){
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
+
     for (myint i = 0; i < ARows; i++){
         if (i < sys->N_edge_s || i >= sys->N_edge - sys->N_edge_s){
             continue;
@@ -920,13 +941,13 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             //if (sys->SRowId[indj] == sys->SColId[indj]){
             //    sys->Sval[indj] = sys->Sval[indj].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[indi + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[indi + sys->N_edge_s] + sys->Sval[indj].imag());
             //}
+
             j++;
             count++;
         }
         v.clear();
     }
     leng_A = j;
-    
 
     mkl_sparse_destroy(a);
     mkl_sparse_destroy(b);

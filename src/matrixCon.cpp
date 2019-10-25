@@ -15,7 +15,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 #else
     bdn = 1;
 #endif
-    myint indi, indj, mark, k, l, n;
+    int indi, indj, mark, k, l, n;
     int status = 0;
     int count = 0;
     int xcol = 0;
@@ -23,17 +23,18 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     vector<int> colId;
     vector<double> val;
     vector<int> temp2;
+    double *temp;
     myint inx = 0, iny = 0, inz = 0;
 
     /* Construct V0d with row id, col id and its val */
     myint leng_v0d1 = 0, v0d1num = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
     myint leng_v0d1a = 0, v0d1anum = 0;
+    myint leng_v0d2 = 0, leng_v0d2a = 0, v0d2num = 0, v0d2anum = 0;
     myint leng_Ad = 0;
     myint *map = (myint*)calloc(sys->N_node, (sizeof(myint)));
     double block1_x, block1_y, block2_x, block2_y, block3_x, block3_y;
     double sideLen = 0.; // around the conductor 10um is considered with rapid potential change
-    //unordered_map<myint, double> Ad1;
-    unordered_map<myint, unordered_map<myint, double>> Ad1;
+    myint node1 = 0, node2 = 0;
 
     block1_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
     block1_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
@@ -46,81 +47,23 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     cout << "V0d's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
     cout << "V0d's block3_x and block3_y are " << block3_x << " " << block3_y << endl;
 #endif
-
-    clock_t t1 = clock();
-    clock_t ts = t1;
+    
+    /* Generate V0d1 */
     sys->merge_v0d1(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, map, sideLen);
-#ifdef PRINT_VERBOSE_TIMING
-    cout << "Merge V0d1 time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+#ifdef V0_new_schema
+    // temp = new double[(sys->N_edge - bdn * sys->N_edge_s) * leng_v0d2];    // -sqrt(D_eps)*V0d2
+    // sys->merge_v0d1_v0d2(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, v0d2num, leng_v0d2, v0d2anum, leng_v0d2a,  map, sideLen, temp, bdn);
 #endif
-    myint node1 = 0, node2 = 0;
+    
 
-    t1 = clock();
     cout << "Length of V0d1 is " << leng_v0d1 << ", and number of non-zeros in V0d1 is " << v0d1num << endl;
     cout << "Length of V0d1a is " << leng_v0d1a << ", and number of non-zeros in V0d1a is " << v0d1anum << endl;
     cout << "V0d is generated!" << endl;
 
-    for (indi = 0; indi < v0d1anum; indi++) {    // the upper and lower planes are PEC
-        if (sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // this edge is along z axis
-            inz = sys->v0d1RowId[indi] / (sys->N_edge_s + sys->N_edge_v);
-            inx = ((sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v)) - sys->N_edge_s) / (sys->N_cell_y + 1);
-            iny = ((sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v)) - sys->N_edge_s) % (sys->N_cell_y + 1);
-            node1 = inz * sys->N_node_s + (sys->N_cell_y + 1) * inx + iny;
-            node2 = (inz + 1) * sys->N_node_s + (sys->N_cell_y + 1) * inx + iny;
-            if (map[node1] != sys->v0d1ColId[indi] + 1 && map[node1] != 0) {
-                Ad1[sys->v0d1ColId[indi]][map[node1] - 1] += sys->v0d1aval[indi] * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += sys->v0d1aval[indi] * (-1) / (sys->zn[inz + 1] - sys->zn[inz]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-            }
-            else if (map[node2] != sys->v0d1ColId[indi] + 1 && map[node2] != 0) {
-                Ad1[sys->v0d1ColId[indi]][map[node2] - 1] += sys->v0d1aval[indi] * (-1) / (sys->zn[inz + 1] - sys->zn[inz]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += sys->v0d1aval[indi] * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-            }
-            else {//if (map[sys->edgelink[sys->v0d1aRowId[indi] * 2]] == 0 || map[sys->edgelink[sys->v0d1aRowId[indi] * 2] + 1] == 0) {
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += abs(sys->v0d1aval[indi] * 1 / (sys->zn[inz + 1] - sys->zn[inz]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
-            }
-        }
-        else if (sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // this edge is along x axis
-            inz = sys->v0d1RowId[indi] / (sys->N_edge_s + sys->N_edge_v);
-            inx = ((sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
-            iny = ((sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) % (sys->N_cell_y + 1);
-            node1 = inz * sys->N_node_s + inx * (sys->N_cell_y + 1) + iny;
-            node2 = inz * sys->N_node_s + (inx + 1) * (sys->N_cell_y + 1) + iny;
-            if (map[node1] != sys->v0d1ColId[indi] + 1 && map[node1] != 0) {
-                Ad1[sys->v0d1ColId[indi]][map[node1] - 1] += sys->v0d1aval[indi] * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += sys->v0d1aval[indi] * (-1) / (sys->xn[inx + 1] - sys->xn[inx]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-            }
-            else if (map[node2] != sys->v0d1ColId[indi] + 1 && map[node2] != 0) {
-                Ad1[sys->v0d1ColId[indi]][map[node2] - 1] += sys->v0d1aval[indi] * (-1) / (sys->xn[inx + 1] - sys->xn[inx]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += sys->v0d1aval[indi] * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-            }
-            else {//if (map[sys->edgelink[sys->v0d1aRowId[indi] * 2]] == 0 || map[sys->edgelink[sys->v0d1aRowId[indi] * 2] + 1] == 0) {
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += abs(sys->v0d1aval[indi] * 1 / (sys->xn[inx + 1] - sys->xn[inx]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
-            }
-        }
-        else{    // this edge is along y axis
-            inz = sys->v0d1RowId[indi] / (sys->N_edge_s + sys->N_edge_v);
-            inx = (sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v)) / sys->N_cell_y;
-            iny = (sys->v0d1RowId[indi] % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
-            node1 = inz * sys->N_node_s + inx * (sys->N_cell_y + 1) + iny;
-            node2 = inz * sys->N_node_s + inx * (sys->N_cell_y + 1) + iny + 1;
-            if (map[node1] != sys->v0d1ColId[indi] + 1 && map[node1] != 0) {
-                Ad1[sys->v0d1ColId[indi]][map[node1] - 1] += sys->v0d1aval[indi] * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += sys->v0d1aval[indi] * (-1) / (sys->yn[iny + 1] - sys->yn[iny]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-            }
-            else if (map[node2] != sys->v0d1ColId[indi] + 1 && map[node2] != 0) {
-                Ad1[sys->v0d1ColId[indi]][map[node2] - 1] += sys->v0d1aval[indi] * (-1) / (sys->yn[iny + 1] - sys->yn[iny]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += sys->v0d1aval[indi] * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-            }
-            else {//if (map[sys->edgelink[sys->v0d1aRowId[indi] * 2]] == 0 || map[sys->edgelink[sys->v0d1aRowId[indi] * 2] + 1] == 0) {
-                Ad1[sys->v0d1ColId[indi]][sys->v0d1ColId[indi]] += abs(sys->v0d1aval[indi] * 1 / (sys->yn[iny + 1] - sys->yn[iny]) * sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
-            }
-        }
-    }
+    /* Generate Ad = V0da1'*D_eps*V0d */
+    sys->generateAd(map, v0d1num, v0d1anum, leng_v0d1, leng_Ad);
 
-
-    for (indi = 0; indi < leng_v0d1; indi++) {
-        leng_Ad += Ad1[indi].size();
-    }
+   
 
 
     sys->v0d1valo = (double*)malloc(v0d1num * sizeof(double));
@@ -173,56 +116,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sparse_matrix_t V0dat;
     s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, leng_v0d1, sys->N_edge, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
 
-    ///******************************************************************/
-    ///* use MKL to do matrix multiplication */
-    ///* Note that the result for each row, the col # is not in the increased order */
-    /*leng_Ad = 0;
-    clock_t t2 = clock();
-    status = mklMatrixMulti(sys, leng_Ad, sys->v0d1aRowId, sys->v0d1aColId, sys->v0d1aval, sys->N_edge, leng_v0d1, sys->v0d1RowId, sys->v0d1ColId, sys->v0d1val, 1);*/
-#ifdef PRINT_VERBOSE_TIMING
-    //cout << "Matrix mutiplication time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
-
-    ///*****************************************************************/
-    sys->AdRowId = (myint*)calloc(leng_Ad, sizeof(myint));
-    sys->AdColId = (myint*)calloc(leng_Ad, sizeof(myint));
-    sys->Adval = (double*)calloc(leng_Ad, sizeof(double));
-    indj = 0;
-    
-    /*for (indi = 0; indi < leng_Ad; indi++) {
-        sys->AdRowId[indj] = AdRowId[indi];
-        sys->AdColId[indj] = AdColId[indi];
-        sys->Adval[indj] = Adval[indi];
-        indj++;
-    }
-    free(AdRowId); AdRowId = NULL;
-    free(AdColId); AdColId = NULL;
-    free(Adval); Adval = NULL;*/
-    for (indi = 0; indi < leng_v0d1; indi++) {
-        vector<pair<myint, double>> v(Ad1[indi].begin(), Ad1[indi].end());
-        sort(v.begin(), v.end());
-        for (auto adi : v) {
-            if (abs(adi.second) > 1e-8) {
-                sys->AdRowId[indj] = indi;
-                sys->AdColId[indj] = adi.first;
-                sys->Adval[indj] = adi.second;
-                indj++;
-            }
-        }
-        v.clear();
-    }
-    Ad1.clear();
-#ifdef PRINT_VERBOSE_TIMING
-    //cout << "Time to generate Ad is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-    //cout << "Number of non-zeros in Ad is " << leng_Ad << endl;
+#ifdef V0_new_schema
+    double * drhs = new double[leng_v0d1 * leng_v0d2];
+    mkl_sparse_d_mm(SPARSE_OPERARION_NON_TRANSPOSE, 1, V0dat, SPARSE_MATRIX_TYPE_GENERAL, SPARSE_LAYOUT_COLUMN_MAJOR, temp, leng_v0d2, (sys->N_edge - bdn * sys->N_edge_s), 0, drhs, leng_v0d1);
+    delete[] temp;
+    delete[] drhs;
 #endif
 
     int *argc;
     char ***argv;
-    /*  trial of first set HYPRE matrix Ad */
-    //HYPRE_IJMatrix ad;
-    //HYPRE_ParCSRMatrix parcsr_ad;
     MPI_Init(argc, argv);
+    
     //status = setHYPREMatrix(sys->AdRowId, sys->AdColId, sys->Adval, leng_v0d1, ad, parcsr_ad);
     /* End */
 
@@ -254,11 +158,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     block1_y = 0;// (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
     block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
     block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
-#ifdef PRINT_V0C_BLOCKS
-    cout << "V0c's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
-    cout << "V0c's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
-#endif
-    t1 = clock();
+
+    clock_t t1 = clock();
     sys->merge_v0c(block1_x, block1_y, block2_x, block2_y, v0cnum, leng_v0c, v0canum, leng_v0ca, map);
 
 #ifdef PRINT_VERBOSE_TIMING
@@ -448,7 +349,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     complex<double> Zresult;
     double *bd1, *bd2;
     double *bdc1, *bdc2;
-    double *temp;
     double mdone;
     int ione;
     lapack_int *ipiv;
@@ -461,7 +361,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     startCol = 0;
     sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
-    sys->x.assign(sys->numPorts * sys->numPorts, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve
+    //sys->x.assign(sys->numPorts * sys->numPorts, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve for V0 solution
+    sys->x.assign(sys->numPorts * sys->numPorts * sys->nfreq, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve
 
     double *b, *xc;    // the array of the right hand side
     xcol = 0;
@@ -513,8 +414,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     lapack_complex_double *J_h;
     double *ferr, *berr;
 
+
     /* HYPRE solves for each port are messy */
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
+        cout << "Port direction for port " << sourcePort << " is " << sys->portCoor[sourcePort].portDirection[0] << endl;
+#ifdef GENERATE_V0_SOLUTION
         t1 = clock();
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
@@ -716,7 +620,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //    u0a[sys->N_edge - 2 * sys->N_edge_s + indi - sys->N_edge_s].real = (yd2a[indi] + yca[indi]) / nna;    // u0ca
         //}
 
-        cout << " Time to generate u0d and u0c up to port" << sourcePort + 1 << " is " << (clock() - ts) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
         for (int id = 0; id < sys->N_edge; id++) {
             yd[id] = yd2[id] - (1i)*(yd1[id]);
@@ -731,43 +634,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         free(yc); yc = NULL;
 
-        /* Build final network parameters matrix for this sourcePort by looping over response ports and adding contributions from each response port edge on first side */
-        /* Z_ij = V_i / I_j = - integ[(grad V_i - part A_i / part t) * dl_i] / iinteg[(J_j) * dS_j] = - sum[(yd + yh)_respedge * leng_respedge]_oneside / sum[1 * area_source_side] */
-        for (int indPort = 0; indPort < sys->numPorts; indPort++) {
-            int indPortSide = 0; // Only deal with first port side to get response edge line integral
-            for (int indEdge = 0; indEdge < sys->portCoor[indPort].portEdge[indPortSide].size(); indEdge++) {
-                myint thisEdge = sys->portCoor[indPort].portEdge[indPortSide][indEdge];
-                if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // This edge is along the z-axis
-                    inz = thisEdge / (sys->N_edge_s + sys->N_edge_v);
-                    leng = sys->zn[inz + 1] - sys->zn[inz];
-                }
-                else if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // This edge is along the x-axis
-                    inx = ((thisEdge % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
-                    leng = sys->xn[inx + 1] - sys->xn[inx];
-                }
-                else {    // This edge is along the y-axis
-                    iny = (thisEdge % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
-                    leng = sys->yn[iny + 1] - sys->yn[iny];
-                }
-
-                /*leng = pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3]), 2);
-                leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
-                leng += pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 2] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
-                leng = sqrt(leng);*/
-                sys->x[indPort + sys->numPorts * xcol] -= yd[thisEdge] * leng; // Accumulating responses due to each response edge line integral (V)
-            }
-
-            /* Only divide matrix entry by current at end of response port calculation */
-            //cout << "  leng = " << leng << ", first side portArea = " << sys->portCoor[sourcePort].portArea[0] << " m^2, first side portDirection = " << sys->portCoor[sourcePort].portDirection[0] << endl;
-            double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
-            for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++)
-            {
-                sourceCurrent += sys->portCoor[sourcePort].portArea[sourcePortSide];
-            }
-            //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
-            sys->x[indPort + sys->numPorts * xcol] /= sourceCurrent; // Final matrix entry (ohm)
-        }
-
+        sys->Construct_Z_V0(yd, sourcePort);
+#endif
 
         /* Calculate the Vh part */
 #ifndef SKIP_VH
@@ -968,21 +836,52 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
 #endif
 
-
+#ifdef GENERATE_V0_SOLUTION
         free(yd); yd = NULL;
-
-        // Solve system for x in (-omega^2 * D_eps + indj * omega * D_sigma + S) * x = -indj * omega * J
-#ifndef SKIP_STIFF_REFERENCE
-        status = reference(sys, final_x, sys->SRowId, sys->SColId, sys->Sval);
-
+        free(sys->J); sys->J = NULL;
 #endif
 
-        free(sys->J); sys->J = NULL;
+        // Solve system for x in (-omega^2 * D_eps + indj * omega * D_sigma + S) * x = -indj * omega * J
+
+
+        
         /*free(u0); u0 = NULL;*/
         //free(sys->y); sys->y = NULL;
         xcol++;
     }
     MPI_Finalize();
+
+#ifndef SKIP_STIFF_REFERENCE
+    /*  Generate the reference results and S parameters in .citi file for different frequencies with multiple right hand side */
+
+
+    for (indi = 0; indi < sys->nfreq; indi++) {
+
+        if (sys->nfreq == 1) {    // to avoid (sys->nfreq - 1)
+            freq = sys->freqStart * sys->freqUnit;
+        }
+        else {
+            if (sys->freqScale == 1) {
+                freq = (sys->freqStart + indi * (sys->freqEnd - sys->freqStart) / (sys->nfreq - 1)) * sys->freqUnit;
+            }
+            else {
+                freq = sys->freqStart * sys->freqUnit * pow(sys->freqEnd / sys->freqStart, (indi * 1.0 / (sys->nfreq - 1)));
+            }
+        }
+        cout << "Frequency " << freq << "'s z parameter matrix is shown below as" << endl;
+
+        status = reference(sys, indi, sys->SRowId, sys->SColId, sys->Sval);
+
+
+        /*for (int indj = 0; indj < sys->numPorts; indj++){
+        for (int indk = 0; indk < sys->numPorts; indk++){
+        cout << sys->x[indi * (sys->numPorts * sys->numPorts) + indj * sys->numPorts + indk] << " ";
+        }
+        cout << endl;
+        }*/
+    }
+
+#endif
 
     /* Report the Z-parameters and Prepare to Export Them */
 #ifdef PRINT_V0_Z_PARAM
@@ -1026,7 +925,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     free(sys->yn); sys->yn = NULL;
     free(sys->zn); sys->zn = NULL;
     sys->stackEpsn.clear();
-
+    cout << "Here\n";
     mkl_sparse_destroy(V0dt);
     mkl_sparse_destroy(V0dat);
     mkl_sparse_destroy(V0ct);

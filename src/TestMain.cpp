@@ -337,7 +337,7 @@ int main(int argc, char** argv)
             //sys.print();
 
             // Generate Stiffness Matrix
-#ifndef SKIP_GENERATE_STIFF
+//#ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
             status = generateStiff(&sys);
             if (status == 0)
@@ -350,7 +350,7 @@ int main(int argc, char** argv)
                 cerr << "generateStiff Fail!" << endl;
                 return status;
             }
-#endif
+//#endif
 
             // Parameter generation
             clock_t t6 = clock();

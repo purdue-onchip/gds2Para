@@ -4,6 +4,7 @@
 
 int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
 {
+    
     int lyr;
     myint indi = 0, indj = 0, indk = 0;
     double upper, lower;
@@ -414,370 +415,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /***********************************************************************************************/
     /* Establish index relationship between nodes and conductors */
     double xc, yc;
-    myint xrange_max;
-    unordered_map<myint, myint> xrange;
-    vector<myint> xcoorv;
-    set<myint> xcoor;
-    unordered_map<myint, set<myint>> xcoory;    // store the start coordinate of the range, the end can be checked from xrange
-    myint ss, ee;
-    myint y1, y2, y3;
     myint ys, yl;
-    myint x1, x2;
-    myint indl;
+   
     tt = clock();
     myint mark = (myint)0;
-    int mark1, mini_k;
-    double mini;
 
+    // sys->printConductorIn();
     // Fast algorithm to find nodes inside conductors
-    for (indi = 0; indi < sys->numCdtRow; indi++) {
-        xrange.clear();
-        xcoor.clear();
-        xcoorv.clear();
-        xcoory.clear();
-        mark1 = 0;
-        //cout << "Number of CdtRow is " << indi << endl;
-        for (indj = 0; indj < sys->conductorIn[indi].numVert - 1; indj++) {
-            if (sys->conductorIn[indi].x[indj] != sys->conductorIn[indi].x[indj + 1] && sys->conductorIn[indi].y[indj] != sys->conductorIn[indi].y[indj + 1]) {   // line with area non-zero slope
-                if (sys->conductorIn[indi].x[indj] < sys->conductorIn[indi].x[indj + 1]) {
-                    x1 = xi[sys->conductorIn[indi].x[indj]];   // smaller x
-                    x2 = xi[sys->conductorIn[indi].x[indj + 1]];    // larger x
-                }
-                else {
-                    x1 = xi[sys->conductorIn[indi].x[indj + 1]];
-                    x2 = xi[sys->conductorIn[indi].x[indj]];
-                }
-                for (indl = x1; indl <= x2; indl++) {
-                    xcoor.insert(indl);
-                }
-            }
-            else {
-                xcoor.insert(xi[sys->conductorIn[indi].x[indj]]);
-            }
-        }
-        if (sys->conductorIn[indi].x[indj] != sys->conductorIn[indi].x[0] && sys->conductorIn[indi].y[indj] != sys->conductorIn[indi].y[0]) {   // line with area non-zero slope
-            if (sys->conductorIn[indi].x[indj] < sys->conductorIn[indi].x[0]) {
-                x1 = xi[sys->conductorIn[indi].x[indj]];   // smaller x
-                x2 = xi[sys->conductorIn[indi].x[0]];    // larger x
-            }
-            else {
-                x1 = xi[sys->conductorIn[indi].x[0]];
-                x2 = xi[sys->conductorIn[indi].x[indj]];
-            }
-            for (indl = x1; indl <= x2; indl++) {
-                xcoor.insert(indl);
-            }
-        }
-        else {
-            xcoor.insert(xi[sys->conductorIn[indi].x[indj]]);
-        }
-
-        for (auto xcoori : xcoor) {
-            xcoorv.push_back(xcoori);
-        }
-        xrange_max = xcoorv.back();   // the maximal x coordinate
+    sys->findInsideCond(xi, yi, zi);
         
-        for (indj = 0; indj < xcoorv.size() - 1; indj++) {
-            mark1 = 1;    // the x coordinates are more than 1
-            xrange[xcoorv[indj]] = xcoorv[indj + 1];
 
-        }
-        if (xcoorv.size() == 1) {    // If it has only one value
-            xrange[xcoorv[0]] = xcoorv[0];
-        }
-
-        for (indj = 0; indj < sys->conductorIn[indi].numVert - 1; indj++) {
-            if (sys->conductorIn[indi].y[indj] == sys->conductorIn[indi].y[indj + 1]) {
-                if (sys->conductorIn[indi].x[indj] < sys->conductorIn[indi].x[indj + 1]) {
-                    ss = xi[sys->conductorIn[indi].x[indj]];
-                    ee = xi[sys->conductorIn[indi].x[indj + 1]];
-                    if (ss == ee && mark1 == 1) {
-                        continue;
-                    }
-                    
-                    while (xrange[ss] <= ee) {
-                        xcoory[ss].insert(yi[sys->conductorIn[indi].y[indj]]);
-                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
-                            
-                            break;
-                        }
-                        ss = xrange[ss];
-                    }
-                }
-                else if (sys->conductorIn[indi].x[indj] > sys->conductorIn[indi].x[indj + 1]) {
-                    ss = xi[sys->conductorIn[indi].x[indj + 1]];
-                    ee = xi[sys->conductorIn[indi].x[indj]];
-                    if (ss == ee && mark1 == 1) {
-                        continue;
-                    }
-                    while (xrange[ss] <= ee) {
-                        xcoory[ss].insert(yi[sys->conductorIn[indi].y[indj]]);
-                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {
-                            
-                            break;
-                        }
-                        ss = xrange[ss];
-                    }
-                }
-            }
-            else if (sys->conductorIn[indi].y[indj] != sys->conductorIn[indi].y[indj + 1] && sys->conductorIn[indi].x[indj] != sys->conductorIn[indi].x[indj + 1]) {   // this edge is with area slope
-                if (sys->conductorIn[indi].x[indj] < sys->conductorIn[indi].x[indj + 1]) {
-                    ss = xi[sys->conductorIn[indi].x[indj]];
-                    ee = xi[sys->conductorIn[indi].x[indj + 1]];
-                    if (ss == ee && mark1 == 1) {
-                        continue;
-                    }
-                    while (xrange[ss] <= ee) {
-                        y3 = (sys->conductorIn[indi].x[indj + 1] - sys->xn[ss]) / (sys->conductorIn[indi].x[indj + 1] - sys->conductorIn[indi].x[indj]) * sys->conductorIn[indi].y[indj] + (sys->xn[ss] - sys->conductorIn[indi].x[indj]) / (sys->conductorIn[indi].x[indj + 1] - sys->conductorIn[indi].x[indj]) * sys->conductorIn[indi].y[indj + 1];
-                        if (sys->conductorIn[indi].y[indj] > sys->conductorIn[indi].y[indj + 1]) {
-                            y1 = yi[sys->conductorIn[indi].y[indj + 1]];
-                            y2 = yi[sys->conductorIn[indi].y[indj]];
-                        }
-                        else {
-                            y1 = yi[sys->conductorIn[indi].y[indj]];
-                            y2 = yi[sys->conductorIn[indi].y[indj + 1]];
-                        }
-                        mini = DOUBLEMAX;
-                        mini_k = y1;
-                        for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-                            if (mini < abs(sys->yn[indl] - y3)) {
-                                mini = abs(sys->yn[indl] - y3);
-                                mini_k = indl;
-                            }
-                        }
-                        xcoory[ss].insert(mini_k);
-                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
-                            
-                            break;
-                        }
-                        ss = xrange[ss];
-                    }
-                }
-                else if (sys->conductorIn[indi].x[indj] > sys->conductorIn[indi].x[indj + 1]) {
-                    ss = xi[sys->conductorIn[indi].x[indj + 1]];
-                    ee = xi[sys->conductorIn[indi].x[indj]];
-                    if (ss == ee && mark1 == 1) {
-                        continue;
-                    }
-                    while (xrange[ss] <= ee) {
-                        y3 = (sys->conductorIn[indi].x[indj] - sys->xn[ss]) / (sys->conductorIn[indi].x[indj] - sys->conductorIn[indi].x[indj + 1]) * sys->conductorIn[indi].y[indj + 1] + (sys->xn[ss] - sys->conductorIn[indi].x[indj + 1]) / (sys->conductorIn[indi].x[indj] - sys->conductorIn[indi].x[indj + 1]) * sys->conductorIn[indi].y[indj];
-                        if (sys->conductorIn[indi].y[indj] > sys->conductorIn[indi].y[indj + 1]) {
-                            y1 = yi[sys->conductorIn[indi].y[indj + 1]];
-                            y2 = yi[sys->conductorIn[indi].y[indj]];
-                        }
-                        else {
-                            y1 = yi[sys->conductorIn[indi].y[indj]];
-                            y2 = yi[sys->conductorIn[indi].y[indj + 1]];
-                        }
-                        mini = DOUBLEMAX;
-                        mini_k = y1;
-                        for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-                            if (mini < abs(sys->yn[indl] - y3)) {
-                                mini = abs(sys->yn[indl] - y3);
-                                mini_k = indl;
-                            }
-                        }
-                        xcoory[ss].insert(mini_k);
-                        if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {
-                            
-                            break;
-                        }
-                        ss = xrange[ss];
-                    }
-                }
-            }
-        }
-        if (sys->conductorIn[indi].y[indj] == sys->conductorIn[indi].y[0]) {
-            if (sys->conductorIn[indi].x[indj] < sys->conductorIn[indi].x[0]) {
-                ss = xi[sys->conductorIn[indi].x[indj]];
-                ee = xi[sys->conductorIn[indi].x[0]];
-                if (ss == ee && mark1 == 1) {
-                    continue;
-                }
-                while (xrange[ss] <= ee) {
-                    xcoory[ss].insert(yi[sys->conductorIn[indi].y[indj]]);
-                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {
-                        
-                        break;
-                    }
-                    ss = xrange[ss];
-                }
-            }
-            else if (sys->conductorIn[indi].x[indj] > sys->conductorIn[indi].x[0]) {
-                ss = xi[sys->conductorIn[indi].x[0]];
-                ee = xi[sys->conductorIn[indi].x[indj]];
-                if (ss == ee && mark1 == 1) {
-                    continue;
-                }
-                while (xrange[ss] <= ee) {
-                    xcoory[ss].insert(yi[sys->conductorIn[indi].y[indj]]);
-                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {
-                        
-                        break;
-                    }
-                    ss = xrange[ss];
-                }
-            }
-        }
-        else if (sys->conductorIn[indi].y[indj] != sys->conductorIn[indi].y[0] && sys->conductorIn[indi].x[indj] != sys->conductorIn[indi].x[0]) {   // this edge is with area slope
-            if (sys->conductorIn[indi].x[indj] < sys->conductorIn[indi].x[0]) {
-                ss = xi[sys->conductorIn[indi].x[indj]];
-                ee = xi[sys->conductorIn[indi].x[0]];
-                if (ss == ee && mark1 == 1) {
-                    continue;
-                }
-                while (xrange[ss] <= ee) {
-                    y3 = (sys->conductorIn[indi].x[0] - sys->xn[ss]) / (sys->conductorIn[indi].x[0] - sys->conductorIn[indi].x[indj]) * sys->conductorIn[indi].y[indj] + (sys->xn[ss] - sys->conductorIn[indi].x[indj]) / (sys->conductorIn[indi].x[0] - sys->conductorIn[indi].x[indj]) * sys->conductorIn[indi].y[0];
-                    if (sys->conductorIn[indi].y[indj] > sys->conductorIn[indi].y[0]) {
-                        y1 = yi[sys->conductorIn[indi].y[0]];
-                        y2 = yi[sys->conductorIn[indi].y[indj]];
-                    }
-                    else {
-                        y1 = yi[sys->conductorIn[indi].y[indj]];
-                        y2 = yi[sys->conductorIn[indi].y[0]];
-                    }
-                    mini = DOUBLEMAX;
-                    mini_k = y1;
-                    for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-                        if (mini < abs(sys->yn[indl] - y3)) {
-                            mini = abs(sys->yn[indl] - y3);
-                            mini_k = indl;
-                        }
-                    }
-                    xcoory[ss].insert(mini_k);
-                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
-                        break;
-                    }
-                    ss = xrange[ss];
-                }
-            }
-            else if (sys->conductorIn[indi].x[indj] > sys->conductorIn[indi].x[0]) {
-                ss = xi[sys->conductorIn[indi].x[0]];
-                ee = xi[sys->conductorIn[indi].x[indj]];
-                if (ss == ee && mark1 == 1) {
-                    continue;
-                }
-                while (xrange[ss] <= ee) {
-                    y3 = (sys->conductorIn[indi].x[indj] - sys->xn[ss]) / (sys->conductorIn[indi].x[indj] - sys->conductorIn[indi].x[0]) * sys->conductorIn[indi].y[0] + (sys->xn[ss] - sys->conductorIn[indi].x[0]) / (sys->conductorIn[indi].x[indj] - sys->conductorIn[indi].x[0]) * sys->conductorIn[indi].y[indj];
-                    if (sys->conductorIn[indi].y[indj] > sys->conductorIn[indi].y[0]) {
-                        y1 = yi[sys->conductorIn[indi].y[0]];
-                        y2 = yi[sys->conductorIn[indi].y[indj]];
-                    }
-                    else {
-                        y1 = yi[sys->conductorIn[indi].y[indj]];
-                        y2 = yi[sys->conductorIn[indi].y[0]];
-                    }
-                    mini = DOUBLEMAX;
-                    mini_k = y1;
-                    for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-                        if (mini < abs(sys->yn[indl] - y3)) {
-                            mini = abs(sys->yn[indl] - y3);
-                            mini_k = indl;
-                        }
-                    }
-                    xcoory[ss].insert(mini_k);
-                    if (xrange.find(xrange[ss]) == xrange.end() || mark1 == 0) {
-                        
-                        break;
-                    }
-                    ss = xrange[ss];
-                }
-            }
-        }
-        /*for (auto xcooryi : xcoory) {
-        cout << xcooryi.first << " : ";
-        for (auto xcooryii : xcooryi.second) {
-        cout << xcooryii << " ";
-        }
-        cout << endl;
-        }*/
-        
-        if (mark1 == 0) {    // only has one x
-            y1 = sys->ny;
-            y2 = 0;
-            for (auto xcooryi : xcoory) {    // only one xcooryi
-                for (auto xrangey : xcooryi.second) {
-                    if (y1 > xrangey) {
-                        y1 = xrangey;
-                    }
-                    if (y2 < xrangey) {
-                        y2 = xrangey;
-                    }
-                }
-                indj = xcooryi.first;
-                for (indl = zi[sys->conductorIn[indi].zmin]; indl <= zi[sys->conductorIn[indi].zmax]; indl++) {
-                    for (indk = y1; indk < y2; indk++) {
-                        sys->markNode[indl * sys->N_node_s + indj * (sys->N_cell_y + 1) + indk] = (myint)1;
-                        sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + indj * (sys->N_cell_y) + indk] = indi + (myint)1;
-                        sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                        if (indl != zi[sys->conductorIn[indi].zmax]) {
-                            sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                        }
-                    }
-                    sys->markNode[indl * sys->N_node_s + indj * (sys->N_cell_y + 1) + indk] = (myint)1;
-                    sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                    if (indl != zi[sys->conductorIn[indi].zmax]) {
-                        sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                    }
-                }
-            }
-            continue;
-        }
-        for (auto xcooryi : xcoory) {
-            mark = 0;
-            x1 = xcooryi.first;
-            x2 = xrange[xcooryi.first];
-            for (indj = x1; indj < x2; indj++) {
-                mark = 0;
-                for (auto xrangey : xcooryi.second) {
-                    mark++;
-                    if (mark % 2 == 1) {
-                        y1 = xrangey;
-                        continue;
-                    }
-                    else if (mark % 2 == 0) {
-                        y2 = xrangey;
-
-                        for (indl = zi[sys->conductorIn[indi].zmin]; indl <= zi[sys->conductorIn[indi].zmax]; indl++) {
-                            for (indk = y1; indk < y2; indk++) {
-                                sys->markNode[indl * sys->N_node_s + indj * (sys->N_cell_y + 1) + indk] = (myint)1;
-                                sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + indj * (sys->N_cell_y) + indk] = indi + (myint)1;
-                                sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                                if (indl != zi[sys->conductorIn[indi].zmax]) {
-                                    sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                                }
-                                if (x2 == xrange_max && indj == x2 - 1) {    // If this range is the rightmost range, include the rightmost point
-                                    sys->markNode[indl * sys->N_node_s + x2 * (sys->N_cell_y + 1) + indk] = (myint)1;
-                                    sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + x2 * (sys->N_cell_y) + indk] = indi + (myint)1;
-                                    if (indl != zi[sys->conductorIn[indi].zmax]) {
-                                        sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + x2 * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                                    }
-                                }
-                            }
-                            sys->markNode[indl * sys->N_node_s + indj * (sys->N_cell_y + 1) + indk] = (myint)1;
-                            sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                            if (indl != zi[sys->conductorIn[indi].zmax]) {
-                                sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indj * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                            }
-                            if (x2 == xrange_max && indj == x2 - 1) {    // If this range is the rightmost range, include the rightmost point
-                                sys->markNode[indl * sys->N_node_s + x2 * (sys->N_cell_y + 1) + indk] = (myint)1;
-                                if (indl != zi[sys->conductorIn[indi].zmax]) {
-                                    sys->markEdge[indl * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + x2 * (sys->N_cell_y + 1) + indk] = indi + (myint)1;
-                                }
-                            }
-                        }
-
-                    }
-                }
-            }
-            
-        }
-        
-    }
-
-#ifdef PRINT_VERBOSE_TIMING
-    cout << "The time to mark Edge and Node is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
+    /*double px = -3225.6e-6, py = 806.4e-6, pz = 716e-6;
+    sys->checkPoint(px, py, pz, xi, yi, zi);*/
 
     /* Assign markers to nodes and edges beyond included conductors */
     for (indi = 0; indi < sys->N_edge_s; indi++) {    // the lower PEC plane
@@ -819,7 +468,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->conductorIn.back().ymin = sys->ylim1;
     sys->conductorIn.back().x = xOuter;
     sys->conductorIn.back().y = yOuter;
-    sys->conductorIn.back().layer = layerMin;
+    //sys->conductorIn.back().layer = layerMin;
+    sys->conductorIn.back().zmax = sys->zn[0];
+    sys->conductorIn.back().zmin = sys->zn[0];
+#ifdef UPPER_BOUNDARY_PEC
     sys->conductorIn.push_back(fdtdOneCondct()); // the upper PEC plane
     sys->conductorIn.back().numVert = 4;
     sys->conductorIn.back().xmax = sys->xlim2;
@@ -828,7 +480,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->conductorIn.back().ymin = sys->ylim1;
     sys->conductorIn.back().x = xOuter;
     sys->conductorIn.back().y = yOuter;
-    sys->conductorIn.back().layer = layerMax;
+    //sys->conductorIn.back().layer = layerMax;
+    sys->conductorIn.back().zmax = sys->zn[sys->nz - 1];
+    sys->conductorIn.back().zmin = sys->zn[sys->nz - 1];
+#endif
 
     /* construct edgelink, no need for edgelink */
     myint eno;
@@ -1111,16 +766,19 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     }*/
 
-    tt = clock();
+    ofstream out;
+    out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_node; indi++) {
         sys->markNode[indi] = visited[indi];
+        if (visited[indi] != 0){
+            out << "1 ";
+        }
+        else{
+            out << "0 ";
+        }
     }
-
-#ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to assign markEdge and markNode is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
-
-    tt = clock();
+    out << endl;
+    out.close();
 
     /* Construct each isolated conductor */
     sys->numCdt = count;
@@ -1131,7 +789,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
         cout << endl;
     }*/
-    tt = clock();
     sys->conductor = (fdtdCdt*)malloc(sys->numCdt * sizeof(fdtdCdt));
     sys->cdtNumNode = (myint*)calloc(sys->numCdt, sizeof(myint));
     for (indi = 0; indi < sys->N_node; indi++) {
@@ -1160,9 +817,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
     }
 
-#ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to assign isolated conductor indices is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
     cout << "Number of isolated conductors is " << sys->numCdt << endl;
 
     /* Establish relationship between isolated conductors and ports */
@@ -1172,7 +826,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     myint indPortNode1, indPortNode2;
     set<int> cond;    // the port conductors
-    tt = clock();
     for (indi = 0; indi < sys->numPorts; indi++) {
         cout << " Checking port" << indi + 1 << endl;
         int mult = sys->portCoor[indi].multiplicity;
@@ -1186,8 +839,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         {
             indPortNode1 = sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]];
             indPortNode2 = sys->markNode[zi[z2coord[indk]] * sys->N_node_s + xi[x2coord[indk]] * (sys->N_cell_y + 1) + yi[y2coord[indk]]];
-            
+            cout << zi[z1coord[indk]] << " " << sys->xn[xi[x1coord[indk]]] << " " << sys->yn[yi[y1coord[indk]]] << endl;
+            cout << zi[z2coord[indk]] << " " << sys->xn[xi[x2coord[indk]]] << " " << sys->yn[yi[y2coord[indk]]] << endl;
+            /*cout << sys->markEdge[zi[z1coord[indk]] * (sys->N_edge_s + sys->N_edge_v) - sys->N_edge_v + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]] << endl;*/
             cout << "  mult = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
+            /*cout << "  First z coordiate is " << z1coord[indk] << " and second z coordinate is " << z2coord[indk] << endl;
+            cout << "  x coordinate is " << x1coord[indk] << " and  y coordinate is " << y1coord[indk] << endl;*/
             if (indPortNode1 == 0 || indPortNode2 == 0) {
                 cerr << "Port node could not be located within a conductor. Exiting now." << endl;
                 return 1;
@@ -1339,9 +996,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     cond.clear();  // Note: this doesn't actually reduce memory usage, but the memory usage can be reduced by calling the destructor ~cond()
     cout << "cond2condIn is set sucessfully!" << endl;
-#ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to construct sys->cond2condIn (size " <<  sys->cond2condIn.size() << ") is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
+
 
     /* Find the two nodes defining each edge (seems odd not to have this already) */
     sys->outedge = 0;
@@ -1714,6 +1369,18 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             }
         }
     }
+
+	/* check whether each port edge goes through any conductor */
+	cout << "Number of ports is " << sys->numPorts << endl;
+	for (indi = 0; indi < sys->numPorts; indi++) {
+		cout << "Port " << indi << " ";
+		for (indj = 0; indj < sys->portCoor[indi].portEdge[0].size(); indj++) {
+			cout << sys->markEdge[sys->portCoor[indi].portEdge[0][indj]] << " ";
+		}
+		cout << endl;		
+	}
+
+	
 
     /* Find markProSide side nodes near ports for less aggressive node merging using crazy index math */
     clock_t t1 = clock();
