@@ -20,7 +20,8 @@
 #include "layeredFdtd.hpp"
 
 // Debug testing macros (comment out if not necessary)
-#define SKIP_GENERATE_STIFF
+//#define SKIP_GENERATE_STIFF
+//#define SKIP_WRITE_SYS_TO_FILE
 
 // Manipulate namespace
 using std::cerr;
@@ -338,7 +339,7 @@ int main(int argc, char** argv)
             //sys.print();
 
             // Generate Stiffness Matrix
-//#ifndef SKIP_GENERATE_STIFF
+#ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
             status = generateStiff(&sys);
             if (status == 0)
@@ -351,16 +352,13 @@ int main(int argc, char** argv)
                 cerr << "generateStiff Fail!" << endl;
                 return status;
             }
-<<<<<<< HEAD
-//#endif
+#endif
 
-=======
-#endif
-			// Write object sys to files
+            // Write object sys to files
 #ifndef SKIP_WRITE_SYS_TO_FILE
-			WriteSysToFile(sys);
+            WriteSysToFile(sys);
 #endif
->>>>>>> b2d1fec315928e6f0600e81e0d61f6e00d16f199
+
             // Parameter generation
             clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
@@ -374,7 +372,6 @@ int main(int argc, char** argv)
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
 
