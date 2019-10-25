@@ -8,6 +8,8 @@
 #include <cerrno>
 #include <cstring>
 #include <cmath>
+#include <ctime>
+#include <string>
 #include <iostream>
 #include <fstream>
 #include <complex>
@@ -67,6 +69,9 @@ using namespace std;
 #define SKIP_GENERATE_STIFF
 //#define SKIP_STIFF_REFERENCE 
 
+// Disable layered FDTD code (comment out if you want to test layered FDTD)
+#define SKIP_WRITE_SYS_TO_FILE        // Skip writing sys obj to txt files
+#define SKIP_LAYERED_FDTD             // Skip the main function to call layeredFdtd code
 
 // Function-like macros
 #define NELEMENT(x) ((sizeof x) / (sizeof x[0]))
