@@ -351,16 +351,12 @@ int main(int argc, char** argv)
                 cerr << "generateStiff Fail!" << endl;
                 return status;
             }
-<<<<<<< HEAD
-//#endif
 
-=======
-#endif
 			// Write object sys to files
 #ifndef SKIP_WRITE_SYS_TO_FILE
 			WriteSysToFile(sys);
 #endif
->>>>>>> b2d1fec315928e6f0600e81e0d61f6e00d16f199
+
             // Parameter generation
             clock_t t6 = clock();
             status = paraGenerator(&sys, xi, yi, zi);
