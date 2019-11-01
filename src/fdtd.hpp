@@ -47,8 +47,8 @@ using namespace std;
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
 #define MINDISFRACX (2e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (6e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
-#define MINDISFRACZ (0.1) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
+#define MINDISFRACY (2e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
@@ -56,7 +56,7 @@ using namespace std;
 
 // Debug testing macros (comment out if not necessary)
 #define UPPER_BOUNDARY_PEC
-//#define LOWER_BOUNDARY_PEC
+#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
@@ -558,11 +558,10 @@ public:
                 xcoorv.push_back(xcoori);
             }
             xrange_max = xcoorv.back();   // the maximal x coordinate
-
+            
             for (indj = 0; indj < xcoorv.size() - 1; indj++) {
                 mark1 = 1;    // the x coordinates are more than 1
                 xrange[xcoorv[indj]] = xcoorv[indj + 1];
-
             }
 
             if (xcoorv.size() == 1) {    // If it has only one value
@@ -579,7 +578,7 @@ public:
                             continue;
                         }
 
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is the last point
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is the last point
                             xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
                             if (mark1 == 0) {   // xrange only has one value, break
                                 break;
@@ -593,7 +592,7 @@ public:
                         if (ss == ee && mark1 == 1) {
                             continue;
                         }
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
                             xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
                             if (mark1 == 0) {    // xrange only has one value, break
                                 break;
@@ -609,7 +608,7 @@ public:
                         if (ss == ee && mark1 == 1) {
                             continue;
                         }
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
                             y3 = (this->conductorIn[indi].x[indj + 1] - this->xn[ss]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj + 1];
                             if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
                                 y1 = yi[this->conductorIn[indi].y[indj + 1]];
@@ -641,7 +640,7 @@ public:
                         if (ss == ee && mark1 == 1) {
                             continue;
                         }
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {
                             y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj + 1] + (this->xn[ss] - this->conductorIn[indi].x[indj + 1]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj];
                             if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
                                 y1 = yi[this->conductorIn[indi].y[indj + 1]];
@@ -676,7 +675,7 @@ public:
                     ee = xi[this->conductorIn[indi].x[0]];
                     if (!(ss == ee && mark1 == 1)) {
 
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
                             xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
                             if (mark1 == 0) {
 
@@ -691,7 +690,7 @@ public:
                     ee = xi[this->conductorIn[indi].x[indj]];
                     if (!(ss == ee && mark1 == 1)) {
 
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
                             xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
                             if (mark1 == 0) {
 
@@ -708,7 +707,7 @@ public:
                     ee = xi[this->conductorIn[indi].x[0]];
                     if (!(ss == ee && mark1 == 1)) {
 
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {   // if ss is not the last point, loop
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {   // if ss is not the last point, loop
                             y3 = (this->conductorIn[indi].x[0] - this->xn[ss]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[0];
                             if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
                                 y1 = yi[this->conductorIn[indi].y[0]];
@@ -739,7 +738,7 @@ public:
                     ee = xi[this->conductorIn[indi].x[indj]];
                     if (!(ss == ee && mark1 == 1)) {
 
-                        while (xrange.find(xrange[ss]) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+                        while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
                             y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[0] + (this->xn[ss] - this->conductorIn[indi].x[0]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[indj];
                             if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
                                 y1 = yi[this->conductorIn[indi].y[0]];
@@ -790,13 +789,13 @@ public:
                             for (indk = y1; indk < y2; indk++) {
                                 this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
                                 this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
-                                this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                
                                 if (indl != zi[this->conductorIn[indi].zmax]) {
                                     this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                 }
                             }
                             this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
-                            this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                            
                             if (indl != zi[this->conductorIn[indi].zmax]) {
                                 this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                             }
@@ -812,8 +811,8 @@ public:
                 mark = 0;
                 x1 = xcooryi.first;
                 x2 = xrange[xcooryi.first];
-                /*cout << endl << endl;
-                cout << this->xn[x1] << " " << this->xn[x2] << endl;*/
+                //cout << endl << endl;
+                //cout << "x are " << this->xn[x1] << " " << this->xn[x2] << " : " << endl;
                 mark = 0;
                 for (auto xrangey : xcooryiv) {
                     mark++;
@@ -823,33 +822,38 @@ public:
                     }
                     else if (mark % 2 == 0) {
                         y2 = xrangey;
-                       /* cout << this->yn[y1] << " " << this->yn[y2] << " ";*/
-                        for (indj = x1; indj < x2; indj++) {
+                        //cout << this->yn[y1] << " " << this->yn[y2] << " ";
+                        //cout << this->conductorIn[indi].zmax << " " << this->conductorIn[indi].zmin;
+                        for (indj = x1; indj <= x2; indj++) {
                             for (indl = zi[this->conductorIn[indi].zmin]; indl <= zi[this->conductorIn[indi].zmax]; indl++) {
                                 for (indk = y1; indk < y2; indk++) {
+                                    if (indj < x2){
+                                        this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                        if (indl != zi[this->conductorIn[indi].zmax]) {
+                                            this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                        }
+                                    }
+                                    else {    // If this range is the rightmost range, include the rightmost point
+                                        this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
+                                        if (indl != zi[this->conductorIn[indi].zmax]) {
+                                            this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                        }
+                                    }
+                                }
+                                if (indj < x2){
                                     this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
-                                    this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
                                     this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                     if (indl != zi[this->conductorIn[indi].zmax]) {
                                         this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                     }
-                                    if (x2 == xrange_max && indj == x2 - 1) {    // If this range is the rightmost range, include the rightmost point
-                                        this->markNode[indl * this->N_node_s + x2 * (this->N_cell_y + 1) + indk] = (myint)1;
-                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + x2 * (this->N_cell_y) + indk] = indi + (myint)1;
-                                        if (indl != zi[this->conductorIn[indi].zmax]) {
-                                            this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + x2 * (this->N_cell_y + 1) + indk] = indi + (myint)1;
-                                        }
-                                    }
                                 }
-                                this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
-                                this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
-                                if (indl != zi[this->conductorIn[indi].zmax]) {
-                                    this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
-                                }
-                                if (x2 == xrange_max && indj == x2 - 1) {    // If this range is the rightmost range, include the rightmost point
-                                    this->markNode[indl * this->N_node_s + x2 * (this->N_cell_y + 1) + indk] = (myint)1;
+                                else {    // If this range is the rightmost range, include the rightmost point
+                                    this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
                                     if (indl != zi[this->conductorIn[indi].zmax]) {
-                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + x2 * (this->N_cell_y + 1) + indk] = indi + (myint)1;
+                                        this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                     }
                                 }
                             }
@@ -860,6 +864,7 @@ public:
             }
 
         }
+        
     }
 
     /* Generate V0d: both V0d1 and V0d2 are put into V0d1 */
@@ -3413,6 +3418,7 @@ public:
 		   bdu : upper PEC bdl = 1, upper PMC bdl = 0 */
 
 		// Arnoldi method
+        double scale = 1.e+14;    // balance the matrix
 		int i, j, indi, start;
 		double* V = new double[(k + 1) * 2 * (this->N_edge - (bdl + bdu) * this->N_edge_s)]();   // Arnoldi orthogonal vectors
 		double* w = new double[2 * (this->N_edge - (bdl + bdu) * this->N_edge_s)];
@@ -3430,11 +3436,11 @@ public:
 				w[this->N_edge - (bdl + bdu) * this->N_edge_s + start] = 0;
                 w[start] = V[(j - 1) * 2 * (this->N_edge - (bdl + bdu) * this->N_edge_s) + (this->N_edge - (bdl + bdu) * this->N_edge_s) + start];
 				while (indi < this->leng_S && this->SRowId[indi] == start) {
-					w[this->N_edge - (bdl + bdu) * this->N_edge_s + start] += -this->Sval[indi] * V[(j - 1) * 2 * (this->N_edge - (bdl + bdu) * this->N_edge_s) + this->SColId[indi]] / (this->stackEpsn[(start + bdl * this->N_edge_s + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+					w[this->N_edge - (bdl + bdu) * this->N_edge_s + start] += -this->Sval[indi] * V[(j - 1) * 2 * (this->N_edge - (bdl + bdu) * this->N_edge_s) + this->SColId[indi]] /  (this->stackEpsn[(start + bdl * this->N_edge_s + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 * pow(scale, 2));
 					indi++;
 				}
 				if (this->markEdge[start + bdl * this->N_edge_s] != 0)
-					w[this->N_edge - (bdl + bdu) * this->N_edge_s + start] += -V[(j - 1) * 2 * (this->N_edge - (bdl + bdu) * this->N_edge_s) + (this->N_edge - (bdl + bdu) * this->N_edge_s) + start] * SIGMA / (this->stackEpsn[(start + bdl * this->N_edge_s + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+					w[this->N_edge - (bdl + bdu) * this->N_edge_s + start] += -V[(j - 1) * 2 * (this->N_edge - (bdl + bdu) * this->N_edge_s) + (this->N_edge - (bdl + bdu) * this->N_edge_s) + start] * SIGMA / (this->stackEpsn[(start + bdl * this->N_edge_s + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 * scale);
 			}
 			for (i = 0; i <= j - 1; i++) {
 				for (int in = 0; in < (this->N_edge - (bdl + bdu) * this->N_edge_s) * 2; in++) {
@@ -3464,26 +3470,100 @@ public:
 		}
         
         
-        double* H1 = new double[k * k]();
+        double* H1 = new double[k * k]();   // copy of H, because dhseqr will change H
         for (i = 0; i < k; i++){
             for (j = 0; j < k; j++){
                 if (i <= j + 1){
-                    H1[j * k + i] = H[j * k + i];
+					H1[j * k + i] =  H[j * k + i];
                 }
             }
         }
-        /*ofstream out;
+        ofstream out;
         out.open("H.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < k; i++){
             for (j = 0; j < k; j++){
-                out << H[j * k + i] << " ";
+                out << H1[j * k + i] << " ";
             }
             out << endl;
         }
-        out.close();*/
-		// QR algorithm to find the eigenvalues and eigenvectors of H
+        out.close();
 
-		// mkl to find the eigenvalues and eigenvectors of H
+
+		/* LAPACKE_dgeev to find the eigenvalues and eigenvectors of H */
+		//// make the matrix balanced
+		//int matrix_layout = LAPACK_COL_MAJOR;
+		//lapack_int info;
+		//char job = 'B';
+		//lapack_int n = k;    // the order of matrix H
+		//lapack_int lda = n;    // leading dimension of H
+		//lapack_int ilo, ihi;
+		//double* scale; 
+		//scale = new double[n];
+		//info = LAPACKE_dgebal(matrix_layout, job, n, H, lda, &ilo, &ihi, scale);
+
+		
+		
+		//char jobvl = 'N';    // left eigenvectors of H are not computed
+		//char jobvr = 'V';    // right eigenvectors of H are computed
+		//double* wr, * wi;    // real and imaginary eigenvalues
+		//double* vl, * vr;    // eigenvectors
+		//lapack_int ldvl = n, ldvr = n;
+
+		//wr = new double[n];
+		//wi = new double[n];
+		//vr = new double[n * n];
+
+		//
+		//info = LAPACKE_dgeev(matrix_layout, jobvl, jobvr, n, H, lda, wr, wi, vl, ldvl, vr, ldvr);
+
+		//if (info != 0) {
+		//	cout << "LAPACKE_dgeev is not successful and info is " << info << endl;
+		//	return;
+		//}
+		//lapack_complex_double* v = new lapack_complex_double[n * n];
+		//for (i = 0; i < n; i++) {
+		//	for (j = 0; j < n; j++) {
+		//		if (wi[j] == 0) {
+		//			v[j * n + i].real = vr[j * n + i];
+		//		}
+		//		else {
+		//			v[j * n + i].real = vr[j * n + i];
+		//			v[j * n + i].imag = vr[(j + 1) * n + i];
+		//			v[(j + 1) * n + i].real = vr[j * n + i];
+		//			v[(j + 1) * n + i].imag = -vr[(j + 1) * n + i];
+		//			j++;
+		//		}
+		//	}
+		//}
+
+		//// transform eigenvectors of the balanced matrix to the original
+		///*char side = 'R';
+		//lapack_int m = n;
+		//lapack_int ldv = n;
+		//info = LAPACKE_zgebak(matrix_layout, job, side, n, ilo, ihi, scale, m, v, ldv);*/
+
+		//out.open("w.txt", std::ofstream::out | std::ofstream::trunc);
+		//for (i = 0; i < n; i++) {
+		//	out << wr[i] << " " << wi[i] << endl;
+		//}
+		//out.close();
+
+		//out.open("v.txt", std::ofstream::out | std::ofstream::trunc);
+		//for (i = 0; i < n; i++) {
+		//	for (j = 0; j < n; j++) {
+		//		out << v[j * n + i].real << " " << v[j * n + i].imag << " ";
+		//	}
+		//	out << endl;
+		//}
+
+
+		//delete[] wr;
+		//delete[] wi;
+		//delete[] vr;
+  //      delete[] v;
+		//delete[] scale;
+
+		/* mkl to find the eigenvalues and eigenvectors of H (not accurate) */
 		int matrix_layout = LAPACK_COL_MAJOR;
 		char job = 'E';   // only eigenvalues are required
 		char compz = 'N';   // no Schur vectors are computed
@@ -3493,17 +3573,21 @@ public:
 		lapack_int ldh = n;    // the leading dimension of H
 		double* wr, * wi;    // real and imaginary parts of eigenvalues, initialize ?
 		lapack_int ldz = n;    // if compz = 'N' then ldz >= 1
+        double ma = 0;   // the max of the eigenvalues
+        double eps = 1e-9;    // esp * ma is considered to be zero eigenvalues
 
 		wr = new double[n];
 		wi = new double[n];
         lapack_int info;
 		info = LAPACKE_dhseqr(matrix_layout, job, compz, n, ilo, ihi, H, ldh, wr, wi, z, ldz);    // calculate all the eigenvalues of H
 
-        /*out.open("w.txt", std::ofstream::out | std::ofstream::trunc);
+        
         for (i = 0; i < n; i++){
-            out << wr[i] << " " << wi[i] << endl;
+            if (sqrt(wr[i] * wr[i] + wi[i] * wi[i]) > ma){
+                ma = sqrt(wr[i] * wr[i] + wi[i] * wi[i]);
+            }
         }
-        out.close();*/
+        
 
 		char side = 'R';    // only right eigenvectors are computed
 		char eigsrc = 'Q';    // the eigenvalues of H are from hseqr
@@ -3512,17 +3596,28 @@ public:
 		double* vl, * vr;   // initv = 'N' need not to be set
 		lapack_int ldvl = n;   // leading dimension of vl
 		lapack_int ldvr = n;    // leading dimension of vr
-		lapack_int mm = n;
-		lapack_int* m = new lapack_int(n);
-        lapack_int* ifaill = new lapack_int[mm];   // 0 for converge
-		lapack_int* ifailr = new lapack_int[mm];
-
-		//vr = new double[n * n]();
+		lapack_int mm = 0;
+        double* wrc, *wic;    // copy of wr and wc because after dhsein wr will be modified, eigenvalues of the original system
+        wrc = new double[n];
+        wic = new double[n];
+        out.open("w.txt", std::ofstream::out | std::ofstream::trunc);
 		for (i = 0; i < n; i++) {
-			select[i] = 1;    // calculate all the eigenvvalues' eigenvectors
+            wrc[i] = wr[i] * scale;
+            wic[i] = wi[i] * scale;
+            if (sqrt(wr[i] * wr[i] + wi[i] * wi[i]) >= ma * eps){
+                select[i] = 1;    // calculate the non-zero eigenvalues' eigenvectors
+                out << wr[i] << " " << wi[i] << endl;
+                mm++;
+            }
+            else{
+                select[i] = 0;
+            }
 		}
-        //vl = new double[k * k];
-        vr = new double[k * k];
+        out.close();
+        lapack_int* m = new lapack_int(mm);
+        lapack_int* ifaill = new lapack_int[mm];   // 0 for converge
+        lapack_int* ifailr = new lapack_int[mm];
+        vr = new double[ldvr * mm];
         /*out.open("H1.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < k; i++){
             for (j = 0; j < k; j++){
@@ -3538,37 +3633,66 @@ public:
 				cout << "The " << i << "th column failed to converge and eigenvalue is " << wr[i] << " + 1i * " << wi[i] << "!" << endl;
 		}
 		
-		/*out.open("vr.txt", std::ofstream::out | std::ofstream::trunc);
+		out.open("vr.txt", std::ofstream::out | std::ofstream::trunc);
+        lapack_complex_double* v = new lapack_complex_double[k * mm];
         for (i = 0; i < n; i++) {
+            int temp = 0;;
             for (j = 0; j < n; j++) {
-                if (wi[j] == 0){
-                    out << vr[j * n + i] << " " << "0" << " ";
-                }
-                else{
-                    out << vr[j * n + i] << " " << vr[(j + 1) * n + i] << " ";
-                    out << vr[j * n + i] << " " << -vr[(j + 1) * n + i] << " ";
-                    j++;
+                if (select[j] == 1){
+                    if (wi[j] == 0){
+                        out << vr[temp * n + i] << " " << "0" << " ";
+                        v[temp * n + i].real = vr[temp * n + i];
+                        v[temp * n + i].imag = 0;
+                        temp++;
+                    }
+                    else{
+                        out << vr[temp * n + i] << " " << vr[(temp + 1) * n + i] << " ";
+                        out << vr[temp * n + i] << " " << -vr[(temp + 1) * n + i] << " ";
+                        v[temp * n + i].real = vr[temp * n + i];
+                        v[temp * n + i].imag = vr[(temp + 1) * n + i];
+                        v[(temp + 1) * n + i].real = vr[temp * n + i];
+                        v[(temp + 1) * n + i].imag = -vr[(temp + 1) * n + i];
+                        temp++;
+                        temp++;
+                        j++;
+                    }
                 }
             }
             out << endl;
         }
-		out.close();*/
-        
-        
-
-        
-        delete[] wr;
+		out.close();
+		delete[] H1;
+		delete[] wr;
         delete[] wi;
+        delete[] wrc;
+        delete[] wic;
         delete[] vl;
         delete[] vr;
         delete[] select;
         delete[] m;
         delete[] ifaill;
         delete[] ifailr;
+
+        /* Generate Vh = V * vr */
+		this->Vh = new lapack_complex_double[(this->N_edge - (bdu + bdl) * this->N_edge_s) * mm];
+        for (i = 0; i < mm; i++){
+            for (j = 0; j < (this->N_edge - (bdu + bdl) * this->N_edge_s); j++){
+                this->Vh[i * (this->N_edge - (bdu + bdl) * this->N_edge_s) + j].real = 0;
+                this->Vh[i * (this->N_edge - (bdu + bdl) * this->N_edge_s) + j].imag = 0;
+                for (int in = 0; in < k; in++){
+                    this->Vh[i * (this->N_edge - (bdu + bdl) * this->N_edge_s) + j].real += V[in * (this->N_edge - (bdu + bdl) * this->N_edge_s) * 2 + j] * v[i * k + in].real;
+                    this->Vh[i * (this->N_edge - (bdu + bdl) * this->N_edge_s) + j].imag += V[in * (this->N_edge - (bdu + bdl) * this->N_edge_s) * 2 + j] * v[i * k + in].imag;
+                }
+            }
+        }
+        delete[] v;
+
+
+
 		delete[] w;
 		delete[] V;
 		delete[] H;
-        delete[] H1;
+        
 	}
 
     /* Calculate the averaged length */

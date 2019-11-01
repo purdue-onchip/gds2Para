@@ -343,15 +343,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /*for (indi = 0; indi < sys->nz - 1; indi++) {
         cout << sys->stackEpsn[indi] << endl;
     }*/
-    
+    ofstream outc;
+    outc.open("x.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->nx; indi++) {
-        cout << sys->xn[indi] << " ";
+        outc << sys->xn[indi] << " ";
     }
-    cout << endl << endl;
+    outc.close();
+    outc.open("y.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->ny; indi++) {
-        cout << sys->yn[indi] << " ";
+        outc << sys->yn[indi] << " ";
     }
-    cout << endl << endl;
+    outc.close();
+    
     for (indi = 0; indi < sys->nz; indi++) {
         cout << sys->zn[indi] << " ";
     }
@@ -466,6 +469,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             layerMax = sys->conductorIn[indi].layer;
         }
     }
+
+    ofstream out;
+    /*out.open("markEdge.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = 0; indi < sys->N_edge; indi++){
+        out << sys->markEdge[indi] << endl;
+    }
+    out.close();*/
 #ifdef LOWER_BOUNDARY_PEC
     sys->conductorIn.push_back(fdtdOneCondct()); // the lower PEC plane
     sys->conductorIn.back().numVert = 4;
@@ -777,7 +787,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         sys->markNode[indi] = visited[indi];
     }
 
-    ofstream out;
+    
     out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_node; indi++) {
         if (visited[indi] != 0){
@@ -851,8 +861,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         {
             indPortNode1 = sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]];
             indPortNode2 = sys->markNode[zi[z2coord[indk]] * sys->N_node_s + xi[x2coord[indk]] * (sys->N_cell_y + 1) + yi[y2coord[indk]]];
-            cout << zi[z1coord[indk]] << " " << sys->xn[xi[x1coord[indk]]] << " " << sys->yn[yi[y1coord[indk]]] << endl;
-            cout << zi[z2coord[indk]] << " " << sys->xn[xi[x2coord[indk]]] << " " << sys->yn[yi[y2coord[indk]]] << endl;
+            cout << zi[z1coord[indk]] << " " << xi[x1coord[indk]] << " " << yi[y1coord[indk]] << endl;
+            cout << zi[z2coord[indk]] << " " << xi[x2coord[indk]] << " " << yi[y2coord[indk]] << endl;
             /*cout << sys->markEdge[zi[z1coord[indk]] * (sys->N_edge_s + sys->N_edge_v) - sys->N_edge_v + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]] << endl;*/
             cout << "  mult = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
             /*cout << "  First z coordiate is " << z1coord[indk] << " and second z coordinate is " << z2coord[indk] << endl;
@@ -1144,6 +1154,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 
 int matrixConstruction(fdtdMesh *sys) {
+    int bdl = 0, bdu = 0;
+#ifdef LOWER_BOUNDARY_PEC
+    bdl = 1;
+#endif
+#ifdef UPPER_BOUNDARY_PEC
+    bdu = 1;
+#endif
     myint indi = 0, indj = 0;
     //cout << sys->stackEpsn.size() << endl;
     /* construct D_eps */
@@ -1175,6 +1192,23 @@ int matrixConstruction(fdtdMesh *sys) {
 #endif
         }
     }*/
+    /*ofstream out;
+    out.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = bdl * sys->N_edge_s; indi < sys->N_edge - bdu * sys->N_edge_s; indi++){
+        out << sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
+    }
+    out.close();
+
+    out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = bdl * sys->N_edge_s; indi < sys->N_edge - bdu * sys->N_edge_s; indi++){
+        if (sys->markEdge[indi] != 0){
+            out << SIGMA << endl;
+        }
+        else{
+            out << 0 << endl;
+        }
+    }
+    out.close();*/
 
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
@@ -1367,7 +1401,17 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 		cout << endl;		
 	}
 
-	
+    /* check portArea */
+    //cout << endl;
+    //for (indi = 0; indi < sys->numPorts; indi++){
+    //    double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
+    //    for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[indi].multiplicity; sourcePortSide++)
+    //    {
+    //        sourceCurrent += sys->portCoor[indi].portArea[sourcePortSide];
+    //    }
+    //    cout << "SourcePort " << indi << "'s area is " << sourceCurrent << endl;
+    //}
+    //cout << endl;
 
     /* Find markProSide side nodes near ports for less aggressive node merging using crazy index math */
     clock_t t1 = clock();

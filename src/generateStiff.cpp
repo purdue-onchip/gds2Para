@@ -877,7 +877,8 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     for (myint i = 0; i < leng_A; i++){
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
-
+    //ofstream out;
+    //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < ARows; i++){
         if (i < bdl * sys->N_edge_s || i >= sys->N_edge - bdu * sys->N_edge_s){
             continue;
@@ -894,15 +895,14 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SRowId[j] = i - bdl * sys->N_edge_s;
             sys->SColId[j] = v[count].first - bdl * sys->N_edge_s;
             sys->Sval[j] = v[count].second / MU;
-            //if (sys->SRowId[indj] == sys->SColId[indj]){
-            //    sys->Sval[indj] = sys->Sval[indj].real();// -pow((2 * M_PI*sys->freqStart * sys->freqUnit), 2) * sys->eps[indi + sys->N_edge_s] + 1i * ((2 * M_PI*sys->freqStart * sys->freqUnit) * sys->sig[indi + sys->N_edge_s] + sys->Sval[indj].imag());
-            //}
+            //out << sys->SRowId[j] << " " << sys->SColId[j] << " " << sys->Sval[j] << endl;
 
             j++;
             count++;
         }
         v.clear();
     }
+    //out.close();
     leng_A = j;
 
     mkl_sparse_destroy(a);

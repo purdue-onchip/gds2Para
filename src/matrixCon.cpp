@@ -640,7 +640,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 #endif
 
         /* Calculate the Vh part */
-		//sys->find_Vh(sourcePort, 50, bdl, bdu);
+        int step = 1000;
+		//sys->find_Vh(sourcePort, step, bdl, bdu);
 #ifndef SKIP_VH
         
         // find the Vh eigenmodes
