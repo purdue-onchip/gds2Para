@@ -1,9 +1,9 @@
 /**
- * @file   TestMain.cpp 
- * @author Michael R. Hayashi
- * @date   18 October 2018
- * @brief  Primary Function for Input/Solver/Output Control Modes
- */
+* @file   TestMain.cpp
+* @author Michael R. Hayashi
+* @date   18 October 2018
+* @brief  Primary Function for Input/Solver/Output Control Modes
+*/
 
 #define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
 #include <iostream>
@@ -95,7 +95,7 @@ int main(int argc, char** argv)
             adb.setFileName(fName.substr(0, indExtension) + "_parrot" + fName.substr(indExtension, string::npos));
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            adb.print({ });
+            adb.print({});
 
             // Dump to parroted file immediately
             adb.dump();
@@ -424,7 +424,7 @@ int main(int argc, char** argv)
             {
                 // Output Xyce subcircuit file
                 string outXyceFile = argv[4];
-                vector<size_t> indLayerPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
+                vector<size_t> indLayerPrint = { 0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
                 sdb.setDesignName(adb.findNames().back());
                 sdb.setOutXyce(outXyceFile);
                 sdb.print(indLayerPrint);
