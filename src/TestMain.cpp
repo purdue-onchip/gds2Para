@@ -1,9 +1,9 @@
 /**
- * @file   TestMain.cpp 
- * @author Michael R. Hayashi
- * @date   18 October 2018
- * @brief  Primary Function for Input/Solver/Output Control Modes
- */
+* @file   TestMain.cpp
+* @author Michael R. Hayashi
+* @date   18 October 2018
+* @brief  Primary Function for Input/Solver/Output Control Modes
+*/
 
 #define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
 #include <iostream>
@@ -20,7 +20,8 @@
 #include "layeredFdtd.hpp"
 
 // Debug testing macros (comment out if not necessary)
-#define SKIP_GENERATE_STIFF
+//#define SKIP_GENERATE_STIFF
+//#define SKIP_WRITE_SYS_TO_FILE
 
 // Manipulate namespace
 using std::cerr;
@@ -94,7 +95,7 @@ int main(int argc, char** argv)
             adb.setFileName(fName.substr(0, indExtension) + "_parrot" + fName.substr(indExtension, string::npos));
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            adb.print({ });
+            adb.print({});
 
             // Dump to parroted file immediately
             adb.dump();
@@ -338,7 +339,7 @@ int main(int argc, char** argv)
             //sys.print();
 
             // Generate Stiffness Matrix
-//#ifndef SKIP_GENERATE_STIFF
+#ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
             status = generateStiff(&sys);
             if (status == 0)
@@ -351,10 +352,11 @@ int main(int argc, char** argv)
                 cerr << "generateStiff Fail!" << endl;
                 return status;
             }
+#endif
 
-			// Write object sys to files
+            // Write object sys to files
 #ifndef SKIP_WRITE_SYS_TO_FILE
-			WriteSysToFile(sys);
+            WriteSysToFile(sys);
 #endif
 
             // Parameter generation
@@ -370,7 +372,6 @@ int main(int argc, char** argv)
                 cerr << "paraGenerator Fail!" << endl;
                 return status;
             }
-
             cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
             cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
 
@@ -423,7 +424,7 @@ int main(int argc, char** argv)
             {
                 // Output Xyce subcircuit file
                 string outXyceFile = argv[4];
-                vector<size_t> indLayerPrint = {0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1}; // {}; // Can use integer division
+                vector<size_t> indLayerPrint = { 0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
                 sdb.setDesignName(adb.findNames().back());
                 sdb.setOutXyce(outXyceFile);
                 sdb.print(indLayerPrint);
