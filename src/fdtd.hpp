@@ -63,13 +63,13 @@ using namespace std;
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
-//#define PRINT_V0_Z_PARAM
+#define PRINT_V0_Z_PARAM
 //#define PRINT_V0_Vh_Z_PARAM
 #define SKIP_PARDISO // Remove PARDISO solver code
-//#define GENERATE_V0_SOLUTION
+#define GENERATE_V0_SOLUTION
 #define SKIP_VH
 #define SKIP_GENERATE_STIFF
-//#define SKIP_STIFF_REFERENCE 
+#define SKIP_STIFF_REFERENCE 
 
 // Disable layered FDTD code (comment out if you want to test layered FDTD)
 #define SKIP_WRITE_SYS_TO_FILE        // Skip writing sys obj to txt files
