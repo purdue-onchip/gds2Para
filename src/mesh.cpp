@@ -354,11 +354,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         outc << sys->yn[indi] << " ";
     }
     outc.close();
-    
+    outc.open("z.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->nz; indi++) {
-        cout << sys->zn[indi] << " ";
+        outc << sys->zn[indi] << " ";
     }
-    cout << endl << endl;
+    outc.close();
 #endif
     
     /***********************************************************************************************/
@@ -470,8 +470,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
     }
 
-    ofstream out;
-    /*out.open("markEdge.txt", std::ofstream::out | std::ofstream::trunc);
+    /*ofstream out;
+    out.open("markEdge.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_edge; indi++){
         out << sys->markEdge[indi] << endl;
     }
@@ -788,7 +788,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
 
     
-    out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
+    /*out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_node; indi++) {
         if (visited[indi] != 0){
             out << to_string(visited[indi]) << " ";
@@ -798,7 +798,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
     }
     out << endl;
-    out.close();
+    out.close();*/
 
     /* Construct each isolated conductor */
     sys->numCdt = count;
