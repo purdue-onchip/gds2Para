@@ -19,10 +19,6 @@
 #include "solnoutclass.hpp"
 #include "layeredFdtd.hpp"
 
-// Debug testing macros (comment out if not necessary)
-//#define SKIP_GENERATE_STIFF
-//#define SKIP_WRITE_SYS_TO_FILE
-
 // Manipulate namespace
 using std::cerr;
 using std::cout;
@@ -95,7 +91,7 @@ int main(int argc, char** argv)
             adb.setFileName(fName.substr(0, indExtension) + "_parrot" + fName.substr(indExtension, string::npos));
             GdsParser::GdsReader adbReader(adb);
             bool adbIsGood = adbReader(fName.c_str());
-            adb.print({});
+            adb.print({ });
 
             // Dump to parroted file immediately
             adb.dump();

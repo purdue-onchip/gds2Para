@@ -12,7 +12,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
     // Get the number of processors
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    cout << "Number of processors is " << num_procs << endl;
+    cout << " Number of processors is " << num_procs << endl;
 
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -134,8 +134,8 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
         if (myid == 0)
         {
-            cout << endl << " Iterations = " << num_iterations << endl;
-            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << " Iterations = " << num_iterations << endl;
+            cout << " Final Relative Residual Norm = " << final_res_norm << endl << endl;
         }
 
         /* Output the final solution */
@@ -188,8 +188,8 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
         if (myid == 0)
         {
-            cout << endl << " Iterations = " << num_iterations << endl;
-            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << " Iterations = " << num_iterations << endl;
+            cout << " Final Relative Residual Norm = " << final_res_norm << endl << endl;
         }
 
         /* Output the final solution */
@@ -258,8 +258,8 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
         if (myid == 0)
         {
-            cout << endl << " Iterations = " << num_iterations << endl;
-            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << " Iterations = " << num_iterations << endl;
+            cout << " Final Relative Residual Norm = " << final_res_norm << endl << endl;
         }
 
         /* Output the final solution */

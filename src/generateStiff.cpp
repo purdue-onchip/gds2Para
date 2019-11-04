@@ -3,7 +3,7 @@
 using namespace std::complex_literals;
 
 
-int generateStiff(fdtdMesh *sys){
+int generateStiff(fdtdMesh *sys) {
     int bdl = 0, bdu = 0;
 #ifdef UPPER_BOUNDARY_PEC
     bdu = 1;
@@ -36,9 +36,9 @@ int generateStiff(fdtdMesh *sys){
     /* the lowest cell layer doesn't contain the lowest plane */
 
     /* the middle layers */
-    for (indz = 1; indz < sys->N_cell_z; indz++){
-        for (indx = 1; indx <= sys->N_cell_x; indx++){
-            for (indy = 1; indy <= sys->N_cell_y; indy++){
+    for (indz = 1; indz < sys->N_cell_z; indz++) {
+        for (indx = 1; indx <= sys->N_cell_x; indx++) {
+            for (indy = 1; indy <= sys->N_cell_y; indy++) {
                 SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
                 SeColId[Senum] = leng_Se;
                 Seval[Senum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
@@ -107,8 +107,8 @@ int generateStiff(fdtdMesh *sys){
 
     /* the toppest layer doesn't contain the upper plane */
     indz = sys->N_cell_z;
-    for (indx = 1; indx <= sys->N_cell_x; indx++){
-        for (indy = 1; indy <= sys->N_cell_y; indy++){
+    for (indx = 1; indx <= sys->N_cell_x; indx++) {
+        for (indy = 1; indy <= sys->N_cell_y; indy++) {
             SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             SeColId[Senum] = leng_Se;
             Seval[Senum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
@@ -198,8 +198,8 @@ int generateStiff(fdtdMesh *sys){
     /* the rightmost yz plane */
     indx = sys->N_cell_x + 1;
     
-    for (indz = 1; indz <= sys->N_cell_z; indz++){
-        for (indy = 1; indy <= sys->N_cell_y; indy++){
+    for (indz = 1; indz <= sys->N_cell_z; indz++) {
+        for (indy = 1; indy <= sys->N_cell_y; indy++) {
             SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             SeColId[Senum] = leng_Se;
             Seval[Senum] = 1 / (sys->zn[indz] - sys->zn[indz - 1]);
@@ -225,8 +225,8 @@ int generateStiff(fdtdMesh *sys){
 
     /* the farthest xz plane */
     indy = sys->N_cell_y + 1;
-    for (indz = 1; indz <= sys->N_cell_z; indz++){
-        for (indx = 1; indx <= sys->N_cell_x; indx++){
+    for (indz = 1; indz <= sys->N_cell_z; indz++) {
+        for (indx = 1; indx <= sys->N_cell_x; indx++) {
             SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             SeColId[Senum] = leng_Se;
             Seval[Senum] = -1 / (sys->zn[indz] - sys->zn[indz - 1]);
@@ -262,21 +262,21 @@ int generateStiff(fdtdMesh *sys){
     dxa[sys->N_cell_x] = sys->xn[sys->N_cell_x] - sys->xn[sys->N_cell_x - 1];
     dya[sys->N_cell_y] = sys->yn[sys->N_cell_y] - sys->yn[sys->N_cell_y - 1];
     dza[sys->N_cell_z] = sys->zn[sys->N_cell_z] - sys->zn[sys->N_cell_z - 1];
-    for (int i = 1; i < sys->N_cell_x; i++){
+    for (int i = 1; i < sys->N_cell_x; i++) {
         dxa[i] = (sys->xn[i + 1] - sys->xn[i - 1]) / 2;
     }
-    for (int i = 1; i < sys->N_cell_y; i++){
+    for (int i = 1; i < sys->N_cell_y; i++) {
         dya[i] = (sys->yn[i + 1] - sys->yn[i - 1]) / 2;
     }
-    for (int i = 1; i < sys->N_cell_z; i++){
+    for (int i = 1; i < sys->N_cell_z; i++) {
         dza[i] = (sys->zn[i + 1] - sys->zn[i - 1]) / 2;
     }
 
 
     /* the middle layers */
-    for (indz = 1; indz < sys->N_cell_z; indz++){
-        for (indx = 1; indx <= sys->N_cell_x; indx++){
-            for (indy = 1; indy <= sys->N_cell_y; indy++){
+    for (indz = 1; indz < sys->N_cell_z; indz++) {
+        for (indx = 1; indx <= sys->N_cell_x; indx++) {
+            for (indy = 1; indy <= sys->N_cell_y; indy++) {
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
                 ShColId[Shnum] = leng_Sh;
                 Shval[Shnum] = -dza[indz - 1] / (dxa[indx - 1] * dza[indz - 1]);
@@ -344,10 +344,10 @@ int generateStiff(fdtdMesh *sys){
         }
     }
 
-    /* the toppest layer doesn't contain the upper plane */
+    /* the topmost layer doesn't contain the upper plane */
     indz = sys->N_cell_z;
-    for (indx = 1; indx <= sys->N_cell_x; indx++){
-        for (indy = 1; indy <= sys->N_cell_y; indy++){
+    for (indx = 1; indx <= sys->N_cell_x; indx++) {
+        for (indy = 1; indy <= sys->N_cell_y; indy++) {
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
             Shval[Shnum] = -dza[indz - 1] / (dza[indz - 1] * dxa[indx - 1]);
@@ -437,8 +437,8 @@ int generateStiff(fdtdMesh *sys){
 
     /* the rightmost yz plane */
     indx = sys->N_cell_x + 1;
-    for (indz = 1; indz <= sys->N_cell_z; indz++){
-        for (indy = 1; indy <= sys->N_cell_y; indy++){
+    for (indz = 1; indz <= sys->N_cell_z; indz++) {
+        for (indy = 1; indy <= sys->N_cell_y; indy++) {
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
             Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dza[indz - 1]);
@@ -464,8 +464,8 @@ int generateStiff(fdtdMesh *sys){
 
     /* the farthest xz plane */
     indy = sys->N_cell_y + 1;
-    for (indz = 1; indz <= sys->N_cell_z; indz++){
-        for (indx = 1; indx <= sys->N_cell_x; indx++){
+    for (indz = 1; indz <= sys->N_cell_z; indz++) {
+        for (indx = 1; indx <= sys->N_cell_x; indx++) {
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
             Shval[Shnum] = -dya[indy - 1] / (dya[indy - 1] * dza[indz - 1]);
@@ -489,7 +489,7 @@ int generateStiff(fdtdMesh *sys){
         }
     }
     /* End of the generation of Sh */
-    /*for (int indi = 0; indi < Shnum; indi++){
+    /*for (int indi = 0; indi < Shnum; indi++) {
         cout << ShRowId[indi] << " " << ShColId[indi] << " " << Shval[indi] << endl;
     }*/
     /* Multiply Sh and Se */
@@ -500,7 +500,7 @@ int generateStiff(fdtdMesh *sys){
     SeColIdo = (myint*)malloc(Senum * sizeof(myint));
     SeRowIdn = (myint*)malloc(Senum * sizeof(myint));
     Sevaln = (double*)malloc(Senum * sizeof(double));
-    for (ind = 0; ind < Senum; ind++){
+    for (ind = 0; ind < Senum; ind++) {
         SeColIdo[ind] = SeColId[ind];
         SeRowIdn[ind] = SeRowId[ind];
         Sevaln[ind] = Seval[ind];
@@ -514,7 +514,7 @@ int generateStiff(fdtdMesh *sys){
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));
     Shvaln = (double*)malloc(Shnum * sizeof(double));
-    for (ind = 0; ind < Shnum; ind++){
+    for (ind = 0; ind < Shnum; ind++) {
         ShColIdo[ind] = ShColId[ind];
         ShRowIdn[ind] = ShRowId[ind];
         Shvaln[ind] = Shval[ind];
@@ -544,8 +544,8 @@ int generateStiff(fdtdMesh *sys){
     free(ShColIdo); ShColIdo = NULL;
     free(Shval); Shval = NULL;
 
-    /*for (int indi = 0; indi < sys->numPorts; indi++){
-        for (int indj = 0; indj < sys->numPorts; indj++){
+    /*for (int indi = 0; indi < sys->numPorts; indi++) {
+        for (int indj = 0; indj < sys->numPorts; indj++) {
             cout << Yr[indi * sys->numPorts + indj].real() << " " << Yr[indi * sys->numPorts + indj].imag() << endl;
         }
     }*/
@@ -553,9 +553,7 @@ int generateStiff(fdtdMesh *sys){
     return 0;
 }
 
-int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val, int bdl, int bdu){
-
-    
+int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val, int bdl, int bdu) {
     double freq = sys->freqNo2freq(freqNo);
     myint size = sys->N_edge - (bdl + bdu) * sys->N_edge_s;
     myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
@@ -569,9 +567,9 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     int indz, indy, temp;
     int sourcePort;
 
-    for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++){
+    for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-            for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
+            for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++) {
                 J[sourcePort * (sys->N_edge - (bdl + bdu) * sys->N_edge_s) + sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - bdl * sys->N_edge_s] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
 
             }
@@ -581,8 +579,8 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     /* Used in plasma2D for upper and lower excitation */
     /*myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
 
-    while (current_edge < sys->N_edge - sys->N_edge_s){
-    if (sys->markEdge[current_edge] == 0){
+    while (current_edge < sys->N_edge - sys->N_edge_s) {
+    if (sys->markEdge[current_edge] == 0) {
     J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
     }
     current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
@@ -595,11 +593,11 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     myint nnz = sys->leng_S;
     //cout << "Start to generate CSR form for S!\n";
     indi = 0;
-    while (indi < nnz){
+    while (indi < nnz) {
         start = RowId[indi];
         while (indi < nnz && RowId[indi] == start) {
             valc[indi] += val[indi]; // val[indi] is real
-            if (RowId[indi] == ColId[indi]){
+            if (RowId[indi] == ColId[indi]) {
                 if (sys->markEdge[RowId[indi] + bdl * sys->N_edge_s] != 0) {
                     complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + bdl * sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
@@ -650,7 +648,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     xr = (complex<double>*)calloc((sys->N_edge - (bdl + bdu) * sys->N_edge_s) * sys->numPorts, sizeof(complex<double>));
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
-    if (error != 0){
+    if (error != 0) {
         printf("\nERROR during numerical factorization: %d", error);
         exit(2);
     }
@@ -673,8 +671,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     return 0;
 }
 
-int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, double *u0c){
-
+int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, double *u0c) {
     clock_t t1 = clock();
     int t0n = 3;
     double dt = DT;
@@ -709,11 +706,11 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
     double *y0 = (double*)calloc(nt, sizeof(double));
     double *yr = (double*)calloc(nt, sizeof(double));
     double nn;
-    for (int ind = 1; ind <= 10; ind++){    // time marching to find the repeated eigenvectors
-        /*for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
+    for (int ind = 1; ind <= 10; ind++) {    // time marching to find the repeated eigenvectors
+        /*for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++) {
             rsc[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
         }*/
-        //for (myint inde = 0; inde < sys->leng_Vh; inde++){
+        //for (myint inde = 0; inde < sys->leng_Vh; inde++) {
         //    temp2[inde].real = yh1[inde].real - 2 * yh2[inde].real;
         //    temp2[inde].imag = yh1[inde].imag - 2 * yh2[inde].imag;
         //}
@@ -731,7 +728,7 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
             //y0nm1[inde] = 1000 * pow(tau, 2) * (exp(-pow(t0, 2) / pow(tau, 2)) - exp(-pow((dt * (ind - 1) - t0) / tau, 2))) * u0d[inde] + 2000 * ((ind - 1) * dt - t0) * exp(-pow(((ind - 1) * dt - t0) / tau, 2)) * u0c[inde];
         //    temp[inde] = (y0np1[inde] + y0nm1[inde] - 2 * y0n[inde]) * sys->eps[inde + sys->N_edge_s] * 2;    // 2 * D_eps*(y0np1+y0nm1-2*y0n)
         //    temp1[inde] = (y0np1[inde] - y0nm1[inde]) * sys->sig[inde + sys->N_edge_s] * dt;    // dt * D_sig*(y0np1-y0nm1)
-        //    for (myint inde1 = 0; inde1 < sys->leng_Vh; inde1++){
+        //    for (myint inde1 = 0; inde1 < sys->leng_Vh; inde1++) {
         //        temp6[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (dt * sys->sig[inde + sys->N_edge_s] + 2 * sys->eps[inde + sys->N_edge_s]);
         //        temp6[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (dt * sys->sig[inde + sys->N_edge_s] + 2 * sys->eps[inde + sys->N_edge_s]);
         //    }
@@ -740,9 +737,9 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
         //m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
         //status = matrix_multi('T', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, temp6, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, m_h);
         //index = 0;
-        //while (index < sys->leng_S){
+        //while (index < sys->leng_S) {
         //    start = sys->SRowId[index];
-        //    while (index < sys->leng_S && sys->SRowId[index] == start){
+        //    while (index < sys->leng_S && sys->SRowId[index] == start) {
         //        y_h[sys->SRowId[index]].real += sys->Sval[index] * temp5[sys->SColId[index]].real * (-2) * pow(dt, 2);
         //        y_h[sys->SRowId[index]].imag += sys->Sval[index] * temp5[sys->SColId[index]].imag * (-2) * pow(dt, 2);
         //        index++;
@@ -756,7 +753,7 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
         //temp7 = (lapack_complex_double*)calloc(sys->N_edge - 2 * sys->N_edge_s, sizeof(lapack_complex_double));
         //status = matrix_multi('N', sys->Vh, (sys->N_edge - 2 * sys->N_edge_s), sys->leng_Vh, yh2, sys->leng_Vh, 1, temp7);    // yhh = V_re1*yh(:,2)
 
-        //for (myint inde = 0; inde < sys->leng_Vh; inde++){
+        //for (myint inde = 0; inde < sys->leng_Vh; inde++) {
         //    yh1[inde].real = yh2[inde].real;
         //    yh1[inde].imag = yh2[inde].imag;
         //    yh2[inde].real = yh3[inde].real;
@@ -768,9 +765,9 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
         // central difference
         //index = 0;
         ////nn = 0;
-        //while (index < sys->leng_S){
+        //while (index < sys->leng_S) {
         //    start = sys->SRowId[index];
-        //    while (index < sys->leng_S && sys->SRowId[index] == start){
+        //    while (index < sys->leng_S && sys->SRowId[index] == start) {
         //        xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[index]] += sys->Sval[index] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[index]] * (-2) * pow(dt, 2);
         //        index++;
         //    }
@@ -779,13 +776,13 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
         //    //nn += pow(xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + start], 2);
         //}
         ////cout << "The norm of xr is " << sqrt(nn) << endl;
-        //for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+        //for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++) {
         //    xr[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
         //    xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
         //    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
         //}
         
-        /*for (myint indj = 0; indj < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indj++){
+        /*for (myint indj = 0; indj < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indj++) {
             int thisEdge = sys->portCoor[sourcePort].portEdge[sourcePortSide][indj];
             leng = pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3]), 2);
             leng = leng + pow((sys->nodepos[sys->edgelink[thisEdge * 2] * 3 + 1] - sys->nodepos[sys->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
@@ -823,19 +820,19 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
 #endif
     /*ofstream out;
     out.open("y1.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint ind = 0; ind < nt; ind++){
+    for (myint ind = 0; ind < nt; ind++) {
         out << y[ind].real << " " << y[ind].imag << endl;
     }
     out.close();
 
     out.open("y01.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint ind = 0; ind < nt; ind++){
+    for (myint ind = 0; ind < nt; ind++) {
         out << y0[ind] << endl;
     }
     out.close();
 
     out.open("yr1.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint ind = 0; ind < nt; ind++){
+    for (myint ind = 0; ind < nt; ind++) {
         out << yr[ind] << endl;
     }
     out.close();*/
@@ -843,7 +840,7 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
     return 0;
 }
 
-int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval, int bdl, int bdu){
+int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval, int bdl, int bdu) {
     // ArowId, AcolId, and Aval should be in the COO format
     sparse_status_t s0;
     sparse_matrix_t a, a_csr;
@@ -855,16 +852,16 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     double *Aval;
     myint k;
     s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, acol, arow, &aColId[0], &aColId[1], aRowId, aval);
-    
+
     sparse_matrix_t b, b_csr;
     s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, acol, arow, &bColId[0], &bColId[1], bRowId, bval);
-    
+
     sparse_matrix_t A;
     s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, a, b, &A);
     sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
     myint ARows, ACols;
     MKL_INT *ArowStart, *ArowEnd;
-        
+
     s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
     leng_A = ArowEnd[ARows - 1];    // how many non-zeros are in S
 
@@ -874,21 +871,21 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     myint count, num, j;
     j = 0;
     vector<pair<myint, double>> col_val;
-    for (myint i = 0; i < leng_A; i++){
+    for (myint i = 0; i < leng_A; i++) {
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
     //ofstream out;
     //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint i = 0; i < ARows; i++){
-        if (i < bdl * sys->N_edge_s || i >= sys->N_edge - bdu * sys->N_edge_s){
+    for (myint i = 0; i < ARows; i++) {
+        if (i < bdl * sys->N_edge_s || i >= sys->N_edge - bdu * sys->N_edge_s) {
             continue;
         }
         num = ArowEnd[i] - ArowStart[i];
         count = 0;
         vector<pair<myint, double>> v(col_val.begin() + ArowStart[i], col_val.begin() + ArowEnd[i]);
         sort(v.begin(), v.end());
-        while (count < num){
-            if (v[count].first < bdl * sys->N_edge_s || v[count].first >= sys->N_edge - bdu * sys->N_edge_s){
+        while (count < num) {
+            if (v[count].first < bdl * sys->N_edge_s || v[count].first >= sys->N_edge - bdu * sys->N_edge_s) {
                 count++;
                 continue;
             }
@@ -911,22 +908,22 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     return 0;
 }
 
-int matrix_multi_cd(char operation, lapack_complex_double *a, myint arow, myint acol, double *b, myint brow, myint bcol, lapack_complex_double *tmp3){    //complex multiply double
+int matrix_multi_cd(char operation, lapack_complex_double *a, myint arow, myint acol, double *b, myint brow, myint bcol, lapack_complex_double *tmp3) {    // complex multiply double
     /* operation = 'T' is first matrix conjugate transpose, operation = 'N' is first matrix non-conjugate-transpose*/
-    if (operation == 'T'){
-        for (myint ind = 0; ind < acol; ind++){
-            for (myint ind1 = 0; ind1 < bcol; ind1++){
-                for (myint ind2 = 0; ind2 < arow; ind2++){
+    if (operation == 'T') {
+        for (myint ind = 0; ind < acol; ind++) {
+            for (myint ind1 = 0; ind1 < bcol; ind1++) {
+                for (myint ind2 = 0; ind2 < arow; ind2++) {
                     tmp3[ind1 * acol + ind].real = tmp3[ind1 * acol + ind].real + a[ind * arow + ind2].real * b[ind1 * brow + ind2];
                     tmp3[ind1 * acol + ind].imag = tmp3[ind1 * acol + ind].imag - a[ind * arow + ind2].imag * b[ind1 * brow + ind2];
                 }
             }
         }
     }
-    else if (operation == 'N'){
-        for (myint ind = 0; ind < arow; ind++){
-            for (myint ind1 = 0; ind1 < bcol; ind1++){
-                for (myint ind2 = 0; ind2 < acol; ind2++){
+    else if (operation == 'N') {
+        for (myint ind = 0; ind < arow; ind++) {
+            for (myint ind1 = 0; ind1 < bcol; ind1++) {
+                for (myint ind2 = 0; ind2 < acol; ind2++) {
                     tmp3[ind1 * arow + ind].real = tmp3[ind1 * arow + ind].real + a[ind2 * arow + ind].real * b[ind1 * brow + ind2];
                     tmp3[ind1 * arow + ind].imag = tmp3[ind1 * arow + ind].imag + a[ind2 * arow + ind].imag * b[ind1 * brow + ind2];
                 }

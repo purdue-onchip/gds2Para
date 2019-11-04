@@ -5897,12 +5897,12 @@ struct SolverDataBase
         data->freqStart = (this->settings).getFreqs().front();
         data->freqEnd = (this->settings).getFreqs().back();
         data->freqScale = (this->settings).getFreqScale();
-        data->xlim1 = (this->settings).getLimits()[0] / (this->settings).getLengthUnit();
-        data->xlim2 = (this->settings).getLimits()[1] / (this->settings).getLengthUnit();
-        data->ylim1 = (this->settings).getLimits()[2] / (this->settings).getLengthUnit();
-        data->ylim2 = (this->settings).getLimits()[3] / (this->settings).getLengthUnit();
-        data->zlim1 = (this->settings).getLimits()[4] / (this->settings).getLengthUnit();
-        data->zlim2 = (this->settings).getLimits()[5] / (this->settings).getLengthUnit();
+        data->xlim1 = (this->settings).getLimits()[0];
+        data->xlim2 = (this->settings).getLimits()[1];
+        data->ylim1 = (this->settings).getLimits()[2];
+        data->ylim2 = (this->settings).getLimits()[3];
+        data->zlim1 = (this->settings).getLimits()[4];
+        data->zlim2 = (this->settings).getLimits()[5];
 
         // Use layer stack-up information to set fields
         vector<Layer> physicalLayers = this->getValidLayers(); // Work with only physically valid layers
