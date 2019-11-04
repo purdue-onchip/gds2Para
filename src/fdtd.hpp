@@ -3705,8 +3705,7 @@ public:
                     iny = (thisEdge % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
                     leng = this->yn[iny + 1] - this->yn[iny];
                 }
-
-                this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] -= x[thisEdge - bdl * this->N_edge_s] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
+                this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] -= x[thisEdge - bdl * this->N_edge_s] * leng * (this->portCoor[indPort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
             }
 
             //cout << "  Response port voltage = " << sys->x[indPort + sys->numPorts * xcol] << " V, Source port current = " << sourceCurrent << " A" << endl;
@@ -3749,7 +3748,7 @@ public:
                 leng += pow((this->nodepos[this->edgelink[thisEdge * 2] * 3 + 1] - this->nodepos[this->edgelink[thisEdge * 2 + 1] * 3 + 1]), 2);
                 leng += pow((this->nodepos[this->edgelink[thisEdge * 2] * 3 + 2] - this->nodepos[this->edgelink[thisEdge * 2 + 1] * 3 + 2]), 2);
                 leng = sqrt(leng);*/
-                this->x[indPort + this->numPorts * sourcePort] -= x[thisEdge] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
+                this->x[indPort + this->numPorts * sourcePort] -= x[thisEdge] * leng * (this->portCoor[indPort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
             }
 
             /* Only divide matrix entry by current at end of response port calculation */
