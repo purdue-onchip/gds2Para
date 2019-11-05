@@ -4,13 +4,6 @@ using namespace std::complex_literals;
 
 
 int generateStiff(fdtdMesh *sys){
-    int bdl = 0, bdu = 0;
-#ifdef UPPER_BOUNDARY_PEC
-    bdu = 1;
-#endif
-#ifdef LOWER_BOUNDARY_PEC
-    bdl = 1;
-#endif
     myint Senum, leng_Se;    // Se's size is (N_patch - 2 * N_patch_s) * (N_edge - 2 * N_edge_s)
     myint Shnum, leng_Sh;    // Sh's size is (N_edge - 2 * N_edge_s) * (N_patch - 2 * N_patch_s)
     myint *SeRowId, *SeColId;
@@ -526,7 +519,7 @@ int generateStiff(fdtdMesh *sys){
 
 
     /* generate the matrix (-w^2*D_eps+iw*D_sig+S) */
-    status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln, bdl, bdu);    // matrix multiplication first matrix keep the same second matrix transpose
+    status = mklMatrixMulti_nt(sys, sys->leng_S, ShRowIdn, ShColId, Shvaln, sys->N_edge, leng_Se, SeRowIdn, SeColId, Sevaln);    // matrix multiplication first matrix keep the same second matrix transpose
   
     //cout << "Length of S is " << sys->leng_S << endl;
     //cout << "S generation is done!\n";
@@ -553,11 +546,11 @@ int generateStiff(fdtdMesh *sys){
     return 0;
 }
 
-int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val, int bdl, int bdu){
+int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val){
 
     
     double freq = sys->freqNo2freq(freqNo);
-    myint size = sys->N_edge - (bdl + bdu) * sys->N_edge_s;
+    myint size = sys->N_edge - sys->bden;
     myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
     int count = 0;
     int indi = 0;
@@ -565,14 +558,14 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     complex<double> *valc;
     valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
     complex<double> *J;
-    J = (complex<double>*)calloc((sys->N_edge - (bdl + bdu) * sys->N_edge_s) * sys->numPorts, sizeof(complex<double>));
+    J = (complex<double>*)calloc((sys->N_edge - sys->bden) * sys->numPorts, sizeof(complex<double>));
     int indz, indy, temp;
     int sourcePort;
 
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++){
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
-                J[sourcePort * (sys->N_edge - (bdl + bdu) * sys->N_edge_s) + sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - bdl * sys->N_edge_s] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
+                J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
                 //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << endl;
 
             }
@@ -601,12 +594,12 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
         while (indi < nnz && RowId[indi] == start) {
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
-                if (sys->markEdge[RowId[indi] + bdl * sys->N_edge_s] != 0) {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + bdl * sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
+                if (sys->markEdge[sys->mapEdgeR[RowId[indi]]] != 0) {
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
                 else {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(RowId[indi] + bdl * sys->N_edge_s + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
             }
@@ -648,7 +641,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
     complex<double> *xr;
     complex<double> * ddum;
-    xr = (complex<double>*)calloc((sys->N_edge - (bdl + bdu) * sys->N_edge_s) * sys->numPorts, sizeof(complex<double>));
+    xr = (complex<double>*)calloc((sys->N_edge - sys->bden) * sys->numPorts, sizeof(complex<double>));
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
     if (error != 0){
@@ -657,7 +650,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     }
     
     for (indi = 0; indi < sourcePort; indi++)
-        sys->Construct_Z_V0_Vh(&xr[indi * (sys->N_edge - (bdl + bdu) * sys->N_edge_s)], freqNo, indi, bdl, bdu);
+        sys->Construct_Z_V0_Vh(&xr[indi * (sys->N_edge - sys->bden)], freqNo, indi);
 
     phase = -1;     // Release internal memory
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
@@ -844,7 +837,7 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
     return 0;
 }
 
-int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval, int bdl, int bdu){
+int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval){
     // ArowId, AcolId, and Aval should be in the COO format
     sparse_status_t s0;
     sparse_matrix_t a, a_csr;
@@ -881,7 +874,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     //ofstream out;
     //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < ARows; i++){
-        if (i < bdl * sys->N_edge_s || i >= sys->N_edge - bdu * sys->N_edge_s){
+        if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
             continue;
         }
         num = ArowEnd[i] - ArowStart[i];
@@ -889,12 +882,12 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         vector<pair<myint, double>> v(col_val.begin() + ArowStart[i], col_val.begin() + ArowEnd[i]);
         sort(v.begin(), v.end());
         while (count < num){
-            if (v[count].first < bdl * sys->N_edge_s || v[count].first >= sys->N_edge - bdu * sys->N_edge_s){
+            if (sys->lbde.find(v[count].first) != sys->lbde.end() || sys->ubde.find(v[count].first) != sys->ubde.end()) {   // if this column number is among the upper or lower boundary edges
                 count++;
                 continue;
             }
-            sys->SRowId[j] = i - bdl * sys->N_edge_s;
-            sys->SColId[j] = v[count].first - bdl * sys->N_edge_s;
+            sys->SRowId[j] = sys->mapEdge[i];
+            sys->SColId[j] = sys->mapEdge[v[count].first];
             sys->Sval[j] = v[count].second / MU;
             //out << sys->SRowId[j] << " " << sys->SColId[j] << " " << sys->Sval[j] << endl;
 

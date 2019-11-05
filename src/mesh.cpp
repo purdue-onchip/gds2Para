@@ -433,7 +433,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     /*double px = -3225.6e-6, py = 806.4e-6, pz = 716e-6;
     sys->checkPoint(px, py, pz, xi, yi, zi);*/
 
-    /* Assign markers to nodes and edges beyond included conductors */
+    /* Assign markers to nodes and edges beyond included conductors. No need for this */
 #ifdef LOWER_BOUNDARY_PEC
     for (indi = 0; indi < sys->N_edge_s; indi++) {    // the lower PEC plane
         sys->markEdge[indi] = sys->numCdtRow + (myint)1;
@@ -818,23 +818,23 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     for (indi = 0; indi < sys->numCdt; indi++) {
         sys->conductor[indi].node = (myint*)calloc(sys->cdtNumNode[indi], sizeof(myint));
-        sys->conductor[indi].cdtNodeind = 0; // Initialize to zero
-        sys->conductor[indi].markPort = 0;
+        sys->conductor[indi].cdtNodeind = 0; // Number of nodes in this conductor
+        sys->conductor[indi].markPort = 0;  // Mark if the conductor contains the reference port or the excited port (which port it corresponds to)
     }
     myint portground_count = 0;
     for (indi = 0; indi < sys->N_node; indi++) {
         if (visited[indi] != 0) {
             sys->conductor[visited[indi] - 1].node[sys->conductor[visited[indi] - 1].cdtNodeind] = indi;
-#ifdef LOWER_BOUNDARY_PEC
-            if ((indi < sys->N_node_s) && sys->conductor[visited[indi] - 1].markPort != -2 && sys->conductor[visited[indi] - 1].markPort != -1) {
-                sys->conductor[visited[indi] - 1].markPort = -1;    // this conductor connects to the lower PEC
-            }
-#endif
-#ifdef UPPER_BOUNDARY_PEC
-            if ((indi >= sys->N_node - sys->N_node_s) && sys->conductor[visited[indi] - 1].markPort != -2 && sys->conductor[visited[indi] - 1].markPort != -1) {
-                sys->conductor[visited[indi] - 1].markPort = -2;    // this conductor connects to the upper PEC
-            }
-#endif
+//#ifdef LOWER_BOUNDARY_PEC
+//            if ((indi < sys->N_node_s) && sys->conductor[visited[indi] - 1].markPort != -2 && sys->conductor[visited[indi] - 1].markPort != -1) {
+//                sys->conductor[visited[indi] - 1].markPort = -1;    // this conductor connects to the lower PEC
+//            }
+//#endif
+//#ifdef UPPER_BOUNDARY_PEC
+//            if ((indi >= sys->N_node - sys->N_node_s) && sys->conductor[visited[indi] - 1].markPort != -2 && sys->conductor[visited[indi] - 1].markPort != -1) {
+//                sys->conductor[visited[indi] - 1].markPort = -2;    // this conductor connects to the upper PEC
+//            }
+//#endif
             sys->conductor[visited[indi] - 1].cdtNodeind++;
         }
     }
@@ -851,19 +851,20 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (indi = 0; indi < sys->numPorts; indi++) {
         cout << " Checking port" << indi + 1 << endl;
         int mult = sys->portCoor[indi].multiplicity;
+        // Always the first port is the excited port and the second one is the referene port
         vector<double> x1coord = sys->portCoor[indi].x1;
         vector<double> y1coord = sys->portCoor[indi].y1;
         vector<double> z1coord = sys->portCoor[indi].z1;
         vector<double> x2coord = sys->portCoor[indi].x2;
         vector<double> y2coord = sys->portCoor[indi].y2;
         vector<double> z2coord = sys->portCoor[indi].z2;
-        for (indk = 0; indk < mult; indk++)
+        for (indk = 0; indk < mult; indk++)   // Check whether all the port nodes are inside conductors, if not return
         {
             indPortNode1 = sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]];
             indPortNode2 = sys->markNode[zi[z2coord[indk]] * sys->N_node_s + xi[x2coord[indk]] * (sys->N_cell_y + 1) + yi[y2coord[indk]]];
             cout << zi[z1coord[indk]] << " " << xi[x1coord[indk]] << " " << yi[y1coord[indk]] << endl;
             cout << zi[z2coord[indk]] << " " << xi[x2coord[indk]] << " " << yi[y2coord[indk]] << endl;
-            /*cout << sys->markEdge[zi[z1coord[indk]] * (sys->N_edge_s + sys->N_edge_v) - sys->N_edge_v + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]] << endl;*/
+
             cout << "  mult = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
             /*cout << "  First z coordiate is " << z1coord[indk] << " and second z coordinate is " << z2coord[indk] << endl;
             cout << "  x coordinate is " << x1coord[indk] << " and  y coordinate is " << y1coord[indk] << endl;*/
@@ -871,154 +872,74 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 cerr << "Port node could not be located within a conductor. Exiting now." << endl;
                 return 1;
             }
+        }
+        sys->conductor[indPortNode1 - 1].markPort = indi + 1;    // which port this excited conductor it corresponds to
+        sys->conductor[indPortNode2 - 1].markPort = -1;    // this is reference conductor
+        if (cond.find(indPortNode1) == cond.end()) {
+            cond.insert(indPortNode1);
+            for (indj = 0; indj < sys->cdtNumNode[indPortNode1 - 1]; indj++) {
+                inz = sys->conductor[indPortNode1 - 1].node[indj] / sys->N_node_s;
+                inx = ((sys->conductor[indPortNode1 - 1].node[indj]) % sys->N_node_s) / (sys->N_cell_y + 1);
+                iny = ((sys->conductor[indPortNode1 - 1].node[indj]) % sys->N_node_s) % (sys->N_cell_y + 1);
 
-            if (cond.find(indPortNode1) == cond.end()) {
-                cond.insert(indPortNode1);
-                for (indj = 0; indj < sys->cdtNumNode[indPortNode1 - 1]; indj++) {
-                    //cout << "  Checking indPortNode1 against conductor " << indj << " out of " << sys->cdtNumNode[indPortNode1 - 1] << endl;
-                    //cout << "  Value of sys->conductor[indPortNode1 - 1].node[indj] = " << sys->conductor[indPortNode1 - 1].node[indj] << endl;
-                    inz = sys->conductor[indPortNode1 - 1].node[indj] / sys->N_node_s;
-                    inx = ((sys->conductor[indPortNode1 - 1].node[indj]) % sys->N_node_s) / (sys->N_cell_y + 1);
-                    iny = ((sys->conductor[indPortNode1 - 1].node[indj]) % sys->N_node_s) % (sys->N_cell_y + 1);
-                    //cout << "   inz = " << inz << ", inx = " << inx << ", iny = " << iny << endl;
-                    if (inz != 0) {    // this node is not on the bottom plane
-                        eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (inz != sys->nz - 1) {    // this node is not on the upper plane
-                        eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (inx != 0) {    // this node is not on the left plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (inx != sys->nx - 1) {    // this node is not on the right plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (iny != 0) {    // this node is not on the front plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (iny != sys->ny - 1) {    // this node is not on the back plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                }
+                sys->findCond2CondIn(inx, iny, inz);
+
             }
-            //cout << "  Checked indPortNode1 against final conductor, and now checking indPortNode2" << endl;
-            if (cond.find(indPortNode2) == cond.end()) {
-                cond.insert(indPortNode2);
-                for (indj = 0; indj < sys->cdtNumNode[indPortNode2 - 1]; indj++) {
-                    //cout << "  Checking indPortNode2 against conductor " << indj << " out of " << sys->cdtNumNode[indPortNode2 - 1] << endl;
-                    inz = sys->conductor[indPortNode2 - 1].node[indj] / sys->N_node_s;
-                    inx = ((sys->conductor[indPortNode2 - 1].node[indj]) % sys->N_node_s) / (sys->N_cell_y + 1);
-                    iny = ((sys->conductor[indPortNode2 - 1].node[indj]) % sys->N_node_s) % (sys->N_cell_y + 1);
-                    //cout << "   inz = " << inz << ", inx = " << inx << ", iny = " << iny << endl;
-                    if (inz != 0) {    // this node is not on the bottom plane
-                        eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (inz != sys->nz - 1) {    // this node is not on the upper plane
-                        eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (inx != 0) {    // this node is not on the left plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (inx != sys->nx - 1) {    // this node is not on the right plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (iny != 0) {    // this node is not on the front plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                    if (iny != sys->ny - 1) {    // this node is not on the back plane
-                        eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
-                        if (sys->markEdge[eno] != 0 && isSetEmpty) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                            isSetEmpty = false;
-                        }
-                        else if (sys->markEdge[eno] != 0 && sys->cond2condIn.find(sys->markEdge[eno]) == sys->cond2condIn.end()) {
-                            sys->cond2condIn.insert(sys->markEdge[eno]);
-                        }
-                    }
-                }
+        }
+
+        if (cond.find(indPortNode2) == cond.end()) {
+            cond.insert(indPortNode2);
+            for (indj = 0; indj < sys->cdtNumNode[indPortNode2 - 1]; indj++) {
+
+                inz = sys->conductor[indPortNode2 - 1].node[indj] / sys->N_node_s;
+                inx = ((sys->conductor[indPortNode2 - 1].node[indj]) % sys->N_node_s) / (sys->N_cell_y + 1);
+                iny = ((sys->conductor[indPortNode2 - 1].node[indj]) % sys->N_node_s) % (sys->N_cell_y + 1);
+
+                sys->findBoundNodeEdge(inx, iny, inz);    // put this conductor's all the boundary edges and nodes in ubde, lbde, ubdn, lbdn
+                sys->findCond2CondIn(inx, iny, inz);
             }
         }
     }
     cond.clear();  // Note: this doesn't actually reduce memory usage, but the memory usage can be reduced by calling the destructor ~cond()
     cout << "cond2condIn is set sucessfully!" << endl;
 
+//#ifdef LOWER_BOUNDARY_PEC
+//    for (int i = 0; i < sys->N_edge_s; i++) {
+//        if (sys->lbde.find(i) == sys->lbde.end()) {
+//            sys->lbde.insert(i);
+//        }
+//    }
+//    for (int i = 0; i < sys->N_node_s; i++) {
+//        if (sys->lbdn.find(i) == sys->lbdn.end()) {
+//            sys->lbdn.insert(i);
+//        }
+//    }
+//#endif
+//#ifdef UPPER_BOUNDARY_PEC
+//    for (int i = sys->N_edge - sys->N_edge_s; i < sys->N_edge; i++) {
+//        if (sys->ubde.find(i) == sys->ubde.end()) {
+//            sys->ubde.insert(i);
+//        }
+//    }
+//    for (int i = sys->N_node - sys->N_node_s; i < sys->N_node; i++) {
+//        if (sys->ubdn.find(i) == sys->ubdn.end()) {
+//            sys->ubdn.insert(i);
+//        }
+//    }
+//#endif
+    sys->bden = sys->lbde.size() + sys->ubde.size();    // the boundary edge number
+    sys->setMapEdge();   // map the original edge to the new edge # with upper and lower boundaries
+    /*outc.open("mapEdge.txt", std::ofstream::out | std::ofstream::trunc);
+    for (int i = 0; i < sys->N_edge; i++) {
+        outc << sys->mapEdge[i] << endl;
+    }
+    outc.close();*/
+    /*for (int i = 0; i < sys->N_edge_s; i++) {
+        if (sys->mapEdge[i] != -1) {
+            cout << "Something is wrong!\n";
+        }
+    }*/
+    cout << "The number of boundary edges is " << sys->bden << endl;
 
     /* Find the two nodes defining each edge (seems odd not to have this already) */
     sys->outedge = 0;
@@ -1154,13 +1075,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 
 int matrixConstruction(fdtdMesh *sys) {
-    int bdl = 0, bdu = 0;
-#ifdef LOWER_BOUNDARY_PEC
-    bdl = 1;
-#endif
-#ifdef UPPER_BOUNDARY_PEC
-    bdu = 1;
-#endif
+
     myint indi = 0, indj = 0;
     //cout << sys->stackEpsn.size() << endl;
     /* construct D_eps */
@@ -1194,14 +1109,14 @@ int matrixConstruction(fdtdMesh *sys) {
     }*/
     /*ofstream out;
     out.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
-    for (indi = bdl * sys->N_edge_s; indi < sys->N_edge - bdu * sys->N_edge_s; indi++){
-        out << sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
+    for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
+        out << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
     }
     out.close();
 
     out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
-    for (indi = bdl * sys->N_edge_s; indi < sys->N_edge - bdu * sys->N_edge_s; indi++){
-        if (sys->markEdge[indi] != 0){
+    for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
+        if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
             out << SIGMA << endl;
         }
         else{
@@ -1251,26 +1166,17 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             /* Track conductor index each port side touches and mark each conductor with the port number */
             if ((indMarkNode1 != 0) && (sys->conductor[indMarkNode1 - 1].markPort > -1)) { // Only supply end of port not on PEC
                 sys->portCoor[indi].portCnd.push_back(indMarkNode1);
-                sys->conductor[indMarkNode1 - 1].markPort = indi + 1;    // markPort index starts from 1
+                //sys->conductor[indMarkNode1 - 1].markPort = indi + 1;    // markPort index starts from 1
             }
             else if ((indMarkNode2 != 0) && (sys->conductor[indMarkNode2 - 1].markPort > -1)) { // Only return end of port not on PEC
                 sys->portCoor[indi].portCnd.push_back(indMarkNode2);
-                sys->conductor[indMarkNode2 - 1].markPort = indi + 1;    // markPort index starts from 1
+                //sys->conductor[indMarkNode2 - 1].markPort = indi + 1;    // markPort index starts from 1
             }
-            else if (indMarkNode1 != 0 && indMarkNode2 != 0) {
-                if (sys->conductor[indMarkNode1 - 1].markPort == -2) {    // the upper PEC conductor is excited
-                    sys->portCoor[indi].portCnd.push_back(indMarkNode1);
-                }
-                else if (sys->conductor[indMarkNode2 - 1].markPort == -2) {
-                    sys->portCoor[indi].portCnd.push_back(indMarkNode2);
-                }
-                //sys->portCoor[indi].portCnd.push_back(indMarkNode2);
-                /*sys->conductor[indMarkNode1 - 1].markPort = indi + 1;
-                sys->conductor[indMarkNode2 - 1].markPort = indi + 1;*/
+            else {
+                cout << "Something is wrong with the port! Exit.\n";
+                return 1;
             }
-            /*for (indj = 0; indj < sys->cdtNumNode[sys->portCoor[indi].portCnd.back() - 1]; indj++) {
-            sys->exciteCdtLayer[sys->conductor[sys->portCoor[indi].portCnd.back() - 1].node[indj] / sys->N_node_s] = 1;
-            }*/
+            
 #ifdef PRINT_PORT_SET
             cout << "portSet() logic test: markNode on Point 1 (" << indMarkNode1 << "), port marker on corresponding isolated conductor for Point 1 (" << sys->conductor[indMarkNode1 - 1].markPort << "), markNode on Point 2 (" << indMarkNode2 << "), port marker on corresponding isolated conductor for Point 2 (" << sys->conductor[indMarkNode2 - 1].markPort << ")" << endl;
             cout << "Value of portCnd for port #" << indi + 1 << " (port side " << indk << "): " << sys->portCoor[indi].portCnd.back() << endl;
@@ -1621,37 +1527,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
     return 0;
 }
 
-/* Is point (x,y) within the polygon? */
-bool polyIn(double x, double y, fdtdMesh *sys, int inPoly) {
-    int npol;
-    myint indi = 0, indj = 0;
-    bool isCond = false;
-    double disMin = 1.e-10;
-
-    npol = sys->conductorIn[inPoly].numVert;
-
-    for (indi = 0, indj = npol - 1; indi < npol; indj = indi++) {
-        if ((abs(y - sys->conductorIn[inPoly].y[indj]) < disMin && abs(y - sys->conductorIn[inPoly].y[indi]) < disMin &&
-            ((x >= sys->conductorIn[inPoly].x[indj] && x <= sys->conductorIn[inPoly].x[indi]) ||
-            (x >= sys->conductorIn[inPoly].x[indi] && x <= sys->conductorIn[inPoly].x[indj])))) {
-            return true;
-        }
-        else if (abs(x - sys->conductorIn[inPoly].x[indj]) < disMin && abs(x - sys->conductorIn[inPoly].x[indi]) < disMin &&
-            ((y >= sys->conductorIn[inPoly].y[indj] && y <= sys->conductorIn[inPoly].y[indi]) ||
-            (y >= sys->conductorIn[inPoly].y[indi] && y <= sys->conductorIn[inPoly].y[indj]))) {
-            return true;
-        }
-
-        else if ((abs(sys->conductorIn[inPoly].y[indi] - sys->conductorIn[inPoly].y[indj]) > disMin &&
-            (((sys->conductorIn[inPoly].y[indi] <= y) && (y < sys->conductorIn[inPoly].y[indj])) ||
-            ((sys->conductorIn[inPoly].y[indj] <= y) && (y < sys->conductorIn[inPoly].y[indi])))) &&
-            (x < (sys->conductorIn[inPoly].x[indj] - sys->conductorIn[inPoly].x[indi]) * (y - sys->conductorIn[inPoly].y[indi]) /
-            (sys->conductorIn[inPoly].y[indj] - sys->conductorIn[inPoly].y[indi]) + sys->conductorIn[inPoly].x[indi])) {
-            isCond = !isCond;
-        }
-    }
-    return isCond;
-}
 
 
 // Print fdtdPort information
