@@ -1193,6 +1193,177 @@ public:
         
     }
 
+    /* Try to resolve the issue when the port node is outside the conductor */
+    int findPortNode(int step, int x1n, int y1n, int z1n, int x2n, int y2n, int z2n, myint indi, myint indk) {
+        /* return 1 means find the port point
+           return 0 means not find the port point 
+           indi : the port #
+           indk : this port's multiplicity*/
+        if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n] == 0) {   // the first port node is not inside the conductor
+            int i = 0;
+            if (x1n < x2n) {   // x1n goes further left
+                while (i < step && x1n > 0) {
+                    x1n -= 1;
+                    if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+                        this->portCoor[indi].x1[indk] = this->xn[x1n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || x1n == 0) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (y1n < y2n) {   // y1n goes further front
+                while (i < step && y1n > 0) {
+                    y1n -= 1;
+                    if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+                        this->portCoor[indi].y1[indk] = this->yn[y1n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || y1n == 0) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (z1n < z2n) {   // z1n goes further down
+                while (i < step && z1n > 0) {
+                    z1n -= 1;
+                    if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+                        this->portCoor[indi].z1[indk] = this->zn[z1n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || z1n == 0) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (x1n > x2n) {   // x1n goes further right
+                while (i < step && x1n < this->nx - 1) {
+                    x1n += 1;
+                    if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+                        this->portCoor[indi].x1[indk] = this->xn[x1n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || x1n == this->nx - 1) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (y1n > y2n) {   // y1n goes further back
+                while (i < step && y1n < this->ny - 1) {
+                    y1n += 1;
+                    if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+                        this->portCoor[indi].y1[indk] = this->yn[y1n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || y1n == this->ny - 1) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (z1n > z2n) {   // z1n goes further up
+                while (i < step && z1n < this->nz - 1) {
+                    z1n += 1;
+                    if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+                        this->portCoor[indi].z1[indk] = this->zn[z1n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || z1n == this->nz - 1) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+        }
+        if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n] == 0) {   // the second port node is not inside the conductor
+            int i = 0;
+            if (x1n < x2n) {   // x2n goes further right
+                while (i < step && x2n < this->nx - 1) {
+                    x2n += 1;
+                    if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n]) {
+                        this->portCoor[indi].x2[indk] = this->xn[x2n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || x2n == this->nx - 1) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (y1n < y2n) {   // y2n goes further back
+                while (i < step && y2n < this->ny - 1) {
+                    y2n += 1;
+                    if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n]) {
+                        this->portCoor[indi].y2[indk] = this->yn[y2n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || y2n == this->ny - 1) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (z1n < z2n) {   // z2n goes further up
+                while (i < step && z2n < this->nz - 1) {
+                    z2n += 1;
+                    if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n]) {
+                        this->portCoor[indi].z2[indk] = this->zn[z2n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || z2n == this->nz - 1) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (x1n > x2n) {   // x2n goes further left
+                while (i < step && x2n > 0) {
+                    x2n -= 1;
+                    if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n]) {
+                        this->portCoor[indi].x2[indk] = this->xn[x2n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || x2n == 0) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (y1n > y2n) {   // y2n goes further front
+                while (i < step && y2n > 0) {
+                    y2n -= 1;
+                    if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n]) {
+                        this->portCoor[indi].y2[indk] = this->yn[y2n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || y2n == 0) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+            else if (z1n > z2n) {   // z1n goes further down
+                while (i < step && z2n > 0) {
+                    z2n -= 1;
+                    if (this->markNode[z2n * this->N_node_s + x2n * (this->N_cell_y + 1) + y2n]) {
+                        this->portCoor[indi].z2[indk] = this->zn[z2n];
+                        break;
+                    }
+                    i++;
+                }
+                if (i == step || z2n == 0) {   // doesn't find a point that is inside the conductor
+                    return 0;
+                }
+            }
+        }
+        return 1;
+    }
+
     /* Find this conductor node's corresponding conductorIn */
     void findCond2CondIn(int inx, int iny, int inz){
         /* inx : this conductor node's x index

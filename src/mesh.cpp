@@ -788,17 +788,17 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
 
     
-    /*out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
+    /*outc.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_node; indi++) {
         if (visited[indi] != 0){
-            out << to_string(visited[indi]) << " ";
+            outc << to_string(visited[indi]) << " ";
         }
         else{
-            out << "0 ";
+            outc << "0 ";
         }
     }
-    out << endl;
-    out.close();*/
+    outc << endl;
+    outc.close();*/
 
     /* Construct each isolated conductor */
     sys->numCdt = count;
@@ -847,6 +847,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         isSetEmpty = true; // Change value to prevent checks against sys->cond2condIn.end()
     }
     myint indPortNode1, indPortNode2;
+    int step = 10;   // further to go 5 steps to find the port node
     set<int> cond;    // the port conductors
     for (indi = 0; indi < sys->numPorts; indi++) {
         cout << " Checking port" << indi + 1 << endl;
@@ -862,15 +863,21 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         {
             indPortNode1 = sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]];
             indPortNode2 = sys->markNode[zi[z2coord[indk]] * sys->N_node_s + xi[x2coord[indk]] * (sys->N_cell_y + 1) + yi[y2coord[indk]]];
-            cout << zi[z1coord[indk]] << " " << xi[x1coord[indk]] << " " << yi[y1coord[indk]] << endl;
-            cout << zi[z2coord[indk]] << " " << xi[x2coord[indk]] << " " << yi[y2coord[indk]] << endl;
+            cout << zi[z1coord[indk]] << " " << sys->xn[xi[x1coord[indk]]] << " " << sys->yn[yi[y1coord[indk]]] << endl;
+            cout << zi[z2coord[indk]] << " " << sys->xn[xi[x2coord[indk]]] << " " << sys->yn[yi[y2coord[indk]]] << endl;
 
-            cout << "  mult = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
+            
             /*cout << "  First z coordiate is " << z1coord[indk] << " and second z coordinate is " << z2coord[indk] << endl;
             cout << "  x coordinate is " << x1coord[indk] << " and  y coordinate is " << y1coord[indk] << endl;*/
-            if (indPortNode1 == 0 || indPortNode2 == 0) {
+           
+            mark = sys->findPortNode(step, xi[x1coord[indk]], yi[y1coord[indk]], zi[z1coord[indk]], xi[x2coord[indk]], yi[y2coord[indk]], zi[z2coord[indk]], indi, indk);
+            indPortNode1 = sys->markNode[zi[sys->portCoor[indi].z1[indk]] * sys->N_node_s + xi[sys->portCoor[indi].x1[indk]] * (sys->N_cell_y + 1) + yi[sys->portCoor[indi].y1[indk]]];
+            indPortNode2 = sys->markNode[zi[sys->portCoor[indi].z2[indk]] * sys->N_node_s + xi[sys->portCoor[indi].x2[indk]] * (sys->N_cell_y + 1) + yi[sys->portCoor[indi].y2[indk]]];   // Update indPortNode1 and indPortNode2
+            cout << "  mult = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
+            if (mark == 0){
                 cerr << "Port node could not be located within a conductor. Exiting now." << endl;
                 return 1;
+
             }
         }
         sys->conductor[indPortNode1 - 1].markPort = indi + 1;    // which port this excited conductor it corresponds to
