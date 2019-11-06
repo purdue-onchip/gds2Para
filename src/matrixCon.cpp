@@ -1206,32 +1206,6 @@ int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val) {
     return 0;
 }
 
-int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1) {    // totalnum is the total number of entries, leng is the row number
-    int indi = 0, indk = 0;
-    int *rowId2;
-    int count = 0, start = 0;
-
-    rowId2 = (int*)malloc((leng + 1) * sizeof(int));
-    rowId2[indk] = 0;
-    indk++; // Start with an increment
-    while (indi < totalnum) {
-        start = rowId[indi];
-        while (indi < totalnum && rowId[indi] == start) {
-            count++;
-            indi++;
-        }
-        rowId2[indk] = (count);
-        indk++;
-    }
-
-    for (indi = 0; indi <= leng; indi++) {
-        rowId1[indi] = rowId2[indi];
-    }
-
-    free(rowId2); rowId2 = NULL;
-    return 0;
-}
-
 #ifndef SKIP_PARDISO
 int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1) {
 
