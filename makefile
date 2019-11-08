@@ -4,6 +4,7 @@ LIB_PREFIX = gds
 BOOST_ROOT_DIR = ${BOOST_DIR}
 LIMBO_ROOT_DIR = ${LIMBO_DIR}
 LIMBO_LIB_DIR = ${LIMBO_DIR}/lib
+CPP_TASKFLOW_ROOT_DIR = ${CPP_TASKFLOW_DIR}
 PARSER_SPEF_ROOT_DIR = ${PARSER_SPEF_DIR}
 EIGEN_ROOT_DIR = ${EIGEN_DIR}
 MKL_ROOT_DIR = ${MKL_DIR}
@@ -34,7 +35,7 @@ endif
 endif
 
 # Special Libraries to Include
-INCLUDE =-I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(HYPRE_HEAD_DIR) $(MKL_COMP_FLAGS)
+INCLUDE =-I $(LIMBO_ROOT_DIR) -I $(CPP_TASKFLOW_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(HYPRE_HEAD_DIR) $(MKL_COMP_FLAGS)
 LIB =-L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -L $(HYPRE_LIB_DIR) -lHYPRE -lm
 
 ifdef false #ZLIB_DIR
@@ -57,7 +58,7 @@ LayoutAnalyzer: $(OBJS)
 
 $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboint.hpp $(SRCDIR)/solnoutclass.hpp
 	@$(MKDIR)
-	mpicxx -std=c++17 -g -lstdc++fs -O0 -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) $(MKL_COMP_FLAGS)
+	mpicxx -std=c++17 -g -lstdc++fs -O0 -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(CPP_TASKFLOW_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) $(MKL_COMP_FLAGS)
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)

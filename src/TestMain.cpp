@@ -242,6 +242,9 @@ int main(int argc, char** argv)
         {
             // Initialize SolverDataBase, mesh, and set variables for performance tracking
             clock_t t1 = clock();
+            tf::Executor executor; // Executor of taskflow
+            tf::Taskflow taskflow; // Taskflow graph
+            AsciiDataBase adb;
             SolverDataBase sdb;
             fdtdMesh sys;
             int status = 0; // Initialize as able to return successfully
@@ -253,101 +256,143 @@ int main(int argc, char** argv)
             size_t indExtension = inGDSIIFile.find_last_of(".");
 
             // Read GDSII file
-            AsciiDataBase adb;
-            adb.setFileName(inGDSIIFile);
-            GdsParser::GdsReader adbReader(adb);
-            adbIsGood = adbReader(inGDSIIFile.c_str());
-            if (adbIsGood)
+            tf::Task taskA = taskflow.placeholder();
+            taskA.name("Cmd Line / Initialize Vars");
+            tf::Task taskB = taskflow.emplace([&]()
             {
-                vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
-                adb.print(indCellPrint);
-                cout << "GDSII file read" << endl;
-            }
-            else
-            {
-                cerr << "Unable to read in GDSII file" << endl;
-                status = 1;
-                return status;
-            }
+                adb.setFileName(inGDSIIFile);
+                GdsParser::GdsReader adbReader(adb);
+                adbIsGood = adbReader(inGDSIIFile.c_str());
+                if (adbIsGood)
+                {
+                    vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
+                    adb.print(indCellPrint);
+                    cout << "GDSII file read" << endl;
+                }
+                else
+                {
+                    cerr << "Unable to read in GDSII file" << endl;
+                    status = 1;
+                    return status;
+                }
+            });
+            taskB.name("Read GDSII");
+            taskA.precede(taskB);
 
             // Read simulation input file
-            sdbIsGood = sdb.readSimInput(inSimFile);
-            if (sdbIsGood)
+            tf::Task taskC = taskflow.emplace([&]()
             {
-                cout << "Simulation input file read" << endl;
-            }
-            else
-            {
-                cerr << "Unable to read in simulation input file" << endl;
-                status = 1;
-                return status;
-            }
+                sdbIsGood = sdb.readSimInput(inSimFile);
+                if (sdbIsGood)
+                {
+                    cout << "Simulation input file read" << endl;
+                }
+                else
+                {
+                    cerr << "Unable to read in simulation input file" << endl;
+                    status = 1;
+                    return status;
+                }
+            });
+            taskC.name("Read Sim Input");
+            taskA.precede(taskC);
 
             // Append information so far to fdtdMesh
             unordered_set<double> portCoorx, portCoory;
-            string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
-            adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys, sdb.findLayerIgnore()); // Recursively save GDSII conductor information to sys
-            sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory); // Save simulation input information to sys
+            tf::Task taskD = taskflow.emplace([&]()
+            {
+                string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
+                adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys, sdb.findLayerIgnore()); // Recursively save GDSII conductor information to sys
+            });
+            taskD.name("GDSII Info to Solver");
+            taskB.precede(taskD);
+            tf::Task taskE = taskflow.emplace([&]()
+            {
+                sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory); // Save simulation input information to sys
+            });
+            taskE.name("Sim Input to Solver");
+            taskC.precede(taskE);
+            taskD.precede(taskE);
 
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;
             clock_t t2 = clock();
-            status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
-            if (status == 0)
+            tf::Task taskF = taskflow.emplace([&]()
             {
-                cout << "meshAndMark Success!" << endl;
-                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-            }
-            else
-            {
-                cerr << "meshAndMark Fail!" << endl;
-                return status;
-            }
-            //sys.print();
+                status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+                if (status == 0)
+                {
+                    cout << "meshAndMark Success!" << endl;
+                    cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                }
+                else
+                {
+                    cerr << "meshAndMark Fail!" << endl;
+                    return status;
+                }
+                //sys.print();
+            });
+            taskF.name("Mesh and Mark");
+            taskE.precede(taskF);
 
             // Set D_eps and D_sig
             clock_t t3 = clock();
-            status = matrixConstruction(&sys);
-            if (status == 0)
+            tf::Task taskG = taskflow.emplace([&]()
             {
-                cout << "matrixConstruction Success!" << endl;
-                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-            }
-            else {
-                cerr << "matrixConstruction Fail!" << endl;
-                return status;
-            }
-            //sys.print();
+                status = matrixConstruction(&sys);
+                if (status == 0)
+                {
+                    cout << "matrixConstruction Success!" << endl;
+                    cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                }
+                else {
+                    cerr << "matrixConstruction Fail!" << endl;
+                    return status;
+                }
+                //sys.print();
+            });
+            taskG.name("D_{eps} / D_{sig}");
+            taskF.precede(taskG);
 
             // Set port
             clock_t t4 = clock();
-            status = portSet(&sys, xi, yi, zi);
-            if (status == 0)
+            tf::Task taskH = taskflow.emplace([&]()
             {
-                cout << "portSet Success!" << endl;
-                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-            }
-            else
-            {
-                cerr << "portSet Fail!" << endl;
-                return status;
-            }
-            //sys.print();
+                status = portSet(&sys, xi, yi, zi);
+                if (status == 0)
+                {
+                    cout << "portSet Success!" << endl;
+                    cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                }
+                else
+                {
+                    cerr << "portSet Fail!" << endl;
+                    return status;
+                }
+                //sys.print();
+            });
+            taskH.name("Port Set");
+            taskF.precede(taskH);
 
             // Generate Stiffness Matrix
 #ifndef SKIP_GENERATE_STIFF
             clock_t t5 = clock();
-            status = generateStiff(&sys);
-            if (status == 0)
+            tf::Task taskI = taskflow.emplace([&]()
             {
-                cout << "generateStiff Success!" << endl;
-                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-            }
-            else
-            {
-                cerr << "generateStiff Fail!" << endl;
-                return status;
-            }
+                status = generateStiff(&sys);
+                if (status == 0)
+                {
+                    cout << "generateStiff Success!" << endl;
+                    cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                }
+                else
+                {
+                    cerr << "generateStiff Fail!" << endl;
+                    return status;
+                }
+            });
+            taskI.name("Generate S");
+            taskG.precede(taskI);
 #endif
 
             // Write object sys to files
@@ -357,76 +402,97 @@ int main(int argc, char** argv)
 
             // Parameter generation
             clock_t t6 = clock();
-            status = paraGenerator(&sys, xi, yi, zi);
-            if (status == 0)
+            tf::Task taskJ = taskflow.emplace([&]()
             {
-                cout << "paraGenerator Success!" << endl;
-                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-            }
-            else
-            {
-                cerr << "paraGenerator Fail!" << endl;
-                return status;
-            }
-            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                status = paraGenerator(&sys, xi, yi, zi);
+                if (status == 0)
+                {
+                    cout << "paraGenerator Success!" << endl;
+                    cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                }
+                else
+                {
+                    cerr << "paraGenerator Fail!" << endl;
+                    return status;
+                }
+                cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+                cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+            });
+            taskJ.name("Generate Z-param");
+            taskG.precede(taskJ);
+            taskH.precede(taskJ);
 
             // Network parameter storage
-            Parasitics newPara = sdb.getParasitics(); // Start with outdated parastics to update
-            newPara.saveNetworkParam('Z', sdb.getSimSettings().getFreqsHertz(), sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
-            sdb.setParasitics(newPara);
+            tf::Task taskK = taskflow.emplace([&]()
+            {
+                Parasitics newPara = sdb.getParasitics(); // Start with outdated parastics to update
+                newPara.saveNetworkParam('Z', sdb.getSimSettings().getFreqsHertz(), sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
+                sdb.setParasitics(newPara);
+            });
+            taskK.name("Z-param to Storage");
+            taskJ.precede(taskK);
 
             // Select Output File Based on Control Mode
-            cout << endl;
-            if ((strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
+            tf::Task taskL = taskflow.emplace([&]()
             {
-                // Output SPEF file
-                string outSPEFFile = argv[4];
-                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
-                sdb.setDesignName(adb.findNames().back());
-                sdb.setOutSPEF(outSPEFFile);
-                sdb.print(indLayerPrint);
-                bool sdbCouldDump = sdb.dumpSPEF();
-                cout << "File ready at " << outSPEFFile << endl;
-            }
-            else if ((strcmp(argv[1], "-sc") == 0) || (strcmp(argv[1], "--citi") == 0))
-            {
-                // Convert to S-parameters
-                Parasitics newPara = sdb.getParasitics(); // Start with copy of parastics to reinterpret
-                newPara.convertParam('S');
-                sdb.setParasitics(newPara);
+                cout << endl;
+                if ((strcmp(argv[1], "-sp") == 0) || (strcmp(argv[1], "--spef") == 0))
+                {
+                    // Output SPEF file
+                    string outSPEFFile = argv[4];
+                    vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                    sdb.setDesignName(adb.findNames().back());
+                    sdb.setOutSPEF(outSPEFFile);
+                    sdb.print(indLayerPrint);
+                    bool sdbCouldDump = sdb.dumpSPEF();
+                    cout << "File ready at " << outSPEFFile << endl;
+                }
+                else if ((strcmp(argv[1], "-sc") == 0) || (strcmp(argv[1], "--citi") == 0))
+                {
+                    // Convert to S-parameters
+                    Parasitics newPara = sdb.getParasitics(); // Start with copy of parastics to reinterpret
+                    newPara.convertParam('S');
+                    sdb.setParasitics(newPara);
 
-                // Output Common Instrumentation Transfer and Interchange file (CITIfile)
-                string outCITIFile = argv[4];
-                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
-                sdb.setDesignName(adb.findNames().back());
-                sdb.setOutCITI(outCITIFile);
-                sdb.print(indLayerPrint);
-                bool sdbCouldDump = sdb.dumpCITI();
-                cout << "File ready at " << outCITIFile << endl;
-            }
-            else if ((strcmp(argv[1], "-st") == 0) || (strcmp(argv[1], "--touchstone") == 0))
-            {
-                // Output Touchstone file
-                string outTstoneFile = argv[4];
-                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
-                sdb.setDesignName(adb.findNames().back());
-                sdb.setOutTouchstone(outTstoneFile);
-                sdb.print(indLayerPrint);
-                bool sdbCouldDump = sdb.dumpTouchstone();
-                cout << "File ready at " << outTstoneFile << endl;
-            }
-            else
-            {
-                // Output Xyce subcircuit file
-                string outXyceFile = argv[4];
-                vector<size_t> indLayerPrint = { 0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
-                sdb.setDesignName(adb.findNames().back());
-                sdb.setOutXyce(outXyceFile);
-                sdb.print(indLayerPrint);
-                sdbCouldDump = sdb.dumpXyce();
-                cout << "File ready at " << outXyceFile << endl;
-            }
+                    // Output Common Instrumentation Transfer and Interchange file (CITIfile)
+                    string outCITIFile = argv[4];
+                    vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                    sdb.setDesignName(adb.findNames().back());
+                    sdb.setOutCITI(outCITIFile);
+                    sdb.print(indLayerPrint);
+                    bool sdbCouldDump = sdb.dumpCITI();
+                    cout << "File ready at " << outCITIFile << endl;
+                }
+                else if ((strcmp(argv[1], "-st") == 0) || (strcmp(argv[1], "--touchstone") == 0))
+                {
+                    // Output Touchstone file
+                    string outTstoneFile = argv[4];
+                    vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                    sdb.setDesignName(adb.findNames().back());
+                    sdb.setOutTouchstone(outTstoneFile);
+                    sdb.print(indLayerPrint);
+                    bool sdbCouldDump = sdb.dumpTouchstone();
+                    cout << "File ready at " << outTstoneFile << endl;
+                }
+                else
+                {
+                    // Output Xyce subcircuit file
+                    string outXyceFile = argv[4];
+                    vector<size_t> indLayerPrint = { 0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                    sdb.setDesignName(adb.findNames().back());
+                    sdb.setOutXyce(outXyceFile);
+                    sdb.print(indLayerPrint);
+                    sdbCouldDump = sdb.dumpXyce();
+                    cout << "File ready at " << outXyceFile << endl;
+                }
+            });
+            taskL.name("Terminal / File Out");
+            taskK.precede(taskL);
+
+            // CPP-Taskflow Executor
+            //taskflow.dump(cout);
+            executor.run(taskflow);
+            executor.wait_for_all();
         }
         else
         {

@@ -20,6 +20,7 @@
 #include <complex>
 #include <ctime>
 #include <algorithm>
+#include <taskflow/taskflow.hpp>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Core>
 #include <Eigen/LU>
