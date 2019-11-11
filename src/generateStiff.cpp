@@ -589,6 +589,8 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     myint nnz = sys->leng_S;
     //cout << "Start to generate CSR form for S!\n";
     indi = 0;
+    //ofstream out;
+    //out.open("A1.txt", std::ofstream::out | std::ofstream::trunc);
     while (indi < nnz){
         start = RowId[indi];
         while (indi < nnz && RowId[indi] == start) {
@@ -603,12 +605,14 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
             }
+            //out << valc[indi].real() << " " << valc[indi].imag() << endl;
             count++;
             indi++;
         }
         RowId1[k] = (count);
         k++;
     }
+    //out.close();
     //cout << "(-w^2*D_eps+iw*D_sig+S) is generated!\n" << endl;
     myint mtype = 13;    /* Real complex unsymmetric matrix */
     myint nrhs = sys->numPorts;    /* Number of right hand sides */
@@ -655,7 +659,12 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     phase = -1;     // Release internal memory
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
 
-    //cout << "Solving (-w^2*D_eps+iwD_sig+S)x=-iwJ is complete!\n";
+    /*cout << "The entire norm of xr is ";
+    double total_norm = 0;
+    for (indi = 0; indi < size; indi++) {
+        total_norm += xr[indi].real() * xr[indi].real() + xr[indi].imag() * xr[indi].imag();
+    }
+    cout << sqrt(total_norm) << endl;*/
 
     
 
@@ -871,8 +880,8 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     for (myint i = 0; i < leng_A; i++){
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
-    //ofstream out;
-    //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
+    ofstream out;
+    out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < ARows; i++){
         if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
             continue;
@@ -889,14 +898,14 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SRowId[j] = sys->mapEdge[i];
             sys->SColId[j] = sys->mapEdge[v[count].first];
             sys->Sval[j] = v[count].second / MU;
-            //out << sys->SRowId[j] << " " << sys->SColId[j] << " " << sys->Sval[j] << endl;
+            out << sys->SRowId[j] << " " << sys->SColId[j] << " " << sys->Sval[j] << endl;
 
             j++;
             count++;
         }
         v.clear();
     }
-    //out.close();
+    out.close();
     leng_A = j;
 
     mkl_sparse_destroy(a);

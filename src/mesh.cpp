@@ -84,9 +84,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->nx = 1;
     xmin = xOrigOld[0];
     xmax = xOrigOld[numOrigOldXY - 1];
+    
     double disMaxx = MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     myint xMaxInd = (myint)((xmax - xmin) / disMaxx); // Cast to myint after floating-point division
-
+    
     for (indi = 1; indi < numOrigOldXY; indi++) {
         if (abs(xOrigOld[indi] - xOrigOld[indi - 1]) > disMinx) {
             sys->nx++;
@@ -154,7 +155,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     ymax = yOrigOld[numOrigOldXY - 1];
     double disMaxy = MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     myint yMaxInd = (myint)((ymax - ymin) / disMaxy); // Cast to myint after floating-point division
-
+    
     for (indi = 1; indi < numOrigOldXY; indi++) {
         if (abs(yOrigOld[indi] - yOrigOld[indi - 1]) > disMiny) {
             sys->ny++;
@@ -195,12 +196,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     myint county = indj;
     //sort(yn, yn + county + 1);
     //sys->ynu = (double*)calloc(sys->ny, sizeof(double));
-
+    
     indj = 0;
     //sys->ynu[0] = yn[0];
     //yi[sys->ynu[0]] = indj;
     temp = yn[0];
     for (indi = 1; indi <= county; indi++) {    // Set the discretization length around port to be equal
+        
         if (abs(yn[indi] - temp) > disMiny) {
             indj++;
             temp = yn[indi];
@@ -212,6 +214,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             //yi[yn[indi]] = indj;
         }
     }
+    
     sys->ny = indj + 1;
 
 
@@ -222,6 +225,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     double disMinz = minLayerDist * MINDISFRACZ; // Minimum discretization retained in z-direction after node merging is fraction of smallest distance between layers
     //double disMaxz = minLayerDist / MAXDISLAYERZ; // Maximum discretization distance in z-direction is fraction of closest distance between layers
     double *zn = (double*)calloc(2 * sys->numStack + 6 * numPortSides, sizeof(double));
+    
     zn[0] = zOrigOld[0];
     indj = 0;
     for (indi = 1; indi < numOrigOldZ; indi++) {
@@ -232,7 +236,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         zn[indj] = zOrigOld[indi]; // Save coordinates for nodes
     }
     myint countz = numOrigOldZ - 1;
-
     /********************************************************************************/
     /* More discretization math */
     sort(xn, xn + countx + 1);
@@ -255,7 +258,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     sys->nx = indj + 1;
     free(xn); xn = NULL;
-
+    
     sort(yn, yn + county + 1);
     yi.clear();
     sys->yn = (double*)calloc(sys->ny, sizeof(double));
@@ -277,7 +280,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     sys->ny = indj + 1;
     free(yn); yn = NULL;
-
+    
+    
     sort(zn, zn + countz + 1);
     zi.clear();
     sys->zn = (double*)calloc(sys->nz, sizeof(double));
@@ -296,7 +300,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
     sys->nz = indj + 1;
     free(zn); zn = NULL;
-
+    
     /* Putting the layer relative permittivities and conductivities in order of increasing z-coordinate */
     indi = 0;
     if (sys->stackBegCoor[0] == sys->zn[0]) {
@@ -348,16 +352,19 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (indi = 0; indi < sys->nx; indi++) {
         outc << sys->xn[indi] << " ";
     }
+    outc << endl << endl;
     outc.close();
     outc.open("y.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->ny; indi++) {
         outc << sys->yn[indi] << " ";
     }
+    outc << endl << endl;
     outc.close();
     outc.open("z.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->nz; indi++) {
         outc << sys->zn[indi] << " ";
     }
+    outc << endl << endl;
     outc.close();
 #endif
     
@@ -427,7 +434,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     // sys->printConductorIn();
     // Fast algorithm to find nodes inside conductors
-    sys->findInsideCond(xi, yi, zi);
+    cout << "Start to find nodes inside polygons!\n";
+    sys->findInsideCond_xrangey(xi, yi, zi);
         
 
     /*double px = -3225.6e-6, py = 806.4e-6, pz = 716e-6;
@@ -469,13 +477,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             layerMax = sys->conductorIn[indi].layer;
         }
     }
-
-    /*ofstream out;
+    cout << "Start to generate markEdge!\n";
+    ofstream out;
     out.open("markEdge.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_edge; indi++){
         out << sys->markEdge[indi] << endl;
     }
-    out.close();*/
+    out.close();
+    cout << "markEdge is generated!\n";
 #ifdef LOWER_BOUNDARY_PEC
     sys->conductorIn.push_back(fdtdOneCondct()); // the lower PEC plane
     sys->conductorIn.back().numVert = 4;
@@ -787,8 +796,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         sys->markNode[indi] = visited[indi];
     }
 
-    
-    /*outc.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
+    //ofstream outc;
+    outc.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_node; indi++) {
         if (visited[indi] != 0){
             outc << to_string(visited[indi]) << " ";
@@ -798,7 +807,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
     }
     outc << endl;
-    outc.close();*/
+    outc.close();
 
     /* Construct each isolated conductor */
     sys->numCdt = count;
@@ -910,30 +919,30 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     cond.clear();  // Note: this doesn't actually reduce memory usage, but the memory usage can be reduced by calling the destructor ~cond()
     cout << "cond2condIn is set sucessfully!" << endl;
 
-//#ifdef LOWER_BOUNDARY_PEC
-//    for (int i = 0; i < sys->N_edge_s; i++) {
-//        if (sys->lbde.find(i) == sys->lbde.end()) {
-//            sys->lbde.insert(i);
-//        }
-//    }
-//    for (int i = 0; i < sys->N_node_s; i++) {
-//        if (sys->lbdn.find(i) == sys->lbdn.end()) {
-//            sys->lbdn.insert(i);
-//        }
-//    }
-//#endif
-//#ifdef UPPER_BOUNDARY_PEC
-//    for (int i = sys->N_edge - sys->N_edge_s; i < sys->N_edge; i++) {
-//        if (sys->ubde.find(i) == sys->ubde.end()) {
-//            sys->ubde.insert(i);
-//        }
-//    }
-//    for (int i = sys->N_node - sys->N_node_s; i < sys->N_node; i++) {
-//        if (sys->ubdn.find(i) == sys->ubdn.end()) {
-//            sys->ubdn.insert(i);
-//        }
-//    }
-//#endif
+#ifdef LOWER_BOUNDARY_PEC
+    for (int i = 0; i < sys->N_edge_s; i++) {
+        if (sys->lbde.find(i) == sys->lbde.end()) {
+            sys->lbde.insert(i);
+        }
+    }
+    for (int i = 0; i < sys->N_node_s; i++) {
+        if (sys->lbdn.find(i) == sys->lbdn.end()) {
+            sys->lbdn.insert(i);
+        }
+    }
+#endif
+#ifdef UPPER_BOUNDARY_PEC
+    for (int i = sys->N_edge - sys->N_edge_s; i < sys->N_edge; i++) {
+        if (sys->ubde.find(i) == sys->ubde.end()) {
+            sys->ubde.insert(i);
+        }
+    }
+    for (int i = sys->N_node - sys->N_node_s; i < sys->N_node; i++) {
+        if (sys->ubdn.find(i) == sys->ubdn.end()) {
+            sys->ubdn.insert(i);
+        }
+    }
+#endif
     sys->bden = sys->lbde.size() + sys->ubde.size();    // the boundary edge number
     sys->setMapEdge();   // map the original edge to the new edge # with upper and lower boundaries
     /*outc.open("mapEdge.txt", std::ofstream::out | std::ofstream::trunc);
@@ -1114,7 +1123,7 @@ int matrixConstruction(fdtdMesh *sys) {
 #endif
         }
     }*/
-    /*ofstream out;
+    ofstream out;
     out.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
         out << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
@@ -1130,7 +1139,7 @@ int matrixConstruction(fdtdMesh *sys) {
             out << 0 << endl;
         }
     }
-    out.close();*/
+    out.close();
 
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
