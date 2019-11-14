@@ -327,10 +327,36 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     complex<double> *final_x;
     lapack_complex_double *J_h;
     double *ferr, *berr;
-
+    ofstream out;
 #ifndef SKIP_VH
-    int step = 100;
+    int step = 1000;
     sys->find_Vh(step);
+    //sys->find_reference_Vh();
+
+    /* Read from vv.txt for the Vh for single strip 2000 debug */
+    //string line;
+    //string::size_type sz;
+    //ifstream myfile("vv.txt");   // open vv.txt
+    //indj = 0;
+    //sys->leng_Vh = 1952;
+    //sys->Vh = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * sys->leng_Vh * sizeof(lapack_complex_double));
+    //if (!myfile.eof()) {    // if the file is open
+    //    while (!myfile.eof()) {
+    //        //cout << indj << endl;
+    //        getline(myfile, line);   // get one line from the file
+    //        indi = 0;
+    //        sys->Vh[indi * (sys->N_edge - sys->bden) + indj].real = stod(line, &sz);
+    //        sys->Vh[indi * (sys->N_edge - sys->bden) + indj].imag = stod(&line[sz + 2], &sz);
+    //        indi++;
+    //        while (indi < sys->leng_Vh) {
+    //            sys->Vh[indi * (sys->N_edge - sys->bden) + indj].real = stod(&line[sz + 2], &sz);
+    //            sys->Vh[indi * (sys->N_edge - sys->bden) + indj].imag = stod(&line[sz + 2], &sz);
+    //            indi++;
+    //        }
+    //        indj++;
+    //    }
+    //    myfile.close();
+    //}
 #endif
 
     /* HYPRE solves for each port are messy */
@@ -365,7 +391,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
         /* End of solving */
-
+        
 #ifndef SKIP_PARDISO
         t1 = clock();
         status = solveV0dSystem(sys, v0daJ, y0d, leng_v0d1);
@@ -384,7 +410,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d, beta, ydt);    // -V0d*(D_eps0\(V0da'*rsc))
         s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d, beta, ydat);    // -V0da*(D_eps0\(V0da'*rsc))
-
+        
         u0 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
         u0a = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
         nn = 0;
@@ -418,12 +444,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             yd1[indi] = ydt[indi];
             ydt[indi] *= -1.0 * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
-
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
         s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, ydt, beta, crhs);
         free(ydt); ydt = NULL;
+        free(ydat); ydat = NULL;
 
         double v0caJn, crhsn;
         v0caJn = 0;
@@ -484,7 +511,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
 
         }
-
+        
         free(v0caJ); v0caJ = NULL;
 
 
@@ -506,7 +533,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         for (indi = 0; indi < sys->N_edge; indi++) {
             yccp[indi] = -yc[indi] * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
-
+        
         alpha = 1;
         beta = 0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
@@ -534,12 +561,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         nn = sqrt(nn);
         nna = sqrt(nna);
-        cout << "Here\n";
+        
         for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
             u0[sys->N_edge - sys->bden + indi].real = (yd2[sys->mapEdgeR[indi]] + yc[sys->mapEdgeR[indi]]) / nn;    // u0c is the other vector in u0
             u0a[sys->N_edge - sys->bden + indi].real = (yd2a[sys->mapEdgeR[indi]] + yca[sys->mapEdgeR[indi]]) / nna;    // u0ca
         }
-        cout << "Here\n";
+        
         yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
         for (int id = 0; id < sys->N_edge; id++) {
             yd[id] = yd2[id] - (1i)*(yd1[id]);
@@ -547,6 +574,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         free(yd2); yd2 = NULL;
         free(yd1); yd1 = NULL;
+        free(yd2a); yd2a = NULL;
+        free(yca); yca = NULL;
 
         //sys->y = (complex<double>*)malloc(sys->N_edge*sizeof(complex<double>));
         for (indi = 0; indi < sys->N_edge; indi++) {
@@ -554,23 +583,41 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         free(yc); yc = NULL;
         
+        
+        /*out.open("U0.txt", std::ofstream::out | std::ofstream::trunc);
+        for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+            for (int inde = 0; inde < 2; inde++) {
+                out << u0[inde * (sys->N_edge - sys->bden) + indi].real << " ";
+            }
+            out << endl;
+        }
+        out.close();
+        out.open("U0a.txt", std::ofstream::out | std::ofstream::trunc);
+        for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+            for (int inde = 0; inde < 2; inde++) {
+                out << u0a[inde * (sys->N_edge - sys->bden) + indi].real << " ";
+            }
+            out << endl;
+        }
+        out.close();*/
         //sys->Construct_Z_V0(yd, sourcePort);
 #endif
 
         /* Calculate the Vh part */
         
-        
+        cout << "Begin to solve Vh!\n";
 #ifndef SKIP_VH
 
         // find the Vh eigenmodes
-        
+        //cout << "Begin to find Vh!\n";
+        //status = find_Vh(sys, u0, u0a, sourcePort);
+        //cout << "Finish finding Vh!\n";
 
         for (indi = 0; indi < sys->nfreq; indi++){
             // this point's frequency
 
             freq = sys->freqNo2freq(indi);
-
-            //status = V0_reference(sys, sourcePort, freq);
+            
 
             // Vh = Vh - u0*((u0a'*A*u0)\(u0a'*A*Vh))
             lapack_complex_double* V_re2 = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * sys->leng_Vh * sizeof(lapack_complex_double));
@@ -588,11 +635,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     }
                 }
             }
-            cout << "Vh is here\n";
+           
+            
             lapack_complex_double *y_re = (lapack_complex_double*)calloc(2 * sys->leng_Vh, sizeof(lapack_complex_double));    // u0a'*A*Vh
             status = matrix_multi('T', u0a, (sys->N_edge - sys->bden), 2, V_re2, (sys->N_edge - sys->bden), sys->leng_Vh, y_re);
             free(V_re2); V_re2 = NULL;
-            cout << "Vh here!\n";
+            
             lapack_complex_double *tmp3 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
             for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*u0
                 for (myint inde2 = 0; inde2 < 2; inde2++) {
@@ -608,7 +656,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                     }
                 }
             }
-
+            
             lapack_complex_double *tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
             status = matrix_multi('T', u0a, (sys->N_edge - sys->bden), 2, tmp3, (sys->N_edge - sys->bden), 2, tmp4);    // u0a'*A*u0
             ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
@@ -625,7 +673,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             free(y_re); y_re = NULL;
             free(tmp3); tmp3 = NULL;
             free(tmp4); tmp4 = NULL;
-            cout << "Vh here2\n";
+            
             lapack_complex_double *m_new = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * sys->leng_Vh, sizeof(lapack_complex_double));
             status = matrix_multi('N', u0, (sys->N_edge - sys->bden), 2, y_new, 2, sys->leng_Vh, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
             free(y_new); y_new = NULL;
@@ -637,7 +685,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
                 }
             }
             free(m_new); m_new = NULL;
-
+            
+            
             // Vh'*(A+C)*Vh
             int inde;
             myint start;
@@ -673,19 +722,18 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
             status = matrix_multi('T', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, tmp, (sys->N_edge - sys->bden), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
-            cout << "Vh left matrix is generated!\n";
-
+            
             rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
             J = (lapack_complex_double*)calloc(sys->N_edge - sys->bden, sizeof(lapack_complex_double));
             for (inde = 0; inde < sys->N_edge; inde++){
-                if (sys->mapEdge[inde] != -1) {
-                    J[sys->mapEdge[inde]].imag = -sys->J[inde] * freq * 2 * M_PI;
+                if (sys->J[inde] != 0) {
+                    J[sys->mapEdge[inde]].imag = -1 * freq * 2 * M_PI;
                 }
-
             }
+            
             status = matrix_multi('T', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, J, (sys->N_edge - sys->bden), 1, rhs_h);    // -1i*omega*V_re1'*J
             free(J); J = NULL;
-            cout << "Vh right hand side is generated!\n";
+            
 
             /* V_re1'*A*u */
             free(tmp);
@@ -717,7 +765,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             y_h = (lapack_complex_double*)calloc((sys->N_edge - sys->bden), sizeof(lapack_complex_double));
             status = matrix_multi('N', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-
+            
             final_x = (complex<double>*)malloc((sys->N_edge - sys->bden) * sizeof(complex<double>));
             for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
                 final_x[inde] = yd[sys->mapEdgeR[inde]].real() + y_h[inde].real + 1i * (yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq + y_h[inde].imag);
@@ -725,11 +773,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
             free(y_h); y_h = NULL;
             free(rhs_h); rhs_h = NULL;
-            cout << "final_x is generated!\n";
+            
             xr = (complex<double>*)calloc(sys->N_edge - sys->bden, sizeof(complex<double>));
-            cout << "xr is going to be generated!\n";
+            
             sys->reference1(indi, sourcePort, xr);
-            cout << "xr is generated!\n";
+            
             // Construct Z parameters
             sys->Construct_Z_V0_Vh(final_x, indi, sourcePort);
 
@@ -751,11 +799,15 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             free(Vh); Vh = NULL;
             free(xr); xr = NULL;
         }
+        free(sys->Vh); sys->Vh = NULL;
+        free(u0); u0 = NULL;
+        free(u0a); u0a = NULL;
 #endif
 
 #ifdef GENERATE_V0_SOLUTION
         free(yd); yd = NULL;
         free(sys->J); sys->J = NULL;
+        
 #endif
 
         // Solve system for x in (-omega^2 * D_eps + indj * omega * D_sigma + S) * x = -indj * omega * J

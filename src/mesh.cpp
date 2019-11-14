@@ -352,7 +352,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (indi = 0; indi < sys->nx; indi++) {
         outc << sys->xn[indi] << " ";
     }
-    outc << endl << endl;
+    outc<< endl << endl;
     outc.close();
     outc.open("y.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->ny; indi++) {
@@ -1126,14 +1126,14 @@ int matrixConstruction(fdtdMesh *sys) {
     ofstream out;
     out.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
-        out << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
+        out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
     }
     out.close();
 
     out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
         if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
-            out << SIGMA << endl;
+            out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << SIGMA << endl;
         }
         else{
             out << 0 << endl;

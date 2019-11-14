@@ -11,6 +11,7 @@
 #include <ctime>
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <complex>
 #include <vector>
@@ -46,16 +47,16 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (2e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (2e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (5e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
-#define MAXDISFRACY (0.05) // Fraction setting largest discretization in y-direction in terms of y-extent
+#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-16) // Time step for finding high-frequency modes (s)
+#define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-//#define UPPER_BOUNDARY_PEC
+#define UPPER_BOUNDARY_PEC
 //#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
@@ -1497,6 +1498,297 @@ public:
         }
     }
 
+    /* Generate V0 and V0a */
+    //void merge_V0(myint &v0num, myint &leng_v0, myint &v0anum, myint &leng_v0a, myint* map) {
+    //    v0num = 0;
+    //    leng_v0 = 0;
+    //    v0anum = 0;
+    //    leng_v0a = 0;
+    //    myint count = 1, nno, eno;
+    //    int* visited;
+    //    int indx, indy;
+
+    //    for (int iz = 0; iz < this->nz; iz++) {    // generate on each layer
+    //        for (int ix = 0; ix < this->nx; ix++) {
+    //            for (int iy = 0; iy < this->ny; iy++) {
+    //                nno = iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy;
+    //                if ((iz != 0 && iz != this->nz - 1) || (this->lbdn.find(nno) == this->lbdn.end() && this->ubdn.find(nno) == this->ubdn.end())) {   // if this node is not boundary node
+    //                    if (visited[ix * (this->N_cell_y + 1) + iy] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] == 0) {
+
+    //                        map[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+
+    //                        if (iz != 0) {    // this node is not on the bottom plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (iz != this->nz - 1) {   // this node is not on the top plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indx != 0) {    // this node is not on the left plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indx != this->nx - 1) {    // this node is not on the right plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indy != 0) {    // this node is not on the front plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indy != this->ny - 1) {   // this node is not on the back plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                    }
+
+    //                    count++;
+    //                }
+    //            }
+    //        }
+    //    }
+    //    for (auto node : this->ubdn) {
+    //        iz = sys->nz - 1;
+    //        indx = (node % this->N_node_s) / (this->N_cell_y + 1);
+    //        indy = (node % this->N_node_s) % (this->N_cell_y + 1);
+    //        map[node] = count;
+    //        if (iz != 0) {    // this node is not on the bottom plane
+    //            v0d1num++;
+    //            v0d1anum++;
+    //        }
+    //        //if (iz != this->nz - 1) {   // this node is not on the top plane
+    //        //    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+    //        //    compute_edgelink(eno, node1, node2);
+    //        //    if (node1 != ndi) {
+    //        //        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+    //        //            v0d1num++;
+    //        //            v0d1anum++;
+    //        //        }
+    //        //    }
+    //        //    else if (node2 != ndi) {
+    //        //        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+    //        //            v0d1num++;
+    //        //            v0d1anum++;
+    //        //        }
+    //        //    }
+    //        //}
+    //        if (indx != 0) {    // this node is not on the left plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+    //            compute_edgelink(eno, node1, node2);
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+
+    //        }
+    //        if (indx != this->nx - 1) {    // this node is not on the right plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //        }
+    //        if (indy != 0) {    // this node is not on the front plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+    //            compute_edgelink(eno, node1, node2);
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //        }
+    //        if (indy != this->ny - 1) {   // this node is not on the back plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+    //            compute_edgelink(eno, node1, node2);
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //        }
+    //    }
+    //    
+
+    //    this->V0RowId = (myint*)malloc(v0num, sizeof(myint));
+    //    this->v0ColId = (myint*)malloc(v0num, sizeof(myint));
+    //    this->v0val = (double*)malloc(v0num, sizeof(myint));
+    //    this->v0aval = (double*)malloc(v0anum, sizeof(double));
+    //    double lx_whole_avg = 0;
+    //    double ly_whole_avg = 0;
+    //    double lz_whole_avg = 0;
+    //    lx_whole_avg = (this->xn[this->nx - 1] - this->xn[0]) / (this->nx - 1);
+    //    ly_whole_avg = (this->yn[this->ny - 1] - this->yn[0]) / (this->ny - 1);
+    //    lz_whole_avg = (this->zn[this->nz - 1] - this->zn[0]) / (this->nz - 1);
+    //    v0num = 0;
+    //    v0anum = 0;
+
+    //    for (int iz = 0; iz < this->nz; iz++) {    // generate on each layer
+    //        for (int ix = 0; ix < this->nx; ix++) {
+    //            for (int iy = 0; iy < this->ny; iy++) {
+    //                nno = iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy;
+    //                if ((iz != 0 && iz != this->nz - 1) || (this->lbdn.find(nno) == this->lbdn.end() && this->ubdn.find(nno) == this->ubdn.end())) {   // if this node is not boundary node
+    //                    if (visited[ix * (this->N_cell_y + 1) + iy] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] == 0) {
+
+
+    //                        avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+    //                        if (iz != 0) {    // this node is not on the bottom plane
+    //                            eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+    //                            this->v0RowId[v0num] = eno;
+    //                            this->v0ColId[v0num] = leng_v0;
+    //                            this->V0val[v0num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+    //                            this->v0aval[v0anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);;
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (iz != this->nz - 1) {   // this node is not on the top plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indx != 0) {    // this node is not on the left plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indx != this->nx - 1) {    // this node is not on the right plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indy != 0) {    // this node is not on the front plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                        if (indy != this->ny - 1) {   // this node is not on the back plane
+    //                            v0num++;
+    //                            v0anum++;
+    //                        }
+    //                    }
+
+    //                    count++;
+    //                }
+    //            }
+    //        }
+    //    }
+    //    for (auto node : this->ubdn) {
+    //        iz = sys->nz - 1;
+    //        indx = (node % this->N_node_s) / (this->N_cell_y + 1);
+    //        indy = (node % this->N_node_s) % (this->N_cell_y + 1);
+    //        if (iz != 0) {    // this node is not on the bottom plane
+    //            v0d1num++;
+    //            v0d1anum++;
+    //        }
+    //        //if (iz != this->nz - 1) {   // this node is not on the top plane
+    //        //    eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+    //        //    compute_edgelink(eno, node1, node2);
+    //        //    if (node1 != ndi) {
+    //        //        if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+    //        //            v0d1num++;
+    //        //            v0d1anum++;
+    //        //        }
+    //        //    }
+    //        //    else if (node2 != ndi) {
+    //        //        if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+    //        //            v0d1num++;
+    //        //            v0d1anum++;
+    //        //        }
+    //        //    }
+    //        //}
+    //        if (indx != 0) {    // this node is not on the left plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+    //            compute_edgelink(eno, node1, node2);
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+
+    //        }
+    //        if (indx != this->nx - 1) {    // this node is not on the right plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //        }
+    //        if (indy != 0) {    // this node is not on the front plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+    //            compute_edgelink(eno, node1, node2);
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //        }
+    //        if (indy != this->ny - 1) {   // this node is not on the back plane
+    //            eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+    //            compute_edgelink(eno, node1, node2);
+    //            if (node1 != node) {
+    //                if (this->ubdn.find(node1) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //            else if (node2 != node) {
+    //                if (this->ubdn.find(node2) == this->ubdn.end()) {
+    //                    v0num++;
+    //                    v0anum++;
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
+
     /* Generate V0d: both V0d1 and V0d2 are put into V0d1 */
     void merge_v0d1(double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint &v0d1num, myint &leng_v0d1, myint &v0d1anum, myint &leng_v0d1a, myint *map, double sideLen){
         int *visited;
@@ -2221,7 +2513,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2231,7 +2523,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2245,7 +2537,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2255,7 +2547,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2269,7 +2561,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2279,7 +2571,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2293,7 +2585,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2303,7 +2595,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2317,7 +2609,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2327,7 +2619,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2341,7 +2633,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2351,7 +2643,7 @@ public:
                             this->v0d1ColId[v0d1num] = leng_v0d1;
                             this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
                             v0d1num++;
-                            this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0d1aval[v0d1anum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0d1anum++;
                         }
                     }
@@ -2447,7 +2739,19 @@ public:
                 leng_v0d1a++;
             }
         }
-
+        //ofstream out;
+        //out.open("V0d.txt", std::ofstream::out | std::ofstream::trunc);
+        //for (indi = 0; indi < v0d1num; indi++) {
+        //    out << this->v0d1RowId[indi] << " " << this->v0d1ColId[indi] << " ";
+        //    out << std::setprecision(15) << this->v0d1val[indi] << endl;
+        //}
+        //out.close();
+        //out.open("V0da.txt", std::ofstream::out | std::ofstream::trunc);
+        //for (indi = 0; indi < v0d1num; indi++) {
+        //    out << this->v0d1RowId[indi] << " " << this->v0d1ColId[indi] << " ";
+        //    out << std::setprecision(15) << this->v0d1aval[indi] << endl;
+        //}
+        //out.close();
         node_group.clear();
     }
 
@@ -3051,7 +3355,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
                             v0cnum++;
-                            this->v0caval[v0canum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3061,7 +3365,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
                             v0cnum++;
-                            this->v0caval[v0canum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3075,7 +3379,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
                             v0cnum++;
-                            this->v0caval[v0canum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3085,7 +3389,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
                             v0cnum++;
-                            this->v0caval[v0canum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3099,7 +3403,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = -1 / (this->xn[indx] - this->xn[indx - 1]);
                             v0cnum++;
-                            this->v0caval[v0canum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3109,7 +3413,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = -1 / (this->xn[indx] - this->xn[indx - 1]);
                             v0cnum++;
-                            this->v0caval[v0canum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3123,7 +3427,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = 1 / (this->xn[indx + 1] - this->xn[indx]);
                             v0cnum++;
-                            this->v0caval[v0canum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3133,7 +3437,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = 1 / (this->xn[indx + 1] - this->xn[indx]);
                             v0cnum++;
-                            this->v0caval[v0canum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3147,7 +3451,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = -1 / (this->yn[indy] - this->yn[indy - 1]);
                             v0cnum++;
-                            this->v0caval[v0canum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3157,7 +3461,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = -1 / (this->yn[indy] - this->yn[indy - 1]);
                             v0cnum++;
-                            this->v0caval[v0canum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3171,7 +3475,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = 1 / (this->yn[indy + 1] - this->yn[indy]);
                             v0cnum++;
-                            this->v0caval[v0canum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3181,7 +3485,7 @@ public:
                             this->v0cColId[v0cnum] = leng_v0c;
                             this->v0cval[v0cnum] = 1 / (this->yn[indy + 1] - this->yn[indy]);
                             v0cnum++;
-                            this->v0caval[v0canum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+                            this->v0caval[v0canum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
                             v0canum++;
                         }
                     }
@@ -3191,7 +3495,19 @@ public:
             leng_v0c++;
             leng_v0ca++;
         }
-
+        //ofstream out;
+        //out.open("V0c.txt", std::ofstream::out | std::ofstream::trunc);
+        //for (int indi = 0; indi < v0cnum; indi++) {
+        //    out << this->v0cRowId[indi] << " " << this->v0cColId[indi] << " ";
+        //    out << std::setprecision (15) << this->v0cval[indi] << endl;
+        //}
+        //out.close();
+        //out.open("V0ca.txt", std::ofstream::out | std::ofstream::trunc);
+        //for (int indi = 0; indi < v0cnum; indi++) {
+        //    out << this->v0cRowId[indi] << " " << this->v0cColId[indi] << " ";
+        //    out << std::setprecision (15) << this->v0caval[indi] << endl;
+        //}
+        //out.close();
     }
 
     void generateAc(myint *map, myint v0cnum, myint v0canum, myint leng_v0c, myint& leng_Ac) {
@@ -3353,23 +3669,23 @@ public:
             }
         }
         ofstream out;
-        out.open("H.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < k; i++){
-            for (j = 0; j < k; j++){
-                out << H1[j * k + i] << " ";
-            }
-            out << endl;
-        }
-        out.close();
+        //out.open("H.txt", std::ofstream::out | std::ofstream::trunc);
+        //for (i = 0; i < k; i++){
+        //    for (j = 0; j < k; j++){
+        //        out << std::fixed << std::setprecision(std::numeric_limits<double>::digits10 + 1) << H1[j * k + i] << " ";
+        //    }
+        //    out << endl;
+        //}
+        //out.close();
 
-        out.open("V.txt", std::ofstream::out | std::ofstream::trunc);
-        for (i = 0; i < 2 * (this->N_edge - this->bden); i++) {
-            for (j = 0; j < k + 1; j++) {
-                out << V[j * 2 * (this->N_edge - this->bden) + i] << " ";
-            }
-            out << endl;
-        }
-        out.close();
+        //out.open("V.txt", std::ofstream::out | std::ofstream::trunc);
+        //for (i = 0; i < 2 * (this->N_edge - this->bden); i++) {
+        //    for (j = 0; j < k + 1; j++) {
+        //        out << std::fixed << std::setprecision(std::numeric_limits<double>::digits10 + 1) << V[j * 2 * (this->N_edge - this->bden) + i] << " ";
+        //    }
+        //    out << endl;
+        //}
+        //out.close();
 
 
         /* LAPACKE_dgeev to find the eigenvalues and eigenvectors of H */
@@ -3456,7 +3772,7 @@ public:
         lapack_int ldh = n;    // the leading dimension of H
         double* wr, *wi;    // real and imaginary parts of eigenvalues, initialize ?
         lapack_int ldz = n;    // if compz = 'N' then ldz >= 1
-        double eps = 1e-5;    // esp * ma is considered to be zero eigenvalues
+        double eps = 1e-6;    // esp * ma is considered to be zero eigenvalues
 
         wr = new double[n];
         wi = new double[n];
@@ -3482,11 +3798,12 @@ public:
             wic[i] = wi[i] * scale;
             if (abs(wi[i]) > eps){
                 select[i] = 1;    // calculate the non-zero eigenvalues' eigenvectors
-                //out << wr[i] << " " << wi[i] << endl;
+                //cout << wr[i] << " " << wi[i] << endl;
                 mm++;
             }
             else{
                 select[i] = 0;
+                //cout << wr[i] << " " << wi[i] << endl;
             }
         }
         
@@ -3518,6 +3835,8 @@ public:
                 if (select[j] == 1){   // always generate the complex conjugate pairs eigenvectors
                     //out << vr[temp * n + i] << " " << vr[(temp + 1) * n + i] << " ";
                     //out << vr[temp * n + i] << " " << -vr[(temp + 1) * n + i] << " ";
+                    //if (i == 0)
+                    //    cout << wrc[j] << " " << wic[j] << endl;
                     v[temp * n + i].real = vr[temp * n + i];
                     v[temp * n + i].imag = vr[(temp + 1) * n + i];
                     v[(temp + 1) * n + i].real = vr[temp * n + i];
@@ -3525,6 +3844,8 @@ public:
                     temp++;
                     temp++;
                     j++;
+                    //if (i == 0)
+                    //    cout << wrc[j] << " " << wic[j] << endl;
                 }
             }
             //out << endl;
@@ -3555,6 +3876,7 @@ public:
             }
         }
         this->leng_Vh = mm;
+        cout << "There are " << this->leng_Vh << " number of columns in Vh!" << endl;
         delete[] v;
 
 
@@ -3563,6 +3885,107 @@ public:
         delete[] V;
         delete[] H;
 
+    }
+
+    /* Reference eigenvectors for the generalized eigenvalue problem [-S, 0; 0, D_eps]v = \lambda [D_sig, D_eps; D_eps, 0]v */
+    void find_reference_Vh() {
+        double scale = 1e+14;
+        double* A, *B;
+        myint indi = 0, indj;
+
+        A = new double[4 * (this->N_edge - this->bden) * (this->N_edge - this->bden)]();
+        B = new double[4 * (this->N_edge - this->bden) * (this->N_edge - this->bden)]();
+
+        // set A
+        while (indi < this->leng_S) {
+            A[this->SColId[indi] * (this->N_edge - this->bden) * 2 + this->SRowId[indi]] = -this->Sval[indi];
+            indi++;
+        }
+        indi = 0;
+        while (indi < (this->N_edge - this->bden)) {
+            A[(this->N_edge - this->bden + indi) * (this->N_edge - this->bden) * 2 + this->N_edge - this->bden + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+            indi++;
+        }
+
+        // set B
+        indi = 0;
+        while (indi < (this->N_edge - this->bden)) {
+            if (this->markEdge[this->mapEdgeR[indi]] != 0) {
+                B[indi * (this->N_edge - this->bden) * 2 + indi] = scale * SIGMA;
+            }
+            B[(this->N_edge - this->bden + indi) * (this->N_edge - this->bden) * 2 + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+            B[indi * (this->N_edge - this->bden) * 2 + this->N_edge - this->bden + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+            indi++;
+        }
+        
+        lapack_int n;
+        char jobvl, jobvr;
+        lapack_int lda, ldb, ldvl, ldvr;
+        double *alphar, *alphai, *beta, *vl, *vr, *lscale, *rscale;
+        n = (this->N_edge - this->bden) * 2;
+        jobvl = 'N'; jobvr = 'V';
+        lda = n; ldb = n;
+        ldvl = n; ldvr = n;
+        alphar = new double[n];
+        alphai = new double[n];
+        beta = new double[n];
+        vl = new double[n * n];
+        vr = new double[n * n];
+        lscale = new double[n];
+        rscale = new double[n];
+
+        cout << "Begin to solve the generalized eigenvalue problem!\n";
+        lapack_int info = LAPACKE_dggev(LAPACK_COL_MAJOR, jobvl, jobvr, n, A, lda, B, ldb, alphar, alphai, beta, vl, ldvl, vr, ldvr);
+        if (info != 0) {
+            cout << "Generalized eigenvalue problem ddgev is failed!\n";
+            return;
+        }
+        cout << "Finish solving the generalized eigenvalue problem!\n";
+        double eps = 1e-4;
+        this->leng_Vh = 0;
+        ofstream out;
+        //out.open("ww.txt", std::ofstream::out | std::ofstream::trunc);
+        for (indi = 0; indi < n; indi++) {
+            if (abs(alphai[indi] / beta[indi]) > eps && abs(alphar[indi] / beta[indi]) < 1) {   // if the imaginary part of Vh is not so small
+                //out << alphar[indi] / beta[indi] << " " << alphai[indi] / beta[indi] << endl;
+                this->leng_Vh++;
+            }
+        }
+        //out.close();
+        out.open("vv.txt", std::ofstream::out | std::ofstream::trunc);
+        this->Vh = new lapack_complex_double[(this->N_edge - this->bden) * this->leng_Vh];
+        indi = 0; indj = 0;
+        while (indi < n) {
+            if (abs(alphai[indi] / beta[indi]) > eps && abs(alphar[indi] / beta[indi]) < 1) {    // the eigenvalue should have a small real part and a non-zero imaginary part
+                for (int indk = 0; indk < this->N_edge - this->bden; indk++) {
+                    this->Vh[indj * (this->N_edge - this->bden) + indk].real = vr[indi * (this->N_edge - this->bden) * 2 + indk];
+                    this->Vh[indj * (this->N_edge - this->bden) + indk].imag = vr[(indi + 1) * (this->N_edge - this->bden) * 2 + indk];
+                    this->Vh[(indj + 1) * (this->N_edge - this->bden) + indk].real = vr[indi * (this->N_edge - this->bden) * 2 + indk];
+                    this->Vh[(indj + 1) * (this->N_edge - this->bden) + indk].imag = -vr[(indi + 1) * (this->N_edge - this->bden) * 2 + indk];
+                }
+                indj++;
+                indj++;
+                indi++;
+            }
+            indi++;
+        }
+        for (indi = 0; indi < this->N_edge - this->bden; indi++) {
+            for (indj = 0; indj < this->leng_Vh; indj++) {
+                out << this->Vh[indj * (this->N_edge - this->bden) + indi].real << " " << this->Vh[indj * (this->N_edge - this->bden) + indi].imag << " ";
+            }
+            out << endl;
+        }
+        out.close();
+        cout << "Vh's number of columns is " << this->leng_Vh << endl;
+        delete[] A;
+        delete[] B;
+        delete[] alphar;
+        delete[] alphai;
+        delete[] beta;
+        delete[] vl;
+        delete[] vr;
+        delete[] lscale;
+        delete[] rscale;
     }
 
     /* Calculate the reference */
@@ -4018,7 +4441,7 @@ public:
         free(this->v0d2aval);
         free(this->v0d2avalo);
         free(this->yd);
-        free(this->Vh);
+        delete[] this->Vh;
         free(this->SRowId);
         free(this->SColId);
         free(this->Sval);

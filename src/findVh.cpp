@@ -12,17 +12,17 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     double tau = 1.e-11;
     double t0 = t0n * tau;
     myint nt = 2 * t0 / dt;
-    myint SG = 100;
+    myint SG = 1000;
     double zero_value = 1e10;    // smaller than this value is discarded as null-space eigenvector
-    double eps1 = 1.e-5;    // weight
+    double eps1 = 1.e-7;    // weight
     double eps2 = 1.e-2;    // wavelength error tolerance
-    double *rsc = (double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(double));
-    double *xr = (double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 3, sizeof(double));
+    double *rsc = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));
+    double *xr = (double*)calloc((sys->N_edge - sys->bden) * 3, sizeof(double));
     myint start;
     myint index;
     int l = 0;
     
-    vector<double> U0_base(sys->N_edge - 2 * sys->N_edge_s, 0);
+    vector<double> U0_base(sys->N_edge - sys->bden, 0);
     vector<vector<double>> U0;   // Since I need to put in new vectors into U0, I need dynamic storage
     double *U0c, *m0;
     vector<vector<double>> temp, temp1, temp2;
@@ -64,7 +64,7 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     double maxvalue = 1.e+100;
     lapack_complex_double *tau_qr;
     int U0_i = 0;
-    double zero_norm = 1.e-5;
+    double zero_norm = 1.e-7;
     lapack_complex_double *m_new;
     lapack_int *ipiv;
     lapack_int iter;
@@ -78,11 +78,11 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     lapack_complex_double *m_re;
     double scale = 1.e+12;
     lapack_complex_double *RR;
-    
+    double eps = 1e-5;
     for (int ind = 1; ind <= nt; ind++){    // time marching to find the repeated eigenvectors
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
-                rsc[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] - sys->N_edge_s] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
+                rsc[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 2000 * exp(-pow((((dt * ind) - t0) / tau), 2)) + 2000 * (dt * ind - t0) * exp(-pow(((dt * ind - t0) / tau), 2)) * (-2 * (dt * ind - t0) / pow(tau, 2));
 
             }
         }
@@ -93,12 +93,18 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
         while (index < sys->leng_S){
             start = sys->SRowId[index];
             while (index < sys->leng_S && sys->SRowId[index] == start){
-                xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + sys->SRowId[index]] += sys->Sval[index] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + sys->SColId[index]] * (-2) * pow(dt, 2);
+                xr[2 * (sys->N_edge - sys->bden) + sys->SRowId[index]] += sys->Sval[index] * xr[1 * (sys->N_edge - sys->bden) + sys->SColId[index]] * (-2) * pow(dt, 2);
                 index++;
             }
-            xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + start] += -rsc[start] * 2 * pow(dt, 2) + dt * sys->sig[start + sys->N_edge_s] * xr[start] - 2 * sys->eps[start + sys->N_edge_s] * xr[start] + 4 * sys->eps[start + sys->N_edge_s] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + start];
-            xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + start] /= (2 * sys->eps[start + sys->N_edge_s] + dt * sys->sig[start + sys->N_edge_s]);
-            nn += xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + start] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + start];
+            if (sys->markEdge[sys->mapEdgeR[start]] != 0){
+                xr[2 * (sys->N_edge - sys->bden) + start] += -rsc[start] * 2 * pow(dt, 2) + dt * SIGMA * xr[start] - 2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[1 * (sys->N_edge - sys->bden) + start];
+                xr[2 * (sys->N_edge - sys->bden) + start] /= (2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 + dt * SIGMA);
+            }
+            else {
+                xr[2 * (sys->N_edge - sys->bden) + start] += -rsc[start] * 2 * pow(dt, 2) - 2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[1 * (sys->N_edge - sys->bden) + start];
+                xr[2 * (sys->N_edge - sys->bden) + start] /= (2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0);
+            }
+            nn += xr[1 * (sys->N_edge - sys->bden) + start] * xr[1 * (sys->N_edge - sys->bden) + start];
         }
         nn = sqrt(nn);
         //cout << "Step " << ind << "'s norm is " << nn << endl;
@@ -111,8 +117,8 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             Cr_p.push_back(Cr_base);
             D_sigr_p.push_back(Cr_base);
             D_epsr_p.push_back(Cr_base);
-            for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-                U0[U0_i][inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] / nn;
+            for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){
+                U0[U0_i][inde] = xr[1 * (sys->N_edge - sys->bden) + inde] / nn;
             }
             U0_i++;
             Cr = (double*)calloc(l * l, sizeof(double));
@@ -126,8 +132,14 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                     temp[0][sys->SRowId[index]] += sys->Sval[index] * U0[U0_i - 1][sys->SColId[index]];
                     index++;
                 }
-                temp1[0][start] = sqrt(sys->sig[start + sys->N_edge_s]) * U0[U0_i - 1][start];
-                temp2[0][start] = sqrt(sys->eps[start + sys->N_edge_s]) * U0[U0_i - 1][start];
+                if (sys->markEdge[sys->mapEdgeR[start]] != 0) {
+                    temp1[0][start] = sqrt(SIGMA) * U0[U0_i - 1][start];
+                    temp2[0][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                }
+                else {
+                    temp1[0][start] = 0;
+                    temp2[0][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                }
             }
             for (myint inde = 0; inde < l; inde++){
                 Cr_p.push_back(Cr_base);
@@ -189,10 +201,11 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             
             info = LAPACKE_dggev(LAPACK_COL_MAJOR, jobvl, jobvr, n, Ar, lda, Br, ldb, alphar, alphai, beta, vl, ldvl, vr, ldvr);
             for (myint inde = 0; inde < 2 * l; inde++){
-                if (alphai[inde] == 0){
-                    dp.push_back(make_pair(alphar[inde] / beta[inde] * scale, inde));
-                }
-                else{
+                //if (alphai[inde] == 0){
+                //    dp.push_back(make_pair(alphar[inde] / beta[inde] * scale, inde));
+                //}
+                //else{
+                if (abs(alphai[inde] / beta[inde]) > eps) {   // only those imaginary part larger than 0 eigenvalues are considered
                     dp.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
                     inde++;
                     dp.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
@@ -211,14 +224,14 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             free(beta); beta = NULL;
         }
         else if (ind % SG == 0){
-            tmp = (double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * sizeof(double));
-            tmp1 = (double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(double));
+            tmp = (double*)malloc((sys->N_edge - sys->bden) * sizeof(double));
+            tmp1 = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));
             tmp2 = (double*)calloc(U0_i, sizeof(double));
             nn = 0;
             nor = 0;
-            for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-                tmp[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                nor += xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
+            for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
+                tmp[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
+                nor += xr[1 * (sys->N_edge - sys->bden) + inde] * xr[1 * (sys->N_edge - sys->bden) + inde];
             }
             nor = sqrt(nor);
 
@@ -266,15 +279,15 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             
             for (myint inde = 0; inde < U0_i; inde++){
                 nn = 0;
-                for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
+                for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
                     nn += tmp[inde1] * U0[inde][inde1];
                 }
-                for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
+                for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
                     tmp[inde1] -= nn * U0[inde][inde1];
                 }
             }
             nn = 0;
-            for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
+            for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){
                 nn += tmp[inde] * tmp[inde];
             }
             nn = sqrt(nn);
@@ -297,16 +310,16 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                 temp.push_back(U0_base);
                 temp1.push_back(U0_base);
                 temp2.push_back(U0_base);
-                for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                     U0[U0_i][inde] = tmp[inde] / nn;
                 }
                 U0_i++;
             }
             else{     // no new information go to the next loop
-                for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-                    xr[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                    xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
+                for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){
+                    xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
+                    xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
+                    xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
                 }
                 free(tmp); tmp = NULL;
                 free(tmp1); tmp1 = NULL;
@@ -337,15 +350,21 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                     temp[(U0_i - 1)][sys->SRowId[index]] += sys->Sval[index] * U0[(U0_i - 1)][sys->SColId[index]];
                     index++;
                 }
-                temp1[(U0_i - 1)][start] = sqrt(sys->sig[start + sys->N_edge_s]) * U0[(U0_i - 1)][start];
-                temp2[(U0_i - 1)][start] = sqrt(sys->eps[start + sys->N_edge_s]) * U0[(U0_i - 1)][start];
+                if (sys->markEdge[sys->mapEdgeR[start]] != 0) {
+                    temp1[(U0_i - 1)][start] = sqrt(SIGMA) * U0[U0_i - 1][start];
+                    temp2[(U0_i - 1)][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                }
+                else {
+                    temp1[(U0_i - 1)][start] = 0;
+                    temp2[(U0_i - 1)][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                }
             }
             index = U0_i - 1;
             Cr_p.push_back(Cr_base);
             D_sigr_p.push_back(Cr_base);
             D_epsr_p.push_back(Cr_base);
             for (myint inde2 = 0; inde2 < U0_i; inde2++){
-                for (myint inde3 = 0; inde3 < (sys->N_edge - 2 * sys->N_edge_s); inde3++){
+                for (myint inde3 = 0; inde3 < (sys->N_edge - sys->bden); inde3++){
                     Cr[index * U0_i + inde2] += U0[inde2][inde3] * temp[index][inde3];
                     D_sigr[index * U0_i + inde2] += temp1[inde2][inde3] * temp1[index][inde3];
                     D_epsr[index * U0_i + inde2] += temp2[inde2][inde3] * temp2[index][inde3];
@@ -358,7 +377,7 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 
             index = U0_i - 1;
             for (myint inde2 = 0; inde2 < U0_i - 1; inde2++){
-                for (myint inde3 = 0; inde3 < (sys->N_edge - 2 * sys->N_edge_s); inde3++){
+                for (myint inde3 = 0; inde3 < (sys->N_edge - sys->bden); inde3++){
                     Cr[inde2 * U0_i + index] += U0[index][inde3] * temp[inde2][inde3];
                     D_sigr[inde2 * U0_i + index] += temp1[index][inde3] * temp1[inde2][inde3];
                     D_epsr[inde2 * U0_i + index] += temp2[index][inde3] * temp2[inde2][inde3];
@@ -459,10 +478,11 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             
 
             for (myint inde = 0; inde < 2 * U0_i; inde++){
-                if (alphai[inde] == 0){
-                    dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale, inde));
-                }
-                else{
+                //if (alphai[inde] == 0){
+                //    dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale, inde));
+                //}
+                //else{
+                if (abs(alphai[inde] / beta[inde]) > eps) {    // only those imaginary part larger than 0 eigenvalues are considered
                     dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
                     inde++;
                     dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
@@ -594,40 +614,40 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             }
             cout << endl;*/
             free(V_re);
-            V_re = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_re, sizeof(lapack_complex_double));
+            V_re = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * i_re, sizeof(lapack_complex_double));
             free(V_nre);
-            V_nre = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_nre, sizeof(lapack_complex_double));
+            V_nre = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * i_nre, sizeof(lapack_complex_double));
 
             i_re = 0;
             
             for (myint rei = 0; rei < re.size(); rei++){
                 if (dp[re[rei]].first.imag() == 0){    // one eigenvector corresponding to real eigenvalue
-                    for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                         for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                            V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].real += U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];    // only get the first half eigenvectors
+                            V_re[i_re * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];    // only get the first half eigenvectors
                         }
                     }
                     i_re++;
                 }
                 else{    // two eigenvectors corresponding to imaginary eigenvalue
                     if (dp[re[rei]].first.imag() > 0){
-                        for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                        for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                             for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                                V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
-                                V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag + U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-                                V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[(dp[re[rei]].second) * 2 * (U0_i - 1) + inde3];
-                                V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag - U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[i_re * (sys->N_edge - sys->bden) + inde].real = V_re[i_re * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[i_re * (sys->N_edge - sys->bden) + inde].imag = V_re[i_re * (sys->N_edge - sys->bden) + inde].imag + U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].real = V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[(dp[re[rei]].second) * 2 * (U0_i - 1) + inde3];
+                                V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].imag = V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].imag - U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
                             }
                         }
                         rei++;
                     }
                     else if (dp[re[rei]].first.imag() < 0){
-                        for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                        for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                             for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                                V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-                                V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[i_re * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag - U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
-                                V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-                                V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[(i_re + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag + U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[i_re * (sys->N_edge - sys->bden) + inde].real = V_re[i_re * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[i_re * (sys->N_edge - sys->bden) + inde].imag = V_re[i_re * (sys->N_edge - sys->bden) + inde].imag - U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].real = V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].imag = V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].imag + U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
                             }
                         }
                         rei++;
@@ -640,41 +660,41 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
             i_nre = 0;
             for (myint nrei = 0; nrei < nre.size(); nrei++){
                 if (abs(dp[nre[nrei]].first) > maxvalue){    // if this eigenvalue is infinity
-                    for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                         for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                            V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
+                            V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
                         }
                     }
                     i_nre++;
                     continue;
                 }
                 if (dp[nre[nrei]].first.imag() == 0){    // one eigenvector corresponding to real eigenvalue
-                    for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                         for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                            V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
+                            V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
                         }
                     }
                     i_nre++;
                 }
                 else{    // two eigenvectors corresponding to imaginary eigenvalue
                     if (dp[nre[nrei]].first.imag() > 0){
-                        for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                        for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                             for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                                V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-                                V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag + U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-                                V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[(dp[nre[nrei]].second) * 2 * (U0_i - 1) + inde3];
-                                V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag - U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real = V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[i_nre * (sys->N_edge - sys->bden) + inde].imag = V_nre[i_nre * (sys->N_edge - sys->bden) + inde].imag + U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].real = V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[(dp[nre[nrei]].second) * 2 * (U0_i - 1) + inde3];
+                                V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].imag = V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].imag - U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
                             }
                         }
                         nrei++;
                     }
                     else if (dp[nre[nrei]].first.imag() < 0){
-                        for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
+                        for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
                             for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-                                V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-                                V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_nre[i_nre * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag - U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-                                V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].real + U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-                                V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_nre[(i_nre + 1) * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag + U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real = V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[i_nre * (sys->N_edge - sys->bden) + inde].imag = V_nre[i_nre * (sys->N_edge - sys->bden) + inde].imag - U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].real = V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].real + U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
+                                V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].imag = V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].imag + U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
                             }
                         }
                         nrei++;
@@ -754,13 +774,13 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 
                 for (myint inde = 0; inde < i_re; inde++){
                     nn = 0;
-                    for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
-                        nn += pow(V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real, 2) + pow(V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag, 2);
+                    for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
+                        nn += pow(V_re[inde * (sys->N_edge - sys->bden) + inde1].real, 2) + pow(V_re[inde * (sys->N_edge - sys->bden) + inde1].imag, 2);
                     }
                     nn = sqrt(nn);
-                    for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
-                        V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real / nn;
-                        V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag / nn;
+                    for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
+                        V_re[inde * (sys->N_edge - sys->bden) + inde1].real = V_re[inde * (sys->N_edge - sys->bden) + inde1].real / nn;
+                        V_re[inde * (sys->N_edge - sys->bden) + inde1].imag = V_re[inde * (sys->N_edge - sys->bden) + inde1].imag / nn;
                     }
                     /*for (myint inde1 = inde + 1; inde1 < i_re; inde1++){
                         nnr = 0;
@@ -792,22 +812,22 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 
                 if (i_nre > 0){
                     tmp3 = (lapack_complex_double*)calloc(i_re * i_nre, sizeof(lapack_complex_double));
-                    tmp4 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_nre, sizeof(lapack_complex_double));
+                    tmp4 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * i_nre, sizeof(lapack_complex_double));
                     m_re = (lapack_complex_double*)calloc(i_re * i_re, sizeof(lapack_complex_double));
                     
-                    status = matrix_multi('T', V_re, (sys->N_edge - 2 * sys->N_edge_s), i_re, V_nre, (sys->N_edge - 2 * sys->N_edge_s), i_nre, tmp3);
-                    status = matrix_multi('T', V_re, (sys->N_edge - 2 * sys->N_edge_s), i_re, V_re, (sys->N_edge - 2 * sys->N_edge_s), i_re, m_re);
+                    status = matrix_multi('T', V_re, (sys->N_edge - sys->bden), i_re, V_nre, (sys->N_edge - sys->bden), i_nre, tmp3);
+                    status = matrix_multi('T', V_re, (sys->N_edge - sys->bden), i_re, V_re, (sys->N_edge - sys->bden), i_re, m_re);
                     ipiv = (lapack_int*)malloc((i_nre + i_re) * sizeof(lapack_int));
                     info = LAPACKE_zgesv(LAPACK_COL_MAJOR, i_re, i_nre, m_re, i_re, ipiv, tmp3, i_re);// , y_nre1, i_nre + i_re, &iter);
-                    status = matrix_multi('N', V_re, (sys->N_edge - 2 * sys->N_edge_s), i_re, tmp3, i_re, i_nre, tmp4);
+                    status = matrix_multi('N', V_re, (sys->N_edge - sys->bden), i_re, tmp3, i_re, i_nre, tmp4);
                     free(ipiv); ipiv = NULL;
                     free(m_re); m_re = NULL;
 
                     //V_nre_norm = (double*)calloc(i_nre, sizeof(double));
                     for (myint inde2 = 0; inde2 < i_nre; inde2++){
-                        for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-                            V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real -= tmp4[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
-                            V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag -= tmp4[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
+                        for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
+                            V_nre[inde2 * (sys->N_edge - sys->bden) + inde].real -= tmp4[inde2 * (sys->N_edge - sys->bden) + inde].real;
+                            V_nre[inde2 * (sys->N_edge - sys->bden) + inde].imag -= tmp4[inde2 * (sys->N_edge - sys->bden) + inde].imag;
                             //V_nre_norm[inde2] += pow(V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real, 2) + pow(V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag, 2);
                         }
                         //V_nre_norm[inde2] = sqrt(V_nre_norm[inde2]);
@@ -817,13 +837,13 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                     // orthogonalize V_nre by using Modified GS
                     for (myint inde = 0; inde < i_nre; inde++){
                         nn = 0;
-                        for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
-                            nn += pow(V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real, 2) + pow(V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag, 2);
+                        for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
+                            nn += pow(V_nre[inde * (sys->N_edge - sys->bden) + inde1].real, 2) + pow(V_nre[inde * (sys->N_edge - sys->bden) + inde1].imag, 2);
                         }
                         nn = sqrt(nn);
-                        for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
-                            V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real / nn;
-                            V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag / nn;
+                        for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
+                            V_nre[inde * (sys->N_edge - sys->bden) + inde1].real = V_nre[inde * (sys->N_edge - sys->bden) + inde1].real / nn;
+                            V_nre[inde * (sys->N_edge - sys->bden) + inde1].imag = V_nre[inde * (sys->N_edge - sys->bden) + inde1].imag / nn;
                         }
                         /*for (myint inde1 = inde + 1; inde1 < i_nre; inde1++){
                             nnr = 0;
@@ -933,10 +953,10 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                 free(alphar); alphar = NULL;
                 free(alphai); alphai = NULL;
                 free(beta); beta = NULL;
-                for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-                    xr[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                    xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
+                for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
+                    xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
+                    xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
+                    xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
                 }
                 /*if (ind >= 5000)
                     break;*/
@@ -970,10 +990,10 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                 free(alphar); alphar = NULL;
                 free(alphai); alphai = NULL;
                 free(beta); beta = NULL;
-                for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-                    xr[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                    xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-                    xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
+                for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
+                    xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
+                    xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
+                    xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
                 }
                 /*if (ind >= 5000)
                     break;*/
@@ -984,31 +1004,31 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                 t1 = clock();
                 y_new = (lapack_complex_double*)calloc((i_re + i_nre), sizeof(lapack_complex_double));
                 for (myint inde = 0; inde < i_re; inde++){
-                    for (myint inde2 = 0; inde2 < (sys->N_edge - 2 * sys->N_edge_s); inde2++){
-                        y_new[inde].real = y_new[inde].real + (V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real) * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2];    //conjugate transpose
-                        y_new[inde].imag = y_new[inde].imag - (V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag) * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2];    //conjugate transpose
+                    for (myint inde2 = 0; inde2 < (sys->N_edge - sys->bden); inde2++){
+                        y_new[inde].real = y_new[inde].real + (V_re[inde * (sys->N_edge - sys->bden) + inde2].real) * xr[1 * (sys->N_edge - sys->bden) + inde2];    //conjugate transpose
+                        y_new[inde].imag = y_new[inde].imag - (V_re[inde * (sys->N_edge - sys->bden) + inde2].imag) * xr[1 * (sys->N_edge - sys->bden) + inde2];    //conjugate transpose
 
                     }
                 }
                 for (myint inde = 0; inde < i_nre; inde++){
-                    for (myint inde2 = 0; inde2 < (sys->N_edge - 2 * sys->N_edge_s); inde2++){
-                        y_new[inde + i_re].real = y_new[inde + i_re].real + V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2];    // conjugate transpose
-                        y_new[inde + i_re].imag = y_new[inde + i_re].imag - V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag * xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2];
+                    for (myint inde2 = 0; inde2 < (sys->N_edge - sys->bden); inde2++){
+                        y_new[inde + i_re].real = y_new[inde + i_re].real + V_nre[inde * (sys->N_edge - sys->bden) + inde2].real * xr[1 * (sys->N_edge - sys->bden) + inde2];    // conjugate transpose
+                        y_new[inde + i_re].imag = y_new[inde + i_re].imag - V_nre[inde * (sys->N_edge - sys->bden) + inde2].imag * xr[1 * (sys->N_edge - sys->bden) + inde2];
                     }
                 }
                 
                 
-                V_new = (lapack_complex_double*)malloc((sys->N_edge - sys->N_edge_s * 2) * (i_re + i_nre) * sizeof(lapack_complex_double));
+                V_new = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * (i_re + i_nre) * sizeof(lapack_complex_double));
                 for (myint inde = 0; inde < i_re; inde++){
-                    for (myint inde2 = 0; inde2 < sys->N_edge - 2 * sys->N_edge_s; inde2++){
-                        V_new[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real;
-                        V_new[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
+                    for (myint inde2 = 0; inde2 < sys->N_edge - sys->bden; inde2++){
+                        V_new[inde * (sys->N_edge - sys->bden) + inde2].real = V_re[inde * (sys->N_edge - sys->bden) + inde2].real;
+                        V_new[inde * (sys->N_edge - sys->bden) + inde2].imag = V_re[inde * (sys->N_edge - sys->bden) + inde2].imag;
                     }
                 }
                 for (myint inde = i_re; inde < i_re + i_nre; inde++){
-                    for (myint inde2 = 0; inde2 < sys->N_edge - 2 * sys->N_edge_s; inde2++){
-                        V_new[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real = V_nre[(inde - i_re) * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real;
-                        V_new[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag = V_nre[(inde - i_re) * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
+                    for (myint inde2 = 0; inde2 < sys->N_edge - sys->bden; inde2++){
+                        V_new[inde * (sys->N_edge - sys->bden) + inde2].real = V_nre[(inde - i_re) * (sys->N_edge - sys->bden) + inde2].real;
+                        V_new[inde * (sys->N_edge - sys->bden) + inde2].imag = V_nre[(inde - i_re) * (sys->N_edge - sys->bden) + inde2].imag;
                     }
                 }
                 
@@ -1016,7 +1036,7 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                 m_new = (lapack_complex_double*)calloc((i_nre + i_re) * (i_nre + i_re), sizeof(lapack_complex_double));
                 ipiv = (lapack_int*)malloc((i_nre + i_re) * sizeof(lapack_int));
                 //y_nre1 = (lapack_complex_double*)calloc(i_nre + i_re, sizeof(lapack_complex_double));
-                status = matrix_multi('T', V_new, (sys->N_edge - 2 * sys->N_edge_s), i_nre + i_re, V_new, (sys->N_edge - 2 * sys->N_edge_s), i_nre + i_re, m_new);
+                status = matrix_multi('T', V_new, (sys->N_edge - sys->bden), i_nre + i_re, V_new, (sys->N_edge - sys->bden), i_nre + i_re, m_new);
                 
                 info = LAPACKE_zgesv(LAPACK_COL_MAJOR, i_nre + i_re, 1, m_new, i_nre + i_re, ipiv, y_new, i_nre + i_re);// , y_nre1, i_nre + i_re, &iter);
                 x_re = 0;
@@ -1079,10 +1099,10 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
 
 
         
-        for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-            xr[inde] = xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-            xr[1 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde];
-            xr[2 * (sys->N_edge - 2 * sys->N_edge_s) + inde] = 0;
+        for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){
+            xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
+            xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
+            xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
         } 
     }
     free(xr); xr = NULL;
@@ -1100,53 +1120,53 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
     }
     outfile.close();*/
     
-    sys->Vh = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * i_re * sizeof(lapack_complex_double));
-    lapack_complex_double *V_re2 = (lapack_complex_double*)malloc((sys->N_edge - 2 * sys->N_edge_s) * i_re * sizeof(lapack_complex_double));
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){    // A*V_re
+    sys->Vh = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * i_re * sizeof(lapack_complex_double));
+    lapack_complex_double *V_re2 = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * i_re * sizeof(lapack_complex_double));
+    for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){    // A*V_re
         for (myint inde2 = 0; inde2 < i_re; inde2++){
-            sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
-            sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
-            V_re2[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
-                - 2 * M_PI * sys->freqStart * sys->freqUnit * V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
-            V_re2[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (sys->freqStart * sys->freqUnit * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
-                - V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
+            sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real = V_re[inde2 * (sys->N_edge - sys->bden) + inde].real;
+            sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag = V_re[inde2 * (sys->N_edge - sys->bden) + inde].imag;
+            //V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = V_re[inde2 * (sys->N_edge - sys->bden) + inde].real * (-sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
+            //    - 2 * M_PI * sys->freqStart * sys->freqUnit * V_re[inde2 * (sys->N_edge - sys->bden) + inde].imag * sys->sig[inde + sys->N_edge_s];
+            //V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = V_re[inde2 * (sys->N_edge - sys->bden) + inde].real * (sys->freqStart * sys->freqUnit * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
+            //    - V_re[inde2 * (sys->N_edge - sys->bden) + inde].imag * (sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
         }
     }
 
-    y_re = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));    // u0a'*A*V_re
-    status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, V_re2, (sys->N_edge - 2 * sys->N_edge_s), i_re, y_re);
+    //y_re = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));    // u0a'*A*V_re
+    //status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, V_re2, (sys->N_edge - 2 * sys->N_edge_s), i_re, y_re);
 
-    tmp3 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){    // A*u0
-        for (myint inde2 = 0; inde2 < 2; inde2++){
-            tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
-                - 2 * M_PI * sys->freqStart * sys->freqUnit * u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
-            tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (sys->freqStart * sys->freqUnit * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
-                - u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
-        }
-    }
+    //tmp3 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * 2, sizeof(lapack_complex_double));
+    //for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){    // A*u0
+    //    for (myint inde2 = 0; inde2 < 2; inde2++){
+    //        tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (-sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s]
+    //            - 2 * M_PI * sys->freqStart * sys->freqUnit * u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * sys->sig[inde + sys->N_edge_s];
+    //        tmp3[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real * (sys->freqStart * sys->freqUnit * 2 * M_PI) * sys->sig[inde + sys->N_edge_s]
+    //            - u0[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag * (sys->freqStart * sys->freqUnit * sys->freqStart * sys->freqUnit * 4 * pow(M_PI, 2)) * sys->eps[inde + sys->N_edge_s];
+    //    }
+    //}
 
-    tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
-    status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp3, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp4);    // u0a'*A*u0
-    ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
-    y_new = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));
-    /*outfile.open("ma.txt", std::ofstream::out | std::ofstream::trunc);
-    for (myint inde = 0; inde < 2; inde++){
-        for (myint inde1 = 0; inde1 < 2; inde1++){
-            outfile << tmp4[inde1 * 2 + inde].real << " " << tmp4[inde1 * 2 + inde].imag << " ";
-        }
-        outfile << endl;
-    }*/
-    info = LAPACKE_zcgesv(LAPACK_COL_MAJOR, 2, i_re, tmp4, 2, ipiv, y_re, 2, y_new, 2, &iter);    // (u0a'*A*u0)\(u0a'*A*V_re)
-    m_new = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_re, sizeof(lapack_complex_double));
-    status = matrix_multi('N', u0, (sys->N_edge - 2 * sys->N_edge_s), 2, y_new, 2, i_re, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
-    for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-        for (myint inde2 = 0; inde2 < i_re; inde2++){
-            sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real -m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
-            sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag -m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
-        }
-    }
-    ofstream out;
+    //tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
+    //status = matrix_multi('T', u0a, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp3, (sys->N_edge - 2 * sys->N_edge_s), 2, tmp4);    // u0a'*A*u0
+    //ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
+    //y_new = (lapack_complex_double*)calloc(2 * i_re, sizeof(lapack_complex_double));
+    ///*outfile.open("ma.txt", std::ofstream::out | std::ofstream::trunc);
+    //for (myint inde = 0; inde < 2; inde++){
+    //    for (myint inde1 = 0; inde1 < 2; inde1++){
+    //        outfile << tmp4[inde1 * 2 + inde].real << " " << tmp4[inde1 * 2 + inde].imag << " ";
+    //    }
+    //    outfile << endl;
+    //}*/
+    //info = LAPACKE_zcgesv(LAPACK_COL_MAJOR, 2, i_re, tmp4, 2, ipiv, y_re, 2, y_new, 2, &iter);    // (u0a'*A*u0)\(u0a'*A*V_re)
+    //m_new = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_re, sizeof(lapack_complex_double));
+    //status = matrix_multi('N', u0, (sys->N_edge - 2 * sys->N_edge_s), 2, y_new, 2, i_re, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
+    //for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
+    //    for (myint inde2 = 0; inde2 < i_re; inde2++){
+    //        sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real -m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real;
+    //        sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = sys->Vh[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag -m_new[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag;
+    //    }
+    //}
+    //ofstream out;
     
     /*out.open("Vh.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
@@ -1187,6 +1207,8 @@ int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint aco
     if (operation == 'T'){
         for (myint ind = 0; ind < acol; ind++){
             for (myint ind1 = 0; ind1 < bcol; ind1++){
+                tmp3[ind1 * acol + ind].real = 0;
+                tmp3[ind1 * acol + ind].imag = 0;
                 for (myint ind2 = 0; ind2 < arow; ind2++){
                     tmp3[ind1 * acol + ind].real = tmp3[ind1 * acol + ind].real + a[ind * arow + ind2].real * b[ind1 * brow + ind2].real + a[ind * arow + ind2].imag * b[ind1 * brow + ind2].imag;
                     tmp3[ind1 * acol + ind].imag = tmp3[ind1 * acol + ind].imag - a[ind * arow + ind2].imag * b[ind1 * brow + ind2].real + a[ind * arow + ind2].real * b[ind1 * brow + ind2].imag;
@@ -1197,6 +1219,8 @@ int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint aco
     else if (operation == 'N'){
         for (myint ind = 0; ind < arow; ind++){
             for (myint ind1 = 0; ind1 < bcol; ind1++){
+                tmp3[ind1 * arow + ind].real = 0;
+                tmp3[ind1 * arow + ind].imag = 0;
                 for (myint ind2 = 0; ind2 < acol; ind2++){
                     tmp3[ind1 * arow + ind].real = tmp3[ind1 * arow + ind].real + a[ind2 * arow + ind].real * b[ind1 * brow + ind2].real - a[ind2 * arow + ind].imag * b[ind1 * brow + ind2].imag;
                     tmp3[ind1 * arow + ind].imag = tmp3[ind1 * arow + ind].imag + a[ind2 * arow + ind].imag * b[ind1 * brow + ind2].real + a[ind2 * arow + ind].real * b[ind1 * brow + ind2].imag;

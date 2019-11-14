@@ -881,7 +881,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
     ofstream out;
-    out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
+    //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < ARows; i++){
         if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
             continue;
@@ -898,14 +898,15 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SRowId[j] = sys->mapEdge[i];
             sys->SColId[j] = sys->mapEdge[v[count].first];
             sys->Sval[j] = v[count].second / MU;
-            out << sys->SRowId[j] << " " << sys->SColId[j] << " " << sys->Sval[j] << endl;
+            //out << sys->SRowId[j] << " " << sys->SColId[j] << " ";
+            //out << sys->Sval[j] << endl;
 
             j++;
             count++;
         }
         v.clear();
     }
-    out.close();
+    //out.close();
     leng_A = j;
 
     mkl_sparse_destroy(a);
