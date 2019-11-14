@@ -9,6 +9,89 @@
 
 using namespace std;
 
+vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz) {
+    /* This function changes the global {e} index from layer growth along Z to that along Y.
+
+    The index follows y - x - z ordering, and {e} is stacked layer by layer as
+    {e_surface, e_volumn}.T at each layer. For the two cases here :
+    case 1 ~ grow along Z: {e} = {e_s, | e_v}.T = {ey,ex, | ez}.T, in which vector
+    {ey} first runs through y for each x, then runs through x as by
+    y - x - z ordering. Same for {ex} ~y->x and {ez} ~y->x.
+    case 2 ~ grow along Y: {e} = {ex,ez, | ey}.T at every layer.
+    {ex}, {ez} and {ey} ~x->z, frist all x for each z then all z
+
+    Input: num of bricks Nx*Ny*Nz
+    Output: vector "eInd_map_z2y" of size N_e mapping global indices of {e}, eInd_map_z2y[oldInd] = newInd
+
+    Yee's grid is used, with E at edge center and H at face center. Outmost
+    boundaries are all E edges. Removal of {e} due to PEC BC has not been considered. */
+
+    // Num of surface or volumetric unknown e at each layer
+    myint n_surfEy_growZ        = Ny*(Nx + 1);
+    myint n_surfEyEx            = n_surfEy_growZ + Nx*(Ny + 1);
+    myint n_volEz               = (Nx + 1)*(Ny + 1);
+    myint n_layerE_growZ        = n_surfEyEx + n_volEz;
+
+    myint n_surfEx_growY        = Nx*(Nz + 1);
+    myint n_surfExEz            = n_surfEx_growY + Nz*(Nx + 1);
+    myint n_volEy               = (Nx + 1)*(Nz + 1);
+    myint n_layerE_growY        = n_surfExEz + n_volEy;
+
+    myint N_tot_E               = n_surfEyEx*(Nz + 1) + n_volEz*Nz;
+
+
+    // y - x - z ordering
+    // Grow along Z : {e} = { ey,ex, | ez }.T, y->x frist all y for each x then all x
+    // Grow along Y : {e} = { ex,ez, | ey }.T, x->z frist all x for each z then all z
+
+    vector<myint> eInd_map_z2y(N_tot_E, 0);
+
+    // Map the edges along y direction, Ey
+    for (myint iz = 0; iz < Nz + 1; iz++) {
+        for (myint iy = 0; iy < Ny; iy++) {
+            for (myint ix = 0; ix < Nx + 1; ix++) {
+                eInd_map_z2y[iz*n_layerE_growZ + ix*(Ny)+iy] =
+                    iy*n_layerE_growY + n_surfExEz + iz*(Nx + 1) + ix;
+            }
+        }
+    }
+
+    // Map the edges along x direction, Ex
+    for (myint iz = 0; iz < Nz + 1; iz++) {
+        for (myint iy = 0; iy < Ny + 1; iy++) {
+            for (myint ix = 0; ix < Nx; ix++) {
+                eInd_map_z2y[iz*n_layerE_growZ + n_surfEy_growZ + ix*(Ny + 1) + iy] =
+                    iy*n_layerE_growY + iz*(Nx)+ix;
+            }
+        }
+    }
+
+    // Map the edges along z direction, Ez
+    for (myint iz = 0; iz < Nz; iz++) {
+        for (myint iy = 0; iy < Ny + 1; iy++) {
+            for (myint ix = 0; ix < Nx + 1; ix++) {
+                eInd_map_z2y[iz*n_layerE_growZ + n_surfEyEx + ix*(Ny + 1) + iy] =
+                    iy*n_layerE_growY + n_surfEx_growY + iz*(Nx + 1) + ix;
+            }
+        }
+    }
+
+    return eInd_map_z2y;
+}
+
+// Reverse the map by swapping the index and value of the mapping array
+vector<myint> Reverse_Map_eInd(const vector<myint> &eInd_map_z2y) {
+    
+    myint N_tot_E = eInd_map_z2y.size();
+    vector<myint> eInd_map_y2z(N_tot_E, 0);
+
+    for (myint id = 0; id < N_tot_E; id++) {
+        eInd_map_y2z[eInd_map_z2y[id]] = id;
+    }
+
+    return eInd_map_y2z;
+}
+
 // Cal all the computed freq points and store in a vector
 vector<double> CalAllFreqPointsHz(const fdtdMesh &sys) {
 	vector<double> vFreqHz;
@@ -47,13 +130,6 @@ void AssignSourceCurrentForSourcePort(fdtdMesh *psys, int sourcePort) {
 
 // Solve E field and Z-parameters in Pardiso, solve layer by layer. (under developing)
 void Solve_E_Zpara_InPardiso_layered(fdtdMesh *psys) {
-    int bdl = 0, bdu = 0;
-#ifdef UPPER_BOUNDARY_PEC
-    bdu = 1;
-#endif
-#ifdef LOWER_BOUNDARY_PEC
-    bdl = 1;
-#endif
 
 	// All computed freq points
 	vector<double> vFreqHz = CalAllFreqPointsHz(*psys);
@@ -86,13 +162,6 @@ void Solve_E_Zpara_InPardiso_layered(fdtdMesh *psys) {
 
 // Solve E field and Z-parameters in Pardiso, solve the whole structure as reference
 void Solve_E_Zpara_InPardiso_reference(fdtdMesh *psys) {
-    int bdl = 0, bdu = 0;
-#ifdef UPPER_BOUNDARY_PEC
-    bdu = 1;
-#endif
-#ifdef LOWER_BOUNDARY_PEC
-    bdl = 1;
-#endif
 
     // All computed freq points
     vector<double> vFreqHz = CalAllFreqPointsHz(*psys);

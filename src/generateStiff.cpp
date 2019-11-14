@@ -1,12 +1,13 @@
 /* Generate the stiffness matrix */
 #include "fdtd.hpp"
+#include "layeredFdtd.hpp"
 using namespace std::complex_literals;
 
 
 int generateStiff(fdtdMesh *sys){
 
-    myint Senum, leng_Se;    // Se's size is (N_patch - 2 * N_patch_s) * (N_edge - 2 * N_edge_s)
-    myint Shnum, leng_Sh;    // Sh's size is (N_edge - 2 * N_edge_s) * (N_patch - 2 * N_patch_s)
+    myint Senum, leng_Se;    
+    myint Shnum, leng_Sh;    
     myint *SeRowId, *SeColId;
     double *Seval;
     myint *ShRowId, *ShColId;
@@ -583,7 +584,8 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
-                J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
+                J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 
+                    0. - (1i) * (double) (sys->portCoor[sourcePort].portDirection[sourcePortSide]) * freq * 2. * M_PI;
                 //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << endl;
 
             }
@@ -940,6 +942,9 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     ofstream out;
     //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
 
+#ifdef SKIP_LAYERED_FDTD  
+// Generate S matrix in COO format and Remove {e} at PEC BC. Layer growth along z
+
     for (myint i = 0; i < ARows; i++){
         if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
             continue;
@@ -965,6 +970,32 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         }
         v.clear();
     }
+#else
+// Generate S matrix in COO format without removing {e} at PEC, namely 6 PMC BCs.
+// Layer growth along y.
+
+    vector<myint> eInd_map_z2y = Map_eInd_GrowZ2Y(sys->N_cell_x, sys->N_cell_y, sys->N_cell_z);
+
+    for (myint i = 0; i < ARows; i++) {
+        num = ArowEnd[i] - ArowStart[i];
+        count = 0;
+        vector<pair<myint, double>> v(col_val.begin() + ArowStart[i], col_val.begin() + ArowEnd[i]);
+        sort(v.begin(), v.end());
+
+        while (count < num) {
+            sys->SRowId[j] = eInd_map_z2y[i];
+            sys->SColId[j] = eInd_map_z2y[v[count].first];
+            sys->Sval[j] = v[count].second / MU;
+            //out << sys->SRowId[j] << " " << sys->SColId[j] << " ";
+            //out << sys->Sval[j] << endl;
+
+            j++;
+            count++;
+        }
+        v.clear();
+}
+#endif
+
     //out.close();
     leng_A = j;
 
