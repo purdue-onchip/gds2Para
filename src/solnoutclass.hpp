@@ -5942,15 +5942,21 @@ struct SolverDataBase
             int mult = thisPort.getMultiplicity(); // Multiplicity of the port
             data->portCoor.emplace_back(fdtdPort()); // Create an empty port in fdtdMesh
 
-            // Save coordinates of the port (portCoor must have x1 < x2, y1 < y2, and z1 < z2)
+            // Save coordinates of the port (portCoor the first is the excited conductor and the second is the reference conductor)
             for (size_t indMult = 0; indMult < mult; indMult++)
             {
-                data->portCoor[indi].x1.push_back(min(thisPort.getCoord()[6 * indMult + 0], thisPort.getCoord()[6 * indMult + 3]));
-                data->portCoor[indi].y1.push_back(min(thisPort.getCoord()[6 * indMult + 1], thisPort.getCoord()[6 * indMult + 4]));
-                data->portCoor[indi].z1.push_back(min(thisPort.getCoord()[6 * indMult + 2], thisPort.getCoord()[6 * indMult + 5]));
-                data->portCoor[indi].x2.push_back(max(thisPort.getCoord()[6 * indMult + 0], thisPort.getCoord()[6 * indMult + 3]));
-                data->portCoor[indi].y2.push_back(max(thisPort.getCoord()[6 * indMult + 1], thisPort.getCoord()[6 * indMult + 4]));
-                data->portCoor[indi].z2.push_back(max(thisPort.getCoord()[6 * indMult + 2], thisPort.getCoord()[6 * indMult + 5]));
+                //data->portCoor[indi].x1.push_back(min(thisPort.getCoord()[6 * indMult + 0], thisPort.getCoord()[6 * indMult + 3]));
+                //data->portCoor[indi].y1.push_back(min(thisPort.getCoord()[6 * indMult + 1], thisPort.getCoord()[6 * indMult + 4]));
+                //data->portCoor[indi].z1.push_back(min(thisPort.getCoord()[6 * indMult + 2], thisPort.getCoord()[6 * indMult + 5]));
+                //data->portCoor[indi].x2.push_back(max(thisPort.getCoord()[6 * indMult + 0], thisPort.getCoord()[6 * indMult + 3]));
+                //data->portCoor[indi].y2.push_back(max(thisPort.getCoord()[6 * indMult + 1], thisPort.getCoord()[6 * indMult + 4]));
+                //data->portCoor[indi].z2.push_back(max(thisPort.getCoord()[6 * indMult + 2], thisPort.getCoord()[6 * indMult + 5]));
+                data->portCoor[indi].x1.push_back(thisPort.getCoord()[6 * indMult + 0]);    
+                data->portCoor[indi].y1.push_back(thisPort.getCoord()[6 * indMult + 1]);
+                data->portCoor[indi].z1.push_back(thisPort.getCoord()[6 * indMult + 2]);
+                data->portCoor[indi].x2.push_back(thisPort.getCoord()[6 * indMult + 3]);
+                data->portCoor[indi].y2.push_back(thisPort.getCoord()[6 * indMult + 4]);
+                data->portCoor[indi].z2.push_back(thisPort.getCoord()[6 * indMult + 5]);
             }
 
             // Save multiplicity and direction of the port (portCoor uses +1 to denote in direction of increasing coordinates)
