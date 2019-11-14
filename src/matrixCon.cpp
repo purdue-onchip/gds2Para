@@ -600,7 +600,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             out << endl;
         }
         out.close();*/
-        //sys->Construct_Z_V0(yd, sourcePort);
+        sys->Construct_Z_V0(yd, sourcePort);
 #endif
 
         /* Calculate the Vh part */

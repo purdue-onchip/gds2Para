@@ -56,7 +56,7 @@ using namespace std;
 #define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-#define UPPER_BOUNDARY_PEC
+//#define UPPER_BOUNDARY_PEC
 //#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
@@ -69,7 +69,7 @@ using namespace std;
 //#define PRINT_V0_Vh_Z_PARAM
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define GENERATE_V0_SOLUTION
-//#define SKIP_VH
+#define SKIP_VH
 //#define SKIP_GENERATE_STIFF
 #define SKIP_STIFF_REFERENCE 
 
@@ -2393,8 +2393,7 @@ public:
 
         /* V0d2 generation */
         myint inz, inx, iny;
-
-        myint iz, ix, iy;
+        int indj;
         queue<myint> qu;
         visited = (int*)calloc(this->N_node, sizeof(int));
         t2 = clock();
@@ -3598,11 +3597,6 @@ public:
                 if (i <= j + 1){
                     H1[j * k + i] = H[j * k + i];
                 }
-                H[(j - 1) * k + j] = sqrt(H[(j - 1) * k + j]);
-                temp = H[(j - 1) * k + j];
-            }
-            for (i = 0; i < (this->N_edge - (bdl + bdu) * this->N_edge_s) * 2; i++) {
-                V[j * (this->N_edge - (bdl + bdu) * this->N_edge_s) * 2 + i] = w[i] / temp;
             }
         }
 
