@@ -487,6 +487,23 @@ int generateStiff(fdtdMesh *sys){
         cout << ShRowId[indi] << " " << ShColId[indi] << " " << Shval[indi] << endl;
     }*/
     /* Multiply Sh and Se */
+    
+    /******************* Explanations to matrices here *******************/
+    // matrix           size (variables in code)            COO format (*rows, *cols, *vals)
+    //
+    // Sh               N_e*N_h (sys.N_edge*leng_Sh)        (ShRowId, ShColId, Shval)
+    // Se               N_e*N_h (sys.N_edge*leng_Se)        (SeRowId, SeColId, Seval)
+    // S = Sh*Se.T/mu   N_e*N_e (sys.N_edge*sys.N_edge)     (sys.SRowId, sys.SColId, sys.Sval)
+    //
+    /******************* In function "COO2CSR_malloc" for Se & Sh *******************/
+    // matrix                                               CSR format (*rows, *cols, *vals)
+    //
+    // a = Sh.T                                             (ShColId, ShRowIdn, Shvaln)
+    // b = Se.T                                             (SeColId, SeRowIdn, Sevaln)
+    //
+    /******************* End of matrix explanation *******************/
+
+
     myint *ShColIdo, *SeColIdo, *ShRowIdn, *SeRowIdn;
     double *Shvaln, *Sevaln;
     myint ind;
@@ -565,7 +582,6 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
 
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
                 J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
                 //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << endl;
@@ -849,11 +865,48 @@ int plotTime(fdtdMesh *sys, int sourcePort, int sourcePortSide, double *u0d, dou
 }
 
 
-int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval){
+int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1) {    // totalnum is the total number of entries, leng is the row number
+    int indi = 0, indk = 0;
+    int *rowId2;
+    int count = 0, start = 0;
 
-    // ArowId, AcolId, and Aval should be in the COO format
+    rowId2 = (int*)malloc((leng + 1) * sizeof(int));
+    rowId2[indk] = 0;
+    indk++; // Start with an increment
+    while (indi < totalnum) {
+        start = rowId[indi];
+        while (indi < totalnum && rowId[indi] == start) {
+            count++;
+            indi++;
+        }
+        rowId2[indk] = (count);
+        indk++;
+    }
+
+    for (indi = 0; indi <= leng; indi++) {
+        rowId1[indi] = rowId2[indi];
+    }
+
+    free(rowId2); rowId2 = NULL;
+    return 0;
+}
+
+int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval) {
+    
+    /******************* Explanations to matrices here *******************/
+    // matrix           size~rows*cols~(variables in code)  CSR format (*rows, *cols, *vals)
+    //
+    // a = Sh.T         N_h*N_e (acol*arow)                 (aColId, aRowId, aval)
+    // b = Se.T         N_h*N_e (acol*arow)                 (bColId, bRowId, bval)
+    // A = a.T*b        N_e*N_e (ARows*ACols)               (~, AcolId, Aval)
+    //
+    // matrix           size                                COO format (*rows, *cols, *vals)
+    //
+    // S = Sh*Se.T/mu   N_e*N_e, then truncate with BC      (sys.SRowId, sys.SColId, sys.Sval)
+    //
+    /******************* End of matrix explanation *******************/
     sparse_status_t s0;
-    sparse_matrix_t a, a_csr;
+    sparse_matrix_t a;
     sparse_index_base_t indexing1 = SPARSE_INDEX_BASE_ZERO;
     myint row, col;
     myint *cols, *cole, *rowi;
@@ -863,7 +916,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     myint k;
     s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, acol, arow, &aColId[0], &aColId[1], aRowId, aval);
 
-    sparse_matrix_t b, b_csr;
+    sparse_matrix_t b;
     s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, acol, arow, &bColId[0], &bColId[1], bRowId, bval);
 
     sparse_matrix_t A;

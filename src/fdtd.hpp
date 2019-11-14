@@ -25,7 +25,7 @@
 #include <utility>
 
 // HYPRE and MKL data type control
-#define LARGE_SYSTEM (1) // Must leave defined with the current makefile
+#define LARGE_SYSTEM (1) // Must leave defined with the current makefile. Comment out in windows system
 #ifdef LARGE_SYSTEM
 #define MKL_ILP64 (1) // Must define before including mkl.h if using long long int 
 typedef long long int myint;
