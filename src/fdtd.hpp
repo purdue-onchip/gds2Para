@@ -4416,4 +4416,5 @@ int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint aco
 int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val);
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
+vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz);
 #endif

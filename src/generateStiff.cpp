@@ -1,6 +1,5 @@
 /* Generate the stiffness matrix */
 #include "fdtd.hpp"
-#include "layeredFdtd.hpp"
 using namespace std::complex_literals;
 
 
@@ -993,7 +992,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             count++;
         }
         v.clear();
-}
+    }
 #endif
 
     //out.close();
