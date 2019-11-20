@@ -78,8 +78,8 @@ int layeredFdtd(void) {
 		return status;
 	}
 
-    Solve_E_Zpara_InPardiso_reference(&sys);
 	Solve_E_Zpara_InPardiso_layered(&sys);
+    Solve_E_Zpara_InPardiso_reference(&sys);
 
 	return 0;
 }
