@@ -47,8 +47,8 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (5e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (3e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (2.5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
@@ -56,7 +56,7 @@ using namespace std;
 #define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-#define UPPER_BOUNDARY_PEC
+//#define UPPER_BOUNDARY_PEC
 //#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
@@ -3602,18 +3602,20 @@ public:
     }
 
     /* Find Vh by using Arnoldi method */
-    void find_Vh(int k) {
+    void find_Vh_Arnoldi(int k) {
         /* sourcePort : The port No. now considered
         k : Arnoldi run k steps
         */
-
+        if ((this->N_edge - this->bden) * 2 < k) {
+            k = (this->N_edge - this->bden) * 2;
+        }
         // Arnoldi method
         double scale = 1.e+14;    // balance the matrix
         int i, j, indi, start;
         double* V = new double[(k + 1) * 2 * (this->N_edge - this->bden)]();   // Arnoldi orthogonal vectors
         double* w = new double[2 * (this->N_edge - this->bden)];
         double* H = new double[k * k]();   // Hessenberg matrix with (k + 1) rows and k columns, stored in column major and initial with 0
-        double temp;
+        double temp, cri_zero = 1e-3;
 
         for (i = 0; i < 2 * (this->N_edge - this->bden); i++){
             V[i] = 1 / sqrt(2 * (this->N_edge - this->bden));   // arbitrary starting vector
@@ -3657,6 +3659,9 @@ public:
             for (i = 0; i < (this->N_edge - this->bden) * 2; i++) {
                 V[j * (this->N_edge - this->bden) * 2 + i] = w[i] / temp;
             }
+            //if (temp < cri_zero) {    // if H[(j - 1) * k + j] is very small, Arnoldi terminates
+            //    break;
+            //}
         }
 
 
@@ -3741,11 +3746,7 @@ public:
         //lapack_int ldv = n;
         //info = LAPACKE_zgebak(matrix_layout, job, side, n, ilo, ihi, scale, m, v, ldv);*/
 
-        //out.open("w.txt", std::ofstream::out | std::ofstream::trunc);
-        //for (i = 0; i < n; i++) {
-        //	out << wr[i] << " " << wi[i] << endl;
-        //}
-        //out.close();
+        
 
         //out.open("v.txt", std::ofstream::out | std::ofstream::trunc);
         //for (i = 0; i < n; i++) {
@@ -3792,7 +3793,6 @@ public:
         double* wrc, *wic;    // copy of wr and wc because after dhsein wr will be modified, eigenvalues of the original system
         wrc = new double[n];
         wic = new double[n];
-        //out.open("w.txt", std::ofstream::out | std::ofstream::trunc);
         for (i = 0; i < n; i++) {
             wrc[i] = wr[i] * scale;
             wic[i] = wi[i] * scale;
@@ -3806,8 +3806,11 @@ public:
                 //cout << wr[i] << " " << wi[i] << endl;
             }
         }
-        
-        //out.close();
+        out.open("w.txt", std::ofstream::out | std::ofstream::trunc);
+        for (i = 0; i < n; i++) {
+            out << wr[i] * scale << " " << wi[i] * scale << endl;
+        }
+        out.close();
         lapack_int* m = new lapack_int(mm);
         lapack_int* ifaill = new lapack_int[mm];   // 0 for converge
         lapack_int* ifailr = new lapack_int[mm];
@@ -3988,6 +3991,26 @@ public:
         delete[] rscale;
     }
 
+	/* Generate backward difference left hand matrix */
+	void backDiffLeftMatrix(myint* rowId, myint* colId, double* val_source, int leng, double* val, double dt) {
+		/* (D_eps + dt * D_sig + dt^2 * S)
+		   val : this matrix's val
+		   dt : the time step
+		   RowId is S's rowId, ColId is S's colId */
+		int i = 0;
+        
+		while (i < leng) {
+			val[i] = val_source[i] * pow(dt, 2);
+			if (rowId[i] == colId[i]) {
+				val[i] += this->stackEpsn[(this->mapEdgeR[rowId[i]] + this->N_edge_v) / (this->N_edge_v + this->N_edge_s)] * EPSILON0;
+				if (this->markEdge[this->mapEdgeR[rowId[i]]]) {
+					val[i] += dt * SIGMA;
+				}
+			}
+            i++;
+		}
+	}
+
     /* Calculate the reference */
     void reference1(int freqNo, int sourcePort, complex<double>* xr) {
         double freq = this->freqNo2freq(freqNo);
@@ -4158,6 +4181,19 @@ public:
             node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
             node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
         }
+    }
+
+    /* Compute one node's indx, indy, indz */
+    void compute_node_index(myint node, int &indx, int &indy, int &indz) {
+        /* node : the node number before adding the boundary condition
+           indx : the node's x index 
+           indy : the node's y index
+           indz : the node's z index */
+        indz = node / this->N_node_s;
+        indx = (node % this->N_node_s) / (this->N_cell_y + 1);
+        indy = (node % this->N_node_s) % (this->N_cell_y + 1);
+
+
     }
 
     /* Construct Z parameters with V0 and Vh */
@@ -4366,6 +4402,7 @@ public:
         return freq;
     }
 
+
     /* Destructor */
     ~fdtdMesh(){
         // Set some important numbers to zero
@@ -4484,9 +4521,12 @@ int merge_v0c(fdtdMesh *sys, double block_x, double block_y, double block2_x, do
 int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, fdtdMesh *sys);
 int generateStiff(fdtdMesh *sys);
 int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId, double *aval, myint arow, myint acol, myint *bRowId, myint *bColId, double *bval);
-int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort);
+int find_Vh_central(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a, int sourcePort);
+int find_Vh_back(fdtdMesh* sys, int sourcePort);
 int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint acol, lapack_complex_double *b, myint brow, myint bcol, lapack_complex_double *tmp3);
 int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val);
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
+myint generateLaplacian_count(fdtdMesh* sys);    // count how many nnz in L, and return the number
+int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val);    // generate the Laplacian matrix
 #endif

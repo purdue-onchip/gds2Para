@@ -6,13 +6,21 @@
 
 
 //int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution) {
-int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution) {
+int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution, int info_show, int solve_id) {
+	/* ARowId : matrix rowId
+	   AColId : matrix colId
+	   Aval : matrix value
+	   leng_A : nnz in A
+	   bin : right hand side
+	   leng_v0 : matrix size, row number or column number
+	   solution : the result 
+       info_show : whether show the information of iteration number and relative residual, 0 not show, 1 show
+       solve : which algorithm is implemented */
     /* Initialize MPI */
     int num_procs, myid;
 
     // Get the number of processors
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    cout << "Number of processors is " << num_procs << endl;
 
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -30,7 +38,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     iupper -= 1;
 
     local_size = iupper - ilower + 1; // Corrected number of rows in process
-
+    //cout << "iupper is " << iupper << " and ilower is " << ilower << endl;
     /* Create the square matrix. [Square matrix => indicate the
     row partition size twice (since N_rows = N_cols)] */
     HYPRE_IJMatrix A;
@@ -105,9 +113,9 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
     HYPRE_IJVectorGetObject(x, (void **)&par_x);
 
     /* Call the appropriate preconditioner and solver */
-#if HYPRE_METHOD == 1
+//#if HYPRE_METHOD == 1
     /* AMG */
-    {
+    if (solve_id == 1) {
         int num_iterations;
         double final_res_norm;
 
@@ -132,7 +140,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Run info - needed logging turned on */
         HYPRE_BoomerAMGGetNumIterations(solver, &num_iterations);
         HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
-        if (myid == 0)
+        if (myid == 0 && info_show == 1)
         {
             cout << endl << " Iterations = " << num_iterations << endl;
             cout << " Final Relative Residual Norm = " << final_res_norm << endl;
@@ -148,15 +156,15 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Destroy solver */
         HYPRE_BoomerAMGDestroy(solver);
     }
-#elif HYPRE_METHOD == 2
+//#elif HYPRE_METHOD == 2
     /* PCG with AMG preconditioner */
-    {
+    else if (solve_id == 2) {
         int num_iterations;
         double final_res_norm;
 
         /* Create solver and preconditioner */
         HYPRE_Solver solver, precond;
-        HYPRE_ParCSRPCGCreate(MPI_COM_WORLD, &solver);
+        HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
         HYPRE_BoomerAMGCreate(&precond);
 
         /* Set some parameters (See Reference Manual for more parameters) */
@@ -186,7 +194,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Run info - needed logging turned on */
         HYPRE_PCGGetNumIterations(solver, &num_iterations);
         HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
-        if (myid == 0)
+        if (myid == 0 && info_show == 1)
         {
             cout << endl << " Iterations = " << num_iterations << endl;
             cout << " Final Relative Residual Norm = " << final_res_norm << endl;
@@ -203,9 +211,9 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_ParCSRPCGDestroy(solver);
         HYPRE_BoomerAMGDestroy(precond);
     }
-#elif HYPRE_METHOD == 3
+//#elif HYPRE_METHOD == 3
     /* Flexible GMRES with AMG Preconditioner */
-    {
+    else if (solve_id == 3) {
         HYPRE_Int    num_iterations;
         double final_res_norm;
         HYPRE_Int    restart = 10;
@@ -256,7 +264,7 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_FlexGMRESGetNumIterations(solver, &num_iterations);
         HYPRE_FlexGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
 
-        if (myid == 0)
+        if (myid == 0 && info_show == 1)
         {
             cout << endl << " Iterations = " << num_iterations << endl;
             cout << " Final Relative Residual Norm = " << final_res_norm << endl;
@@ -273,7 +281,62 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         HYPRE_ParCSRFlexGMRESDestroy(solver);
         HYPRE_BoomerAMGDestroy(precond);
     }
-#endif
+    /* PCG with Parasails Preconditioner */
+    else if (solve_id == 4) {
+        HYPRE_Int num_iterations;
+        double final_res_norm;
+
+        int      sai_max_levels = 1;
+        double   sai_threshold = 0.1;
+        double   sai_filter = 0.05;
+        int      sai_sym = 1;
+
+        /* Create solver */
+        HYPRE_Solver solver, precond;
+        HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
+
+        /* Set some parameters (See Reference Manual for more parameters) */
+        HYPRE_PCGSetMaxIter(solver, 100); /* max iterations */
+        HYPRE_PCGSetTol(solver, 1e-5); /* conv. tolerance */
+        HYPRE_PCGSetTwoNorm(solver, 1); /* use the two norm as the stopping criteria */
+        HYPRE_PCGSetPrintLevel(solver, 2); /* print solve info */
+        HYPRE_PCGSetLogging(solver, 1); /* needed to get run info later */
+
+        /* Now set up the ParaSails preconditioner and specify any parameters */
+        HYPRE_ParaSailsCreate(MPI_COMM_WORLD, &precond);
+
+        /* Set some parameters (See Reference Manual for more parameters) */
+        HYPRE_ParaSailsSetParams(precond, sai_threshold, sai_max_levels);
+        HYPRE_ParaSailsSetFilter(precond, sai_filter);
+        HYPRE_ParaSailsSetSym(precond, sai_sym);
+        HYPRE_ParaSailsSetLogging(precond, 3);
+
+        /* Set the PCG preconditioner */
+        HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_ParaSailsSolve,
+            (HYPRE_PtrToSolverFcn)HYPRE_ParaSailsSetup, precond);
+
+        /* Now setup and solve! */
+        HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
+        HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
+
+
+        /* Run info - needed logging turned on */
+        HYPRE_PCGGetNumIterations(solver, &num_iterations);
+        HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+        if (myid == 0)
+        {
+            printf("\n");
+            printf("Iterations = %lld\n", num_iterations);
+            printf("Final Relative Residual Norm = %e\n", final_res_norm);
+            printf("\n");
+        }
+
+        /* Destory solver and preconditioner */
+        HYPRE_ParCSRPCGDestroy(solver);
+        HYPRE_ParaSailsDestroy(precond);
+    }
+
+//#endif
 
     /* Clean up */
     HYPRE_IJMatrixDestroy(A);

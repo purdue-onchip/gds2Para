@@ -330,7 +330,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     ofstream out;
 #ifndef SKIP_VH
     int step = 1000;
-    sys->find_Vh(step);
+    //sys->find_Vh_Arnoldi(step);
     //sys->find_reference_Vh();
 
     /* Read from vv.txt for the Vh for single strip 2000 debug */
@@ -361,7 +361,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     /* HYPRE solves for each port are messy */
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
-        //cout << "Port direction for port " << sourcePort << " is " << sys->portCoor[sourcePort].portDirection[0] << endl;
+        
 #ifdef GENERATE_V0_SOLUTION
         t1 = clock();
         sys->J = (double*)calloc(sys->N_edge, sizeof(double));
@@ -389,7 +389,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
         t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, leng_Ad, v0daJ, leng_v0d1, y0d);
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d);
+        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, v0daJ, leng_v0d1, y0d, 1, 3);
         /* End of solving */
         
 #ifndef SKIP_PARDISO
@@ -508,7 +508,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             //free(y0cs); y0cs = NULL;
 
             //status = hypreSolve(sys, ac, parcsr_ac, leng_Ac, v0caJ, leng_v0c, y0c);
-            status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c);
+            status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, leng_Ac, v0caJ, leng_v0c, y0c, 1, 3);
 
         }
         
@@ -541,7 +541,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(yccp); yccp = NULL;
 
         
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2);
+        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, leng_Ad, dRhs2, leng_v0d1, y0d2, 1, 3);
         free(dRhs2); dRhs2 = NULL;
 
         yd2 = (double*)calloc(sys->N_edge, sizeof(double));
@@ -608,9 +608,15 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         cout << "Begin to solve Vh!\n";
 #ifndef SKIP_VH
 
+        // u0a = V0a*(V0a'*V0a)*V0a'*u0
+        /*for (indi = 0; indi < 2; indi++) {
+
+        }*/
+
         // find the Vh eigenmodes
         //cout << "Begin to find Vh!\n";
-        //status = find_Vh(sys, u0, u0a, sourcePort);
+        //status = find_Vh_central(sys, u0, u0a, sourcePort);
+        status = find_Vh_back(sys, sourcePort);
         //cout << "Finish finding Vh!\n";
 
         for (indi = 0; indi < sys->nfreq; indi++){
@@ -860,7 +866,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 #ifdef PRINT_V0_Vh_Z_PARAM
     sys->print_z_V0_Vh();
 #endif
-
     sys->cindex.clear();
     sys->acu_cnno.clear();
 

@@ -911,7 +911,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 inx = ((sys->conductor[indPortNode2 - 1].node[indj]) % sys->N_node_s) / (sys->N_cell_y + 1);
                 iny = ((sys->conductor[indPortNode2 - 1].node[indj]) % sys->N_node_s) % (sys->N_cell_y + 1);
 
-                sys->findBoundNodeEdge(inx, iny, inz);    // put this conductor's all the boundary edges and nodes in ubde, lbde, ubdn, lbdn
+                //sys->findBoundNodeEdge(inx, iny, inz);    // put this conductor's all the boundary edges and nodes in ubde, lbde, ubdn, lbdn
                 sys->findCond2CondIn(inx, iny, inz);
             }
         }
