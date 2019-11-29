@@ -338,6 +338,12 @@ public:
     double *Sval;
     myint leng_S;
 
+	/* Laplacian decomposed v0 xh left matrix */
+	myint* LdrowId;
+	myint* LdcolId;
+	double* Ldval;
+	myint leng_Ld;
+
     /* Solution storage */
     complex<double> *y;
     vector<complex<double>> x;    // the solution involving all the sourcePorts
@@ -4402,6 +4408,72 @@ public:
         return freq;
     }
 
+	void generateLaplacianLeft(myint* LrowId, myint* LcolId, double* Lval, myint Lleng, double dt) {
+		/* Generate the matrix [V0a'*D*V0, V0a'*D; D*V0, D+L] */
+		myint i;
+		int indx, indy, indz, mark;
+		leng_Ld = 0;
+		set<myint> remNode;   // the node which are removed due to PEC
+		if (lbdn.size() == 0 && ubdn.size() == 0)
+			remNode.insert(N_node);
+		else if (lbdn.size() != 0)
+			remNode = lbdn;
+		else
+			remNode = ubdn;
+		
+
+		for (i = 0; i < N_node; ++i) {
+			if (remNode.find(i) != remNode.end())
+				continue;
+			compute_node_index(i, indx, indy, indz);
+			leng_Ld++;   // with itself
+			if (indz > 0) {   // has a lower node
+				leng_Ld++;
+				leng_Ld++;    // V0a'*D has one non-zero edge
+				leng_Ld++;    // D*V0 has one non-zero edge
+			}
+			if (indz < nz - 1) {   // has an upper node
+				leng_Ld++;
+				leng_Ld++;
+				leng_Ld++;
+			}
+			if (indx > 0) {   // has a left node
+				leng_Ld++;
+				leng_Ld++;
+				leng_Ld++;
+			}
+			if (indx < nx - 1) {    // has a right node
+				leng_Ld++;
+				leng_Ld++;
+				leng_Ld++;
+			}
+			if (indy > 0) {    // has a front node
+				leng_Ld++;
+				leng_Ld++;
+				leng_Ld++;
+			}
+			if (indy < ny - 1) {    // has a back node
+				leng_Ld++;
+				leng_Ld++;
+				leng_Ld++;
+			}
+		}
+		leng_Ld += Lleng;    // add the non-zero entries in (D_eps+dt*D_sig+dt^2*L)
+
+		// balance the norm of the matrices, normalize the V0 vectors, columnwise matrix
+		LdrowId = (myint*)malloc(leng_Ld * sizeof(myint));
+		LdcolId = (myint*)malloc(leng_Ld * sizeof(myint));
+		Ldval = (double*)malloc(leng_Ld * sizeof(double));
+		leng_Ld = 0;
+		for (i = 0; i < N_node; ++i) {
+			compute_node_index(i, indx, indy, indz);
+			if (indz > 0) {
+				LdrowId[leng_Ld] = i - N_node_s;
+				LdcolId[leng_Ld] = i;
+
+			}
+		}
+	}
 
     /* Destructor */
     ~fdtdMesh(){
