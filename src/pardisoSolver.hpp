@@ -9,8 +9,6 @@
 
 typedef vector< tuple<myint, myint, double> > BlockType;    // store rows-cols-vals of each block matrix
 
-#define BUFF_ALIGN 64   // parameter of mkl_malloc, alignment of the buffer
-
 // 0-based row-major 3-array CSR format of a matrix
 class csrFormatOfMatrix {
 public:
@@ -32,16 +30,16 @@ public:
         this->N_cols = N_cols;
         this->N_nnz = N_nnz;
 
-        this->rows = (myint *)mkl_malloc(sizeof(myint) * (N_rows + 1), BUFF_ALIGN);
-        this->cols = (myint *)mkl_malloc(sizeof(myint) * N_nnz, BUFF_ALIGN);
-        this->vals = (double *)mkl_malloc(sizeof(double) * N_nnz, BUFF_ALIGN);
+        this->rows = new myint[N_rows + 1]();
+        this->cols = new myint[N_nnz]();
+        this->vals = new double[N_nnz]();
     }
 
     // Destructor
     ~csrFormatOfMatrix() {
-        mkl_free(this->rows);
-        mkl_free(this->cols);
-        mkl_free(this->vals);
+        delete[] this->rows;
+        delete[] this->cols;
+        delete[] this->vals;
     }
 
     // Declaration of functions
@@ -82,14 +80,14 @@ int csrFormatOfMatrix::convertBlockTypeToCsr(const BlockType &block) {
     return 0;
 }
 
-// 0-based column-major dense format of a matrix stored col by col in 1-D array
+// 0-based column-major dense format of a matrix stored col by col in 1-D vector
 class denseFormatOfMatrix {
 public:
     // matrix information
     myint N_rows;
     myint N_cols;
     myint matrixSize;
-    double *vals = nullptr;
+    vector<double> vals;
 
     // Constructor
     denseFormatOfMatrix(myint N_rows, myint N_cols) {
@@ -97,12 +95,8 @@ public:
         this->N_cols = N_cols;
         this->matrixSize = N_rows * N_cols;
 
-        this->vals = (double *)mkl_malloc(sizeof(double) * this->matrixSize, BUFF_ALIGN);
-    }
-
-    // Destructor
-    ~denseFormatOfMatrix() {
-        mkl_free(this->vals);
+        this->vals.reserve(this->matrixSize);
+        this->vals.assign(this->matrixSize, 0.0);
     }
 
     // Convert BlockType (COO) to dense format.
@@ -121,11 +115,11 @@ vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz) {
 
     The index follows y - x - z ordering, and {e} is stacked layer by layer as
     {e_surface, e_volumn}.T at each layer. For the two cases here :
-    case 1 ~ grow along Z: {e} = {e_s, | e_v}.T = {ey,ex, | ez}.T, in which vector
-    {ey} first runs through y for each x, then runs through x as by
-    y - x - z ordering. Same for {ex} ~y->x and {ez} ~y->x.
-    case 2 ~ grow along Y: {e} = {ex,ez, | ey}.T at every layer.
-    {ex}, {ez} and {ey} ~x->z, frist all x for each z then all z
+    - case 1 ~ grow along Z: {e} = {e_s, | e_v}.T = {ey,ex, | ez}.T, in which vector
+            {ey} first runs through y for each x, then runs through x as by
+            y - x - z ordering. Same for {ex} ~y->x and {ez} ~y->x.
+    - case 2 ~ grow along Y: {e} = {ex,ez, | ey}.T at every layer.
+            {ex}, {ez} and {ey} ~x->z, frist all x for each z then all z
 
     Input: num of bricks Nx*Ny*Nz
     Output: vector "eInd_map_z2y" of size N_e mapping global indices of {e}, eInd_map_z2y[oldInd] = newInd
@@ -204,21 +198,21 @@ inline myint mapRowColIdToBlockId(const myint B_rowId, const myint B_colId) {
     /* Explanation to notations here:
 
     Matrix S is partitioned into blocks as surface-vol-surface-... along row/col
-    Bolck ordering:     0s,0v,1s,1v,..., Nlayer_s
-    Block row/col Id:   0, 1, 2, 3, ..., 2*Nlayer
-    BlockId:            counted nnz block Id, row major. 
+    - Bolck ordering:     0s,0v,1s,1v,..., Nlayer_s
+    - Block row/col Id:   0, 1, 2, 3, ..., 2*Nlayer
+    - BlockId:            counted nnz block Id, row major. 
 
     Example: (Nlayer = 3, Nblock = 8*Nlayer + 1 = 25)
-                0s  0v  1s  1v  2s  2v  3s
-    B_colId->   0   1   2   3   4   5   6
-                                                B_rowId (below) 
-    BlockId:  | 0   1   2                  |    0   0s
-              | 3   4   5                  |    1   0v
-              | 6   7   8   9   10         |    2   1s
-              |         11  12  13         |    3   1v
-              |         14  15  16  17  18 |    4   2s
-              |                 19  20  21 |    5   2v
-              |                 22  23  24 |    6   3s
+                    0s  0v  1s  1v  2s  2v  3s
+        B_colId->   0   1   2   3   4   5   6
+                                                    B_rowId (below) 
+        BlockId:  | 0   1   2                  |    0   0s
+                  | 3   4   5                  |    1   0v
+                  | 6   7   8   9   10         |    2   1s
+                  |         11  12  13         |    3   1v
+                  |         14  15  16  17  18 |    4   2s
+                  |                 19  20  21 |    5   2v
+                  |                 22  23  24 |    6   3s
 
     Input: Block row/col Id
     Output: BlockId of this block    */
@@ -264,7 +258,7 @@ int solveInverseInPardiso(const csrFormatOfMatrix &csrB22,
     //iparm[10] = 0;       /* Use nonsymmetric permutation and scaling MPS */
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(csrB22.N_rows), csrB22.vals, csrB22.rows, csrB22.cols,
-        &perm, &nrhs, iparm, &msglvl, denseB21B23.vals, pdenseD0sD1s->vals, &error);
+        &perm, &nrhs, iparm, &msglvl, (double*) denseB21B23.vals.data(), pdenseD0sD1s->vals.data(), &error);
     if (error != 0) {
         printf("\nERROR during numerical factorization: %d", error);
         exit(2);
@@ -281,7 +275,7 @@ int solveInverseInPardiso(const csrFormatOfMatrix &csrB22,
 
 // Compute y = alpha * A * x + beta * y and store computed dense matrix in y
 int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of csr A
-                        myint N_rows_x, double *x,              // x,y ~ dense matrix stored in array 
+                        myint N_rows_x, double *x,              // x,y ~ dense matrix stored in continuous memory array 
                         denseFormatOfMatrix *y) {
     /* see doc: https://software.intel.com/en-us/onemkl-developer-reference-c-mkl-sparse-mm
     Example: 
@@ -303,13 +297,13 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
         y->N_cols,
         N_rows_x,
         beta,
-        y->vals,
+        y->vals.data(),                     // Pointer to the memory array used by the vector to store its owned elements
         y->N_rows);
 
     return 0;
 }
 
-void eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE) {
+int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE, denseFormatOfMatrix *preducedS) {
     /* This function eliminates e_vol from whole S matrix (all layers coupled) and obtain the
     2*2 block matrix related only to e_surf at single layer.
 
@@ -318,7 +312,7 @@ void eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_vol
         N_surfE: number of {e}_surface at one surface, e.g. 0s
         N_volE: number of {e}_volumn at one layer, e.g. 0v
     Output:
-        reducedS: 
+        preducedS: pointing to memory of a vector storing 4 reduced dense blocks as {C11, C12, C21, C22}
 
     Each isolated layer here contains 2 surfaces and 1 middle volumn e, namely 0s-0v-1s. 
     A symbolic form is (each number represents the blockId in vector<BlockType>):
@@ -352,53 +346,40 @@ void eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_vol
     vB21B23.clear();
 
     // Solve D0s = inv(B22)*B21, D1s = inv(B22)*B23 in Pardiso
-    csrFormatOfMatrix csrB22(N_volE, N_volE, layerS[4].size());
+    csrFormatOfMatrix csrB22(N_volE, N_volE, layerS[4].size()); // CSR B22
     csrB22.convertBlockTypeToCsr(layerS[4]);
     denseFormatOfMatrix denseD0sD1s(N_volE, 2 * N_surfE);       // combined dense [D0s, D1s]
-
     solveInverseInPardiso(csrB22, denseB21B23, &denseD0sD1s);
-    csrB22.~csrFormatOfMatrix();                                // free CSR B22
     denseB21B23.~denseFormatOfMatrix();                         // free combined dense [B21, B23]
 
     // Convert B12, B32 to mkl internal CSR matrix handles
     sparse_matrix_t csrB12_mklHandle, csrB32_mklHandle;
-
     csrFormatOfMatrix csrB12(N_surfE, N_volE, layerS[1].size());
     csrB12.convertBlockTypeToCsr(layerS[1]);
     mkl_sparse_d_create_csr(&csrB12_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB12.N_rows, csrB12.N_cols,
         csrB12.rows, csrB12.rows + 1, csrB12.cols, csrB12.vals);
-    csrB12.~csrFormatOfMatrix();                                // free CSR B12
-
     csrFormatOfMatrix csrB32(N_surfE, N_volE, layerS[7].size());
     csrB32.convertBlockTypeToCsr(layerS[7]);
     mkl_sparse_d_create_csr(&csrB32_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB32.N_rows, csrB32.N_cols,
         csrB32.rows, csrB32.rows + 1, csrB32.cols, csrB32.vals);
-    csrB32.~csrFormatOfMatrix();                                // free CSR B32
 
     // Solve reducedS blocks C11 = B11 - B12*D0s, C12 = B13 - B12*D1s
-    denseFormatOfMatrix denseB11(N_surfE, N_surfE);
-    denseB11.convertBlockTypeToDense(layerS[0]);
-    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals, &denseB11);
-
+    preducedS->convertBlockTypeToDense(layerS[0]);              // dense B11 & dense C11
+    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS);
     myint matrixSizeD0s = N_volE * N_surfE;
-    denseFormatOfMatrix denseB13(N_surfE, N_surfE);
-    denseB13.convertBlockTypeToDense(layerS[2]);
-    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals + matrixSizeD0s, &denseB13);
-
+    (preducedS + 1)->convertBlockTypeToDense(layerS[2]);        // dense B13 & dense C12
+    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 1);
     mkl_sparse_destroy(csrB12_mklHandle);                       // free mkl CSR B12 handle
 
     // Solve reducedS blocks C21 = B31 - B32*D0s, C22 = B33 - B32*D1s
-    denseFormatOfMatrix denseB31(N_surfE, N_surfE);
-    denseB31.convertBlockTypeToDense(layerS[6]);
-    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals, &denseB31);
-
-    denseFormatOfMatrix denseB33(N_surfE, N_surfE);
-    denseB33.convertBlockTypeToDense(layerS[8]);
-    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals + matrixSizeD0s, &denseB33);
-
+    (preducedS + 2)->convertBlockTypeToDense(layerS[6]);        // dense B31 & dense C21
+    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS + 2);
+    (preducedS + 3)->convertBlockTypeToDense(layerS[8]);        // dense B33 & dense C22
+    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 3);
     mkl_sparse_destroy(csrB32_mklHandle);                       // free mkl CSR B32 handle
 
     denseD0sD1s.~denseFormatOfMatrix();                         // free combined dense [D0s, D1s]
+    return 0;
 }
 
 void cascadeMatrixS(fdtdMesh *psys) {
@@ -411,7 +392,7 @@ void cascadeMatrixS(fdtdMesh *psys) {
     myint n_layerE_growY        = n_surfExEz + n_volEy;
     myint N_layers              = psys->N_cell_y;   // num of layers
 
-    // Store all Bolck matrices in a vector (2-D vector)
+    // Store all Bolck matrices of the whole matrix S in a 2D vector
     vector< BlockType > Blocks(8 * N_layers + 1);
 
     // Determine the block id of each nnz element of S and store in corresponding block matrix
@@ -461,12 +442,18 @@ void cascadeMatrixS(fdtdMesh *psys) {
         }
     }
 
-    // Eliminate e_volumn at each layer
+    // Eliminate e_volumn at each layer and store 4 reduced dense blocks of each layer
+    vector<vector<denseFormatOfMatrix>> surfSurfBlocks(N_layers);   // N_layers*4 dense blocks
     for (myint i_layer = 0; i_layer < N_layers; i_layer++) {
-        
-        vector<BlockType> layerS(Blocks.begin() + 8* i_layer, Blocks.begin() + 8 * i_layer + 9);
-        eliminateVolumE(layerS, N_surfE, N_volE);
+        // Init and allocate memory for 4 dense blocks of each layer
+        surfSurfBlocks[i_layer].reserve(4);
+        for (myint i_block = 0; i_block < 4; i_block++) {           
+            surfSurfBlocks[i_layer].push_back(denseFormatOfMatrix(N_surfE, N_surfE));
+        }
 
+        // From 9 blocks to 4 blocks
+        vector<BlockType> layerS(Blocks.begin() + 8 * i_layer, Blocks.begin() + 8 * i_layer + 9);
+        eliminateVolumE(layerS, N_surfE, N_volE, surfSurfBlocks[i_layer].data());
         layerS.clear();
     }
 
