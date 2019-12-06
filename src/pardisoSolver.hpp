@@ -6,109 +6,7 @@
 #include <string>
 
 #include "fdtd.hpp"
-
-typedef vector< tuple<myint, myint, double> > BlockType;    // store rows-cols-vals of each block matrix
-
-// 0-based row-major 3-array CSR format of a matrix
-class csrFormatOfMatrix {
-public:
-    // matrix information
-    myint N_rows;
-    myint N_cols;
-    myint N_nnz;
-    myint *rows         = nullptr;      // CSR row indices, size = N_rows + 1
-    myint *cols         = nullptr;      // CSR col indices, size = N_nnz
-    double *vals        = nullptr;      // CSR nnz values,  size = N_nnz
-
-    // Constructor
-    csrFormatOfMatrix(myint N_rows, myint N_cols, myint N_nnz) {
-        /* Inputs: 
-            N_rows*N_cols:  matrix size;
-            N_nnz:          num of nonzeros.     */
-
-        this->N_rows = N_rows;
-        this->N_cols = N_cols;
-        this->N_nnz = N_nnz;
-
-        this->rows = new myint[N_rows + 1]();
-        this->cols = new myint[N_nnz]();
-        this->vals = new double[N_nnz]();
-    }
-
-    // Destructor
-    ~csrFormatOfMatrix() {
-        delete[] this->rows;
-        delete[] this->cols;
-        delete[] this->vals;
-    }
-
-    // Declaration of functions
-    int convertBlockTypeToCsr(const BlockType &block);
-};
-
-int csrFormatOfMatrix::convertBlockTypeToCsr(const BlockType &block) {
-    /* This function convert BlockType (COO) to CSR format. 
-    The input BlockType must have been sorted by row index. */
-
-    // The first index of rows is always 0 and the last is always N_nnz
-    this->rows[0] = 0;
-    this->rows[this->N_rows] = block.size();
-
-    myint nnz_ind = 0;
-    myint thisRow_ind = 0;
-    for (const auto &nnz_tuple : block) {
-        
-        // cols and vals are direct copy of the tuple for every nnz
-        this->cols[nnz_ind] = get<1>(nnz_tuple);
-        this->vals[nnz_ind] = get<2>(nnz_tuple);
-
-        // When saw nnz at a new row
-        while (thisRow_ind < get<0>(nnz_tuple)) {
-            thisRow_ind++;
-            this->rows[thisRow_ind] = nnz_ind;
-        }
-
-        nnz_ind++;
-
-        // Extrame case: when the last few rows are all blank
-        while (nnz_ind == block.size() && thisRow_ind < this->N_rows-1) {
-            thisRow_ind++;
-            this->rows[thisRow_ind] = nnz_ind;
-        }
-    }
-
-    return 0;
-}
-
-// 0-based column-major dense format of a matrix stored col by col in 1-D vector
-class denseFormatOfMatrix {
-public:
-    // matrix information
-    myint N_rows;
-    myint N_cols;
-    myint matrixSize;
-    vector<double> vals;
-
-    // Constructor
-    denseFormatOfMatrix(myint N_rows, myint N_cols) {
-        this->N_rows = N_rows;
-        this->N_cols = N_cols;
-        this->matrixSize = N_rows * N_cols;
-
-        this->vals.reserve(this->matrixSize);
-        this->vals.assign(this->matrixSize, 0.0);
-    }
-
-    // Convert BlockType (COO) to dense format.
-    void convertBlockTypeToDense(const BlockType &block) {
-        for (const auto &nnz_tuple : block) {
-            myint row_ind = get<0>(nnz_tuple);
-            myint col_ind = get<1>(nnz_tuple);
-            myint ind_inArray = col_ind * this->N_rows + row_ind;
-            this->vals[ind_inArray] = get<2>(nnz_tuple);
-        }
-    }
-};
+#include "matrixTypeDef.hpp"
 
 vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz) {
     /* This function changes the global {e} index from layer growth along Z to that along Y.
@@ -382,7 +280,77 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     return 0;
 }
 
-void cascadeMatrixS(fdtdMesh *psys) {
+// Reconstruct blocks stored in portportBlocks (or surfSurfBlocks) to S matrix in 1-D dense format
+denseFormatOfMatrix reconstructBlocksToDense(const vector<vector<denseFormatOfMatrix>> &portportBlocks) {
+    /* Example: N_layers = 2
+            |D11     D12          |
+            |D21   D22+D11'   D12'|     =   cascadedS
+            |        D21'     D22'|
+        Input: N_layers*4 2-D vector of blocks:  
+            portportBlocks[0] = {D11, D12, D21, D22}
+            portportBlocks[1] = {D11', D12', D21', D22'}
+        Return:
+            above block-tridiagonal square matrix cascadedS in 1-D dense format
+    */
+
+    // All blocks D and S are square matrix
+    myint N_rows_perBlock = portportBlocks[0][0].N_rows;
+    myint N_layers = portportBlocks.size();
+    myint N_rows_S = N_rows_perBlock * (N_layers + 1);
+    denseFormatOfMatrix cascadedS(N_rows_S, N_rows_S);
+    denseFormatOfMatrix tempD(N_rows_perBlock, N_rows_perBlock);
+
+    for (myint i_layer = 0; i_layer < N_layers; i_layer++) {
+        for (myint j_col = 0; j_col < N_rows_perBlock; j_col++) {
+            for (myint i_row = 0; i_row < N_rows_perBlock; i_row++) {
+                myint ind_inBolck = j_col * N_rows_perBlock + i_row;
+
+                // Upper triangular blocks Di i+1
+                myint ind_inS_upperTri = (j_col + (i_layer+1) * N_rows_perBlock)* N_rows_S + i_row + i_layer * N_rows_perBlock;
+                cascadedS.vals[ind_inS_upperTri] = portportBlocks[i_layer][1].vals[ind_inBolck];
+                
+                // Lower triangular blocks Di i-1
+                myint ind_inS_lowerTri = (j_col + i_layer * N_rows_perBlock)* N_rows_S + i_row + (i_layer + 1) * N_rows_perBlock;
+                cascadedS.vals[ind_inS_lowerTri] = portportBlocks[i_layer][2].vals[ind_inBolck];
+            }
+        }
+    }
+
+    // First diagonal block
+    tempD = portportBlocks[0][0];
+    for (myint j_col = 0; j_col < N_rows_perBlock; j_col++) {
+        for (myint i_row = 0; i_row < N_rows_perBlock; i_row++) {
+            myint ind_inBolck = j_col * N_rows_perBlock + i_row;
+            myint ind_inS = j_col * N_rows_S + i_row;
+            cascadedS.vals[ind_inS] = tempD.vals[ind_inBolck];
+        }
+    }
+
+    // Last diagonal block
+    tempD = portportBlocks[N_layers - 1][3];
+    for (myint j_col = 0; j_col < N_rows_perBlock; j_col++) {
+        for (myint i_row = 0; i_row < N_rows_perBlock; i_row++) {
+            myint ind_inBolck = j_col * N_rows_perBlock + i_row;
+            myint ind_inS = (j_col + N_layers * N_rows_perBlock)* N_rows_S + i_row + N_layers * N_rows_perBlock;
+            cascadedS.vals[ind_inS] = tempD.vals[ind_inBolck];
+        }
+    }
+    
+    // The overlapped diagonal blocks (D22 and next D11')
+    for (myint i_layer = 1; i_layer < N_layers; i_layer++) {
+        tempD = portportBlocks[i_layer - 1][3].add(portportBlocks[i_layer][0]);
+        for (myint j_col = 0; j_col < N_rows_perBlock; j_col++) {
+            for (myint i_row = 0; i_row < N_rows_perBlock; i_row++) {
+                myint ind_inBolck = j_col * N_rows_perBlock + i_row;
+                myint ind_inS = (j_col + i_layer * N_rows_perBlock)* N_rows_S + i_row + i_layer * N_rows_perBlock;
+                cascadedS.vals[ind_inS] = tempD.vals[ind_inBolck];
+            }
+        }
+    }
+    return cascadedS;
+}
+
+int cascadeMatrixS(fdtdMesh *psys) {
 
     // Num of e at each surface or each layer. Layer growth along y.
     myint Nx                    = psys->N_cell_x;
@@ -451,15 +419,92 @@ void cascadeMatrixS(fdtdMesh *psys) {
             surfSurfBlocks[i_layer].push_back(denseFormatOfMatrix(N_surfE, N_surfE));
         }
 
-        // From 9 blocks to 4 blocks
+        // From 9 blocks at this layer to 4, surfSurfBlocks[i_layer] = {C11, C12, C21, C22}
         vector<BlockType> layerS(Blocks.begin() + 8 * i_layer, Blocks.begin() + 8 * i_layer + 9);
         eliminateVolumE(layerS, N_surfE, N_volE, surfSurfBlocks[i_layer].data());
         layerS.clear();
     }
+    Blocks.clear();     // free blocks of original whole matrix S to save memory
 
-    // free blocks of original whole matrix S to save memory
-    Blocks.clear();
+    // Cascade surf-surf blocks and only keep layers where ports are
+    vector<myint> surfLocationOfPort{ 2, 7, 8 };    // surface index of each port's location, many ports at 1 surf counted once
+    sort(surfLocationOfPort.begin(), surfLocationOfPort.end());
+    
+    /* Each layer: surfSurfBlocks[i_layer] = {C11, C12, C21, C22} */
 
+    // Left -> first port: cascaded C22' = C22 - C21*inv(C11)*C12
+    for (myint i_layer = 0; i_layer < surfLocationOfPort.front(); i_layer++) {
+        surfSurfBlocks[i_layer][3] = surfSurfBlocks[i_layer][3].minus(
+            surfSurfBlocks[i_layer][2].dot(surfSurfBlocks[i_layer][0].backslash(surfSurfBlocks[i_layer][1])));
+
+        // Add cascaded C22' at this layer to C11 at next layer
+        surfSurfBlocks[i_layer + 1][0] = surfSurfBlocks[i_layer + 1][0].add(surfSurfBlocks[i_layer][3]);
+    }
+
+    // Right -> last port: cascaded C11' = C11 - C12*inv(C22)*C21
+    for (myint i_layer = N_layers-1; i_layer >= surfLocationOfPort.back(); i_layer--) {
+        surfSurfBlocks[i_layer][0] = surfSurfBlocks[i_layer][0].minus(
+            surfSurfBlocks[i_layer][1].dot(surfSurfBlocks[i_layer][3].backslash(surfSurfBlocks[i_layer][2])));
+
+        // Add cascaded C11' at this layer to C22 at previous layer
+        surfSurfBlocks[i_layer - 1][3] = surfSurfBlocks[i_layer - 1][3].add(surfSurfBlocks[i_layer][0]);
+    }
+
+    // Middle: 
+    /* For the middle, cascaded the middle surface ({e}_midLayer) between 2 layers
+         For example:
+            |C11     C12          | {e}_thisPortLayer
+            |C21   C22+C11'   C12'| {e}_midLayer       , where  4 Cij at thisPortLayer
+            |        C21'     C22'| {e}_midLayer+1              4 Cij' at the midLayer
+            To cascade the middle surface {e}_midLayer, the precedures are:
+                1) tempC22 = C22+C11'
+                2) tempD21 = tempC22\C21, tempD12 = tempC22\C12'
+                3) cascaded 4 blocks still store in Cij at thisPortLayer:
+                    cascaded C11 = C11 - C12*tempD21,  cascaded C12 = 0 - C12*tempD12
+                    cascaded C21 =  0 - C21'*tempD21,  cascaded C22 = C22' - C21'*tempD12
+      
+      Then, the cascaded 4 blocks for each port (index 0 <= i_port < N_ports-1, except last port) will be stored in corresponding layer.
+            let: thisPortLayer = surfLocationOfPort[i_port];
+                 nextPortLayer = surfLocationOfPort[i_port + 1];
+            i_port's 4 blocks are stored in:
+                 surfSurfBlocks[thisPortLayer] = {D11, D12, D21, D22}
+            next port's 4 blocks are stored in:
+                 surfSurfBlocks[nextPortLayer] = {D11', D12', D21', D22'}
+            To reconstruct cascaded S matrix, we need to organize above cascaded blocks as
+                |D11     D12          | {e}_thisPort
+                |D21   D22+D11'   D12'| {e}_nextPort
+                |        D21'     D22'| {e}_nextnextPort
+    */
+    denseFormatOfMatrix tempC22(N_surfE, N_surfE);              // tempC22 = C22+C11'
+    denseFormatOfMatrix tempD21(N_surfE, N_surfE);              // tempD21 = tempC22\C21
+    denseFormatOfMatrix tempD12(N_surfE, N_surfE);              // tempD12 = tempC22\C12'
+    for (myint i_port = 0; i_port < surfLocationOfPort.size() - 1; i_port++) {                  // all the intervals between ports
+        myint thisPortLayer = surfLocationOfPort[i_port];       // surface index and layer index of this port (i_port)
+        myint nextPortLayer = surfLocationOfPort[i_port + 1];   // surface index and layer index of next port
+        for (myint i_midLayer = thisPortLayer + 1; i_midLayer < nextPortLayer; i_midLayer++) {    // all middle layers between 2 ports
+            tempC22 = surfSurfBlocks[thisPortLayer][3].add(surfSurfBlocks[i_midLayer][0]);
+            tempD21 = tempC22.backslash(surfSurfBlocks[thisPortLayer][2]);
+            tempD12 = tempC22.backslash(surfSurfBlocks[i_midLayer][1]);
+            surfSurfBlocks[thisPortLayer][0] = surfSurfBlocks[thisPortLayer][0].minus(
+                surfSurfBlocks[thisPortLayer][1].dot(tempD21));
+            surfSurfBlocks[thisPortLayer][1] = surfSurfBlocks[thisPortLayer][1].dot(tempD12).multiplyScalar(-1.0);
+            surfSurfBlocks[thisPortLayer][2] = surfSurfBlocks[i_midLayer][2].dot(tempD21).multiplyScalar(-1.0);
+            surfSurfBlocks[thisPortLayer][3] = surfSurfBlocks[i_midLayer][3].minus(
+                surfSurfBlocks[i_midLayer][2].dot(tempD12));
+        }
+    }
+    
+    // Collect all cascaded blocks only related to port surfaces
+    myint N_ports = surfLocationOfPort.size();
+    vector<vector<denseFormatOfMatrix>> portportBlocks(N_ports-1);   // (N_ports-1)*4 dense blocks
+    for (myint i_port = 0; i_port < N_ports - 1; i_port++) {
+        myint thisPortLayer = surfLocationOfPort[i_port];
+        portportBlocks[i_port] = surfSurfBlocks[thisPortLayer];
+    }
+    surfSurfBlocks.clear(); // free surf-surf blocks 
+
+    denseFormatOfMatrix cascadedS = reconstructBlocksToDense(portportBlocks);
+    return 0;
 }
 
 // Cal all the computed freq points and store in a vector
