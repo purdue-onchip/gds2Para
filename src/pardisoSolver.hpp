@@ -1,8 +1,8 @@
 #ifndef GDS2PARA_PARDISO_SOLVER_H_
 #define GDS2PARA_PARDISO_SOLVER_H_
 
-#include <iostream> 
-#include <fstream> 
+#include <iostream>
+#include <fstream>
 #include <string>
 
 #include "fdtd.hpp"
@@ -132,48 +132,9 @@ inline myint mapRowColIdToBlockId(const myint B_rowId, const myint B_colId) {
     return BlockId;
 }
 
-// Solve D0sD1s = inv(B22)*B21B23 in Pardiso
-int solveInverseInPardiso(const csrFormatOfMatrix &csrB22, 
-    const denseFormatOfMatrix &denseB21B23, denseFormatOfMatrix *pdenseD0sD1s) {
-
-    // Pardiso parameters, see https://software.intel.com/en-us/mkl-developer-reference-c-pardiso
-    MKL_INT maxfct = 1;
-    MKL_INT mnum = 1;
-    MKL_INT mtype = 11;                 /* Real unsymmetric matrix */
-    MKL_INT phase = 13;
-    MKL_INT perm;
-    myint nrhs = denseB21B23.N_cols;    /* Number of right hand sides */
-    MKL_INT msglvl = 0;                 /* If msglvl=1, print statistical information */
-    MKL_INT error = 0;
-
-    void *pt[64];
-    myint iparm[64];
-    pardisoinit(pt, &mtype, iparm);
-    iparm[38] = 1;
-    iparm[34] = 1;         /* 0-based indexing */
-    iparm[3] = 0;          /* No iterative-direct algorithm */
-    //iparm[59] = 2;       /* out of core version to solve very large problem */
-    //iparm[10] = 0;       /* Use nonsymmetric permutation and scaling MPS */
-
-    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(csrB22.N_rows), csrB22.vals, csrB22.rows, csrB22.cols,
-        &perm, &nrhs, iparm, &msglvl, (double*) denseB21B23.vals.data(), pdenseD0sD1s->vals.data(), &error);
-    if (error != 0) {
-        printf("\nERROR during numerical factorization: %d", error);
-        exit(2);
-    }
-
-    // Release internal memory
-    phase = -1;
-    double ddum;           /* Double dummy */
-    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(csrB22.N_rows), &ddum, csrB22.rows, csrB22.cols,
-        &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
-
-    return 0;
-}
-
 // Compute y = alpha * A * x + beta * y and store computed dense matrix in y
 int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of csr A
-                        myint N_rows_x, double *x,              // x,y ~ dense matrix stored in continuous memory array 
+                        myint N_rows_x, complex<double> *x,     // x,y ~ dense matrix stored in continuous memory array 
                         denseFormatOfMatrix *y) {
     /* see doc: https://software.intel.com/en-us/onemkl-developer-reference-c-mkl-sparse-mm
     Example: 
@@ -181,20 +142,21 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
             C11 = -1.0  * B12 * D0s + 1.0  * B11    */
 
 
-    double alpha = -1.0, beta = 1.0;
+    complex<double> alpha(-1.0, 0.0);
+    complex<double> beta(1.0, 0.0);
     struct matrix_descr descrA;             // Descriptor of main sparse matrix properties
     descrA.type = SPARSE_MATRIX_TYPE_GENERAL;
 
     // Compute y = alpha * A * x + beta * y
-    mkl_sparse_d_mm(SPARSE_OPERATION_NON_TRANSPOSE,
-        alpha,
-        csrA_mklHandle,
+    mkl_sparse_z_mm(SPARSE_OPERATION_NON_TRANSPOSE,
+        alpha,                              // alpha = -1.0
+        csrA_mklHandle,                     // A
         descrA,
         SPARSE_LAYOUT_COLUMN_MAJOR,         // Describes the storage scheme for the dense matrix
         x,
         y->N_cols,
         N_rows_x,
-        beta,
+        beta,                               // beta = 1.0
         y->vals.data(),                     // Pointer to the memory array used by the vector to store its owned elements
         y->N_rows);
 
@@ -246,19 +208,19 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     // Solve D0s = inv(B22)*B21, D1s = inv(B22)*B23 in Pardiso
     csrFormatOfMatrix csrB22(N_volE, N_volE, layerS[4].size()); // CSR B22
     csrB22.convertBlockTypeToCsr(layerS[4]);
-    denseFormatOfMatrix denseD0sD1s(N_volE, 2 * N_surfE);       // combined dense [D0s, D1s]
-    solveInverseInPardiso(csrB22, denseB21B23, &denseD0sD1s);
+    denseFormatOfMatrix denseD0sD1s = 
+        csrB22.backslashDense(denseB21B23);                     // combined dense [D0s, D1s]
     denseB21B23.~denseFormatOfMatrix();                         // free combined dense [B21, B23]
 
     // Convert B12, B32 to mkl internal CSR matrix handles
     sparse_matrix_t csrB12_mklHandle, csrB32_mklHandle;
     csrFormatOfMatrix csrB12(N_surfE, N_volE, layerS[1].size());
     csrB12.convertBlockTypeToCsr(layerS[1]);
-    mkl_sparse_d_create_csr(&csrB12_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB12.N_rows, csrB12.N_cols,
+    mkl_sparse_z_create_csr(&csrB12_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB12.N_rows, csrB12.N_cols,
         csrB12.rows, csrB12.rows + 1, csrB12.cols, csrB12.vals);
     csrFormatOfMatrix csrB32(N_surfE, N_volE, layerS[7].size());
     csrB32.convertBlockTypeToCsr(layerS[7]);
-    mkl_sparse_d_create_csr(&csrB32_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB32.N_rows, csrB32.N_cols,
+    mkl_sparse_z_create_csr(&csrB32_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB32.N_rows, csrB32.N_cols,
         csrB32.rows, csrB32.rows + 1, csrB32.cols, csrB32.vals);
 
     // Solve reducedS blocks C11 = B11 - B12*D0s, C12 = B13 - B12*D1s
@@ -350,7 +312,16 @@ denseFormatOfMatrix reconstructBlocksToDense(const vector<vector<denseFormatOfMa
     return cascadedS;
 }
 
-int cascadeMatrixS(fdtdMesh *psys) {
+denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
+    /* This function cascades original S matrix in COO format to a dense matrix with only port surfaces left.
+    Inputs:
+        freqHz: objective frequency in unit Hz
+        matrix ShSe/mu:
+                (psys->SRowId, psys->SColId, psys->Sval) ~ COO format
+                psys->leng_S: number of nnz in ShSe/mu
+    Return:
+        cascadedS: matrix "(-w^2*D_eps+iw*D_sig+ShSe/mu)" with only {e}_portSurf left
+    */
 
     // Num of e at each surface or each layer. Layer growth along y.
     myint Nx                    = psys->N_cell_x;
@@ -378,7 +349,7 @@ int cascadeMatrixS(fdtdMesh *psys) {
         nnzS_rowId = nnzS_rowId - (B_rowId / 2) * n_layerE_growY - (B_rowId % 2) * n_surfExEz;
         nnzS_colId = nnzS_colId - (B_colId / 2) * n_layerE_growY - (B_colId % 2) * n_surfExEz;
 
-        Blocks[BlockId].push_back(make_tuple(nnzS_rowId, nnzS_colId, psys->Sval[i_nnz]));
+        Blocks[BlockId].push_back({ nnzS_rowId, nnzS_colId, psys->Sval[i_nnz] });
     }
 
     // Free original matrix S to save memory
@@ -398,7 +369,7 @@ int cascadeMatrixS(fdtdMesh *psys) {
     // Sort each block matrix by its row indices, 1st element of the tuple
     /* The purpose is to allow easy convert from COO to CSR format*/
     for (auto &block : Blocks) {
-        sort(block.begin(), block.end());
+        sort(block.begin(), block.end(), ascendByRowInd);
     }
 
     // Half the value of overlapped ns-ns blocks between adjcent two layers
@@ -406,7 +377,7 @@ int cascadeMatrixS(fdtdMesh *psys) {
     cascade block matrix S. Any partition works like C = aC' + bC''. C = C' + C' makes codeing easier.*/
     for (myint nsns_BlockId = 8; nsns_BlockId < 8 * N_layers; nsns_BlockId += 8) {
         for (auto &nnz : Blocks[nsns_BlockId]) {
-            get<2>(nnz) *= 0.5;
+            nnz.val *= 0.5;
         }
     }
 
@@ -503,8 +474,7 @@ int cascadeMatrixS(fdtdMesh *psys) {
     }
     surfSurfBlocks.clear(); // free surf-surf blocks 
 
-    denseFormatOfMatrix cascadedS = reconstructBlocksToDense(portportBlocks);
-    return 0;
+    return reconstructBlocksToDense(portportBlocks);
 }
 
 // Cal all the computed freq points and store in a vector
@@ -542,13 +512,11 @@ void Assign_J_eachPort(fdtdMesh *psys, int sourcePort) {
 // Solve E field and Z-parameters in Pardiso, solve layer by layer. (under developing)
 void Solve_E_Zpara_InPardiso_layered(fdtdMesh *psys) {
 
-    cascadeMatrixS(psys);
+    double freqHz = 0;
+    cascadeMatrixS(psys, freqHz);
 
     // All computed freq points
     vector<double> vFreqHz = CalAllFreqPointsHz(*psys);
-
-    // S matrix in CSR format
-    const myint *pcsrS_colId = psys->SColId;
 
     // Right-Hand-Side term -iwJ (A * m^-2 / s) and electric field eField (V/m), SI unit
     complex<double> *pRhsJ_SI = new complex<double>[psys->N_edge - 2 * psys->N_edge_s]();    // -iw{j}
