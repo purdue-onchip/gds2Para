@@ -12,10 +12,11 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
 
     // Get the number of processors
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    cout << " Number of processors is " << num_procs << endl;
+    //cout << " Number of processors is " << num_procs << endl;
 
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    //cout << " Rank of process is " << myid << endl;
 
     /* Initialize HYPRE for multiple processes */
     HYPRE_Int indi = 0;
@@ -132,11 +133,13 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Run info - needed logging turned on */
         HYPRE_BoomerAMGGetNumIterations(solver, &num_iterations);
         HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+#ifdef HYPRE_PRINT_STATS
         if (myid == 0)
         {
             cout << " Iterations = " << num_iterations << endl;
             cout << " Final Relative Residual Norm = " << final_res_norm << endl << endl;
         }
+#endif
 
         /* Output the final solution */
         HYPRE_Complex v;
@@ -186,11 +189,13 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         /* Run info - needed logging turned on */
         HYPRE_PCGGetNumIterations(solver, &num_iterations);
         HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+#ifdef HYPRE_PRINT_STATS
         if (myid == 0)
         {
             cout << " Iterations = " << num_iterations << endl;
             cout << " Final Relative Residual Norm = " << final_res_norm << endl << endl;
         }
+#endif
 
         /* Output the final solution */
         HYPRE_Complex v;
@@ -247,20 +252,22 @@ int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint 
         }
 
         /* Now setup and solve! */
-        //cout << "Setup and solve in GMRES block" << endl;
+        //cout << " Setup and solve in GMRES block" << endl;
         HYPRE_ParCSRFlexGMRESSetup(solver, parcsr_A, par_b, par_x);
-        //cout << "GMRES has been set up, awaiting solve" << endl;
+        //cout << " GMRES has been set up, awaiting solve" << endl;
         HYPRE_ParCSRFlexGMRESSolve(solver, parcsr_A, par_b, par_x);
 
         /* Run info - needed logging turned on */
         HYPRE_FlexGMRESGetNumIterations(solver, &num_iterations);
         HYPRE_FlexGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
 
+#ifdef HYPRE_PRINT_STATS
         if (myid == 0)
         {
             cout << " Iterations = " << num_iterations << endl;
             cout << " Final Relative Residual Norm = " << final_res_norm << endl << endl;
         }
+#endif
 
         /* Output the final solution */
         HYPRE_Complex v;

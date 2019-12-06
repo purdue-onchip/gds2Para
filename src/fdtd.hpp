@@ -22,6 +22,8 @@
 #include <string>
 #include <algorithm>
 #include <utility>
+#include <memory>
+#include <taskflow/taskflow.hpp>
 
 // HYPRE and MKL data type control
 #define LARGE_SYSTEM (1) // Must leave defined with the current makefile. Comment out in windows system
@@ -59,9 +61,9 @@ using namespace std;
 #define LOWER_BOUNDARY_PEC
 //#define PRINT_NODE_COORD // Terminal output has raw node coordinates for debugging
 #define PRINT_DIS_COUNT // Terminal output has discretization lengths and edge, node, and cell counts
-#define PRINT_PORT_COND // Terminal output has extra information about locating ports in isolated conductors
+//#define PRINT_PORT_COND // Terminal output has extra information about locating ports in isolated conductors
 #define SKIP_MARK_CELL
-#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
+//#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
 //#define PRINT_V0D_BLOCKS
 //#define V0_NEW_SCHEMA
@@ -1500,7 +1502,6 @@ public:
 
             }
         }
-        
         /* Sparse matrix construction for V0d1 */
         this->v0d1RowId = (myint*)malloc(v0d1num * sizeof(myint));
         this->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
@@ -1671,6 +1672,7 @@ public:
             leng_v0d1++;
             leng_v0d1a++;
         }
+
         for (indi = 0; indi < this->numCdt; indi++) {
             if (this->conductor[indi].markPort == markb) {
                 continue;
@@ -3337,6 +3339,98 @@ public:
 
     }
 
+    /* Generate Ac */
+    void generateAc(myint *map, myint v0cnum, myint v0canum, myint leng_v0c, myint& leng_Ac) {
+        myint indi, indj, inx, iny, inz;
+        myint node1, node2;
+        unordered_map<myint, unordered_map<myint, double>> Ac;
+
+        for (indi = 0; indi < v0canum; indi++) {    // the upper and lower planes are PEC
+            if (this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
+                inz = this->v0cRowId[indi] / (this->N_edge_s + this->N_edge_v);
+                inx = ((this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) / (this->N_cell_y + 1);
+                iny = ((this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) % (this->N_cell_y + 1);
+                node1 = inz * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
+                node2 = (inz + 1) * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
+                if (map[node1] != this->v0cColId[indi] + 1 && map[node1] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
+                }
+                else if (map[node2] != this->v0cColId[indi] + 1 && map[node2] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
+                }
+                else if (this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * SIGMA);
+                }
+            }
+            else if (this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
+                inz = this->v0cRowId[indi] / (this->N_edge_s + this->N_edge_v);
+                inx = ((this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+                iny = ((this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) % (this->N_cell_y + 1);
+                node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
+                node2 = inz * this->N_node_s + (inx + 1) * (this->N_cell_y + 1) + iny;
+                if (map[node1] != this->v0cColId[indi] + 1 && map[node1] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
+                }
+                else if (map[node2] != this->v0cColId[indi] + 1 && map[node2] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
+                }
+                else if (this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * SIGMA);
+                }
+            }
+            else {    // this edge is along y axis
+                inz = this->v0cRowId[indi] / (this->N_edge_s + this->N_edge_v);
+                inx = (this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) / this->N_cell_y;
+                iny = (this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+                node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
+                node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
+                if (map[node1] != this->v0cColId[indi] + 1 && map[node1] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
+                }
+                else if (map[node2] != this->v0cColId[indi] + 1 && map[node2] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
+                }
+                else if (this->markEdge[this->v0cRowId[indi]] != 0) {
+                    Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * SIGMA);
+                }
+            }
+        }
+
+        for (indi = 0; indi < leng_v0c; indi++) {
+            leng_Ac += Ac[indi].size();
+        }
+        this->AcRowId = (myint*)calloc(leng_Ac, sizeof(myint));
+        this->AcColId = (myint*)calloc(leng_Ac, sizeof(myint));
+        this->Acval = (double*)calloc(leng_Ac, sizeof(double));
+        indj = 0;
+        int k = 1;
+        for (indi = 0; indi < leng_v0c; indi++) {
+            vector<pair<myint, double>> v(Ac[indi].begin(), Ac[indi].end());
+            sort(v.begin(), v.end());
+            for (auto aci : v) {
+                if (abs(aci.second) > 1e5) {
+                    this->AcRowId[indj] = indi;
+                    this->AcColId[indj] = aci.first;
+                    this->Acval[indj] = aci.second;
+                    if (this->AcRowId[indj] >= this->acu_cnno[k]) {
+                        this->cindex.push_back(indj - 1);
+                        k++;
+                    }
+                    indj++;
+                }
+            }
+            v.clear();
+        }
+        this->cindex.push_back(indj - 1);
+        Ac.clear();
+    }
+
     /* Find Vh by using Arnoldi method */
     void find_Vh(int sourcePort, int k, int bdl, int bdu) {
         /* sourcePort : The port No. now considered
@@ -3803,7 +3897,7 @@ public:
                     freq = this->freqStart * this->freqUnit;
 
                     // Report the saved result
-                    cout << "Z-parameters at frequency " << (this->freqStart + id * (this->freqEnd - this->freqStart) / (this->nfreq - 1)) * this->freqUnit << " Hz:" << endl;
+                    cout << endl << "Z-parameters at frequency " << (this->freqStart + id * (this->freqEnd - this->freqStart) / (this->nfreq - 1)) * this->freqUnit << " Hz:" << endl;
                     for (indi = 0; indi < this->numPorts; indi++) {
                         for (indj = 0; indj < this->numPorts; indj++) {
                             Zresult = this->x[indj + indi*this->numPorts];
@@ -3972,8 +4066,8 @@ int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);
 void freePara(fdtdMesh *sys);
 int matrixConstruction(fdtdMesh *sys);
-int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
-int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark);
+int portSet(fdtdMesh *sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi, tf::Subflow subflow);
+//int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark);
 // The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double *index_val, int size);
@@ -3985,7 +4079,7 @@ int nodeAddAvgLarger(int *index, int size, int total_size, fdtdMesh *sys, int &n
 int nodeAddAvg_count(int *index, int size, int total_size, fdtdMesh *sys, int &num, int &leng);
 int interativeSolver(int N, int nrhs, double *rhs, int *ia, int *ja, double *a, int *ib, int *jb, double *b, double *solution, fdtdMesh *sys);
 int output(fdtdMesh *sys);
-int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
+int paraGenerator(fdtdMesh *sys, tf::Subflow subflow);
 int yParaGenerator(fdtdMesh *sys);
 int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int leng_v0d1);
 int pardisoSolve(fdtdMesh *sys, double *rhs, double *solution, int leng_v0d1);

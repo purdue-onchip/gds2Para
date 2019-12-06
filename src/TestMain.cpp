@@ -6,15 +6,7 @@
 */
 
 #define _USE_MATH_DEFINES // Place before including <cmath> for e, log2(e), log10(e), ln(2), ln(10), pi, pi/2, pi/4, 1/pi, 2/pi, 2/sqrt(pi), sqrt(2), and 1/sqrt(2)
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <ctime>
-#include <unordered_set>
-#include <limbo/parsers/gdsii/stream/GdsReader.h>
 #include <parser-spef/parser-spef.hpp>
-#include <Eigen/Sparse>
 #include "limboint.hpp"
 #include "solnoutclass.hpp"
 #include "layeredFdtd.hpp"
@@ -256,6 +248,7 @@ int main(int argc, char** argv)
             size_t indExtension = inGDSIIFile.find_last_of(".");
 
             // Read GDSII file
+            taskflow.name("TestMain");
             tf::Task taskA = taskflow.placeholder();
             taskA.name("Cmd Line / Initialize Vars");
             tf::Task taskB = taskflow.emplace([&]()
@@ -273,7 +266,7 @@ int main(int argc, char** argv)
                 {
                     cerr << "Unable to read in GDSII file" << endl;
                     status = 1;
-                    return status;
+                    exit(status);
                 }
             });
             taskB.name("Read GDSII");
@@ -291,7 +284,7 @@ int main(int argc, char** argv)
                 {
                     cerr << "Unable to read in simulation input file" << endl;
                     status = 1;
-                    return status;
+                    exit(status);
                 }
             });
             taskC.name("Read Sim Input");
@@ -328,7 +321,7 @@ int main(int argc, char** argv)
                 else
                 {
                     cerr << "meshAndMark Fail!" << endl;
-                    return status;
+                    exit(status);
                 }
                 //sys.print();
             });
@@ -347,7 +340,7 @@ int main(int argc, char** argv)
                 }
                 else {
                     cerr << "matrixConstruction Fail!" << endl;
-                    return status;
+                    exit(status);
                 }
                 //sys.print();
             });
@@ -356,18 +349,18 @@ int main(int argc, char** argv)
 
             // Set port
             clock_t t4 = clock();
-            tf::Task taskH = taskflow.emplace([&]()
+            tf::Task taskH = taskflow.emplace([&](auto &subflow)
             {
-                status = portSet(&sys, xi, yi, zi);
+                status = portSet(&sys, xi, yi, zi, subflow);
                 if (status == 0)
                 {
-                    cout << "portSet Success!" << endl;
-                    cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                    cout << "portSet dynamic tasking Success!" << endl;
+                    cout << "portSet dynamic tasking time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
                 }
                 else
                 {
-                    cerr << "portSet Fail!" << endl;
-                    return status;
+                    cerr << "portSet dynamic tasking Fail!" << endl;
+                    exit(status);
                 }
                 //sys.print();
             });
@@ -388,7 +381,7 @@ int main(int argc, char** argv)
                 else
                 {
                     cerr << "generateStiff Fail!" << endl;
-                    return status;
+                    exit(status);
                 }
             });
             taskI.name("Generate S");
@@ -402,18 +395,18 @@ int main(int argc, char** argv)
 
             // Parameter generation
             clock_t t6 = clock();
-            tf::Task taskJ = taskflow.emplace([&]()
+            tf::Task taskJ = taskflow.emplace([&](auto &subflow)
             {
-                status = paraGenerator(&sys, xi, yi, zi);
+                status = paraGenerator(&sys, subflow);
                 if (status == 0)
                 {
-                    cout << "paraGenerator Success!" << endl;
-                    cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                    cout << "paraGenerator dynamic tasking Success!" << endl;
+                    cout << "paraGenerator dynamic tasking time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
                 }
                 else
                 {
-                    cerr << "paraGenerator Fail!" << endl;
-                    return status;
+                    cerr << "paraGenerator dynamic tasking Fail!" << endl;
+                    exit(status);
                 }
                 cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
                 cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
@@ -445,7 +438,7 @@ int main(int argc, char** argv)
                     sdb.setOutSPEF(outSPEFFile);
                     sdb.print(indLayerPrint);
                     bool sdbCouldDump = sdb.dumpSPEF();
-                    cout << "File ready at " << outSPEFFile << endl;
+                    cout << "File ready at " << outSPEFFile << endl << endl;
                 }
                 else if ((strcmp(argv[1], "-sc") == 0) || (strcmp(argv[1], "--citi") == 0))
                 {
@@ -461,7 +454,7 @@ int main(int argc, char** argv)
                     sdb.setOutCITI(outCITIFile);
                     sdb.print(indLayerPrint);
                     bool sdbCouldDump = sdb.dumpCITI();
-                    cout << "File ready at " << outCITIFile << endl;
+                    cout << "File ready at " << outCITIFile << endl << endl;
                 }
                 else if ((strcmp(argv[1], "-st") == 0) || (strcmp(argv[1], "--touchstone") == 0))
                 {
@@ -472,7 +465,7 @@ int main(int argc, char** argv)
                     sdb.setOutTouchstone(outTstoneFile);
                     sdb.print(indLayerPrint);
                     bool sdbCouldDump = sdb.dumpTouchstone();
-                    cout << "File ready at " << outTstoneFile << endl;
+                    cout << "File ready at " << outTstoneFile << endl << endl;
                 }
                 else
                 {
@@ -483,16 +476,16 @@ int main(int argc, char** argv)
                     sdb.setOutXyce(outXyceFile);
                     sdb.print(indLayerPrint);
                     sdbCouldDump = sdb.dumpXyce();
-                    cout << "File ready at " << outXyceFile << endl;
+                    cout << "File ready at " << outXyceFile << endl << endl;
                 }
             });
             taskL.name("Terminal / File Out");
             taskK.precede(taskL);
 
             // CPP-Taskflow Executor
-            //taskflow.dump(cout);
             executor.run(taskflow);
             executor.wait_for_all();
+            taskflow.dump(cout);
         }
         else
         {

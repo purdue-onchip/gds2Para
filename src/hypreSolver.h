@@ -9,6 +9,7 @@
 #define HYPRE_PC_TOL (1000. * HYPRE_CONV_TOL) // Preconditioner tolerance (relative residual norm) for HYPRE
 #define HYPRE_PC_MOD_SWEEPS (10) // Modified number of preconditioner sweeps if preconditioner tolerance not met on first preconditioner sweep for HYPRE
 #define HYPRE_MAX_ITER (100) // Maximum iterations for HYPRE
+//#define HYPRE_PRINT_STATS // Terminal output has HYPRE solver run statistics
 
 //int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution);
 int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution);
