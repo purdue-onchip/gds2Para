@@ -43,6 +43,23 @@ public:
         }
     }
 
+    // Copy this->vals to a MKL_Complex16 type memory
+    void copyToMKL_Complex16(MKL_Complex16 *ptr) const {
+        /* Input: a pointer to assigned MKL_Complex16 memory of size this->matrixSize */
+        for (myint ind = 0; ind < this->matrixSize; ind++) {
+            ptr[ind].real = this->vals[ind].real();
+            ptr[ind].imag = this->vals[ind].imag();
+        }
+    }
+
+    // Copy this->vals from a MKL_Complex16 type memory
+    void copyFromMKL_Complex16(MKL_Complex16 *ptr) {
+        /* Input: a pointer to assigned MKL_Complex16 memory of size this->matrixSize */
+        for (myint ind = 0; ind < this->matrixSize; ind++) {
+            this->vals[ind] = { ptr[ind].real , ptr[ind].imag };
+        }
+    }
+
     // C = A (this) + B
     denseFormatOfMatrix add(const denseFormatOfMatrix &B) const {
         if (this->N_rows != B.N_rows && this->N_cols != B.N_cols) {
@@ -113,13 +130,14 @@ public:
         }
 
         // Compute the LU factorization of a general m-by-n matrix A (this) and store in A_LU
-        vector<complex<double>> A_LU(this->vals);
+        vector<MKL_Complex16> A_LU(this->matrixSize);
+        this->copyToMKL_Complex16(A_LU.data());         // copy matrix A to a MKL_Complex16 type A_LU
         vector<myint> ipiv(this->N_rows);
         lapack_int info = LAPACKE_zgetrf(LAPACK_COL_MAJOR,
-            this->N_rows, this->N_cols,     // matrix dimensions ~ m, n
-            A_LU.data(),                    // matrix A
+            this->N_rows, this->N_cols,                 // matrix dimensions ~ m, n
+            A_LU.data(),                                // matrix A
             this->N_rows,
-            ipiv.data()                     // pivot indices
+            ipiv.data()                                 // pivot indices
         );
         if (info != 0) {
             cout << "Issue on LU factorization, LAPACKE_dgetrf returns: " << info << endl;
@@ -127,18 +145,22 @@ public:
         }
 
         // Solve C = A_LU \ B with LAPACKE_dgetrs
-        denseFormatOfMatrix C(B.N_rows, B.N_cols);
-        C.vals = B.vals;                // copy matrix B to C
+        vector<MKL_Complex16> C_mklComplex(B.matrixSize);
+        B.copyToMKL_Complex16(C_mklComplex.data());     // copy matrix B to a MKL_Complex16 type C_mklComplex
         info = LAPACKE_zgetrs(LAPACK_COL_MAJOR, 'N',
-            B.N_rows, B.N_cols,         // n & nrhs
-            A_LU.data(), B.N_rows,      // A_LU
-            ipiv.data(),                // pivot indices of A_LU
-            C.vals.data(), B.N_rows     // C (copied B) will be overwritten by the solution matrix
+            B.N_rows, B.N_cols,                         // n & nrhs
+            A_LU.data(), B.N_rows,                      // A_LU
+            ipiv.data(),                                // pivot indices of A_LU
+            C_mklComplex.data(), B.N_rows               // C (copied B) will be overwritten by the solution matrix
         );
         if (info != 0) {
             cout << "Issue on mkl backslash, LAPACKE_dgetrs returns: " << info << endl;
             exit(2);
         }
+
+        // Store the solution at denseFormatOfMatrix
+        denseFormatOfMatrix C(B.N_rows, B.N_cols);
+        C.copyFromMKL_Complex16(C_mklComplex.data());   // copy C.vals (complex<double>) from MKL_Complex16
 
         return C;
     }
@@ -175,6 +197,15 @@ public:
         delete[] this->rows;
         delete[] this->cols;
         delete[] this->vals;
+    }
+
+    // Copy this->vals to a MKL_Complex16 type memory
+    void copyToMKL_Complex16(MKL_Complex16 *ptr) const {
+        /* Input: a pointer to assigned MKL_Complex16 memory of size this->N_nnz */
+        for (myint ind = 0; ind < this->N_nnz; ind++) {
+            ptr[ind].real = this->vals[ind].real();
+            ptr[ind].imag = this->vals[ind].imag();
+        }
     }
 
     // Convert BlockType (COO) to CSR
@@ -252,7 +283,7 @@ denseFormatOfMatrix csrFormatOfMatrix::backslashDense(const denseFormatOfMatrix 
 
     // Release internal memory
     phase = -1;
-    double ddum;           /* Double dummy */
+    complex<double> ddum;               /* Complex<double> dummy */
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(this->N_rows), &ddum, this->rows, this->cols,
         &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
 

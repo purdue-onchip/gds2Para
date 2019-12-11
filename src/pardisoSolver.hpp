@@ -134,18 +134,27 @@ inline myint mapRowColIdToBlockId(const myint B_rowId, const myint B_colId) {
 
 // Compute y = alpha * A * x + beta * y and store computed dense matrix in y
 int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of csr A
-                        myint N_rows_x, complex<double> *x,     // x,y ~ dense matrix stored in continuous memory array 
-                        denseFormatOfMatrix *y) {
+    myint N_rows_x, complex<double> *xval,     // x,y ~ dense matrix stored in continuous memory array 
+    denseFormatOfMatrix *y) {
     /* see doc: https://software.intel.com/en-us/onemkl-developer-reference-c-mkl-sparse-mm
-    Example: 
+    Example:
             y   = alpha * A   * x   + beta * y
             C11 = -1.0  * B12 * D0s + 1.0  * B11    */
 
 
-    complex<double> alpha(-1.0, 0.0);
-    complex<double> beta(1.0, 0.0);
+    MKL_Complex16 alpha = { -1.0, 0.0 };
+    MKL_Complex16 beta = { 1.0, 0.0 };
     struct matrix_descr descrA;             // Descriptor of main sparse matrix properties
     descrA.type = SPARSE_MATRIX_TYPE_GENERAL;
+
+    vector<MKL_Complex16> yval_mklComplex(y->matrixSize);
+    y->copyToMKL_Complex16(yval_mklComplex.data());
+    myint x_matrixSize = N_rows_x * y->N_rows;
+    vector<MKL_Complex16> xval_mklComplex(x_matrixSize);
+    for (myint ind = 0; ind < x_matrixSize; ind++) {
+        xval_mklComplex[ind].real = xval[ind].real();
+        xval_mklComplex[ind].imag = xval[ind].imag();
+    }
 
     // Compute y = alpha * A * x + beta * y
     mkl_sparse_z_mm(SPARSE_OPERATION_NON_TRANSPOSE,
@@ -153,11 +162,11 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
         csrA_mklHandle,                     // A
         descrA,
         SPARSE_LAYOUT_COLUMN_MAJOR,         // Describes the storage scheme for the dense matrix
-        x,
+        xval_mklComplex.data(),
         y->N_cols,
         N_rows_x,
         beta,                               // beta = 1.0
-        y->vals.data(),                     // Pointer to the memory array used by the vector to store its owned elements
+        yval_mklComplex.data(),             // Pointer to the memory array used by the vector to store its owned elements
         y->N_rows);
 
     return 0;
@@ -216,12 +225,16 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     sparse_matrix_t csrB12_mklHandle, csrB32_mklHandle;
     csrFormatOfMatrix csrB12(N_surfE, N_volE, layerS[1].size());
     csrB12.convertBlockTypeToCsr(layerS[1]);
+    vector<MKL_Complex16> csrB12vals_mklCompl(csrB12.N_nnz);
+    csrB12.copyToMKL_Complex16(csrB12vals_mklCompl.data());
     mkl_sparse_z_create_csr(&csrB12_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB12.N_rows, csrB12.N_cols,
-        csrB12.rows, csrB12.rows + 1, csrB12.cols, csrB12.vals);
+        csrB12.rows, csrB12.rows + 1, csrB12.cols, csrB12vals_mklCompl.data());
     csrFormatOfMatrix csrB32(N_surfE, N_volE, layerS[7].size());
     csrB32.convertBlockTypeToCsr(layerS[7]);
+    vector<MKL_Complex16> csrB32vals_mklCompl(csrB32.N_nnz);
+    csrB32.copyToMKL_Complex16(csrB32vals_mklCompl.data());
     mkl_sparse_z_create_csr(&csrB32_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB32.N_rows, csrB32.N_cols,
-        csrB32.rows, csrB32.rows + 1, csrB32.cols, csrB32.vals);
+        csrB32.rows, csrB32.rows + 1, csrB32.cols, csrB32vals_mklCompl.data());
 
     // Solve reducedS blocks C11 = B11 - B12*D0s, C12 = B13 - B12*D1s
     preducedS->convertBlockTypeToDense(layerS[0]);              // dense B11 & dense C11
