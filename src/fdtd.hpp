@@ -33,14 +33,6 @@ typedef long long int myint;
 typedef int myint;
 #endif
 
-// Customize the complex type in MKL and LAPACK to std::complex<double>
-#include "mkl_types.h"
-#define MKL_Complex16 std::complex<double>
-#ifndef LAPACK_COMPLEX_CUSTOM
-#define LAPACK_COMPLEX_CUSTOM
-#define lapack_complex_double std::complex<double>
-#endif
-
 #include <mkl.h>
 #include <mkl_spblas.h>
 
@@ -3779,10 +3771,10 @@ public:
                     //out << vr[temp * n + i] << " " << -vr[(temp + 1) * n + i] << " ";
                     //if (i == 0)
                     //    cout << wrc[j] << " " << wic[j] << endl;
-                    v[temp * n + i].real(vr[temp * n + i]);
-                    v[temp * n + i].imag(vr[(temp + 1) * n + i]);
-                    v[(temp + 1) * n + i].real(vr[temp * n + i]);
-                    v[(temp + 1) * n + i].imag(-vr[(temp + 1) * n + i]);
+                    v[temp * n + i].real = vr[temp * n + i];
+                    v[temp * n + i].imag = vr[(temp + 1) * n + i];
+                    v[(temp + 1) * n + i].real = vr[temp * n + i];
+                    v[(temp + 1) * n + i].imag = -vr[(temp + 1) * n + i];
                     temp++;
                     temp++;
                     j++;
@@ -3809,9 +3801,11 @@ public:
         this->Vh = new lapack_complex_double[(this->N_edge - this->bden) * mm];
         for (i = 0; i < mm; i++){
             for (j = 0; j < (this->N_edge - this->bden); j++){
-                this->Vh[i * (this->N_edge - this->bden) + j] = 0;
+                this->Vh[i * (this->N_edge - this->bden) + j].real = 0;
+                this->Vh[i * (this->N_edge - this->bden) + j].imag = 0;
                 for (int in = 0; in < k; in++){
-                    this->Vh[i * (this->N_edge - this->bden) + j] += V[in * (this->N_edge - this->bden) * 2 + j] * v[i * k + in];
+                    this->Vh[i * (this->N_edge - this->bden) + j].real += V[in * (this->N_edge - this->bden) * 2 + j] * v[i * k + in].real;
+                    this->Vh[i * (this->N_edge - this->bden) + j].imag += V[in * (this->N_edge - this->bden) * 2 + j] * v[i * k + in].imag;
                 }
             }
         }
@@ -3895,10 +3889,10 @@ public:
         while (indi < n) {
             if (abs(alphai[indi] / beta[indi]) > eps && abs(alphar[indi] / beta[indi]) < 1) {    // the eigenvalue should have a small real part and a non-zero imaginary part
                 for (int indk = 0; indk < this->N_edge - this->bden; indk++) {
-                    this->Vh[indj * (this->N_edge - this->bden) + indk].real(vr[indi * (this->N_edge - this->bden) * 2 + indk]);
-                    this->Vh[indj * (this->N_edge - this->bden) + indk].imag(vr[(indi + 1) * (this->N_edge - this->bden) * 2 + indk]);
-                    this->Vh[(indj + 1) * (this->N_edge - this->bden) + indk].real(vr[indi * (this->N_edge - this->bden) * 2 + indk]);
-                    this->Vh[(indj + 1) * (this->N_edge - this->bden) + indk].imag(-vr[(indi + 1) * (this->N_edge - this->bden) * 2 + indk]);
+                    this->Vh[indj * (this->N_edge - this->bden) + indk].real = vr[indi * (this->N_edge - this->bden) * 2 + indk];
+                    this->Vh[indj * (this->N_edge - this->bden) + indk].imag = vr[(indi + 1) * (this->N_edge - this->bden) * 2 + indk];
+                    this->Vh[(indj + 1) * (this->N_edge - this->bden) + indk].real = vr[indi * (this->N_edge - this->bden) * 2 + indk];
+                    this->Vh[(indj + 1) * (this->N_edge - this->bden) + indk].imag = -vr[(indi + 1) * (this->N_edge - this->bden) * 2 + indk];
                 }
                 indj++;
                 indj++;
@@ -3908,7 +3902,7 @@ public:
         }
         for (indi = 0; indi < this->N_edge - this->bden; indi++) {
             for (indj = 0; indj < this->leng_Vh; indj++) {
-                out << this->Vh[indj * (this->N_edge - this->bden) + indi].real() << " " << this->Vh[indj * (this->N_edge - this->bden) + indi].imag() << " ";
+                out << this->Vh[indj * (this->N_edge - this->bden) + indi].real << " " << this->Vh[indj * (this->N_edge - this->bden) + indi].imag << " ";
             }
             out << endl;
         }

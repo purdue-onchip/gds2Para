@@ -1010,8 +1010,8 @@ int matrix_multi_cd(char operation, lapack_complex_double *a, myint arow, myint 
         for (myint ind = 0; ind < acol; ind++) {
             for (myint ind1 = 0; ind1 < bcol; ind1++) {
                 for (myint ind2 = 0; ind2 < arow; ind2++) {
-                    tmp3[ind1 * acol + ind].real(tmp3[ind1 * acol + ind].real() + a[ind * arow + ind2].real() * b[ind1 * brow + ind2]);
-                    tmp3[ind1 * acol + ind].imag(tmp3[ind1 * acol + ind].imag() - a[ind * arow + ind2].imag() * b[ind1 * brow + ind2]);
+                    tmp3[ind1 * acol + ind].real = tmp3[ind1 * acol + ind].real + a[ind * arow + ind2].real * b[ind1 * brow + ind2];
+                    tmp3[ind1 * acol + ind].imag = tmp3[ind1 * acol + ind].imag - a[ind * arow + ind2].imag * b[ind1 * brow + ind2];
                 }
             }
         }
@@ -1020,7 +1020,8 @@ int matrix_multi_cd(char operation, lapack_complex_double *a, myint arow, myint 
         for (myint ind = 0; ind < arow; ind++) {
             for (myint ind1 = 0; ind1 < bcol; ind1++) {
                 for (myint ind2 = 0; ind2 < acol; ind2++) {
-                    tmp3[ind1 * arow + ind] = tmp3[ind1 * arow + ind] + a[ind2 * arow + ind] * b[ind1 * brow + ind2];
+                    tmp3[ind1 * arow + ind].real = tmp3[ind1 * arow + ind].real + a[ind2 * arow + ind].real * b[ind1 * brow + ind2];
+                    tmp3[ind1 * arow + ind].imag = tmp3[ind1 * arow + ind].imag + a[ind2 * arow + ind].imag * b[ind1 * brow + ind2];
                 }
             }
         }
