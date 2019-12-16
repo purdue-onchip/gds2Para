@@ -8,7 +8,7 @@
 #include "fdtd.hpp"
 #include "matrixTypeDef.hpp"
 
-vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz) {
+vector<myint> map_eIndexFromGrowzToGrowy(const myint Nx, const myint Ny, const myint Nz) {
     /* This function changes the global {e} index from layer growth along Z to that along Y.
 
     The index follows y - x - z ordering, and {e} is stacked layer by layer as
@@ -79,7 +79,7 @@ vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz) {
 }
 
 // Reverse the map by swapping the index and value of the mapping array
-vector<myint> Reverse_Map_eInd(const vector<myint> &eInd_map_z2y) {
+vector<myint> reverseMap_eInd(const vector<myint> &eInd_map_z2y) {
     
     myint N_tot_E = eInd_map_z2y.size();
     vector<myint> eInd_map_y2z(N_tot_E, 0);
@@ -325,10 +325,45 @@ denseFormatOfMatrix reconstructBlocksToDense(const vector<vector<denseFormatOfMa
     return cascadedS;
 }
 
-denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
+// Find the surface index of each port (layer growth along Y)
+vector<myint> findSurfLocationOfPort(fdtdMesh *psys) {
+/*  Method explained:
+        - Each sourcePort has its position stored at psys->portCoor[sourcePort].y1, .y2, etc.
+        - All node positions are stored at psys->yn, xn, zn.
+        - Search psys->portCoor[sourcePort].y1 in psys->yn to find the surface index for that node.
+    Notes: 
+        - Many ports at 1 surf are counted once
+        - For layer growth along y only and source current along x or z only
+
+    Example: Nlayer = psys->N_cell_y = 3
+        layer:      0s 0v 1s 1v 2s 2v 3s
+        surfId:     0     1     2     3
+        if port at: 0           2
+        returned surfLocationOfPort = { 0, 2 }      */
+
+    vector<myint> surfLocationOfPort;
+
+    for (myint sourcePort = 0; sourcePort < psys->numPorts; sourcePort++) {
+        double y_thisPort = psys->portCoor[sourcePort].y1[0];
+        for (myint indy = 0; indy < psys->N_cell_y + 1; indy++) {   // search over all y nodes
+            if (y_thisPort == psys->yn[indy]) {
+                surfLocationOfPort.push_back(indy);
+                break;
+            }
+        }
+    }
+
+    // Sort vector and erase duplicated surface index
+    sort(surfLocationOfPort.begin(), surfLocationOfPort.end());
+    surfLocationOfPort.erase( unique(surfLocationOfPort.begin(), surfLocationOfPort.end()), surfLocationOfPort.end() );
+
+    return surfLocationOfPort;
+}
+
+denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz) {
     /* This function cascades original S matrix in COO format to a dense matrix with only port surfaces left.
     Inputs:
-        freqHz: objective frequency in unit Hz
+        omegaHz (w): objective angular frequency in unit Hz
         matrix ShSe/mu:
                 (psys->SRowId, psys->SColId, psys->Sval) ~ COO format
                 psys->leng_S: number of nnz in ShSe/mu
@@ -349,9 +384,28 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
 
     // Determine the block id of each nnz element of S and store in corresponding block matrix
     myint nnzS_rowId, nnzS_colId, B_rowId, B_colId, BlockId;
+    complex<double> cascadedS_val;
+    vector<myint> eIndmap_z2y = map_eIndexFromGrowzToGrowy(psys->N_cell_x, psys->N_cell_y, psys->N_cell_z);
+    vector<myint> eIndmap_y2z = reverseMap_eInd(eIndmap_z2y);   // the reverse map to z-growth global index in V0Vh code
     for (myint i_nnz = 0; i_nnz < psys->leng_S; i_nnz++) {
         nnzS_rowId = psys->SRowId[i_nnz];
         nnzS_colId = psys->SColId[i_nnz];
+        cascadedS_val = psys->Sval[i_nnz];
+
+
+        // For diagonal nnz, add "-w^2*eps+iw*sig" to psys->Sval (ShSe/mu)
+        if (nnzS_rowId == nnzS_colId) {     // if at diagonal
+            myint layerInd_alongZ = (eIndmap_y2z[nnzS_rowId] + psys->N_edge_v) / (psys->N_edge_s + psys->N_edge_v);
+            double epsi_thisnnz = psys->stackEpsn[layerInd_alongZ] * EPSILON0;
+            double sigma_thisnnz = 0;
+            if (psys->markEdge[eIndmap_y2z[nnzS_rowId]] != 0) {
+                sigma_thisnnz = SIGMA;
+            }   // if inside a conductor 
+
+            complex<double> epsi_sigma = { -omegaHz*omegaHz*epsi_thisnnz, omegaHz*sigma_thisnnz };
+            cascadedS_val += epsi_sigma;    // -w^2*D_eps+iw*D_sig+ShSe/mu
+        }
+
 
         B_rowId = nnzS_rowId / n_layerE_growY * 2 + (nnzS_rowId % n_layerE_growY) / n_surfExEz;
         B_colId = nnzS_colId / n_layerE_growY * 2 + (nnzS_colId % n_layerE_growY) / n_surfExEz;
@@ -362,13 +416,13 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
         nnzS_rowId = nnzS_rowId - (B_rowId / 2) * n_layerE_growY - (B_rowId % 2) * n_surfExEz;
         nnzS_colId = nnzS_colId - (B_colId / 2) * n_layerE_growY - (B_colId % 2) * n_surfExEz;
 
-        Blocks[BlockId].push_back({ nnzS_rowId, nnzS_colId, psys->Sval[i_nnz] });
+        Blocks[BlockId].push_back({ nnzS_rowId, nnzS_colId, cascadedS_val });
     }
 
-    // Free original matrix S to save memory
-    free(psys->SRowId);
-    free(psys->SColId);
-    free(psys->Sval);
+    //// Free original matrix S to save memory
+    //free(psys->SRowId);
+    //free(psys->SColId);
+    //free(psys->Sval);
 
     /******************** Start Cascading Matrix S from Blocks ***************************/
     
@@ -411,8 +465,7 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
     Blocks.clear();     // free blocks of original whole matrix S to save memory
 
     // Cascade surf-surf blocks and only keep layers where ports are
-    vector<myint> surfLocationOfPort{ 2, 7, 8 };    // surface index of each port's location, many ports at 1 surf counted once
-    sort(surfLocationOfPort.begin(), surfLocationOfPort.end());
+    vector<myint> surfLocationOfPort = findSurfLocationOfPort(psys);
     
     /* Each layer: surfSurfBlocks[i_layer] = {C11, C12, C21, C22} */
 
@@ -421,8 +474,10 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
         surfSurfBlocks[i_layer][3] = surfSurfBlocks[i_layer][3].minus(
             surfSurfBlocks[i_layer][2].dot(surfSurfBlocks[i_layer][0].backslash(surfSurfBlocks[i_layer][1])));
 
-        // Add cascaded C22' at this layer to C11 at next layer
-        surfSurfBlocks[i_layer + 1][0] = surfSurfBlocks[i_layer + 1][0].add(surfSurfBlocks[i_layer][3]);
+        if (i_layer != N_layers) {  // if not reaching the right most layer
+            // Add cascaded C22' at this layer to C11 at next layer
+            surfSurfBlocks[i_layer + 1][0] = surfSurfBlocks[i_layer + 1][0].add(surfSurfBlocks[i_layer][3]);
+        }
     }
 
     // Right -> last port: cascaded C11' = C11 - C12*inv(C22)*C21
@@ -430,8 +485,10 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
         surfSurfBlocks[i_layer][0] = surfSurfBlocks[i_layer][0].minus(
             surfSurfBlocks[i_layer][1].dot(surfSurfBlocks[i_layer][3].backslash(surfSurfBlocks[i_layer][2])));
 
-        // Add cascaded C11' at this layer to C22 at previous layer
-        surfSurfBlocks[i_layer - 1][3] = surfSurfBlocks[i_layer - 1][3].add(surfSurfBlocks[i_layer][0]);
+        if (i_layer != 0) {         // if not reaching the left most layer
+            // Add cascaded C11' at this layer to C22 at previous layer
+            surfSurfBlocks[i_layer - 1][3] = surfSurfBlocks[i_layer - 1][3].add(surfSurfBlocks[i_layer][0]);
+        }
     }
 
     // Middle: 
@@ -480,6 +537,10 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
     
     // Collect all cascaded blocks only related to port surfaces
     myint N_ports = surfLocationOfPort.size();
+    if (N_ports == 1) {     // when only one port, return the block C11
+        myint thisPortLayer = surfLocationOfPort[0];
+        return surfSurfBlocks[thisPortLayer][0];
+    }
     vector<vector<denseFormatOfMatrix>> portportBlocks(N_ports-1);   // (N_ports-1)*4 dense blocks
     for (myint i_port = 0; i_port < N_ports - 1; i_port++) {
         myint thisPortLayer = surfLocationOfPort[i_port];
@@ -490,8 +551,8 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double freqHz) {
     return reconstructBlocksToDense(portportBlocks);
 }
 
-// Cal all the computed freq points and store in a vector
-vector<double> CalAllFreqPointsHz(const fdtdMesh &sys) {
+// Calculate all the simulated freq points and store in a vector
+vector<double> calAllFreqPointsHz(const fdtdMesh &sys) {
     vector<double> vFreqHz;
 
     vFreqHz.push_back(sys.freqStart * sys.freqUnit);          // First frequency in sweep
@@ -508,59 +569,139 @@ vector<double> CalAllFreqPointsHz(const fdtdMesh &sys) {
     return vFreqHz;
 }
 
-// Assign source current density for a source port
-void Assign_J_eachPort(fdtdMesh *psys, int sourcePort) {
-    if (psys->J != nullptr) {
-        free(psys->J);
-    }   // delete previous J assignment
+// Assign source current density (-iw{j}) for every port excitation
+denseFormatOfMatrix assignRhsJForAllPorts(fdtdMesh *psys, double omegaHz) {
+    /* -iw{j} for each port is stored continusly in denseFormatOfMatrix (col by col)
+    
+    - step 1: get psys->portCoor[sourcePort].portEdge[sourcePortSide][], the stored the global edge index 
+              (grow along Z, no PEC removal) of all excitation current lines when excited at port index "sourcePort"
+    - step 2: map to (grow along Y, no PEC removal)
+    - step 3: cascade to port surfaces    */
 
-    psys->J = (double*)calloc(psys->N_edge, sizeof(double));
-    for (int sourcePortSide = 0; sourcePortSide < psys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-        for (int indEdge = 0; indEdge < psys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
-            psys->J[psys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = psys->portCoor[sourcePort].portDirection[sourcePortSide];
+    // Map -iw{j} at at edges from original index (grow Z) to new index (grow Y) 
+    myint N_allEdges = psys->N_edge;                                // num of all edges in the computational domain
+    denseFormatOfMatrix RhsJ_SI(N_allEdges, psys->numPorts);        // -iw{j} at all edges
+    vector<myint> eIndmap_z2y = map_eIndexFromGrowzToGrowy(psys->N_cell_x, psys->N_cell_y, psys->N_cell_z);
+    for (myint sourcePort = 0; sourcePort < psys->numPorts; sourcePort++) {
+        for (myint sourcePortSide = 0; sourcePortSide < psys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+            for (myint inde = 0; inde < psys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++) {
+                myint ind_j_growZ = psys->portCoor[sourcePort].portEdge[sourcePortSide][inde];  // j edge index (growZ, no PEC removal)
+                myint ind_j_growY = eIndmap_z2y[ind_j_growZ];                                   // map to j edge index (growY, no PEC removal)
+                ind_j_growY += sourcePort * N_allEdges;                                         // index shifted by port number
+                RhsJ_SI.vals[ind_j_growY] = { 0.0, -1.0 * omegaHz * (psys->portCoor[sourcePort].portDirection[sourcePortSide]) };
+            }
         }
     }
+
+    // Only keep -iw{j} to port surfaces (cascading)
+    myint Nx = psys->N_cell_x;
+    myint Nz = psys->N_cell_z;
+    myint N_surfExEz = Nx*(Nz + 1) + Nz*(Nx + 1);                               // number of edges at one surface
+    myint n_volEy = (Nx + 1)*(Nz + 1);                                          // number of volumn edges in one layer
+    myint N_allCascadedEdges = psys->numPorts * N_surfExEz;                     // number of all edges in kept surfaces
+    denseFormatOfMatrix cascadedRhsJ_SI(N_allCascadedEdges, psys->numPorts);    // -iw{j} only in port surfaces
+    vector<myint> surfLocationOfPort = findSurfLocationOfPort(psys);
+    for (myint excitedPort = 0; excitedPort < psys->numPorts; excitedPort++) {
+        for (myint ind_thisPort = 0; ind_thisPort < psys->numPorts; ind_thisPort++) {           // for each kept port surface
+            for (myint j_ind = 0; j_ind < N_surfExEz; j_ind++) {    // for all e at this surface, index starting from 0
+                // Cascaded index = indJ at this surface + shift by previous port surfaces + shift by previous port excitation
+                myint indJ_cascaded = j_ind + ind_thisPort * N_surfExEz + excitedPort * N_allCascadedEdges;
+
+                // For original noncascaded index
+                myint surfInd_thisPort = surfLocationOfPort[ind_thisPort];
+                myint shift_surfvol = surfInd_thisPort * (N_surfExEz + n_volEy);    // index shift from all surf-vol {e} before this surface
+                myint indJ_noncasc = j_ind + shift_surfvol + excitedPort * N_allEdges;
+
+                cascadedRhsJ_SI.vals[indJ_cascaded] = RhsJ_SI.vals[indJ_noncasc];
+            }   
+        }   
+    }
+
+    return cascadedRhsJ_SI;
+}
+
+// Reconstruct {e} as in V0Vh part (grow Z, removed PEC) from cascaded {e} solution (grow Y, no PEC removal)
+denseFormatOfMatrix reconstruct_e(fdtdMesh *psys, const denseFormatOfMatrix &cascadedeField_SI, double excitedPort) {
+    /*  Inputs:
+            - cascadedeField_SI: of size N_allCascadedEdges * psys->numPorts
+            - excitedPort: excited port index
+        Return:
+            - eField_oneExcit: of size (psys->N_edge - psys->bden) * 1
+    */
+
+    myint Nx = psys->N_cell_x;
+    myint Nz = psys->N_cell_z;
+    myint N_surfExEz = Nx*(Nz + 1) + Nz*(Nx + 1);                               // number of edges at one surface
+    myint n_volEy = (Nx + 1)*(Nz + 1);                                          // number of volumn edges in one layer
+    myint N_allCascadedEdges = psys->numPorts * N_surfExEz;                     // number of all edges in kept surfaces
+    myint N_allEdges = psys->N_edge;                                            // num of all edges in the computational domain
+    myint N_allEdgesNoPEC = psys->N_edge - psys->bden;                          // num of all edges after removing PEC
+    vector<myint> surfLocationOfPort = findSurfLocationOfPort(psys);            // surf index of the port's location
+
+    
+    vector<myint> eIndmap_z2y = map_eIndexFromGrowzToGrowy(psys->N_cell_x, psys->N_cell_y, psys->N_cell_z);
+    vector<myint> eIndmap_y2z = reverseMap_eInd(eIndmap_z2y);                   // map (grow Y, no PEC removal) to (grow Z, no PEC removal)
+    myint* &eMap_GrowZ_pec2nopec = psys->mapEdge;
+
+    // Reconstruct {e} solution when excited at port index "excitedPort"
+    denseFormatOfMatrix eField_oneExcit(N_allEdgesNoPEC, 1);
+    for (myint ind_thisPort = 0; ind_thisPort < psys->numPorts; ind_thisPort++) {           // for each kept port surface
+        for (myint e_ind = 0; e_ind < N_surfExEz; e_ind++) {    // for all e at this surface, index starting from 0
+            // Cascaded index = e_ind at this surface + shift by previous port surfaces + shift by previous port excitation
+            myint eInd_cascaded = e_ind + ind_thisPort * N_surfExEz + excitedPort * N_allCascadedEdges;
+
+            // For original noncascaded index
+            myint surfInd_thisPort = surfLocationOfPort[ind_thisPort];
+            myint shift_surfvol = surfInd_thisPort * (N_surfExEz + n_volEy);    // index shift from all surf-vol {e} before this surface
+            myint eInd_growYnoPEC = e_ind + shift_surfvol;                      // Step 1: original index at (grow Y, no PEC removal)
+            myint eInd_growZnoPEC = eIndmap_y2z[eInd_growYnoPEC];               // Step 2: map (grow Y, no PEC removal) to (grow Z, no PEC removal)
+            myint eInd_growZpec = psys->mapEdge[eInd_growZnoPEC];               // Step 3: map (grow Z, no PEC removal) to (grow Z, removed PEC)
+            
+            if (eInd_growZpec != -1) {
+                eField_oneExcit.vals[eInd_growZpec] = cascadedeField_SI.vals[eInd_cascaded];
+            }   // psys->mapEdge maps PEC edge index to -1, meaning not in domain
+        }
+    }
+
+    return eField_oneExcit;
 }
 
 // Solve E field and Z-parameters in Pardiso, solve layer by layer. (under developing)
-void Solve_E_Zpara_InPardiso_layered(fdtdMesh *psys) {
+void solveE_Zpara_layered(fdtdMesh *psys) {
 
-    double freqHz = 0;
-    cascadeMatrixS(psys, freqHz);
-
-    // All computed freq points
-    vector<double> vFreqHz = CalAllFreqPointsHz(*psys);
-
-    // Right-Hand-Side term -iwJ (A * m^-2 / s) and electric field eField (V/m), SI unit
-    complex<double> *pRhsJ_SI = new complex<double>[psys->N_edge - 2 * psys->N_edge_s]();    // -iw{j}
-    complex<double> *peField_SI = new complex<double>[psys->N_edge - 2 * psys->N_edge_s]();  // {e}
-    
-    // Use complex double constructor to assign initial output matrix for single-frequency solve
+    // Initilize Z-parameters for all frequencies
     psys->x.assign(psys->numPorts * psys->numPorts * psys->nfreq, complex<double>(0., 0.));
 
-    for (int indFreq = 0; indFreq < vFreqHz.size(); indFreq++) {
-        //for (int sourcePort = 0; sourcePort < psys->numPorts; sourcePort++) {
-        //    AssignSourceCurrentForSourcePort(psys, sourcePort);
-        //    Solve_E_InPardiso(psys, peField_SI, pRhsJ_SI, vFreqHz[indFreq], psys->SRowId, psys->SColId, psys->Sval);
-        //    psys->Construct_Z_V0_Vh(peField_SI, indFreq, sourcePort, bdl, bdu);
-        //}   // solve for each port
-        reference(psys, indFreq, psys->SRowId, psys->SColId, psys->Sval);
-        
-    }   // solve for each frequency
+    vector<double> vFreqHz = calAllFreqPointsHz(*psys);
+    for (int indFreq = 0; indFreq < vFreqHz.size(); indFreq++) {    // for each computed freq point
+        double omegaHz = 2.0 * M_PI * vFreqHz[indFreq];
+
+        // Cascaded system matrix (-w^2*D_eps+iw*D_sig+ShSe/mu)
+        denseFormatOfMatrix cascadedS = cascadeMatrixS(psys, omegaHz);
+
+        // Cascaded -iwJ and {e}. All excitations at each port are solved together
+        denseFormatOfMatrix cascadedRhsJ_SI = assignRhsJForAllPorts(psys, omegaHz);     // -iw{j} in unit (A * m^-2 / s)
+        denseFormatOfMatrix cascadedeField_SI = cascadedS.backslash(cascadedRhsJ_SI);   // {e} in unit (V/m)
+
+        // For each port excitation, reconstruct {e} and solve Z-parameters
+        for (myint excitedPort = 0; excitedPort < psys->numPorts; excitedPort++) {
+            denseFormatOfMatrix eField_oneExcit = reconstruct_e(psys, cascadedeField_SI, excitedPort);
+            psys->Construct_Z_V0_Vh(eField_oneExcit.vals.data(), indFreq, excitedPort);
+        }
+    }
 
     // Print Z-parameters
     psys->print_z_V0_Vh();
 
-    delete[] pRhsJ_SI, peField_SI;
 }
 
 // Solve E field and Z-parameters in Pardiso, solve the whole structure as reference
-void Solve_E_Zpara_InPardiso_reference(fdtdMesh *psys) {
+void solveE_Zpara_reference(fdtdMesh *psys) {
 
     // All computed freq points
-    vector<double> vFreqHz = CalAllFreqPointsHz(*psys);
+    vector<double> vFreqHz = calAllFreqPointsHz(*psys);
 
-    // Use complex double constructor to assign initial output matrix for single-frequency solve
+    // Initilize Z-parameters for all frequencies
     psys->x.assign(psys->numPorts * psys->numPorts * psys->nfreq, complex<double>(0., 0.));
 
     // At each frequency, solve all ports together

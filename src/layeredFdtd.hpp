@@ -18,8 +18,8 @@ int layeredFdtd(void) {
 	// Read object sys (class fdtdMesh) from files
 	ReadSysFromFile(&sys);
 
-	// Write object sys to files
-	WriteSysToFile(sys);
+	//// Write object sys to files
+	//WriteSysToFile(sys);
 
 	// Mesh the domain and mark conductors
 	unordered_set<double> portCoorx, portCoory;
@@ -78,8 +78,8 @@ int layeredFdtd(void) {
 		return status;
 	}
 
-	Solve_E_Zpara_InPardiso_layered(&sys);
-    Solve_E_Zpara_InPardiso_reference(&sys);
+    solveE_Zpara_layered(&sys);
+    solveE_Zpara_reference(&sys);
 
 	return 0;
 }

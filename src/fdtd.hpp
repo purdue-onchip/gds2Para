@@ -76,7 +76,7 @@ using namespace std;
 
 // Disable layered FDTD code (comment out if you want to test layered FDTD)
 #define SKIP_WRITE_SYS_TO_FILE        // Skip writing sys obj to txt files
-#define SKIP_LAYERED_FDTD             // Skip the main function to call layeredFdtd code
+#define SKIP_LAYERED_FDTD             // Skip the main function's calling layeredFdtd code
 
 // Function-like macros
 #define NELEMENT(x) ((sizeof x) / (sizeof x[0]))
@@ -4093,7 +4093,7 @@ public:
     /* Construct Z parameters with V0 and Vh */
     void Construct_Z_V0_Vh(complex<double> *x, int freqNo, int sourcePort){
 
-        /* x: field distribution
+        /* x: field distribution ({e}_PEC has been removed in this *x)
         freqNo: frequency no.
         sourcePort: port no.
         Note: portDirection is the relative position of the port to the ground. E.g., ground is on the top, then portDirection = -1 */
@@ -4417,5 +4417,5 @@ int matrix_multi(char operation, lapack_complex_double *a, myint arow, myint aco
 int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val);
 int plotTime(fdtdMesh *sys, int sourcePort, double *u0d, double *u0c);
 int avg_length(fdtdMesh *sys, int iz, int iy, int ix, double &lx, double &ly, double &lz);
-vector<myint> Map_eInd_GrowZ2Y(const myint Nx, const myint Ny, const myint Nz);
+vector<myint> map_eIndexFromGrowzToGrowy(const myint Nx, const myint Ny, const myint Nz);
 #endif

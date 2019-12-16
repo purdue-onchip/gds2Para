@@ -585,6 +585,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
                 J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 
                     0. - (1i) * (double) (sys->portCoor[sourcePort].portDirection[sourcePortSide]) * freq * 2. * M_PI;
+                //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] << endl;
                 //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << endl;
 
             }
@@ -973,7 +974,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
 // Generate S matrix in COO format without removing {e} at PEC, namely 6 PMC BCs.
 // Layer growth along y.
 
-    vector<myint> eInd_map_z2y = Map_eInd_GrowZ2Y(sys->N_cell_x, sys->N_cell_y, sys->N_cell_z);
+    vector<myint> eInd_map_z2y = map_eIndexFromGrowzToGrowy(sys->N_cell_x, sys->N_cell_y, sys->N_cell_z);
 
     for (myint i = 0; i < ARows; i++) {
         num = ArowEnd[i] - ArowStart[i];
