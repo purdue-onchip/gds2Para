@@ -953,68 +953,68 @@ myint generateLaplacian_count(fdtdMesh* sys) {
         sys->compute_node_index(node2, indx2, indy2, indz2);
 
         if (indx1 != indx2) {   // if this edge is along x
-            if (indz1 > 0) {    // has lower x edge
+            if (indz1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v] >= 0) {    // has lower x edge
                 leng++;
             }
-            if (indx1 > 0) {    // has left x edge
+            if (indx1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y - 1] >= 0) {    // has left x edge
                 leng++;
             }
-            if (indy1 > 0) {    // has front x edge
+            if (indy1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - 1] >= 0) {    // has front x edge
                 leng++;
             }
             //with itseld
             leng++;
-            if (indy1 < sys->N_cell_y) {    // has back x edge
+            if (indy1 < sys->N_cell_y && sys->mapEdge[sys->mapEdgeR[ind] + 1] >= 0) {    // has back x edge
                 leng++;
             }
-            if (indx2 < sys->N_cell_x) {   // has right x edge
+            if (indx2 < sys->N_cell_x && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y + 1] >= 0) {   // has right x edge
                 leng++;
             }
-            if (indz1 < sys->N_cell_z) {   // has upper x edge
+            if (indz1 < sys->N_cell_z && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v] >= 0) {   // has upper x edge
                 leng++;
             }
         }
         else if (indy1 != indy2) {    // if this edge is along y
-            if (indz1 > 0) {   // has lower y edge
+            if (indz1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v] >= 0) {   // has lower y edge
                 leng++;
             }
-            if (indx1 > 0) {   // has left y edge
+            if (indx1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y] >= 0) {   // has left y edge
                 leng++;
             }
-            if (indy1 > 0) {   // has front y edge
+            if (indy1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - 1] >= 0) {   // has front y edge
                 leng++;
             }
             // with itself
             leng++;
-            if (indz1 < sys->N_cell_z) {   // has upper y edge
+            if (indz1 < sys->N_cell_z && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v] >= 0) {   // has upper y edge
                 leng++;
             }
-            if (indx1 < sys->N_cell_x) {   // has right y edge
+            if (indx1 < sys->N_cell_x && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y] >= 0) {   // has right y edge
                 leng++;
             }
-            if (indy2 < sys->N_cell_y) {   // has back y edge
+            if (indy2 < sys->N_cell_y && sys->mapEdge[sys->mapEdgeR[ind] + 1] >= 0) {   // has back y edge
                 leng++;
             }
         }
         else if (indz1 != indz2) {    // if this edge is along z
-            if (indz1 > 0) {   // has lower z edge
+            if (indz1 > 0 && sys->mapEdge[sys->mapEdge[ind] - sys->N_edge_s - sys->N_edge_v] >= 0) {   // has lower z edge
                 leng++;
             }
-            if (indx1 > 0) {   // has left z edge
+            if (indx1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y - 1] >= 0) {   // has left z edge
                 leng++;
             }
-            if (indy1 > 0) {   // has front y edge
+            if (indy1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - 1] >= 0) {   // has front z edge
                 leng++;
             }
             // with itself
             leng++;
-            if (indz2 < sys->N_cell_z) {   // has upper z edge
+            if (indz2 < sys->N_cell_z && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v] >= 0) {   // has upper z edge
                 leng++;
             }
-            if (indx1 < sys->N_cell_x) {   // has right z edge
+            if (indx1 < sys->N_cell_x && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y + 1] >= 0) {   // has right z edge
                 leng++;
             }
-            if (indy1 < sys->N_cell_y) {   // has back z edge
+            if (indy1 < sys->N_cell_y && sys->mapEdge[sys->mapEdgeR[ind] + 1] >= 0) {   // has back z edge
                 leng++;
             }
         }
@@ -1023,12 +1023,15 @@ myint generateLaplacian_count(fdtdMesh* sys) {
 }
 
 int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val) {
+	/* Note : All boundaries are PEC */
     myint node1, node2;
     int indx1, indy1, indz1, indx2, indy2, indz2;
     myint leng = 0;
 
     double lxa1, lya1, lza1, lxa2, lya2, lza2;   // averaged lengths along x, y, z
+	cout << sys->N_edge - sys->bden << endl;
     for (int ind = 0; ind < sys->N_edge - sys->bden; ind++) {
+
         sys->compute_edgelink(sys->mapEdgeR[ind], node1, node2);   // two nodes on the ends of the edge
         sys->compute_node_index(node1, indx1, indy1, indz1);
         sys->compute_node_index(node2, indx2, indy2, indz2);
@@ -1036,124 +1039,124 @@ int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val) {
         sys->avg_length(indz2, indy2, indx2, lxa2, lya2, lza2);
         if (indx1 != indx2) {   // if this edge is along x
             
-            if (indz1 > 0) {    // has lower x edge
+            if (indz1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v] >= 0) {    // has lower x edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v];
-                val[leng] = -1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1;
+                val[leng] = -1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1 / MU;
                 leng++;
             }
-            if (indx1 > 0) {    // has left x edge
+            if (indx1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y - 1] >= 0) {    // has left x edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y - 1];
-                val[leng] = -1 / lxa1 * 1 / (sys->xn[indx2] - sys->xn[indx1]);
+                val[leng] = -1 / lxa1 * 1 / (sys->xn[indx2] - sys->xn[indx1]) / MU;
                 leng++;
             }
-            if (indy1 > 0) {    // has front x edge
+            if (indy1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - 1] >= 0) {    // has front x edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - 1];
-                val[leng] = -1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1;
+                val[leng] = -1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1 / MU;
                 leng++;
             }
-            //with itseld
+            //with itself
             rowId[leng] = ind;
             colId[leng] = ind;
-            val[leng] = 1 / lxa1 * 1 / (sys->xn[indx2] - sys->xn[indx1]) + 1 / lxa2 * 1 / (sys->xn[indx2] - sys->xn[indx1]);
+            val[leng] = (1 / lxa1 * 1 / (sys->xn[indx2] - sys->xn[indx1]) + 1 / lxa2 * 1 / (sys->xn[indx2] - sys->xn[indx1])) / MU;
             if (indz1 > 0)
-                val[leng] += 1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1;
+                val[leng] += 1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1 / MU;
             if (indz1 < sys->N_cell_z)
-                val[leng] += 1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1;
+                val[leng] += 1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1 / MU;
             if (indy1 > 0)
-                val[leng] += 1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1;
+                val[leng] += 1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1 / MU;
             if (indy1 < sys->N_cell_y)
-                val[leng] += 1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1;
+                val[leng] += 1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1 / MU;
             leng++;
-            if (indy1 < sys->N_cell_y) {    // has back x edge
+            if (indy1 < sys->N_cell_y && sys->mapEdge[sys->mapEdgeR[ind] + 1] >= 0) {    // has back x edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + 1];
-                val[leng] = -1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1;
+                val[leng] = -1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1 / MU;
                 leng++;
             }
-            if (indx2 < sys->N_cell_x) {   // has right x edge
+            if (indx2 < sys->N_cell_x && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y + 1] >= 0) {   // has right x edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y + 1];
-                val[leng] = -1 / lxa2 * 1 / (sys->xn[indx2] - sys->xn[indx1]);
+                val[leng] = -1 / lxa2 * 1 / (sys->xn[indx2] - sys->xn[indx1]) / MU;
                 leng++;
             }
-            if (indz1 < sys->N_cell_z) {   // has upper x edge
+            if (indz1 < sys->N_cell_z && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v] >= 0) {   // has upper x edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v];
-                val[leng] = -1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1;
+                val[leng] = -1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1 / MU;
                 leng++;
             }
         }
         else if (indy1 != indy2) {    // if this edge is along y
-            if (indz1 > 0) {   // has lower y edge
+            if (indz1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v] >= 0) {   // has lower y edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v];
-                val[leng] = -1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1;
+                val[leng] = -1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1 / MU;
                 leng++;
             }
-            if (indx1 > 0) {   // has left y edge
+            if (indx1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y] >= 0) {   // has left y edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y];
-                val[leng] = -1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1;
+                val[leng] = -1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1 / MU;
                 leng++;
             }
-            if (indy1 > 0) {   // has front y edge
+            if (indy1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - 1] >= 0) {   // has front y edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - 1];
-                val[leng] = -1 / lya1 * 1 / (sys->yn[indy2] - sys->yn[indy1]);
+                val[leng] = -1 / lya1 * 1 / (sys->yn[indy2] - sys->yn[indy1]) / MU;
                 leng++;
             }
             // with itself
             rowId[leng] = ind;
             colId[leng] = ind;
-            val[leng] = 1 / lya1 * 1 / (sys->yn[indy2] - sys->yn[indy1]) + 1 / lya2 * 1 / (sys->yn[indy2] - sys->yn[indy1]);
+            val[leng] = (1 / lya1 * 1 / (sys->yn[indy2] - sys->yn[indy1]) + 1 / lya2 * 1 / (sys->yn[indy2] - sys->yn[indy1])) / MU;
             if (indz1 > 0)
-                val[leng] += 1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1;
+                val[leng] += 1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1 / MU;
             if (indz1 < sys->N_cell_z)
-                val[leng] += 1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1;
+                val[leng] += 1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1 / MU;
             if (indx1 > 0)
-                val[leng] += 1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1;
+                val[leng] += 1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1 / MU;
             if (indx1 < sys->N_cell_x)
-                val[leng] += 1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1;
+                val[leng] += 1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1 / MU;
             leng++;
-            if (indy2 < sys->N_cell_y) {   // has back y edge
+            if (indy2 < sys->N_cell_y && sys->mapEdge[sys->mapEdgeR[ind] + 1] >= 0) {   // has back y edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + 1];
-                val[leng] = -1 / lya2 * 1 / (sys->yn[indy2] - sys->yn[indy1]);
+                val[leng] = -1 / lya2 * 1 / (sys->yn[indy2] - sys->yn[indy1]) / MU;
                 leng++;
             }
-            if (indx1 < sys->N_cell_x) {   // has right y edge
+            if (indx1 < sys->N_cell_x && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y] >= 0) {   // has right y edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y];
-                val[leng] = -1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1;
+                val[leng] = -1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1 / MU;
                 leng++;
             }
-            if (indz1 < sys->N_cell_z) {   // has upper y edge
+            if (indz1 < sys->N_cell_z && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v] >= 0) {   // has upper y edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v];
-                val[leng] = -1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1;
+                val[leng] = -1 / (sys->zn[indz1 + 1] - sys->zn[indz1]) * 1 / lza1 / MU;
                 leng++;
             }
         }
         else if (indz1 != indz2) {    // if this edge is along z
-            if (indz1 > 0) {   // has lower z edge
+            if (indz1 > 0 && sys->mapEdge[sys->mapEdge[ind] - sys->N_edge_s - sys->N_edge_v] >= 0) {   // has lower z edge
                 rowId[leng] = ind;
-                colId[leng] = sys->mapEdge[sys->mapEdge[ind] - sys->N_edge_s - sys->N_edge_v];
-                val[leng] = -1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]);
+                colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - sys->N_edge_s - sys->N_edge_v];
+                val[leng] = -1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
                 leng++;
             }
-            if (indx1 > 0) {   // has left z edge
+            if (indx1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y - 1] >= 0) {   // has left z edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - sys->N_cell_y - 1];
-                val[leng] = -1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1;
+                val[leng] = -1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1 / MU;
                 leng++;
             }
-            if (indy1 > 0) {   // has front y edge
+            if (indy1 > 0 && sys->mapEdge[sys->mapEdgeR[ind] - 1] >= 0) {   // has front z edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] - 1];
-                val[leng] = -1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1;
+                val[leng] = -1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1 / MU;
                 leng++;
             }
             // with itself
@@ -1162,44 +1165,65 @@ int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val) {
             val[leng] = 0;
 #ifdef LOWER_BOUNDARY_PEC
             if (indz1 > 0)
-                val[leng] += 1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]);
+                val[leng] += 1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #else
-            val[leng] += 1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]);
+            val[leng] += 1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #endif
 #ifdef UPPER_BOUNDARY_PEC
             if (indz2 < sys->N_cell_z)
-                val[leng] += 1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]);
+                val[leng] += 1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #else
-            val[leng] += 1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]);
+            val[leng] += 1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #endif
             if (indx1 > 0)
-                val[leng] += 1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1;
+                val[leng] += 1 / (sys->xn[indx1] - sys->xn[indx1 - 1]) * 1 / lxa1 / MU;
             if (indx1 < sys->N_cell_x)
-                val[leng] += 1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1;
+                val[leng] += 1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1 / MU;
             if (indy1 > 0)
-                val[leng] += 1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1;
+                val[leng] += 1 / (sys->yn[indy1] - sys->yn[indy1 - 1]) * 1 / lya1 / MU;
             if (indy1 < sys->N_cell_y)
-                val[leng] += 1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1;
+                val[leng] += 1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1 / MU;
             leng++;
-            if (indy1 < sys->N_cell_y) {   // has back z edge
+            if (indy1 < sys->N_cell_y && sys->mapEdge[sys->mapEdgeR[ind] + 1] >= 0) {   // has back z edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + 1];
-                val[leng] = -1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1;
+                val[leng] = -1 / (sys->yn[indy1 + 1] - sys->yn[indy1]) * 1 / lya1 / MU;
                 leng++;
             }
-            if (indx1 < sys->N_cell_x) {   // has right z edge
+            if (indx1 < sys->N_cell_x && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y + 1] >= 0) {   // has right z edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + sys->N_cell_y + 1];
-                val[leng] = -1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1;
+                val[leng] = -1 / (sys->xn[indx1 + 1] - sys->xn[indx1]) * 1 / lxa1 / MU;
                 leng++;
             }
-            if (indz2 < sys->N_cell_z) {   // has upper z edge
+            if (indz2 < sys->N_cell_z && sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v] >= 0) {   // has upper z edge
                 rowId[leng] = ind;
                 colId[leng] = sys->mapEdge[sys->mapEdgeR[ind] + sys->N_edge_s + sys->N_edge_v];
-                val[leng] = -1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]);
+                val[leng] = -1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
                 leng++;
             }
         }
     }
+	
     return 0;
+}
+
+int sparse_mv(int index, myint* RowId, myint* ColId, double* val, myint leng, double* v, double* res) {
+	/* sparse matrix multiply a dense vector
+	index : 0 is no transpose, 1 is transpose
+	RowId : sparse matrix rowId
+	ColId : sparse matrix colId
+	val : sparse matrix value
+	leng : nnz in the sparse matrix
+	v : the dense vector
+	res : the product */
+	if (index == 1) {
+		myint* temp = RowId;
+		RowId = ColId;
+		ColId = temp;
+	}
+	for (int ind = 0; ind < leng; ++ind) {
+		res[RowId[ind]] += val[ind] * v[ColId[ind]];
+	}
+	return 0;
 }

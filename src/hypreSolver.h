@@ -5,7 +5,7 @@
 
 // HYPRE control macros
 #define HYPRE_METHOD (3) // 1 = AMG, 2 = PCG with AMG Preconditioner, 3 = Flexible GMRES with AMG Preconditioner
-#define HYPRE_CONV_TOL (1.e-10) // Convergence relative tolerance for HYPRE
+#define HYPRE_CONV_TOL (1.e-5) // Convergence relative tolerance for HYPRE
 #define HYPRE_PC_TOL (1000. * HYPRE_CONV_TOL) // Preconditioner tolerance (relative residual norm) for HYPRE
 #define HYPRE_PC_MOD_SWEEPS (10) // Modified number of preconditioner sweeps if preconditioner tolerance not met on first preconditioner sweep for HYPRE
 #define HYPRE_MAX_ITER (500) // Maximum iterations for HYPRE
