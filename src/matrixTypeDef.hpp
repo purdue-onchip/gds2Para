@@ -140,11 +140,11 @@ public:
             ipiv.data()                                 // pivot indices
         );
         if (info != 0) {
-            cout << "Issue on LU factorization, LAPACKE_dgetrf returns: " << info << endl;
+            cout << "Issue on LU factorization, LAPACKE_?getrf returns: " << info << endl;
             exit(2);
         }
 
-        // Solve C = A_LU \ B with LAPACKE_dgetrs
+        // Solve C = A_LU \ B with LAPACKE_?getrs
         vector<MKL_Complex16> C_mklComplex(B.matrixSize);
         B.copyToMKL_Complex16(C_mklComplex.data());     // copy matrix B to a MKL_Complex16 type C_mklComplex
         info = LAPACKE_zgetrs(LAPACK_COL_MAJOR, 'N',
@@ -154,7 +154,7 @@ public:
             C_mklComplex.data(), B.N_rows               // C (copied B) will be overwritten by the solution matrix
         );
         if (info != 0) {
-            cout << "Issue on mkl backslash, LAPACKE_dgetrs returns: " << info << endl;
+            cout << "Issue on mkl backslash, LAPACKE_?getrs returns: " << info << endl;
             exit(2);
         }
 
