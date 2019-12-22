@@ -50,10 +50,10 @@ using namespace std;
 #define MINDISFRACX (3e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
 #define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACX (0.0333333) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-14) // Time step for finding high-frequency modes (s)
+#define DT (1.e-12) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
 //#define UPPER_BOUNDARY_PEC
@@ -355,7 +355,15 @@ public:
 	double* Llval;
 	myint leng_Ll;
 
-	
+	/* outside conductor Laplacian rowId, colId, val */
+	myint* LooRowId, *LooColId;
+	double* Looval;
+	myint leng_Loo;
+
+	/* map the edges to the groups inside or outside */
+	myint* mapio, *mapioR;
+	myint inside, outside;    // size ranges of inside and outside
+
 
 	/* Solution storage */
 	complex<double>* y;
@@ -380,6 +388,9 @@ public:
 		this->numCdtRow = (myint)0;
 		this->leng_Vh = (myint)0;
 		this->leng_S = (myint)0;
+		inside = 0;
+		outside = 0;
+		leng_Loo = 0;
 
 		// Set all pointers to NULL for safety
 		this->xn = NULL;
@@ -466,6 +477,12 @@ public:
 		this->LlRowId = NULL;
 		this->LlColId = NULL;
 		this->Llval = NULL;
+		mapio = NULL;
+		mapioR = NULL;
+		LooRowId = NULL;
+		LooColId = NULL;
+		Looval = NULL;
+
 
 		// Set all vectors to empty vectors
 		this->nodeEdge = {};
@@ -596,6 +613,35 @@ public:
 		return isCond;
 	}
 
+	/* Map the after removed PEC edges to the inside outside edges */
+	void mapEdgeInsideOutside() {
+		myint edge = N_edge - bden;
+		mapio = (myint*)malloc(edge * sizeof(myint));
+		mapioR = (myint*)malloc(edge * sizeof(myint));
+		inside = 0;
+		outside = 0;
+
+		/* count how many edges are outside the conductors */
+		for (int ind = 0; ind < edge; ++ind) {
+			if (markEdge[mapEdgeR[ind]] == 0)
+			{
+				inside++;
+			}
+		}
+		/* map the edges to inside and outside edges */
+		for (int ind = 0; ind < edge; ++ind) {
+			if (markEdge[mapEdgeR[ind]] == 0) {
+				mapio[ind] = outside;
+				mapioR[outside] = ind;
+				outside++;
+			}
+			else {
+				mapio[ind] = inside;
+				mapioR[inside] = ind;
+				inside++;
+			}
+		}
+	}
 
 	/* Find nodes inside conductors by judging whether the point in each small window is inside the polygon or not */
 	void findInsideCond(unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi) {
@@ -2792,11 +2838,14 @@ public:
 		}
 		int start;
 		markref = 0;
+		/* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
 		for (indi = 0; indi < this->numCdt; indi++) {
+			
 			if (this->conductor[indi].markPort <= -1 && markref == 0) {
 				markref = 1;
 				continue;
 			}
+			//cout << V[indi] << endl;
 			start = v0d1num;
 			mark = 0;
 			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
@@ -2811,7 +2860,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = -1 / lz_avg;// -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2823,7 +2872,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = 1 / lz_avg;// lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2835,7 +2884,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = -1 / lx_avg;// -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2847,7 +2896,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = 1 / lx_avg;// ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2859,7 +2908,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = -1 / ly_avg;// -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2871,7 +2920,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = 1 / ly_avg;// lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
 						v0d1anum++;
 						mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
 					}
@@ -2887,7 +2936,7 @@ public:
 				leng_v0d1a++;
 			}
 		}
-		for (indj = 0; indj < leng_v0d1; ++indj) {
+		for (indj = 0; indj < leng_v0d1; ++indj) {   // when using the frequency domain schema should not normalize the vectors
 			this->v0dn[indj] = sqrt(this->v0dn[indj]);
 			this->v0dan[indj] = sqrt(this->v0dan[indj]);
 		}
@@ -3679,7 +3728,7 @@ public:
 			leng_v0c++;
 			leng_v0ca++;
 		}
-		for (int ind = 0; ind < leng_v0c; ++ind) {
+		for (int ind = 0; ind < leng_v0c; ++ind) {   // when in the frequency schema should not normalize the vectors
 			this->v0cn[ind] = sqrt(this->v0cn[ind]);
 			this->v0can[ind] = sqrt(this->v0can[ind]);
 		}
@@ -4195,7 +4244,7 @@ public:
 		while (i < leng) {
 			val[i] = val_source[i] * pow(dt, 2);
 			if (rowId[i] == colId[i]) {
-				val[i] += this->stackEpsn[(this->mapEdgeR[rowId[i]] + this->N_edge_v) / (this->N_edge_v + this->N_edge_s)] * EPSILON0;
+				val[i] += getEps(this->mapEdgeR[rowId[i]]);
 				if (this->markEdge[this->mapEdgeR[rowId[i]]]) {
 					val[i] += dt * SIGMA;
 				}
@@ -5044,6 +5093,11 @@ public:
 		free(this->v0dan);
 		free(this->v0cn);
 		free(this->v0can);
+		free(mapio);
+		free(mapioR);
+		free(LooRowId);
+		free(LooColId);
+		free(Looval);
 	}
 };
 
@@ -5056,8 +5110,6 @@ int parameterConstruction(fdtdMesh* sys, unordered_map<double, int> xi, unordere
 void freePara(fdtdMesh* sys);
 int matrixConstruction(fdtdMesh* sys);
 int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
-int mklMatrixMulti(fdtdMesh* sys, int& leng_A, int* aRowId, int* aColId, double* aval, int arow, int acol, int* bRowId, int* bColId, double* bval, int mark);
-// The first is read row by row, and the second one is read column by column
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
 int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double* index_val, int size);
 int nodeAdd(int* index, int size, int total_size, fdtdMesh* sys, int& v0d2num, int& leng_v0d2, int mark);
@@ -5097,5 +5149,12 @@ int sparseMatrixVecMul(myint* rowId, myint* colId, double* val, myint leng, doub
 int pardisoSolve(fdtdMesh* sys, myint* rowId, myint* colId, double* val, double* rsc, double* xsol, myint size);   // findVh.cpp
 int storeTimeRespValue(fdtdMesh* sys, double** resp, int ind, double* xr);   // findVh.cpp
 int mklFFT(fdtdMesh* sys, double* time, complex<double>* freq, int N);   // findVh.cpp
-int printResponseTime(fdtdMesh* sys, int ind, double* x, ofstream& out);   // findVh.cpp: print out the response in time domain for all ports
+void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows);    // matrixCon.cpp
+void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint* AoorowId, myint* AoocolId, double* Aooval, double scale);   // matrixCon.cpp
+void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint& leng_Aoo);   // matrixCon.cpp
+void matrixInsideOutside(fdtdMesh* sys, myint* rowId, myint* colId, double* val, myint leng, myint* ooRowId, myint* ooColId, double* ooval, myint* oiRowId, myint* oiColId, double* oival, myint* ioRowId, myint* ioColId, double* ioval);   // matrixCon.cpp
+void matrixInsideOutside_count(fdtdMesh* sys, myint* rowId, myint* colId, myint leng, myint& lengoo, myint& lengoi, myint& lengio);   // matrixCon.cpp
+int mkl_gmres_A(fdtdMesh* sys, double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N);   // findVh.cpp
+int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio);  // findVh.cpp
+int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* xo);  // findVh.cpp
 #endif

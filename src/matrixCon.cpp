@@ -82,6 +82,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     if (status != 0) {
         return status;
     }
+	/* Begin to set v0d to be the outside v0d */
+	for (indi = 0; indi < sys->v0d1num; indi++) {
+		sys->v0d1RowId[indi] = sys->mapio[sys->mapEdge[sys->v0d1RowId[indi]]];
+	}
+	/* End of setting v0d to be the outside v0d */
 
     /*sys->v0d1aColIdo = (myint*)malloc(sys->v0d1anum * sizeof(myint));
     for (indi = 0; indi < sys->v0d1anum; indi++)
@@ -97,11 +102,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     /* V0d^T's csr form handle for MKL */
     sparse_matrix_t V0dt;
-    s = mkl_sparse_d_create_csr(&V0dt, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, sys->N_edge, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1valo);
+    s = mkl_sparse_d_create_csr(&V0dt, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, sys->outside/*sys->N_edge*/, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1valo);
 
     /* V0da^T's csr form handle for MKL */
     sparse_matrix_t V0dat;
-    s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, sys->N_edge, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
+    s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, sys->outside/*sys->N_edge*/, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
 
 #ifdef V0_new_schema
     double * drhs = new double[sys->leng_v0d1 * leng_v0d2];
@@ -236,6 +241,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	//}
 	//outfile.close();
 
+	//outfile.open("inside.txt", std::ofstream::trunc | std::ofstream::out);
+	//for (indi = 0; indi < sys->N_edge; ++indi) {
+	//	if (sys->markEdge[indi]) {
+	//		outfile << indi << endl;
+	//	}
+	//}
+	//outfile.close();
     /*for (indi = 0; indi < sys->numCdt + 1; indi++) {
     cout << sys->acu_cnno[indi] << " ";
     }
@@ -266,7 +278,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
     startCol = 0;
     sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
-    //sys->x.assign(sys->numPorts * sys->numPorts, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve for V0 solution
     sys->x.assign(sys->numPorts * sys->numPorts * sys->nfreq, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve
 
     double *b, *xc;    // the array of the right hand side
@@ -318,59 +329,126 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     lapack_complex_double *J_h;
     double *ferr, *berr;
     ofstream out;
-#ifndef SKIP_VH
-    int step = 1000;
-    //sys->find_Vh_Arnoldi(step);
-    //sys->find_reference_Vh();
 
-    /* Read from vv.txt for the Vh for single strip 2000 debug */
-    //string line;
-    //string::size_type sz;
-    //ifstream myfile("vv.txt");   // open vv.txt
-    //indj = 0;
-    //sys->leng_Vh = 1952;
-    //sys->Vh = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * sys->leng_Vh * sizeof(lapack_complex_double));
-    //if (!myfile.eof()) {    // if the file is open
-    //    while (!myfile.eof()) {
-    //        //cout << indj << endl;
-    //        getline(myfile, line);   // get one line from the file
-    //        indi = 0;
-    //        sys->Vh[indi * (sys->N_edge - sys->bden) + indj].real = stod(line, &sz);
-    //        sys->Vh[indi * (sys->N_edge - sys->bden) + indj].imag = stod(&line[sz + 2], &sz);
-    //        indi++;
-    //        while (indi < sys->leng_Vh) {
-    //            sys->Vh[indi * (sys->N_edge - sys->bden) + indj].real = stod(&line[sz + 2], &sz);
-    //            sys->Vh[indi * (sys->N_edge - sys->bden) + indj].imag = stod(&line[sz + 2], &sz);
-    //            indi++;
-    //        }
-    //        indj++;
-    //    }
-    //    myfile.close();
-    //}
-#endif
+	/* Begin to map the inside and outside edges */
+	sys->mapEdgeInsideOutside();   // generate mapio and mapioR
+	/* End of mapping the inside and outside edges */
 
+	/* Begin to generate Soo, Soi, Sio */
+	myint lengoo = 0, lengoi = 0, lengio = 0;   // nnz for each submatrix
+	matrixInsideOutside_count(sys, sys->SRowId, sys->SColId, sys->leng_S, lengoo, lengoi, lengio);   // count nnz in each submatrix
+	myint* SooRowId = (myint*)malloc(lengoo * sizeof(myint));
+	myint* SooColId = (myint*)malloc(lengoo * sizeof(myint));
+	double* Sooval = (double*)malloc(lengoo * sizeof(double));
+	myint* SoiRowId = (myint*)malloc(lengoi * sizeof(myint));
+	myint* SoiColId = (myint*)malloc(lengoi * sizeof(myint));
+	double* Soival = (double*)malloc(lengoi * sizeof(double));
+	myint* SioRowId = (myint*)malloc(lengio * sizeof(myint));
+	myint* SioColId = (myint*)malloc(lengio * sizeof(myint));
+	double* Sioval = (double*)malloc(lengio * sizeof(double));
+	matrixInsideOutside(sys, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, SooRowId, SooColId, Sooval, SoiRowId, SoiColId, Soival, SioRowId, SioColId, Sioval);   // assign each matrix's rowId, colId, val
+	/* calculate D_epsoo+dt^2*Soo */
+	//outfile.open("Moo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < lengoo; ++ind) {
+	//	Sooval[ind] = Sooval[ind] * pow(DT, 2);
+	//	if (SooRowId[ind] == SooColId[ind]) {
+	//		Sooval[ind] += sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[ind]]]);
+	//	}
+	////	outfile << SooRowId[ind] << " " << SooColId[ind] << " " << Sooval[ind] << endl;
+	//}
+	//outfile.close();
+	/* End of generating Soo, Soi, Sio */
 
+	/* Begin to generate Loo */
+	myint* AoorowId, *AoocolId;
+	double* Aooval;   // the operator gradient divergence
+	sparse_matrix_t A;
+	sparse_status_t s0;
+	s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, V0dt, V0dat, &A);   // A = v0d*v0da'
+	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+	myint ARows, ACols, leng_Aoo = 0;
+	MKL_INT *ArowStart, *ArowEnd, *AcolId;
+	double *Aval;
+	s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+	myint leng_A = ArowEnd[ARows - 1];    // how many non-zeros are in A
+	matrixOutside_count(sys, ArowStart, ArowEnd, AcolId, Aval, ARows, leng_Aoo);    // count how many nnz in Aoo
+	AoorowId = (myint*)malloc(leng_Aoo * sizeof(myint));
+	AoocolId = (myint*)malloc(leng_Aoo * sizeof(myint));
+	Aooval = (double*)malloc(leng_Aoo * sizeof(double));
+	matrixOutside(sys, ArowStart, ArowEnd, AcolId, Aval, ARows, AoorowId, AoocolId, Aooval, 1 / MU);   // assign Aoo rowId, colId, val
+	myint* AoorowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
+	status = COO2CSR_malloc(AoorowId, AoocolId, Aooval, leng_Aoo, sys->outside, AoorowId1);
+	//outfile.open("Aoo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < leng_Aoo; ++ind) {
+	//	outfile << AoorowId[ind] << " " << AoocolId[ind] << " " << Aooval[ind] << endl;
+	//}
+	//outfile.close();
+
+	myint* SooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
+	status = COO2CSR_malloc(SooRowId, SooColId, Sooval, lengoo, sys->outside, SooRowId1);
+	//outfile.open("Soo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < lengoo; ++ind) {
+	//	outfile << SooRowId[ind] << " " << SooColId[ind] << " " << Sooval[ind] << endl;
+	//}
+	//outfile.close();
+
+	if (status != 0) {
+		return status;
+	}
+	sparseMatrixSum(sys, AoorowId1, AoocolId, Aooval, SooRowId1, SooColId, Sooval, sys->outside);   //do the sparse matrix summation and put the result in Loo
+	/* output the Loo and Soo */
+	//outfile.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->leng_Loo; ++ind) {
+	//	outfile << sys->LooRowId[ind] << " " << sys->LooColId[ind] << " " << sys->Looval[ind] << endl;
+	//}
+	//outfile.close();
+	/* End of generating Loo */
+	myint nedge = sys->N_edge - sys->bden;
 	/* HYPRE solves for each port are messy */
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
 		sys->J = (double*)calloc(sys->N_edge, sizeof(double));
 		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-			
+			//double sourceArea = 0;
+			//sourceArea += sys->portCoor[sourcePort].portArea[sourcePortSide];
 			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
 				/* Set current density for all edges within sides in port to prepare solver */
-				
 				sys->J[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
-				//cout << "sourcePort is " << sourcePort << " and indEdge is " << indEdge << " is " << sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge] << endl;
+			}
+			//cout << "SourcePort " << sourcePort << " area is " << sourceArea << endl;
+		}
+
+		/* debug testing to see the performance of different solvers */
+		double* bo = (double*)calloc(sys->outside, sizeof(double));
+		double* yo = (double*)calloc(sys->outside, sizeof(double));
+		for (int ind = 0; ind < sys->N_edge; ++ind) {
+			if (sys->markEdge[ind] == 0) {
+				bo[sys->mapio[ind]] = 1;   // test right hand side
 			}
 		}
+		//status = hypreSolve(sys, sys->LooRowId, sys->LooColId, sys->Looval, sys->leng_Loo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (dt^2*Loo+D_epsoo)
+		//status = hypreSolve(sys, SooRowId, SooColId, Sooval, lengoo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (dt^2*Soo+D_epsoo)
+		status = mkl_gmres_A(sys, bo, yo, sys->LooRowId, sys->LooColId, sys->Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo)
+		/* End of debugging to see the performance of different solvers */
 		
 		/* backward difference */
-		find_Vh_back(sys, sourcePort, V0ct, V0cat, V0dt, V0dat);
+		//find_Vh_back(sys, sourcePort, V0ct, V0cat, V0dt, V0dat);
+		
 
 		/* central difference */
 		//find_Vh_central(sys, sourcePort);
 
+		/* Frequency domain to solve the inside and outside part
+		[-omega^2*D_epsoo+Soo, Soi;
+		 Sio,                  i*omega*D_sigii+Sii] */
+		complex<double>* y;
+		for (int ind = 0; ind < sys->nfreq; ++ind) {
+			y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
+			solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
+			free(y);
+		}
+
+
 #ifdef GENERATE_V0_SOLUTION
-        t1 = clock();
 
 
         v0daJ = (double*)calloc(sys->leng_v0d1, sizeof(double));
@@ -386,16 +464,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         }
         /* solve V0d system */
 
-        t1 = clock();
         //status = hypreSolve(sys, ad, parcsr_ad, sys->leng_Ad, v0daJ, sys->leng_v0d1, y0d);
         status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, v0daJ, sys->leng_v0d1, y0d, 1, 3);
         /* End of solving */
         
-#ifndef SKIP_PARDISO
-        t1 = clock();
-        status = solveV0dSystem(sys, v0daJ, y0d, sys->leng_v0d1);
-        cout << " Pardiso solve time " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-#endif
 
         for (indi = 0; indi < sys->leng_v0d1; indi++) {
             y0d[indi] /= (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
@@ -600,10 +672,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 #endif
 
         /* Calculate the Vh part */
-        
-        cout << "Begin to solve Vh!\n";
 #ifndef SKIP_VH
-
+		cout << "Begin to solve Vh!\n";
         // u0a = V0a*(V0a'*V0a)*V0a'*u0
         /*for (indi = 0; indi < 2; indi++) {
 
@@ -612,7 +682,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         // find the Vh eigenmodes
         //cout << "Begin to find Vh!\n";
         //status = find_Vh_central(sys, u0, u0a, sourcePort);
-        status = find_Vh_back(sys, sourcePort);
+        //status = find_Vh_back(sys, sourcePort);
         //cout << "Finish finding Vh!\n";
 
         for (indi = 0; indi < sys->nfreq; indi++){
@@ -626,14 +696,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*Vh
                 for (myint inde2 = 0; inde2 < sys->leng_Vh; inde2++) {
                     if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {    // if this edge is inside the conductor
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde])
                             - 2 * M_PI * freq * sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * SIGMA;
                         V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (freq * 2 * M_PI) * SIGMA
-                            - sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+                            - sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
                     }
                     else {
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = -sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = -sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
                     }
                 }
             }
@@ -647,14 +717,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*u0
                 for (myint inde2 = 0; inde2 < 2; inde2++) {
                     if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0
+                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde])
                             - 2 * M_PI * freq * u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * SIGMA;
                         tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (freq * 2 * M_PI) * SIGMA
-                            - u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+                            - u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
                     }
                     else {
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = -u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = -u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
                     }
                 }
             }
@@ -709,14 +779,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
                 for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
                     if (sys->markEdge[sys->mapEdgeR[inde]] != 0){
-                        tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * Vh[j * (sys->N_edge - sys->bden) + inde].real
+                        tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].real
                             - freq * 2 * M_PI * SIGMA * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
-                        tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * Vh[j * (sys->N_edge - sys->bden) + inde].imag
+                        tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].imag
                             + freq * 2 * M_PI * SIGMA * Vh[j * (sys->N_edge - sys->bden) + inde].real;
                     }
                     else {
-                        tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * Vh[j * (sys->N_edge - sys->bden) + inde].real;
-                        tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
+                        tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].real;
+                        tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
                     }
                 }
             }
@@ -742,12 +812,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             tmp = (lapack_complex_double*)calloc((sys->N_edge - sys->bden), sizeof(lapack_complex_double));
             for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
                 if (sys->markEdge[sys->mapEdgeR[inde]] != 0){
-                    tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[sys->mapEdgeR[inde]].real() - freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
-                    tmp[inde].imag = freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].real() - pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
+                    tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].real() - freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
+                    tmp[inde].imag = freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].real() - pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
                 }
                 else {
-                    tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[sys->mapEdgeR[inde]].real();
-                    tmp[inde].imag = -pow(freq * 2 * M_PI, 2) * sys->stackEpsn[(sys->mapEdgeR[inde] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
+                    tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].real();
+                    tmp[inde].imag = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
                 }
             }
             rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
@@ -794,6 +864,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
             err = sqrt(err);
             err0 = sqrt(err0);
             total_norm = sqrt(total_norm);
+
             cout << "Freq " << freq << " the y0 total error is " << err0 / total_norm << endl;
             cout << "Freq " << freq << " the total error is " << err / total_norm << endl;
           
@@ -808,14 +879,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 
 #ifdef GENERATE_V0_SOLUTION
         free(yd); yd = NULL;
-        
-        
 #endif
+
 		free(sys->J); sys->J = NULL;
-        // Solve system for x in (-omega^2 * D_eps + indj * omega * D_sigma + S) * x = -indj * omega * J
-
-
-
         /*free(u0); u0 = NULL;*/
         //free(sys->y); sys->y = NULL;
         xcol++;
@@ -870,6 +936,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     mkl_sparse_destroy(V0dat);
     mkl_sparse_destroy(V0ct);
     mkl_sparse_destroy(V0cat);
+	//mkl_sparse_destroy(A);
 
     //HYPRE_IJMatrixDestroy(ad);
     //HYPRE_IJMatrixDestroy(ac);
@@ -877,197 +944,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     return 0;
 }
 
-
-
-//int mklMatrixMulti(fdtdMesh *sys, int &leng_A, int *aRowId, int *aColId, double *aval, int arow, int acol, int *bRowId, int *bColId, double *bval, int mark) {
-//    // ArowId, AcolId, and Aval should be in the COO format
-//    sparse_status_t s0;
-//    sparse_matrix_t a, a_csr;
-//    sparse_index_base_t indexing1 = SPARSE_INDEX_BASE_ZERO;
-//    int row, col;
-//    int *cols, *cole, *rowi;
-//    double *val;
-//    MKL_INT *AcolId;
-//    double *Aval;
-//    int k;
-//
-//    s0 = mkl_sparse_d_create_csc(&a, SPARSE_INDEX_BASE_ZERO, arow, acol, &aColId[0], &aColId[1], aRowId, aval);
-//
-//
-//    sparse_matrix_t b, b_csr;
-//    s0 = mkl_sparse_d_create_csc(&b, SPARSE_INDEX_BASE_ZERO, arow, acol, &bColId[0], &bColId[1], bRowId, bval);
-//    
-//    s0 = mkl_sparse_convert_csr(a, SPARSE_OPERATION_NON_TRANSPOSE, &a_csr);
-//
-//    s0 = mkl_sparse_convert_csr(b, SPARSE_OPERATION_NON_TRANSPOSE, &b_csr);
-//
-//    sparse_matrix_t A;
-//    s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, a_csr, b_csr, &A);
-//    
-//
-//    sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
-//    int ARows, ACols;
-//    MKL_INT *ArowStart, *ArowEnd;
-//    s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
-//    
-//    leng_A = ArowEnd[ARows - 1];
-//    
-//    if (mark == 1) {    // dielectric
-//        sys->AdRowId = (int*)malloc(leng_A * sizeof(int));
-//        sys->AdColId = (int*)malloc(leng_A * sizeof(int));
-//        sys->Adval = (double*)malloc(leng_A * sizeof(double));
-//        int count, num, indj;
-//
-//        indj = 0;
-//        for (int indi = 0; indi < ARows; indi++) {
-//            num = ArowEnd[indi] - ArowStart[indi];
-//            count = 0;
-//            while (count < num) {
-//                sys->AdRowId[indj] = indi;
-//                sys->AdColId[indj] = AcolId[indj];
-//                sys->Adval[indj] = Aval[indj];
-//                indj++;
-//                count++;
-//            }
-//        }
-//    }
-//    else if (mark == 2) {    // conductor
-//        sys->AcRowId = (int*)malloc(leng_A * sizeof(int));
-//        sys->AcColId = (int*)malloc(leng_A * sizeof(int));
-//        sys->Acval = (double*)malloc(leng_A * sizeof(double));
-//        int count, num, indj;
-//
-//        indj = 0;
-//        k = 1;
-//        sys->cindex[k] = sys->cindex[k - 1];
-//        for (int indi = 0; indi < ARows; indi++) {
-//            num = ArowEnd[indi] - ArowStart[indi];
-//            count = 0;
-//            while (count < num) {
-//                sys->AcRowId[indj] = indi;
-//                sys->AcColId[indj] = AcolId[indj];
-//                sys->Acval[indj] = Aval[indj];
-//                if (k - 1 <= indi) {
-//                    sys->cindex[k]++;
-//                }
-//                else{
-//                    k++;
-//                    sys->cindex[k] = sys->cindex[k - 1];
-//                    sys->cindex[k]++;
-//                }
-//                indj++;
-//                count++;
-//            }
-//        }
-//    }
-//    
-//    mkl_sparse_destroy(a);
-//    mkl_sparse_destroy(b);
-//    mkl_sparse_destroy(A);
-//    
-//   
-//    return 0;
-//}
-
-
-int matrixMul(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int> bRowId, vector<int> bColId, vector<double> bval, vector<int> &cRowId, vector<int> &cColId, vector<double> &cval) {
-    //the first matrix is row by row, the second matrix is column by column
-
-    int i = 0, j = 0;
-    int flaga, flagb, k;
-    int starta;
-    double sum;
-
-    flaga = aRowId[0];
-    flagb = bColId[0];
-    starta = 0;
-    sum = 0;
-    while (i < aRowId.size()) {
-        while (j < bColId.size() && bColId[j] == flagb && i < aRowId.size() && aRowId[i] == flaga) {
-            if (aColId[i] == bRowId[j]) {
-                sum += aval[i] * bval[j];
-                j++;
-                i++;
-            }
-            else if (aColId[i] < bRowId[j]) {
-                i++;
-            }
-            else if (aColId[i] > bRowId[j]) {
-                j++;
-            }
-        }
-        if (sum != 0) {
-            cRowId.push_back(flaga);
-            cColId.push_back(flagb);
-            cval.push_back(sum);
-            sum = 0;
-        }
-        if (i == aRowId.size()) {
-            if (j == bColId.size())
-                break;
-            else{
-                i = starta;
-                while (bColId[j] == flagb) {
-                    j++;
-                    if (j == bColId.size()) {
-                        while (i < aRowId.size() && aRowId[i] == flaga) {
-                            i++;
-                        }
-                        starta = i;
-                        if (i == aRowId.size())    //run all of the datas
-                            break;
-                        flaga = aRowId[i];
-                        j = 0;
-                        break;
-                    }
-                }
-                flagb = bColId[j];
-                continue;
-            }
-        }
-        if (j == bColId.size()) {
-            while (i < aRowId.size() && aRowId[i] == flaga) {
-                i++;
-            }
-            starta = i;
-            if (i == aRowId.size())    //run all of the datas
-                break;
-            flaga = aRowId[i];
-            j = 0;
-        }
-        else{
-            if (bColId[j] != flagb && aRowId[i] != flaga) {
-                flagb = bColId[j];
-                i = starta;
-            }
-            else if (bColId[j] != flagb) {
-                flagb = bColId[j];
-                i = starta;
-            }
-            else if (aRowId[i] != flaga) {
-                i = starta;
-                while (bColId[j] == flagb) {
-                    j++;
-                    if (j == bColId.size()) {
-                        while (i < aRowId.size() && aRowId[i] == flaga) {
-                            i++;
-                        }
-                        starta = i;
-                        if (i == aRowId.size())    //run all of the datas
-                            break;
-                        flaga = aRowId[i];
-                        j = 0;
-                        break;
-                    }
-                }
-                flagb = bColId[j];
-            }
-
-        }
-    }
-
-    return 0;
-}
 
 int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val) {
     int i;
@@ -1122,44 +998,6 @@ int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myin
 }
 
 
-
-#ifndef SKIP_PARDISO
-int solveV0dSystem(fdtdMesh *sys, double *dRhs, double *y0d, int sys->leng_v0d1) {
-
-    clock_t t1 = clock();
-    /* A\b1 */
-    double *d = &(sys->Adval[0]);
-    int *id = &(sys->AdRowId1[0]);
-    int *jd = &(sys->AdColId[0]);
-
-    void *ptd[64];
-    int mtyped;
-    int iparmd[64];
-    double dparmd[64];
-    int maxfctd, mnumd, phased, errord, solverd;
-    int num_processd;   //number of processors
-    int v0csin;
-    int permd;
-    int nrhs = 1;
-    int msglvld = 0;    //print statistical information
-
-    mtyped = 11;    // real and not symmetric
-    solverd = 0;
-    errord = 0;
-    maxfctd = 1;    //maximum number of numerical factorizations
-    mnumd = 1;    //which factorization to use
-    phased = 13;    //analysis
-
-    pardisoinit(ptd, &mtyped, iparmd);
-    nrhs = 1;
-    iparmd[38] = 1;
-    iparmd[34] = 1;    //0-based indexing
-    pardiso(ptd, &maxfctd, &mnumd, &mtyped, &phased, &sys->leng_v0d1, d, id, jd, &permd, &nrhs, iparmd, &msglvld, dRhs, y0d, &errord);
-    cout << "Time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-
-    return 0;
-}
-#endif
 
 int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, fdtdMesh *sys) {
     queue<int> q;
@@ -1228,4 +1066,161 @@ int setsideLen(int node, double sideLen, int *markLayerNode, int *markProSide, f
     free(visited); visited = NULL;
 
     return 0;
+}
+
+void matrixInsideOutside_count(fdtdMesh* sys, myint* rowId, myint* colId, myint leng, myint& lengoo, myint& lengoi, myint& lengio) {
+	/* count each submatrix nnz number
+	   sys : used to provide inside outside edge numbers
+	   rowId : matrix rowId
+	   colId : matrix colId
+	   leng: : nnz in this matrix
+	   lengoo : oo nnz
+	   lengoi : oi nnz
+	   lengio : io nnz */
+
+	for (int ind = 0; ind < leng; ++ind) {
+		if (sys->mapio[rowId[ind]] >= 0 && sys->mapio[rowId[ind]] < sys->outside && sys->mapio[colId[ind]] >= 0 && sys->mapio[colId[ind]] < sys->outside) {
+			lengoo++;
+		}
+		else if (sys->mapio[rowId[ind]] >= 0 && sys->mapio[rowId[ind]] < sys->outside && sys->mapio[colId[ind]] >= sys->outside && sys->mapio[colId[ind]] < sys->inside) {
+			lengoi++;
+		}
+		else if (sys->mapio[rowId[ind]] >= sys->outside && sys->mapio[rowId[ind]] < sys->inside && sys->mapio[colId[ind]] >= 0 && sys->mapio[colId[ind]] < sys->outside) {
+			lengio++;
+		}
+	}
+	return;
+}
+
+void matrixInsideOutside(fdtdMesh* sys, myint* rowId, myint* colId, double* val, myint leng, myint* ooRowId, myint* ooColId, double* ooval, myint* oiRowId, myint* oiColId, double* oival, myint* ioRowId, myint* ioColId, double* ioval) {
+	/* assign the matrix that is oo, oi, io
+	rowId : matrix rowId
+	colId : matrix colId
+	val : matrix value
+	leng : matrix nnz
+	lengoo : count the nnz in oo
+	lengoi : count the nnz in oi
+	lengio : count the nnz in io*/
+	myint lengoo = 0, lengoi = 0, lengio = 0;
+	for (int ind = 0; ind < leng; ++ind) {
+		if (sys->mapio[rowId[ind]] >= 0 && sys->mapio[rowId[ind]] < sys->outside && sys->mapio[colId[ind]] >= 0 && sys->mapio[colId[ind]] < sys->outside) {
+			ooRowId[lengoo] = sys->mapio[rowId[ind]];
+			ooColId[lengoo] = sys->mapio[colId[ind]];
+			ooval[lengoo] = val[ind];
+			lengoo++;
+		}
+		else if (sys->mapio[rowId[ind]] >= 0 && sys->mapio[rowId[ind]] < sys->outside && sys->mapio[colId[ind]] >= sys->outside && sys->mapio[colId[ind]] < sys->inside) {
+			oiRowId[lengoi] = sys->mapio[rowId[ind]];
+			oiColId[lengoi] = sys->mapio[colId[ind]] - sys->outside;
+			oival[lengoi] = val[ind];
+			lengoi++;
+		}
+		else if (sys->mapio[rowId[ind]] >= sys->outside && sys->mapio[rowId[ind]] < sys->inside && sys->mapio[colId[ind]] >= 0 && sys->mapio[colId[ind]] < sys->outside) {
+			ioRowId[lengio] = sys->mapio[rowId[ind]] - sys->outside;
+			ioColId[lengio] = sys->mapio[colId[ind]];
+			ioval[lengio] = val[ind];
+			lengio++;
+		}
+	}
+	return;
+}
+
+void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint& leng_Aoo) {
+	/* Count how many nnz in oo part of the matrix
+	ArowStart : the start index in each row 
+	ArowEnd : the start index of the next row
+	AcolId : colId of this matrix
+	Aval : value of this matrix
+	ARows : how many rows are there in the matrix
+	leng_Aoo : the nnz of this matrix as output */
+	for (int ind = 0; ind < ARows; ++ind) {
+		if (sys->mapio[ind] < sys->outside) {
+			for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+				if (sys->mapio[AcolId[indi]] >= 0 && sys->mapio[AcolId[indi]] < sys->outside) {
+					leng_Aoo++;
+				}
+			}
+		}
+	}
+}
+
+void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint* AoorowId, myint* AoocolId, double* Aooval, double scale) {
+	/* assign the matrix nnz for the ourside part
+	ArowStart :  the start index in each row 
+	ArowEnd : the start index in the next row
+	AcolId : colId of this matrix
+	Aval : value of this matrix
+	ARows : row number in this matrix
+	AoorowId : output, the outside part rowId
+	AoocolId : output, the outside part colId
+	Aooval : output, the outside part of value
+	scale : scalar scale of the value */
+	myint leng_Aoo = 0;
+	for (int ind = 0; ind < ARows; ++ind) {
+		if (sys->mapio[ind] < sys->outside) {
+			for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+				if (sys->mapio[AcolId[indi]] >= 0 && sys->mapio[AcolId[indi]] < sys->outside) {
+					AoorowId[leng_Aoo] = sys->mapio[ind];
+					AoocolId[leng_Aoo] = sys->mapio[AcolId[indi]];
+					Aooval[leng_Aoo] = Aval[indi] * scale;
+					leng_Aoo++;
+				}
+			}
+		}
+	}
+}
+
+void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows) {
+	/* Add two sparse matrices
+	arowId1 : csr form of rowId of matrix a
+	acolId : a matrix colId
+	aval : a matrix value
+	browId : csr form of rowId of matrix b
+	bcolId : b matrix colId
+	bval : b matrix value
+	Rows : row # of matrices a or b
+	rrowId : resultant matrix rowId
+	rcolId : resultant matrix colId
+	rval : resultant matrix value
+	rleng : resultant matrix nnz */
+
+	sparse_operation_t operation = SPARSE_OPERATION_NON_TRANSPOSE;
+	sparse_matrix_t a, b, r;
+	sparse_status_t s0;
+	double alpha = 1.0;
+
+	s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &arowId1[0], &arowId1[1], acolId, aval);
+	//if (s0 == SPARSE_STATUS_SUCCESS)
+	//	cout << "SPARSE_STATUS_SUCCESS\n";
+	s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &browId1[0], &browId1[1], bcolId, bval);
+	//if (s0 == SPARSE_STATUS_SUCCESS)
+	//	cout << "SPARSE_STATUS_SUCCESS";
+
+	s0 = mkl_sparse_d_add(operation, b, alpha, a, &r);   // add the two sparse matrices
+
+	myint ARows, ACols;
+	MKL_INT *ArowStart, *ArowEnd;
+	MKL_INT *AcolId;
+	double *Aval;
+	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+	s0 = mkl_sparse_d_export_csr(r, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+	sys->leng_Loo = ArowEnd[ARows - 1];
+
+	sys->LooRowId = (myint*)malloc(sys->leng_Loo * sizeof(myint));
+	sys->LooColId = (myint*)malloc(sys->leng_Loo * sizeof(myint));
+	sys->Looval = (double*)malloc(sys->leng_Loo * sizeof(double));
+
+	myint count = 0;
+	for (int ind = 0; ind < ARows; ++ind) {
+		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+			sys->LooRowId[count] = ind;
+			sys->LooColId[count] = AcolId[indi];
+			sys->Looval[count] = Aval[indi];
+			count++;
+		}
+	}
+
+	mkl_sparse_destroy(a);
+	mkl_sparse_destroy(b);
+	mkl_sparse_destroy(r);
 }

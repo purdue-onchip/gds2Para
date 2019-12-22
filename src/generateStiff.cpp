@@ -34,12 +34,12 @@ int generateStiff(fdtdMesh *sys){
             for (indy = 1; indy <= sys->N_cell_y; indy++){
                 SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
                 SeColId[Senum] = leng_Se;
-                Seval[Senum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
+				Seval[Senum] = -1 / (sys->xn[indx] - sys->xn[indx - 1]);
                 Senum++;
 
                 SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + indx*sys->N_cell_y + indy - 1;
                 SeColId[Senum] = leng_Se;
-                Seval[Senum] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
+				Seval[Senum] = 1 / (sys->xn[indx] - sys->xn[indx - 1]);
                 Senum++;
 
                 SeRowId[Senum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
