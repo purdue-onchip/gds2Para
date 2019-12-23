@@ -54,7 +54,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     /* Generate Ad = V0da1'*D_eps*V0d */
     sys->generateAd(sys->mapd, sys->v0d1num, sys->v0d1anum, sys->leng_v0d1);
 
-
+	/* Begin to map the inside and outside edges */
+	sys->mapEdgeInsideOutside();   // generate mapio and mapioR
+	/* End of mapping the inside and outside edges */
 
 
     sys->v0d1valo = (double*)malloc(sys->v0d1num * sizeof(double));
@@ -330,9 +332,6 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     double *ferr, *berr;
     ofstream out;
 
-	/* Begin to map the inside and outside edges */
-	sys->mapEdgeInsideOutside();   // generate mapio and mapioR
-	/* End of mapping the inside and outside edges */
 
 	/* Begin to generate Soo, Soi, Sio */
 	myint lengoo = 0, lengoi = 0, lengio = 0;   // nnz for each submatrix
@@ -370,8 +369,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	MKL_INT *ArowStart, *ArowEnd, *AcolId;
 	double *Aval;
 	s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
-	myint leng_A = ArowEnd[ARows - 1];    // how many non-zeros are in A
-	matrixOutside_count(sys, ArowStart, ArowEnd, AcolId, Aval, ARows, leng_Aoo);    // count how many nnz in Aoo
+	leng_Aoo = ArowEnd[ARows - 1];    // how many non-zeros are in A
 	AoorowId = (myint*)malloc(leng_Aoo * sizeof(myint));
 	AoocolId = (myint*)malloc(leng_Aoo * sizeof(myint));
 	Aooval = (double*)malloc(leng_Aoo * sizeof(double));
@@ -396,6 +394,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 		return status;
 	}
 	sparseMatrixSum(sys, AoorowId1, AoocolId, Aooval, SooRowId1, SooColId, Sooval, sys->outside);   //do the sparse matrix summation and put the result in Loo
+	
 	/* output the Loo and Soo */
 	//outfile.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->leng_Loo; ++ind) {
@@ -440,12 +439,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 		/* Frequency domain to solve the inside and outside part
 		[-omega^2*D_epsoo+Soo, Soi;
 		 Sio,                  i*omega*D_sigii+Sii] */
-		complex<double>* y;
-		for (int ind = 0; ind < sys->nfreq; ++ind) {
-			y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
-			solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
-			free(y);
-		}
+		//complex<double>* y;
+		//for (int ind = 0; ind < sys->nfreq; ++ind) {
+		//	y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
+		//	solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
+		//	free(y);
+		//}
 
 
 #ifdef GENERATE_V0_SOLUTION
@@ -1146,7 +1145,7 @@ void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint*
 
 void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint* AoorowId, myint* AoocolId, double* Aooval, double scale) {
 	/* assign the matrix nnz for the ourside part
-	ArowStart :  the start index in each row 
+	ArowStart :  the start index in each row
 	ArowEnd : the start index in the next row
 	AcolId : colId of this matrix
 	Aval : value of this matrix
@@ -1157,15 +1156,11 @@ void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolI
 	scale : scalar scale of the value */
 	myint leng_Aoo = 0;
 	for (int ind = 0; ind < ARows; ++ind) {
-		if (sys->mapio[ind] < sys->outside) {
-			for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
-				if (sys->mapio[AcolId[indi]] >= 0 && sys->mapio[AcolId[indi]] < sys->outside) {
-					AoorowId[leng_Aoo] = sys->mapio[ind];
-					AoocolId[leng_Aoo] = sys->mapio[AcolId[indi]];
-					Aooval[leng_Aoo] = Aval[indi] * scale;
-					leng_Aoo++;
-				}
-			}
+		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+			AoorowId[leng_Aoo] = ind;
+			AoocolId[leng_Aoo] = AcolId[indi];
+			Aooval[leng_Aoo] = Aval[indi] * scale;
+			leng_Aoo++;
 		}
 	}
 }
@@ -1192,11 +1187,12 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 	s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &arowId1[0], &arowId1[1], acolId, aval);
 	//if (s0 == SPARSE_STATUS_SUCCESS)
 	//	cout << "SPARSE_STATUS_SUCCESS\n";
+	
 	s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &browId1[0], &browId1[1], bcolId, bval);
 	//if (s0 == SPARSE_STATUS_SUCCESS)
 	//	cout << "SPARSE_STATUS_SUCCESS";
 
-	s0 = mkl_sparse_d_add(operation, b, alpha, a, &r);   // add the two sparse matrices
+	s0 = mkl_sparse_d_add(operation, a, alpha, b, &r);   // add the two sparse matrices
 
 	myint ARows, ACols;
 	MKL_INT *ArowStart, *ArowEnd;
@@ -1215,7 +1211,10 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
 			sys->LooRowId[count] = ind;
 			sys->LooColId[count] = AcolId[indi];
-			sys->Looval[count] = Aval[indi];
+			sys->Looval[count] = Aval[indi] * pow(DT, 2);
+			if (sys->LooRowId[count] == sys->LooColId[count]) {
+				sys->Looval[count] += sys->getEps(sys->mapEdgeR[sys->mapioR[sys->LooRowId[count]]]);
+			}
 			count++;
 		}
 	}
