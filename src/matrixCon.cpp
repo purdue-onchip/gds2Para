@@ -86,17 +86,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     }
 	/* Begin to set v0d to be the outside v0d */
 	for (indi = 0; indi < sys->v0d1num; indi++) {
+		//if (sys->markEdge[sys->v0d1RowId[indi]])
+		//	cout << "Something wrong with V0d!" << endl;
 		sys->v0d1RowId[indi] = sys->mapio[sys->mapEdge[sys->v0d1RowId[indi]]];
 	}
 	/* End of setting v0d to be the outside v0d */
 
-    /*sys->v0d1aColIdo = (myint*)malloc(sys->v0d1anum * sizeof(myint));
-    for (indi = 0; indi < sys->v0d1anum; indi++)
-    sys->v0d1aColIdo[indi] = sys->v0d1aColId[indi];
-    free(sys->v0d1aColId); sys->v0d1aColId = (myint*)malloc((sys->sys->leng_v0d1a + 1) * sizeof(myint));
-    status = COO2CSR_malloc(sys->v0d1aColIdo, sys->v0d1aRowId, sys->v0d1aval, sys->v0d1anum, sys->sys->leng_v0d1a, sys->v0d1aColId);
-    if (status != 0)
-    return status;*/
 
     //cout << "Number of NNZ in V0d1 is " << sys->v0d1num << endl;
 
@@ -369,6 +364,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	MKL_INT *ArowStart, *ArowEnd, *AcolId;
 	double *Aval;
 	s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+	//cout << "V0d*V0da' row number is " << ARows << " and column number is " << ACols << endl;
 	leng_Aoo = ArowEnd[ARows - 1];    // how many non-zeros are in A
 	AoorowId = (myint*)malloc(leng_Aoo * sizeof(myint));
 	AoocolId = (myint*)malloc(leng_Aoo * sizeof(myint));
@@ -379,6 +375,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	//outfile.open("Aoo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < leng_Aoo; ++ind) {
 	//	outfile << AoorowId[ind] << " " << AoocolId[ind] << " " << Aooval[ind] << endl;
+	//}
+	//outfile.close();
+	//outfile.open("AoorowId1.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind <= sys->outside; ++ind) {
+	//	outfile << AoorowId1[ind] << endl;
 	//}
 	//outfile.close();
 
@@ -417,16 +418,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 		}
 
 		/* debug testing to see the performance of different solvers */
-		double* bo = (double*)calloc(sys->outside, sizeof(double));
-		double* yo = (double*)calloc(sys->outside, sizeof(double));
-		for (int ind = 0; ind < sys->N_edge; ++ind) {
-			if (sys->markEdge[ind] == 0) {
-				bo[sys->mapio[ind]] = 1;   // test right hand side
-			}
-		}
+		//double* bo = (double*)calloc(sys->outside, sizeof(double));
+		//double* yo = (double*)calloc(sys->outside, sizeof(double));
+		//for (int ind = 0; ind < sys->N_edge; ++ind) {
+		//	if (sys->markEdge[ind] == 0) {
+		//		bo[sys->mapio[ind]] = 1;   // test right hand side
+		//	}
+		//}
 		//status = hypreSolve(sys, sys->LooRowId, sys->LooColId, sys->Looval, sys->leng_Loo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (dt^2*Loo+D_epsoo)
 		//status = hypreSolve(sys, SooRowId, SooColId, Sooval, lengoo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (dt^2*Soo+D_epsoo)
-		status = mkl_gmres_A(sys, bo, yo, sys->LooRowId, sys->LooColId, sys->Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo)
+		//status = mkl_gmres_A(sys, bo, yo, sys->LooRowId, sys->LooColId, sys->Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo)
 		/* End of debugging to see the performance of different solvers */
 		
 		/* backward difference */
@@ -439,12 +440,24 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 		/* Frequency domain to solve the inside and outside part
 		[-omega^2*D_epsoo+Soo, Soi;
 		 Sio,                  i*omega*D_sigii+Sii] */
-		//complex<double>* y;
-		//for (int ind = 0; ind < sys->nfreq; ++ind) {
-		//	y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
-		//	solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
-		//	free(y);
-		//}
+		complex<double>* y;
+		for (int ind = 0; ind < sys->nfreq; ++ind) {
+			/* Begin to output (-omega^2*D_epsoo+Soo) */
+			//double freq = sys->freqNo2freq(ind);
+			//outfile.open("Moo.txt", std::ofstream::out | std::ofstream::trunc);
+			//for (int ind = 0; ind < lengoo; ++ind) {
+			//	Sooval[ind] = Sooval[ind];
+			//	if (SooRowId[ind] == SooColId[ind]) {
+			//		Sooval[ind] += -sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[ind]]]) * pow(freq * 2 * M_PI, 2);
+			//	}
+			//outfile << SooRowId[ind] + 1 << " " << SooColId[ind] + 1 << " " << setprecision(15) << Sooval[ind] << endl;
+			//}
+			//outfile.close();
+			/* End of outputting (-omega^2*D_epsoo+Soo) */
+			y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
+			solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
+			free(y); y = NULL;
+		}
 
 
 #ifdef GENERATE_V0_SOLUTION
@@ -966,33 +979,31 @@ int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val) {
     return 0;
 }
 
-int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1) {    // totalnum is the total number of entries, leng is the row number
-    int i;
-    int *rowId2;
-    int count, start;
-    int k;
+int COO2CSR_malloc(myint *rowId, myint *ColId, double *val, myint totalnum, myint leng, myint *rowId1) {    
+	/* Transfer the COO format to CSR format
+	The COO format is rowwise
+	totalnum is the total number of entries
+	leng is the row number
+	*/
+    myint i, start, k;
 
-    rowId2 = (int*)malloc((leng + 1) * sizeof(int));
-    count = 0;
     i = 0;
     k = 0;
-    rowId2[k] = 0;
-    k++;
+    rowId1[k] = 0;
+	k++;
     while (i < totalnum) {
-        start = rowId[i];
+        start = rowId[i];   // start + 1 denotes the row # (starting from 1)
+		while (k < start + 1) {
+			rowId1[k] = i;
+			k++;
+		}
         while (i < totalnum && rowId[i] == start) {
-            count++;
             i++;
         }
-        rowId2[k] = (count);
-        k++;
+        rowId1[start + 1] = i;
+		k = start + 2;
     }
 
-    for (i = 0; i <= leng; i++) {
-        rowId1[i] = rowId2[i];
-    }
-
-    free(rowId2); rowId2 = NULL;
     return 0;
 }
 
@@ -1133,12 +1144,8 @@ void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint*
 	ARows : how many rows are there in the matrix
 	leng_Aoo : the nnz of this matrix as output */
 	for (int ind = 0; ind < ARows; ++ind) {
-		if (sys->mapio[ind] < sys->outside) {
-			for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
-				if (sys->mapio[AcolId[indi]] >= 0 && sys->mapio[AcolId[indi]] < sys->outside) {
-					leng_Aoo++;
-				}
-			}
+		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+			leng_Aoo++;
 		}
 	}
 }
@@ -1192,7 +1199,7 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 	//if (s0 == SPARSE_STATUS_SUCCESS)
 	//	cout << "SPARSE_STATUS_SUCCESS";
 
-	s0 = mkl_sparse_d_add(operation, a, alpha, b, &r);   // add the two sparse matrices
+	s0 = mkl_sparse_d_add(operation, a, alpha, a, &r);   // add the two sparse matrices
 
 	myint ARows, ACols;
 	MKL_INT *ArowStart, *ArowEnd;
@@ -1211,10 +1218,10 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
 			sys->LooRowId[count] = ind;
 			sys->LooColId[count] = AcolId[indi];
-			sys->Looval[count] = Aval[indi] * pow(DT, 2);
-			if (sys->LooRowId[count] == sys->LooColId[count]) {
-				sys->Looval[count] += sys->getEps(sys->mapEdgeR[sys->mapioR[sys->LooRowId[count]]]);
-			}
+			sys->Looval[count] = Aval[indi];
+			//if (sys->LooRowId[count] == sys->LooColId[count]) {
+			//	sys->Looval[count] += sys->getEps(sys->mapEdgeR[sys->mapioR[sys->LooRowId[count]]]);
+			//}
 			count++;
 		}
 	}

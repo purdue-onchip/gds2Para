@@ -57,7 +57,7 @@ using namespace std;
 
 // Debug testing macros (comment out if not necessary)
 //#define UPPER_BOUNDARY_PEC
-//#define LOWER_BOUNDARY_PEC
+#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
@@ -2840,12 +2840,11 @@ public:
 		markref = 0;
 		/* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
 		for (indi = 0; indi < this->numCdt; indi++) {
-			
+			//cout << "Conductor " << indi << " markPort is " << conductor[indi].markPort << endl;
 			if (this->conductor[indi].markPort <= -1 && markref == 0) {
 				markref = 1;
 				continue;
 			}
-			//cout << V[indi] << endl;
 			start = v0d1num;
 			mark = 0;
 			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
@@ -2860,7 +2859,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -1 / lz_avg;// -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// -1 / lz_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2872,7 +2871,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = 1 / lz_avg;// lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// 1 / lz_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2884,7 +2883,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -1 / lx_avg;// -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// -1 / lx_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2896,7 +2895,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = 1 / lx_avg;// ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// 1 / lx_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2908,7 +2907,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -1 / ly_avg;// -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// -1 / ly_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2920,7 +2919,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = 1 / ly_avg;// lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// 1 / ly_avg;
 						v0d1anum++;
 						mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
 					}
@@ -2937,8 +2936,8 @@ public:
 			}
 		}
 		for (indj = 0; indj < leng_v0d1; ++indj) {   // when using the frequency domain schema should not normalize the vectors
-			this->v0dn[indj] = sqrt(this->v0dn[indj]);
-			this->v0dan[indj] = sqrt(this->v0dan[indj]);
+			this->v0dn[indj] = 1;// sqrt(this->v0dn[indj]);
+			this->v0dan[indj] = 1;// sqrt(this->v0dan[indj]);
 		}
 		//ofstream out;
 		//out.open("V0d.txt", std::ofstream::out | std::ofstream::trunc);

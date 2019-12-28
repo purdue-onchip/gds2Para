@@ -15,6 +15,7 @@ int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sp
 	   sourcePort : which source is now used
 	   y : the solution */
 	myint nedge = sys->N_edge - sys->bden, inside = nedge - sys->outside;
+	ofstream out;
 
 	/* Solve the outside part */
 	double* Jo = (double*)calloc(sys->outside, sizeof(double));   // Jo
@@ -24,18 +25,30 @@ int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sp
 			Jo[sys->mapio[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
 		}
 	}
-
+	
 
 	/* solve oo part */
 	double freq = sys->freqNo2freq(freqi);
 	double* xo = (double*)calloc(sys->outside, sizeof(double));
 	solveOO(sys, freq, Jo, v0dt, v0dat, xo);   // xo should be imaginary add i later
+	/* Begin to check the correctness of OO part */
+	//out.open("Jo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->outside; ++ind) {
+	//	out << Jo[ind] << endl;
+	//}
+	//out.close();
+	//out.open("xo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->outside; ++ind) {
+	//	out << setprecision(15) << xo[ind] << endl;
+	//}
+	//out.close();
+	/* End of checking the correctness of OO part */
 
 	/* solve ii part */
-	double* temp = (double*)calloc(sys->outside, sizeof(double));
+	double* temp = (double*)calloc(inside, sizeof(double));
 	double* xi = (double*)calloc(inside, sizeof(double));
 	sparseMatrixVecMul(SioRowId, SioColId, Sioval, lengio, xo, temp);   // temp=Sio*xo
-	for (int indi = 0; indi < nedge; ++indi) {
+	for (int indi = 0; indi < inside; ++indi) {
 		xi[indi] = -temp[indi] / (2 * M_PI * freq * SIGMA);
 	}
 
@@ -47,6 +60,11 @@ int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sp
 			y[indi] = 0 + 1i * xo[sys->mapio[indi]];
 		}
 	}
+
+	free(Jo); Jo = NULL;
+	free(xo); xo = NULL;
+	free(temp); temp = NULL;
+	free(xi); xi = NULL;
 }
 
 int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat) {
@@ -2862,7 +2880,7 @@ int mkl_gmres_A(fdtdMesh* sys, double* bm, double* x, myint* ARowId, myint* ACol
 	/* Initialize the initial guess
 	/*--------------------------------------------------------------------------*/
 	for (i = 0; i < N; ++i) {
-		computed_solution[i] =  bm[i];
+		computed_solution[i] = 0;// bm[i];
 	}
 	double bmn = 0;
 
@@ -2929,7 +2947,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
-		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
 		if (dvar < 0.001) goto COMPLETE;
 		else goto ONE;
 	}
@@ -3403,6 +3421,7 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	int status;
+	ofstream out;
 
 	/* xh */
 	double* temp = (double*)calloc(sys->leng_v0d1, sizeof(double));
@@ -3417,7 +3436,7 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0dt, descr, temp1, beta, temp2);   // temp2=v0d*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
 	for (int ind = 0; ind < sys->outside; ++ind) {
 		temp2[ind] *= -freq * freq * M_PI * M_PI * 4 * sys->getEps(sys->mapEdgeR[sys->mapioR[ind]]);   // temp2=(-omega^2*D_epsoo*v0d)*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
-		temp2[ind] = Jo[ind] - temp2[ind];   // temp2=b-(-omega^2*D_epsoo*v0d)*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
+		temp2[ind] = Jo[ind] - temp2[ind];   // temp2=Jo-(-omega^2*D_epsoo*v0d)*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
 	}
 	double* Looval = (double*)calloc(sys->leng_Loo, sizeof(double));
 	for (int ind = 0; ind < sys->leng_Loo; ++ind) {   // define Looval for (-omega^2*D_epsoo+Loo)
@@ -3427,6 +3446,23 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 		}
 	}
 	status = mkl_gmres_A(sys, temp2, xh, sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo), xh is got!
+	/* Begin to output (Loo-omega^2*D_epsoo) */
+	//out.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->leng_Loo; ++ind) {
+	//	out << sys->LooRowId[ind] + 1 << " " << sys->LooColId[ind] + 1 << " " << setprecision(15) << Looval[ind] << endl;
+	//}
+	//out.close();
+	//out.open("temp2.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->outside; ++ind) {
+	//	out << setprecision(15) << temp2[ind] << endl;
+	//}
+	//out.close();
+	//out.open("xh.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->outside; ++ind) {
+	//	out << setprecision(15) << xh[ind] << endl;
+	//}
+	//out.close();
+	/* End of outputting (Loo-omega^2*(D_epsoo) */
 
 	for (int ind = 0; ind < sys->outside; ++ind) {
 		temp2[ind] = xh[ind] * (-pow(freq * M_PI * 2, 2)) * sys->getEps(sys->mapEdgeR[sys->mapioR[ind]]);   // temp2=(-omega^2*D_epsoo)*xh
