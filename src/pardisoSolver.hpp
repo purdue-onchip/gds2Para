@@ -515,13 +515,12 @@ denseFormatOfMatrix reconstruct_e(fdtdMesh *psys, const mapIndex &indexMap, cons
             // For original noncascaded index, mode (growZ, removed PEC)
             myint surfInd_thisPort = surfLocationOfPort[ind_thisPort];
             myint shift_surfvol = surfInd_thisPort * (N_surfExEz + n_volEy);    // index shift from all surf-vol {e} before this surface
-            myint eInd_growY = e_ind + shift_surfvol;                           // Step 1: -> index at (growY, no PEC removal)
+            myint eInd_growYrmPEC = e_ind + shift_surfvol;                      // Step 0: -> index at (growY, removed PEC)
+            myint eInd_growY = indexMap.eInd_map_rmPEC2y[eInd_growYrmPEC];      // Step 1: -> index at (growY, no PEC removal)
             myint eInd_growZ = indexMap.eInd_map_y2z[eInd_growY];               // Step 2: map (growY, no PEC removal) to (growZ, no PEC removal)
             myint eInd_growZrmPEC = psys->mapEdge[eInd_growZ];                  // Step 3: map (growZ, no PEC removal) to (growZ, removed PEC)
             
-            if (eInd_growZrmPEC != -1) {
-                eField_oneExcit.vals[eInd_growZrmPEC] = cascadedeField_SI.vals[eInd_cascaded];
-            }   // psys->mapEdge maps PEC edge index to -1, meaning not in domain
+            eField_oneExcit.vals[eInd_growZrmPEC] = cascadedeField_SI.vals[eInd_cascaded];
         }
     }
 
