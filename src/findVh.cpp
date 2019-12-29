@@ -60,6 +60,11 @@ int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sp
 			y[indi] = 0 + 1i * xo[sys->mapio[indi]];
 		}
 	}
+	//out.open("y.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int indi = 0; indi < nedge; ++indi) {
+	//	out << y[indi].real() << " " << y[indi].imag() << endl;
+	//}
+	//out.close();
 
 	free(Jo); Jo = NULL;
 	free(xo); xo = NULL;

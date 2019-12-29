@@ -1092,22 +1092,22 @@ int matrixConstruction(fdtdMesh *sys) {
         }
     }*/
     ofstream out;
-    //out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
-    //for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
-    //    out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
-    //}
-    //out.close();
+    out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
+    for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
+        out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
+    }
+    out.close();
 
-    //out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
-    //for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
-    //    if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
-    //        out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << SIGMA << endl;
-    //    }
-    //    else{
-    //        out << 0 << endl;
-    //    }
-    //}
-    //out.close();
+    out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
+    for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
+        if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
+            out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << SIGMA << endl;
+        }
+        else{
+            out << 0 << endl;
+        }
+    }
+    out.close();
 
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();

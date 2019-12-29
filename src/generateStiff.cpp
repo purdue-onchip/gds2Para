@@ -900,7 +900,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SColId[j] = sys->mapEdge[v[count].first];
             sys->Sval[j] = v[count].second / MU;
             //out << sys->SRowId[j] << " " << sys->SColId[j] << " ";
-            //out << sys->Sval[j] << endl;
+            //out << setprecision(15) << sys->Sval[j] << endl;
 
             j++;
             count++;

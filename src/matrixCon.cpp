@@ -366,22 +366,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
 	//cout << "V0d*V0da' row number is " << ARows << " and column number is " << ACols << endl;
 	leng_Aoo = ArowEnd[ARows - 1];    // how many non-zeros are in A
-	AoorowId = (myint*)malloc(leng_Aoo * sizeof(myint));
-	AoocolId = (myint*)malloc(leng_Aoo * sizeof(myint));
-	Aooval = (double*)malloc(leng_Aoo * sizeof(double));
-	matrixOutside(sys, ArowStart, ArowEnd, AcolId, Aval, ARows, AoorowId, AoocolId, Aooval, 1 / MU);   // assign Aoo rowId, colId, val
 	myint* AoorowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
-	status = COO2CSR_malloc(AoorowId, AoocolId, Aooval, leng_Aoo, sys->outside, AoorowId1);
-	//outfile.open("Aoo.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind < leng_Aoo; ++ind) {
-	//	outfile << AoorowId[ind] << " " << AoocolId[ind] << " " << Aooval[ind] << endl;
-	//}
-	//outfile.close();
-	//outfile.open("AoorowId1.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind <= sys->outside; ++ind) {
-	//	outfile << AoorowId1[ind] << endl;
-	//}
-	//outfile.close();
+	for (int ind = 0; ind < sys->outside; ++ind) {
+		AoorowId1[ind] = ArowStart[ind];
+	}
+	AoorowId1[sys->outside] = ArowEnd[sys->outside - 1];
+	for (int ind = 0; ind < leng_Aoo; ++ind) {
+		Aval[ind] /= MU;
+	}
 
 	myint* SooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
 	status = COO2CSR_malloc(SooRowId, SooColId, Sooval, lengoo, sys->outside, SooRowId1);
@@ -394,12 +386,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	if (status != 0) {
 		return status;
 	}
-	sparseMatrixSum(sys, AoorowId1, AoocolId, Aooval, SooRowId1, SooColId, Sooval, sys->outside);   //do the sparse matrix summation and put the result in Loo
+	sparseMatrixSum(sys, AoorowId1, AcolId, Aval, SooRowId1, SooColId, Sooval, sys->outside);   //do the sparse matrix summation and put the result in Loo
 	
 	/* output the Loo and Soo */
 	//outfile.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->leng_Loo; ++ind) {
 	//	outfile << sys->LooRowId[ind] << " " << sys->LooColId[ind] << " " << sys->Looval[ind] << endl;
+	//}
+	//outfile.close();
+	//outfile.open("epsoo.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->outside; ++ind) {
+	//	outfile << sys->getEps(sys->mapEdgeR[sys->mapioR[ind]]) << endl;
 	//}
 	//outfile.close();
 	/* End of generating Loo */
@@ -416,6 +413,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 			}
 			//cout << "SourcePort " << sourcePort << " area is " << sourceArea << endl;
 		}
+		outfile.open("J.txt", std::ofstream::out | std::ofstream::trunc);
+		for (int ind = 0; ind < nedge; ++ind) {
+			outfile << sys->J[sys->mapEdgeR[ind]] << endl;
+		}
+		outfile.close();
 
 		/* debug testing to see the performance of different solvers */
 		//double* bo = (double*)calloc(sys->outside, sizeof(double));
@@ -450,12 +452,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 			//	if (SooRowId[ind] == SooColId[ind]) {
 			//		Sooval[ind] += -sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[ind]]]) * pow(freq * 2 * M_PI, 2);
 			//	}
-			//outfile << SooRowId[ind] + 1 << " " << SooColId[ind] + 1 << " " << setprecision(15) << Sooval[ind] << endl;
+			//	outfile << SooRowId[ind] + 1 << " " << SooColId[ind] + 1 << " " << setprecision(15) << Sooval[ind] << endl;
 			//}
 			//outfile.close();
 			/* End of outputting (-omega^2*D_epsoo+Soo) */
 			y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
 			solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
+			sys->Construct_Z_V0_Vh(y, ind, sourcePort);
 			free(y); y = NULL;
 		}
 
@@ -1199,7 +1202,7 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 	//if (s0 == SPARSE_STATUS_SUCCESS)
 	//	cout << "SPARSE_STATUS_SUCCESS";
 
-	s0 = mkl_sparse_d_add(operation, a, alpha, a, &r);   // add the two sparse matrices
+	s0 = mkl_sparse_d_add(operation, a, alpha, b, &r);   // add the two sparse matrices
 
 	myint ARows, ACols;
 	MKL_INT *ArowStart, *ArowEnd;

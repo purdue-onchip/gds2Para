@@ -50,14 +50,14 @@ using namespace std;
 #define MINDISFRACX (3e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
 #define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.0333333) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-12) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
 //#define UPPER_BOUNDARY_PEC
-#define LOWER_BOUNDARY_PEC
+//#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
@@ -2847,7 +2847,9 @@ public:
 			}
 			start = v0d1num;
 			mark = 0;
+			myint cnode = this->cdtNumNode[indi];
 			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+				
 				iz = this->conductor[indi].node[indj] / this->N_node_s;
 				ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
 				iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
@@ -2859,7 +2861,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// -1 / lz_avg;
+						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// -1 / lz_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2871,7 +2873,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// 1 / lz_avg;
+						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// 1 / lz_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2883,7 +2885,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// -1 / lx_avg;
+						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// -1 / lx_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2895,7 +2897,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// 1 / lx_avg;
+						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// 1 / lx_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2907,7 +2909,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// -1 / ly_avg;
+						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// -1 / ly_avg;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2919,7 +2921,7 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);// 1 / ly_avg;
+						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// 1 / ly_avg;
 						v0d1anum++;
 						mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
 					}
