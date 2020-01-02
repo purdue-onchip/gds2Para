@@ -158,6 +158,26 @@ public:
             exit(2);
         }
 
+        //// Refines the solution C = A_LU \ B and estimate its error (Error < 1e-12, negligible at this step)
+        //vector<MKL_Complex16> A_mklComplex(this->matrixSize);
+        //this->copyToMKL_Complex16(A_mklComplex.data()); // copy matrix A to a MKL_Complex16 type A_mklComplex
+        //vector<MKL_Complex16> B_mklComplex(B.matrixSize);
+        //B.copyToMKL_Complex16(B_mklComplex.data());     // copy matrix B to a MKL_Complex16 type B_mklComplex
+        //vector<double> ferr(B.N_cols, 0.0), berr(B.N_cols, 0.0);
+        //info = LAPACKE_zgerfs(LAPACK_COL_MAJOR, 'N',
+        //    B.N_rows, B.N_cols,                         // n & nrhs
+        //    A_mklComplex.data(), B.N_rows,              // original A in MKL_Complex16 type
+        //    A_LU.data(), B.N_rows,                      // A_LU
+        //    ipiv.data(),                                // pivot indices of A_LU
+        //    B_mklComplex.data(), B.N_rows,              // B
+        //    C_mklComplex.data(), B.N_rows,              // C
+        //    ferr.data(), berr.data()                    // forward and backward errors for each solution vector
+        //);
+        //if (info != 0) {
+        //    cout << "Issue on backlash refinement, LAPACKE_?gerfs returns: " << info << endl;
+        //    exit(2);
+        //}
+
         // Store the solution at denseFormatOfMatrix
         denseFormatOfMatrix C(B.N_rows, B.N_cols);
         C.copyFromMKL_Complex16(C_mklComplex.data());   // copy C.vals (complex<double>) from MKL_Complex16
@@ -277,7 +297,7 @@ denseFormatOfMatrix csrFormatOfMatrix::backslashDense(const denseFormatOfMatrix 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(this->N_rows), this->vals, this->rows, this->cols,
         &perm, &nrhs, iparm, &msglvl, (complex<double>*)denseB21B23.vals.data(), denseD0sD1s.vals.data(), &error);
     if (error != 0) {
-        printf("\nERROR during numerical factorization: %d", error);
+        printf("\nERROR during PARDISO backslash: %d", error);
         exit(2);
     }
 

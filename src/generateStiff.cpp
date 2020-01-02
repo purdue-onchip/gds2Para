@@ -658,9 +658,10 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
 
     pardisoinit(pt, &mtype, iparm);
     iparm[38] = 1;
-    iparm[34] = 1;    // 0-based indexing
-    iparm[3] = 2;    // number of processors
-    //iparm[59] = 2;    // out of core version to solve very large problem
+    iparm[34] = 1;          // 0-based indexing
+    iparm[3] = 0;           /* No iterative-direct algorithm */
+    //iparm[3] = 2;         // CGS iteration for symmetric positive definite matrices replaces the computation of LLT
+    //iparm[59] = 2;        // out of core version to solve very large problem
     //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
 
     //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";

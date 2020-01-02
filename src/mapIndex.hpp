@@ -2,18 +2,18 @@
 #define GDS2PARA_MAP_INDEX_H_
 
 #include "fdtd.hpp"
-//#include "matrixTypeDef.hpp"
 
 class mapIndex {
 public:
     // num of bricks Nx*Ny*Nz
     myint Nx, Ny, Nz;
     myint N_totEdges;                   // number of all {e} or edges without PEC removal
+    myint N_totEdges_rmPEC;             // number of all {e} or edges after PEC removal
 
     // num of edges after removing PEC
     myint N_edgesAtPEC;                 // number of {e} or edges at PEC surfaces
     myint N_surfExEz_rmPEC;             // number of {e}_surface at one surface e.g. 0s, mode (growY, removed PEC)
-    myint N_volEy_rmPEC;                // number of {e}_volumn at one layer, e.g. 0v, mode (growY, removed PEC)
+    myint N_volEy_rmPEC;                // number of {e}_volume at one layer, e.g. 0v, mode (growY, removed PEC)
 
     // Upper PEC edge indices (z=zmax) and lower PEC edge indices (z=zmin), index mode (growY, no PEC removal)
     unordered_set<myint> edges_upperPEC;
@@ -54,13 +54,13 @@ public:
         this->N_surfExEz_rmPEC -= Nx;                       // remove Ex at PEC
         this->N_volEy_rmPEC -= (Nx + 1);                    // remove Ey at PEC
 #endif
-
+        this->N_totEdges_rmPEC = this->N_totEdges - this->N_edgesAtPEC;
     }
 
     // Set global {e} index map between mode (growZ, no PEC removal) and mode (growY, no PEC removal)
     void setEdgeMap_growZgrowY() {
     /*  The index follows y - x - z ordering, and {e} is stacked layer by layer as
-        {e_surface, e_volumn}.T at each layer. For the two cases here:
+        {e_surface, e_volume}.T at each layer. For the two cases here:
         - case 1 ~ grow along Z: {e} = {e_s, | e_v}.T = {ey,ex, | ez}.T, in which vector
                 {ey} first runs through y for each x, then runs through x as by
                 y - x - z ordering. Same for {ex} ~y->x and {ez} ~y->x.
