@@ -22,10 +22,11 @@ int layeredFdtd(void) {
     WriteSysToFile(sys);
 
     // Mesh the domain and mark conductors
-    unordered_set<double> portCoorx, portCoory;
     unordered_map<double, int> xi, yi, zi;
+    tf::Taskflow taskflow;
+    tf::Subflow subflowEmpty(taskflow);
     clock_t t2 = clock();
-    int status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+    int status = meshAndMark(&sys, &xi, &yi, &zi, subflowEmpty);
     if (status == 0)
     {
         cout << "meshAndMark Success!" << endl;
@@ -52,8 +53,6 @@ int layeredFdtd(void) {
 
     // Set port
     clock_t t4 = clock();
-    tf::Taskflow taskflow;
-    tf::Subflow subflowEmpty(taskflow);
     status = portSet(&sys, xi, yi, zi, subflowEmpty);
     if (status == 0)
     {

@@ -63,7 +63,7 @@ using namespace std;
 #define PRINT_DIS_COUNT // Terminal output has discretization lengths and edge, node, and cell counts
 //#define PRINT_PORT_COND // Terminal output has extra information about locating ports in isolated conductors
 #define SKIP_MARK_CELL
-//#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
+#define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
 //#define PRINT_V0D_BLOCKS
 //#define V0_NEW_SCHEMA
@@ -572,7 +572,6 @@ public:
             }
 
             for (indj = 0; indj < this->conductorIn[indi].numVert - 1; indj++) {
-
                 if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[indj + 1]) {   // line along x direction
                     if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
                         ss = xi[this->conductorIn[indi].x[indj]];
@@ -826,34 +825,34 @@ public:
                         //cout << this->yn[y1] << " " << this->yn[y2] << " ";
                         //cout << this->conductorIn[indi].zmax << " " << this->conductorIn[indi].zmin;
                         for (indj = x1; indj <= x2; indj++) {
-                            for (indl = zi[this->conductorIn[indi].zmin]; indl <= zi[this->conductorIn[indi].zmax]; indl++) {
+                            for (indl = zi.at(this->conductorIn[indi].zmin); indl <= zi.at(this->conductorIn[indi].zmax); indl++) {
                                 for (indk = y1; indk < y2; indk++) {
-                                    if (indj < x2){
+                                    if (indj < x2) {
                                         this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
                                         this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
                                         this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
-                                        if (indl != zi[this->conductorIn[indi].zmax]) {
+                                        if (indl != zi.at(this->conductorIn[indi].zmax)) {
                                             this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                         }
                                     }
                                     else {    // If this range is the rightmost range, include the rightmost point
                                         this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
                                         this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + indj * (this->N_cell_y) + indk] = indi + (myint)1;
-                                        if (indl != zi[this->conductorIn[indi].zmax]) {
+                                        if (indl != zi.at(this->conductorIn[indi].zmax)) {
                                             this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                         }
                                     }
                                 }
-                                if (indj < x2){
+                                if (indj < x2) {
                                     this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
                                     this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
-                                    if (indl != zi[this->conductorIn[indi].zmax]) {
+                                    if (indl != zi.at(this->conductorIn[indi].zmax)) {
                                         this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                     }
                                 }
                                 else {    // If this range is the rightmost range, include the rightmost point
                                     this->markNode[indl * this->N_node_s + indj * (this->N_cell_y + 1) + indk] = (myint)1;
-                                    if (indl != zi[this->conductorIn[indi].zmax]) {
+                                    if (indl != zi.at(this->conductorIn[indi].zmax)) {
                                         this->markEdge[indl * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indj * (this->N_cell_y + 1) + indk] = indi + (myint)1;
                                     }
                                 }
@@ -4060,7 +4059,7 @@ public:
 
 
 
-int meshAndMark(fdtdMesh* sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory);
+int meshAndMark(fdtdMesh* sys, unordered_map<double, int> *xi1, unordered_map<double, int> *yi1, unordered_map<double, int> *zi1, tf::Subflow subflow);
 int compute_edgelink(fdtdMesh *sys, myint eno, myint &node1, myint &node2);
 int parameterConstruction(fdtdMesh* sys, unordered_map<double,int> xi, unordered_map<double,int> yi, unordered_map<double,int> zi);
 bool polyIn(double x, double y, fdtdMesh *sys, int inPoly);

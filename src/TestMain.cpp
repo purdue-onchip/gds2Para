@@ -310,17 +310,17 @@ int main(int argc, char** argv)
             // Mesh the domain and mark conductors
             unordered_map<double, int> xi, yi, zi;
             clock_t t2 = clock();
-            tf::Task taskF = taskflow.emplace([&]()
+            tf::Task taskF = taskflow.emplace([&](auto &subflow)
             {
-                status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+                status = meshAndMark(&sys, &xi, &yi, &zi, subflow);
                 if (status == 0)
                 {
-                    cout << "meshAndMark Success!" << endl;
-                    cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+                    cout << "meshAndMark dynamic tasking Success!" << endl;
+                    cout << "meshAndMark dynamic tasking time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
                 }
                 else
                 {
-                    cerr << "meshAndMark Fail!" << endl;
+                    cerr << "meshAndMark dynamic tasking Fail!" << endl;
                     exit(status);
                 }
                 //sys.print();
