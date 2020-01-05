@@ -106,13 +106,13 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     vector<MKL_Complex16> csrB12vals_mklCompl(csrB12.N_nnz);
     csrB12.copyToMKL_Complex16(csrB12vals_mklCompl.data());
     mkl_sparse_z_create_csr(&csrB12_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB12.N_rows, csrB12.N_cols,
-        csrB12.rows, csrB12.rows + 1, csrB12.cols, csrB12vals_mklCompl.data());
+        csrB12.rows.data(), csrB12.rows.data() + 1, csrB12.cols.data(), csrB12vals_mklCompl.data());
     csrFormatOfMatrix csrB32(N_surfE, N_volE, layerS[7].size());
     csrB32.convertBlockTypeToCsr(layerS[7]);
     vector<MKL_Complex16> csrB32vals_mklCompl(csrB32.N_nnz);
     csrB32.copyToMKL_Complex16(csrB32vals_mklCompl.data());
     mkl_sparse_z_create_csr(&csrB32_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB32.N_rows, csrB32.N_cols,
-        csrB32.rows, csrB32.rows + 1, csrB32.cols, csrB32vals_mklCompl.data());
+        csrB32.rows.data(), csrB32.rows.data() + 1, csrB32.cols.data(), csrB32vals_mklCompl.data());
 
     // Solve reducedS blocks C11 = B11 - B12*D0s, C12 = B13 - B12*D1s
     preducedS->convertBlockTypeToDense(layerS[0]);              // dense B11 & dense C11
@@ -267,7 +267,8 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
     myint N_layers              = psys->N_cell_y;       // num of layers
 
 #ifdef DEBUG_SOLVE_REORDERED_S
-    BlockType coo_reorderedS(psys->leng_S);
+    BlockType coo_reorderedS;
+    coo_reorderedS.reserve(psys->leng_S);
     for (myint i_nnz = 0; i_nnz < psys->leng_S; i_nnz++) {
         // (rowId, colId, val) of this nnz element in ShSe/mu, index mode (growZ, removed PEC)
         myint nnzS_rowId_rmPECz = psys->SRowId[i_nnz];
@@ -294,6 +295,10 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
         coo_reorderedS.push_back({ nnzS_rowId, nnzS_colId, cascadedS_val });
     }
 
+    /*csrFormatOfMatrix csrS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC, psys->leng_S);
+    sort(coo_reorderedS.begin(), coo_reorderedS.end(), ascendByRowIndThenByColInd);
+    csrS_reordered.convertBlockTypeToCsr(coo_reorderedS);
+    return csrS_reordered;*/
     denseFormatOfMatrix denseS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC);
     denseS_reordered.convertBlockTypeToDense(coo_reorderedS);
     return denseS_reordered;
@@ -349,10 +354,10 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
     myint N_surfE = indexMap.N_surfExEz_rmPEC;
     myint N_volE = indexMap.N_volEy_rmPEC;
 
-    // Sort each block matrix by its row indices, 1st element of the tuple
+    // Sort nnzs in each block matrix by row index first then by col index
     /* The purpose is to allow easy convert from COO to CSR format*/
     for (auto &block : Blocks) {
-        sort(block.begin(), block.end(), ascendByRowInd);
+        sort(block.begin(), block.end(), ascendByRowIndThenByColInd);
     }
 
     // Half the value of overlapped ns-ns blocks between adjcent two layers

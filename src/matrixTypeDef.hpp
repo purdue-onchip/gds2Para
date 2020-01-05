@@ -10,9 +10,9 @@ typedef struct {
     complex<double> val;
 }onennzType;                            // store the row-col-val of one nnz element
 typedef vector<onennzType> BlockType;   // store rows-cols-vals of all nnzs inside each block matrix
-bool ascendByRowInd(const onennzType& nnz1, const onennzType& nnz2) {
-    return nnz1.row_ind < nnz2.row_ind;
-}                                       // operator for sorting the nnz by its row_ind
+bool ascendByRowIndThenByColInd(const onennzType& nnz1, const onennzType& nnz2) {
+    return tie(nnz1.row_ind, nnz1.col_ind) < tie(nnz2.row_ind, nnz2.col_ind);
+}                                       // operator for sorting nnz by row_ind first then by col_ind
 
 // 0-based column-major dense format of a matrix stored col by col in 1-D vector
 class denseFormatOfMatrix {
@@ -193,9 +193,9 @@ public:
     myint N_rows;
     myint N_cols;
     myint N_nnz;
-    myint *rows = nullptr;                  // CSR row indices, size = N_rows + 1
-    myint *cols = nullptr;                  // CSR col indices, size = N_nnz
-    complex<double> *vals = nullptr;        // CSR nnz values,  size = N_nnz
+    vector<myint> rows;                  // CSR row indices, size = N_rows + 1
+    vector<myint> cols;                  // CSR col indices, size = N_nnz
+    vector<complex<double>> vals;        // CSR nnz values,  size = N_nnz
 
     // Constructor
     csrFormatOfMatrix(myint N_rows, myint N_cols, myint N_nnz) {
@@ -207,16 +207,9 @@ public:
         this->N_cols = N_cols;
         this->N_nnz = N_nnz;
 
-        this->rows = new myint[N_rows + 1]();
-        this->cols = new myint[N_nnz]();
-        this->vals = new complex<double>[N_nnz]();
-    }
-
-    // Destructor
-    ~csrFormatOfMatrix() {
-        delete[] this->rows;
-        delete[] this->cols;
-        delete[] this->vals;
+        this->rows.assign(N_rows + 1, 0);
+        this->cols.assign(N_nnz, 0);
+        this->vals.assign(N_nnz, { 0.0, 0.0 });
     }
 
     // Copy this->vals to a MKL_Complex16 type memory
@@ -229,85 +222,79 @@ public:
     }
 
     // Convert BlockType (COO) to CSR
-    int convertBlockTypeToCsr(const BlockType &block);
+    void convertBlockTypeToCsr(const BlockType &block) {
+        /* This function convert BlockType (COO) to CSR format.
+        The input BlockType must have been sorted by row index first then col index
+        within each row. All in increasing order. */
+
+        // The first index of rows is always 0 and the last is always N_nnz
+        this->rows[0] = 0;
+        this->rows[this->N_rows] = block.size();
+
+        myint nnz_ind = 0;
+        myint thisRow_ind = 0;
+        for (const auto &onennz : block) {
+
+            // cols and vals are direct copy of the tuple for every nnz
+            this->cols[nnz_ind] = onennz.col_ind;
+            this->vals[nnz_ind] = onennz.val;
+
+            // When saw nnz at a new row
+            while (thisRow_ind < onennz.row_ind) {
+                thisRow_ind++;
+                this->rows[thisRow_ind] = nnz_ind;
+            }
+
+            nnz_ind++;
+
+            // Extrame case: when the last few rows are all blank
+            while (nnz_ind == block.size() && thisRow_ind < this->N_rows - 1) {
+                thisRow_ind++;
+                this->rows[thisRow_ind] = nnz_ind;
+            }
+        }
+    }
 
     // Return denseD0sD1s = csrB22 (this) \ denseB21B23 = inv(csrB22)*denseB21B23
-    denseFormatOfMatrix backslashDense(const denseFormatOfMatrix &denseB21B23);
+    denseFormatOfMatrix backslashDense(const denseFormatOfMatrix &denseB21B23) {
+        // combined dense [D0s, D1s]
+        denseFormatOfMatrix denseD0sD1s(denseB21B23.N_rows, denseB21B23.N_cols);
+
+        // Pardiso parameters, see https://software.intel.com/en-us/mkl-developer-reference-c-pardiso
+        MKL_INT maxfct = 1;
+        MKL_INT mnum = 1;
+        MKL_INT mtype = 13;                 /* Complex and nonsymmetric matrix */
+        MKL_INT phase = 13;
+        MKL_INT perm;
+        myint nrhs = denseB21B23.N_cols;    /* Number of right hand sides */
+        MKL_INT msglvl = 0;                 /* If msglvl=1, print statistical information */
+        MKL_INT error = 0;
+
+        void *pt[64];
+        myint iparm[64];
+        pardisoinit(pt, &mtype, iparm);
+        iparm[38] = 1;
+        iparm[34] = 1;         /* 0-based indexing */
+        //iparm[26] = 1;       /* Check whether column indices are sorted in increasing order within each row */
+        iparm[3] = 0;          /* No iterative-direct algorithm */
+        //iparm[59] = 2;       /* out of core version to solve very large problem */
+        //iparm[10] = 0;       /* Use nonsymmetric permutation and scaling MPS */
+
+        pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(this->N_rows), this->vals.data(), this->rows.data(), this->cols.data(),
+            &perm, &nrhs, iparm, &msglvl, (complex<double>*)denseB21B23.vals.data(), denseD0sD1s.vals.data(), &error);
+        if (error != 0) {
+            printf("\nERROR during PARDISO backslash: %d", error);
+            exit(2);
+        }
+
+        // Release internal memory
+        phase = -1;
+        complex<double> ddum;               /* Complex<double> dummy */
+        pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(this->N_rows), &ddum, this->rows.data(), this->cols.data(),
+            &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+
+        return denseD0sD1s;
+    }
 };
-
-int csrFormatOfMatrix::convertBlockTypeToCsr(const BlockType &block) {
-    /* This function convert BlockType (COO) to CSR format.
-    The input BlockType must have been sorted by row index. */
-
-    // The first index of rows is always 0 and the last is always N_nnz
-    this->rows[0] = 0;
-    this->rows[this->N_rows] = block.size();
-
-    myint nnz_ind = 0;
-    myint thisRow_ind = 0;
-    for (const auto &onennz : block) {
-
-        // cols and vals are direct copy of the tuple for every nnz
-        this->cols[nnz_ind] = onennz.col_ind;
-        this->vals[nnz_ind] = onennz.val;
-
-        // When saw nnz at a new row
-        while (thisRow_ind < onennz.row_ind) {
-            thisRow_ind++;
-            this->rows[thisRow_ind] = nnz_ind;
-        }
-
-        nnz_ind++;
-
-        // Extrame case: when the last few rows are all blank
-        while (nnz_ind == block.size() && thisRow_ind < this->N_rows - 1) {
-            thisRow_ind++;
-            this->rows[thisRow_ind] = nnz_ind;
-        }
-    }
-
-    return 0;
-}
-
-// Return denseD0sD1s = csrB22 (this) \ denseB21B23 = inv(csrB22)*denseB21B23
-denseFormatOfMatrix csrFormatOfMatrix::backslashDense(const denseFormatOfMatrix &denseB21B23) {
-
-    // combined dense [D0s, D1s]
-    denseFormatOfMatrix denseD0sD1s(denseB21B23.N_rows, denseB21B23.N_cols);
-
-    // Pardiso parameters, see https://software.intel.com/en-us/mkl-developer-reference-c-pardiso
-    MKL_INT maxfct = 1;
-    MKL_INT mnum = 1;
-    MKL_INT mtype = 13;                 /* Complex and nonsymmetric matrix */
-    MKL_INT phase = 13;
-    MKL_INT perm;
-    myint nrhs = denseB21B23.N_cols;    /* Number of right hand sides */
-    MKL_INT msglvl = 0;                 /* If msglvl=1, print statistical information */
-    MKL_INT error = 0;
-
-    void *pt[64];
-    myint iparm[64];
-    pardisoinit(pt, &mtype, iparm);
-    iparm[38] = 1;
-    iparm[34] = 1;         /* 0-based indexing */
-    iparm[3] = 0;          /* No iterative-direct algorithm */
-    //iparm[59] = 2;       /* out of core version to solve very large problem */
-    //iparm[10] = 0;       /* Use nonsymmetric permutation and scaling MPS */
-
-    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(this->N_rows), this->vals, this->rows, this->cols,
-        &perm, &nrhs, iparm, &msglvl, (complex<double>*)denseB21B23.vals.data(), denseD0sD1s.vals.data(), &error);
-    if (error != 0) {
-        printf("\nERROR during PARDISO backslash: %d", error);
-        exit(2);
-    }
-
-    // Release internal memory
-    phase = -1;
-    complex<double> ddum;               /* Complex<double> dummy */
-    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &(this->N_rows), &ddum, this->rows, this->cols,
-        &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
-
-    return denseD0sD1s;
-}
 
 #endif
