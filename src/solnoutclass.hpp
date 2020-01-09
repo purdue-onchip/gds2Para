@@ -31,7 +31,7 @@
 // Parasitics representation macros
 //#define EIGEN_SPARSE // Enable to use sparse matrices for parasitics reporting
 //#define EIGEN_COMPRESS // Enable to allow compressed sparse row (CSR) format for sparse matrices
-#define WRITE_THRESH (1.e-5) // Threshold for saving a parasitic value to file as fraction of total represented in matrix
+#define WRITE_THRESH (1.e-7) // Threshold for saving a parasitic value to file as fraction of total represented in matrix
 
 // Define types for Eigen
 typedef Eigen::Triplet<double, int> dTriplet;
@@ -6073,7 +6073,7 @@ struct SolverDataBase
             citiFile << "VAR_LIST_BEGIN" << endl;
             for (size_t indFreq = 0; indFreq < nfreq; indFreq++)
             {
-                citiFile << std::left << std::setw(13) << std::setprecision(7) << freqs[indFreq] << endl;
+                citiFile << std::left << std::setw(23) << std::setprecision(17) << freqs[indFreq] << endl;
             }
             citiFile << "VAR_LIST_END" << endl;
 
@@ -6086,7 +6086,7 @@ struct SolverDataBase
                     for (size_t indFreq = 0; indFreq < nfreq; indFreq++)
                     {
                         complex<double> pij = matParam[indFreq].coeffRef(indi, indj); // Expensive binary search to get specific index if sparse parameter matrix
-                        citiFile << std::right << std::setw(13) << std::setprecision(7) << pij.real() << "," << std::left << std::setw(13) << std::setprecision(7) << pij.imag() << endl; // One entry of the parameter matrix at a given frequency (real, imaginary)
+                        citiFile << std::right << std::setw(23) << std::setprecision(17) << pij.real() << "," << std::left << std::setw(23) << std::setprecision(17) << pij.imag() << endl; // One entry of the parameter matrix at a given frequency (real, imaginary)
                     }
                     citiFile << "END" << endl;
                 }
@@ -6167,7 +6167,7 @@ struct SolverDataBase
                     tstoneFile << "Im" << paramType << indi + 1 << "," << indj + 1 << std::string(8 - indi / 10 - indj / 10, ' ');
                     if (((indj + 1) % 4 == 0) && (indj + 1 != nPorts) && (nPorts > 2))
                     {
-                        tstoneFile << endl << "!" << std::string(13, ' '); // Put no more than 4 columns of parameters on one file line
+                        tstoneFile << endl << "!" << std::string(23, ' '); // Put no more than 4 columns of parameters on one file line
                     }
                 }
                 if (nPorts > 2)
@@ -6178,17 +6178,17 @@ struct SolverDataBase
             tstoneFile << endl; // End helpful comment line
             for (size_t indFreq = 0; indFreq < nfreq; indFreq++)
             {
-                tstoneFile << std::left << std::setw(13) << std::setprecision(7) << freqs[indFreq] << " ";
+                tstoneFile << std::left << std::setw(23) << std::setprecision(17) << freqs[indFreq] << " ";
                 for (size_t indi = 0; indi < nPorts; indi++)
                 {
                     for (size_t indj = 0; indj < nPorts; indj++)
                     {
                         complex<double> pij = matParam[indFreq].coeffRef(indi, indj); // Expensive binary search to get specific index if sparse parameter matrix
-                        tstoneFile << std::left << std::setw(13) << std::setprecision(7) << pij.real() << " "; // Real part of parameter entry at this frequency
-                        tstoneFile << std::left << std::setw(13) << std::setprecision(7) << pij.imag() << " "; // Imaginary part of parameter entry at this frequency
+                        tstoneFile << std::left << std::setw(23) << std::setprecision(17) << pij.real() << " "; // Real part of parameter entry at this frequency
+                        tstoneFile << std::left << std::setw(23) << std::setprecision(17) << pij.imag() << " "; // Imaginary part of parameter entry at this frequency
                         if (((indj + 1) % 4 == 0) && (indj + 1 != nPorts) && (nPorts > 2))
                         {
-                            tstoneFile << endl << std::string(14, ' '); // Put no more than 4 columns of parameters on one file line
+                            tstoneFile << endl << std::string(24, ' '); // Put no more than 4 columns of parameters on one file line
                         }
                     }
                     if (nPorts > 2)

@@ -134,6 +134,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         sys->v0d1ColId = (myint*)malloc((*leng_v0d1 + 1) * sizeof(myint));
         int status = COO2CSR_malloc(sys->v0d1ColIdo, sys->v0d1RowId, sys->v0d1val, *v0d1num, *leng_v0d1, sys->v0d1ColId);
         if (status != 0) {
+            cerr << "Could not make V0d1ColIdo into a sparse matrix (status = " << status << ")" << endl;
             exit(1);
         }
         free(sys->v0d1val); sys->v0d1val = NULL;
@@ -146,6 +147,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         free(sys->v0d1aColId); sys->v0d1aColId = (myint*)malloc((leng_v0d1a + 1) * sizeof(myint));
         status = COO2CSR_malloc(sys->v0d1aColIdo, sys->v0d1aRowId, sys->v0d1aval, v0d1anum, leng_v0d1a, sys->v0d1aColId);
         if (status != 0) {
+            cerr << "Could not make V0d1aColIdo into a sparse matrix (status = " << status << ")" << endl;
             exit(1);
         }*/
         free(sys->v0d1aval); sys->v0d1aval = NULL;
@@ -255,6 +257,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         free(sys->v0cColId); sys->v0cColId = (myint*)malloc((*leng_v0c + 1) * sizeof(myint));
         int status = COO2CSR_malloc(sys->v0cColIdo, sys->v0cRowId, sys->v0cval, *v0cnum, *leng_v0c, sys->v0cColId);
         if (status != 0) {
+            cerr << "Could not make V0cColIdo into a sparse matrix (status = " << status << ")" << endl;
             exit(1);
         }
         free(sys->v0cColIdo); sys->v0cColIdo = NULL;
@@ -267,6 +270,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         free(sys->v0caColId); sys->v0caColId = (myint*)malloc((leng_v0ca + 1)*sizeof(myint));
         status = COO2CSR_malloc(sys->v0caColIdo, sys->v0caRowId, sys->v0caval, v0canum, leng_v0ca, sys->v0caColId);
         if (status != 0) {
+            cerr << "Could not make V0caColIdo into a sparse matrix (status = " << status << ")" << endl;
             exit(1);
         }
         free(sys->v0caColIdo); sys->v0caColIdo = NULL;*/

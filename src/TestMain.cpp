@@ -408,6 +408,7 @@ int main(int argc, char** argv)
                     cerr << "paraGenerator dynamic tasking Fail!" << endl;
                     exit(status);
                 }
+                //sys.print();
                 cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
                 cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
             });
@@ -485,7 +486,9 @@ int main(int argc, char** argv)
             // CPP-Taskflow Executor
             executor.run(taskflow);
             executor.wait_for_all();
+#ifdef PRINT_TASKFLOW_GRAPH
             taskflow.dump(cout);
+#endif
         }
         else
         {

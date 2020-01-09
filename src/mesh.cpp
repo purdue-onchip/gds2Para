@@ -1507,7 +1507,7 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
 #ifdef PRINT_PORT_SET
         cout << "Number of ports is " << sys->numPorts << endl;
         for (myint indi = 0; indi < sys->numPorts; indi++) {
-            cout << " Port " << indi + 1 << " ";
+            cout << " Port " << indi + 1 << ":  ";
             for (myint indj = 0; indj < sys->portCoor[indi].portEdge[0].size(); indj++) {
                 cout << sys->markEdge[sys->portCoor[indi].portEdge[0][indj]] << " ";
             }

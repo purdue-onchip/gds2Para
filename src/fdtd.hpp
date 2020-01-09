@@ -48,10 +48,10 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (2e-3) // Fraction setting minimum discretization retained in x-direction after node merging in terms of smaller of x-extent
+#define MINDISFRACX (2e-4) // Fraction setting minimum discretization retained in x-direction after node merging in terms of smaller of x-extent
 #define MINDISFRACY (MINDISFRACX) // Fraction setting minimum discretization retained in y-direction after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACX (0.02) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (MAXDISFRACX) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-16) // Time step for finding high-frequency modes (s)
@@ -64,16 +64,17 @@ using namespace std;
 //#define PRINT_PORT_COND // Terminal output has extra information about locating ports in isolated conductors
 #define SKIP_MARK_CELL
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
-//#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
+#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
 //#define PRINT_V0D_BLOCKS
 //#define V0_NEW_SCHEMA
-#define PRINT_V0_Z_PARAM
+//#define PRINT_V0_Z_PARAM
 //#define PRINT_V0_Vh_Z_PARAM
 #define SKIP_PARDISO // Remove PARDISO solver code
 #define GENERATE_V0_SOLUTION
 #define SKIP_VH
 #define SKIP_GENERATE_STIFF
 #define SKIP_STIFF_REFERENCE
+//#define PRINT_TASKFLOW_GRAPH // Terminal output has GraphViz taskflow graph
 
 // Disable layered FDTD code (comment out if you want to test layered FDTD)
 #define SKIP_WRITE_SYS_TO_FILE        // Skip writing sys obj to txt files
