@@ -19,6 +19,7 @@
 #include <stack>
 #include <set>
 #include <unordered_map>
+#include <map>
 #include <unordered_set>
 #include <string>
 #include <algorithm>
@@ -47,17 +48,17 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (3e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (0.005) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (0.005) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
-#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
+#define MAXDISFRACX (0.01) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACY (0.01) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-12) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-//#define UPPER_BOUNDARY_PEC
-//#define LOWER_BOUNDARY_PEC
+#define UPPER_BOUNDARY_PEC
+#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
@@ -320,6 +321,7 @@ public:
 	myint* v0d1aColId;
 	myint* v0d1aColIdo;
 	double* v0d1aval;
+	double* v0d1aval1;
 	double* v0d1avalo;
 
 	myint* v0d2RowId;
@@ -448,6 +450,7 @@ public:
 		this->v0d1aColId = NULL;
 		this->v0d1aColIdo = NULL;
 		this->v0d1aval = NULL;
+		this->v0d1aval1 = NULL;
 		this->v0d1avalo = NULL;
 		this->v0d2RowId = NULL;
 		this->v0d2ColId = NULL;
@@ -577,8 +580,13 @@ public:
 
 	/* Get the eps for a particular edge */
 	double getEps(myint eno) {
-		/* eno : edge number without PEC*/
-		return stackEpsn[(eno + N_edge_v) / (N_edge_s + N_edge_v)] * EPSILON0;
+		/* eno : edge number from the original mesh */
+		if (eno >= N_edge_s && eno < N_edge - N_edge_s && eno % (N_edge_s + N_edge_v) < N_edge_s) {   // this edge is not on the top and bottom planes and this edge are on the interface between two layers
+			return (stackEpsn[(eno + N_edge_v) / (N_edge_s + N_edge_v)] + stackEpsn[(eno + N_edge_s + N_edge_v * 2) / (N_edge_s + N_edge_v)]) / 2 * EPSILON0;
+		}
+		else {
+			return stackEpsn[(eno + N_edge_v) / (N_edge_s + N_edge_v)] * EPSILON0;
+		}
 	}
 
 	/* Is point (x,y) within the polygon? */
@@ -591,24 +599,31 @@ public:
 		npol = this->conductorIn[inPoly].numVert;
 
 		for (indi = 0, indj = npol - 1; indi < npol; indj = indi++) {
-			if ((abs(y - this->conductorIn[inPoly].y[indj]) < disMin && abs(y - this->conductorIn[inPoly].y[indi]) < disMin &&
-				((x >= this->conductorIn[inPoly].x[indj] && x <= this->conductorIn[inPoly].x[indi]) ||
-				(x >= this->conductorIn[inPoly].x[indi] && x <= this->conductorIn[inPoly].x[indj])))) {    // on x direction edge
-				return true;
-			}
-			else if (abs(x - this->conductorIn[inPoly].x[indj]) < disMin && abs(x - this->conductorIn[inPoly].x[indi]) < disMin &&
-				((y >= this->conductorIn[inPoly].y[indj] && y <= this->conductorIn[inPoly].y[indi]) ||
-				(y >= this->conductorIn[inPoly].y[indi] && y <= this->conductorIn[inPoly].y[indj]))) {    // on y direction edge
-				return true;
-			}
+			//if ((abs(y - this->conductorIn[inPoly].y[indj]) < disMin && abs(y - this->conductorIn[inPoly].y[indi]) < disMin &&
+			//	((x >= this->conductorIn[inPoly].x[indj] && x <= this->conductorIn[inPoly].x[indi]) ||
+			//	(x >= this->conductorIn[inPoly].x[indi] && x <= this->conductorIn[inPoly].x[indj])))) {    // on x direction edge
+			//	return true;
+			//}
+			//else if (abs(x - this->conductorIn[inPoly].x[indj]) < disMin && abs(x - this->conductorIn[inPoly].x[indi]) < disMin &&
+			//	((y >= this->conductorIn[inPoly].y[indj] && y <= this->conductorIn[inPoly].y[indi]) ||
+			//	(y >= this->conductorIn[inPoly].y[indi] && y <= this->conductorIn[inPoly].y[indj]))) {    // on y direction edge
+			//	return true;
+			//}
 
-			else if ((abs(this->conductorIn[inPoly].y[indi] - this->conductorIn[inPoly].y[indj]) > disMin &&
-				(((this->conductorIn[inPoly].y[indi] <= y) && (y < this->conductorIn[inPoly].y[indj])) ||
-				((this->conductorIn[inPoly].y[indj] <= y) && (y < this->conductorIn[inPoly].y[indi])))) &&
-					(x < (this->conductorIn[inPoly].x[indj] - this->conductorIn[inPoly].x[indi]) * (y - this->conductorIn[inPoly].y[indi]) /
+			//else if ((abs(this->conductorIn[inPoly].y[indi] - this->conductorIn[inPoly].y[indj]) > disMin &&
+			//	(((this->conductorIn[inPoly].y[indi] <= y) && (y < this->conductorIn[inPoly].y[indj])) ||
+			//	((this->conductorIn[inPoly].y[indj] <= y) && (y < this->conductorIn[inPoly].y[indi])))) &&
+			//		(x < (this->conductorIn[inPoly].x[indj] - this->conductorIn[inPoly].x[indi]) * (y - this->conductorIn[inPoly].y[indi]) /
+			//	(this->conductorIn[inPoly].y[indj] - this->conductorIn[inPoly].y[indi]) + this->conductorIn[inPoly].x[indi])) {
+			//	isCond = !isCond;
+			//}
+			if ((((this->conductorIn[inPoly].y[indi] <= y) && (y < this->conductorIn[inPoly].y[indj])) ||
+				((this->conductorIn[inPoly].y[indj] <= y) && (y < this->conductorIn[inPoly].y[indi]))) &&
+				(x < (this->conductorIn[inPoly].x[indj] - this->conductorIn[inPoly].x[indi]) * (y - this->conductorIn[inPoly].y[indi]) /
 				(this->conductorIn[inPoly].y[indj] - this->conductorIn[inPoly].y[indi]) + this->conductorIn[inPoly].x[indi])) {
 				isCond = !isCond;
 			}
+
 		}
 		return isCond;
 	}
@@ -641,7 +656,148 @@ public:
 				inside++;
 			}
 		}
+		cout << outside << " " << inside << endl;
+		return;
 	}
+
+	//dj new algorithms for finding conducting edges and nodes
+
+	void findInsideCondNew(unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi) {
+
+		double xmin;
+		double xmax;
+		double ymin;
+		double ymax;
+		double zmin, zmax;
+		ofstream out;
+		ofstream out2;
+		int indi, indk, ip = 0, iq = 0, nip = 2649;
+		myint node, node1, node2, idi, idj, idk;
+		myint i1, i2, j1, j2, k1, k2, eno;
+
+		//cout << "Pls enter a conductor " << endl;
+		//cin >> nip;
+
+		for (indi = 0; indi < this->numCdtRow; indi++) {
+			xmin = this->xlim2*this->lengthUnit;
+			xmax = this->xlim1*this->lengthUnit;
+			ymin = this->ylim2*this->lengthUnit;
+			ymax = this->ylim1*this->lengthUnit;
+			//cout << "xmin max, ymin, ymax" << xmin << " " << xmax <<" "<<ymin<<" "<<ymax<< endl;
+
+			//if (this->conductorIn[indi].zmax == this->conductorIn[indi].zmin)
+			//continue;
+			//if (this->conductorIn[indi].zmin >= this->zlim1*this->lengthUnit && this->conductorIn[indi].zmin <= this->zlim2*this->lengthUnit) {
+			//if (this->conductorIn[indi].zmax >= this->zlim1*this->lengthUnit && this->conductorIn[indi].zmax <= this->zlim2*this->lengthUnit) {
+			if (this->conductorIn[indi].zmax != this->conductorIn[indi].zmin) {
+
+				ip++;
+				//if (indi == nip) {
+				//	out.open("Cnt1.txt", std::ofstream::out | std::ofstream::trunc);
+				//	out.precision(17);
+				//	out2.open("Cnt1_new.txt", std::ofstream::out | std::ofstream::trunc);
+				//	out2.precision(17);
+				//}
+				for (indk = 0; indk < this->conductorIn[indi].numVert; indk++) {
+					xmin = fmin(xmin, this->conductorIn[indi].x[indk]);
+					xmax = fmax(xmax, this->conductorIn[indi].x[indk]);
+					ymin = fmin(ymin, this->conductorIn[indi].y[indk]);
+					ymax = fmax(ymax, this->conductorIn[indi].y[indk]);
+					//cout << "indi " << indi << "indk " << indk << "" << this->conductorIn[indi].x[indk] << " " << this->conductorIn[indi].y[indk] << endl;
+					//if (indi == nip) {
+					//	out << this->conductorIn[indi].x[indk] << " " << this->conductorIn[indi].y[indk] << endl;
+					//}
+				}
+				//if (indi == nip) {
+				//	out.close();
+				//}
+				//cout << "new xmin max, ymin, ymax" << xmin << " " << xmax << " " << ymin << " " << ymax << endl;
+				zmin = this->conductorIn[indi].zmin;
+				zmax = this->conductorIn[indi].zmax;
+				//cout << "zmin, zmax" << zmin << " " << zmax << endl;
+				i1 = xi[xmin];//get to know the bounding box;
+				i2 = xi[xmax];
+				j1 = yi[ymin];
+				j2 = yi[ymax];
+				k1 = zi[zmin];
+				k2 = zi[zmax];
+				//cout << "i1..." << i1 << " " << i2 << " " << j1 << " " << j2 << " " << k1 << " " << k2 << endl;
+
+				//cin >> iq;
+				for (idi = i1; idi <= i2; idi++) {
+					for (idj = j1; idj <= j2; idj++) {
+						if (polyIn(this->xn[idi], this->yn[idj], indi)) {
+							//if (indi == nip) {
+							//	out2 << this->xn[idi] << " " << this->yn[idj] << " " << k1 << " " << k2 << endl;
+							//}
+							//cout << idi << " " << idj << endl;
+							for (idk = k1; idk <= k2; idk++) {
+								node = idk * this->N_node_s + (this->N_cell_y + 1) * idi + idj;
+								this->markNode[node] = indi + 1;
+							}
+						}
+					}
+				}
+				//if (indi == nip) {
+				//	out2.close();
+				//	//cin >> iq;
+				//}
+				//dj test
+				for (idi = i1; idi < i2; idi++) {
+					for (idj = j1; idj <= j2; idj++) {
+						for (idk = k1; idk <= k2; idk++) {// x-direction
+							eno = idk * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + idi * (this->N_cell_y + 1) + idj;
+							node1 = idk * this->N_node_s + (this->N_cell_y + 1) * idi + idj;
+							node2 = idk * this->N_node_s + (this->N_cell_y + 1) * (idi + 1) + idj;
+							if (this->markNode[node1] == (indi + 1) && this->markNode[node2] == (indi + 1)) {
+								this->markEdge[eno] = indi + 1;
+							}
+						}
+					}
+				}
+				for (idi = i1; idi <= i2; idi++) {
+					for (idj = j1; idj < j2; idj++) {
+						for (idk = k1; idk <= k2; idk++) {// y-direction
+							eno = idk * (this->N_edge_s + this->N_edge_v) + idi * (this->N_cell_y) + idj;
+							node1 = idk * this->N_node_s + (this->N_cell_y + 1) * idi + idj;
+							node2 = idk * this->N_node_s + (this->N_cell_y + 1) * idi + idj + 1;
+							if (this->markNode[node1] == (indi + 1) && this->markNode[node2] == (indi + 1)) {
+								this->markEdge[eno] = indi + 1;
+							}
+						}
+					}
+				}
+				for (idi = i1; idi <= i2; idi++) {
+					for (idj = j1; idj <= j2; idj++) {
+						for (idk = k1; idk < k2; idk++) {// z-direction
+							eno = idk*(this->N_edge_s + this->N_edge_v) + this->N_edge_s + idi * (this->N_cell_y + 1) + idj;
+							node1 = idk * this->N_node_s + (this->N_cell_y + 1) * idi + idj;
+							node2 = (idk + 1) * this->N_node_s + (this->N_cell_y + 1) * idi + idj;
+							if (this->markNode[node1] == (indi + 1) && this->markNode[node2] == (indi + 1)) {
+								this->markEdge[eno] = indi + 1;
+							}
+						}
+					}
+				}
+				//dj
+
+
+			}
+			//}
+			//}
+		}
+		cout << "old conduct number " << this->numCdtRow << "new number " << ip << endl;
+		//cin >> indi;
+		// the following part cannot be used because the node conductor can get changed during the assignment
+		// So I rewrote the above x-y-z section to get markEdge.
+		/*for (indi = 0; indi < this->N_edge; indi++) {
+		compute_edgelink(indi, node1, node2);
+		if (this->markNode[node1] == this->markNode[node2] && this->markNode[node1] > 0) {
+		this->markEdge[indi] = this->markNode[node1];
+		}
+		}*/
+	}
+
 
 	/* Find nodes inside conductors by judging whether the point in each small window is inside the polygon or not */
 	void findInsideCond(unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi) {
@@ -666,6 +822,9 @@ public:
 		for (indi = 0; indi < this->numCdtRow; indi++) {
 			if (this->conductorIn[indi].zmax == this->conductorIn[indi].zmin)
 				continue;
+			if (!(conductorIn[indi].zmin >= zlim1 * lengthUnit && conductorIn[indi].zmin <= zlim2 * lengthUnit && conductorIn[indi].zmax >= zlim1 * lengthUnit && conductorIn[indi].zmax <= zlim2 * lengthUnit))
+				continue;
+
 			xrange.clear();
 			xcoor.clear();
 			xcoorv.clear();
@@ -951,6 +1110,8 @@ public:
 
 		for (indi = 0; indi < this->numCdtRow; indi++) {
 			if (this->conductorIn[indi].zmax == this->conductorIn[indi].zmin)
+				continue;
+			if (!(conductorIn[indi].zmin >= zlim1 * lengthUnit && conductorIn[indi].zmin <= zlim2 * lengthUnit && conductorIn[indi].zmax >= zlim1 * lengthUnit && conductorIn[indi].zmax <= zlim2 * lengthUnit))
 				continue;
 			xrange.clear();
 			xcoor.clear();
@@ -1487,7 +1648,7 @@ public:
 		iny : this conductor node's y index
 		inz : this conductor node's z index */
 		myint eno;
-
+		
 		if (inz != 0) {    // this node is not on the bottom plane
 			eno = (inz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + inx * (this->N_cell_y + 1) + iny;    // the node's lower edge
 			if (this->markEdge[eno] != 0 && this->cond2condIn.find(this->markEdge[eno]) == this->cond2condIn.end()) {
@@ -1962,7 +2123,7 @@ public:
 		/* Mark layer nodes from port sides */
 		for (int indPort = 0; indPort < this->numPorts; indPort++) {
 
-			for (int indPortSide = 0; indPortSide < this->portCoor[indPort].multiplicity; indPortSide++) {
+			for (int indPortSide = 0; indPortSide < this->portCoor[indPort].portCnd.size(); indPortSide++) {
 				myint indCdt = this->portCoor[indPort].portCnd[indPortSide] - 1; // Conductor index for this port side
 
 				for (int indCdtNode = 0; indCdtNode < this->cdtNumNode[indCdt]; indCdtNode++) {
@@ -2645,6 +2806,7 @@ public:
 		this->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
 		this->v0d1val = (double*)malloc(v0d1num * sizeof(double));
 		this->v0d1aval = (double*)malloc(v0d1anum * sizeof(double));
+		this->v0d1aval1 = (double*)malloc(v0d1anum * sizeof(double));
 		this->v0dn = (double*)calloc(leng_v0d1, sizeof(double));
 		this->v0dan = (double*)calloc(leng_v0d1, sizeof(double));
 
@@ -2675,6 +2837,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = -1 / lz_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1anum++;
 						}
@@ -2687,6 +2850,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = -1 / lz_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1anum++;
 						}
@@ -2703,6 +2867,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = 1 / lz_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1anum++;
 						}
@@ -2715,6 +2880,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = 1 / lz_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1anum++;
 						}
@@ -2731,6 +2897,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = -1 / lx_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1anum++;
 						}
@@ -2743,6 +2910,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = -1 / lx_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1anum++;
 						}
@@ -2759,6 +2927,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = 1 / lx_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1anum++;
 						}
@@ -2771,6 +2940,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = 1 / lx_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1anum++;
 						}
@@ -2784,9 +2954,10 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->xn[indy - 1]), 2);
+							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = -1 / ly_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1anum++;
 						}
@@ -2799,6 +2970,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = -1 / ly_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1anum++;
 						}
@@ -2815,6 +2987,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = 1 / ly_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1anum++;
 						}
@@ -2827,6 +3000,7 @@ public:
 							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
 							v0d1num++;
 							this->v0d1aval[v0d1anum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1anum] = 1 / ly_avg / MU;
 							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1anum++;
 						}
@@ -2838,6 +3012,7 @@ public:
 		}
 		int start;
 		markref = 0;
+		double scalar = 1;   // debug use : check with scalar is better
 		/* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
 		for (indi = 0; indi < this->numCdt; indi++) {
 			//cout << "Conductor " << indi << " markPort is " << conductor[indi].markPort << endl;
@@ -2861,7 +3036,8 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// -1 / lz_avg;
+						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / lz_avg;
+						this->v0d1aval1[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / lz_avg / MU;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2873,7 +3049,8 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// 1 / lz_avg;
+						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / lz_avg;
+						this->v0d1aval1[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / lz_avg / MU;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2885,7 +3062,8 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// -1 / lx_avg;
+						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / lx_avg;
+						this->v0d1aval1[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / lx_avg / MU;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2897,7 +3075,8 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// 1 / lx_avg;
+						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / lx_avg;
+						this->v0d1aval1[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / lx_avg / MU;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2909,7 +3088,8 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// -1 / ly_avg;
+						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / ly_avg;
+						this->v0d1aval1[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / ly_avg / MU;
 						v0d1anum++;
 						mark = 1;
 					}
@@ -2921,7 +3101,8 @@ public:
 						this->v0d1ColId[v0d1num] = leng_v0d1;
 						this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
 						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / cnode;// 1 / ly_avg;
+						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / ly_avg;
+						this->v0d1aval1[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / ly_avg / MU;
 						v0d1anum++;
 						mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
 					}
@@ -2938,8 +3119,8 @@ public:
 			}
 		}
 		for (indj = 0; indj < leng_v0d1; ++indj) {   // when using the frequency domain schema should not normalize the vectors
-			this->v0dn[indj] = 1;// sqrt(this->v0dn[indj]);
-			this->v0dan[indj] = 1;// sqrt(this->v0dan[indj]);
+			this->v0dn[indj] = sqrt(this->v0dn[indj]);
+			this->v0dan[indj] = sqrt(this->v0dan[indj]);
 		}
 		//ofstream out;
 		//out.open("V0d.txt", std::ofstream::out | std::ofstream::trunc);
@@ -4525,6 +4706,33 @@ public:
 		}
 	}
 
+	double getVoltage(double* x, int sourcePort) {
+		double vol = 0;
+		int inz, inx, iny;
+		double leng;
+
+		int indPortSide = 0; // Only deal with first port side to get voltage
+		for (int indEdge = 0; indEdge < this->portCoor[sourcePort].portEdge[indPortSide].size(); indEdge++) {
+			myint thisEdge = this->portCoor[sourcePort].portEdge[indPortSide][indEdge];
+			if (thisEdge % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // This edge is along the z-axis
+				inz = thisEdge / (this->N_edge_s + this->N_edge_v);
+				leng = this->zn[inz + 1] - this->zn[inz];
+			}
+			else if (thisEdge % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // This edge is along the x-axis
+				inx = ((thisEdge % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+				leng = this->xn[inx + 1] - this->xn[inx];
+			}
+			else {    // This edge is along the y-axis
+				iny = (thisEdge % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+				leng = this->yn[iny + 1] - this->yn[iny];
+			}
+
+			vol -= x[this->mapEdge[thisEdge]] * leng * (this->portCoor[sourcePort].portDirection[indPortSide] * 1.0); // Accumulating responses due to each response edge line integral (V)
+		}
+		
+		return vol;
+	}
+
 	/* print Z for both V0 and Vh */
 	void print_z_V0_Vh() {
 		int indi, inde, indj;
@@ -5106,42 +5314,25 @@ public:
 
 
 int meshAndMark(fdtdMesh* sys, unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi, unordered_set<double>* portCoorx, unordered_set<double>* portCoory);
-int compute_edgelink(fdtdMesh* sys, myint eno, myint& node1, myint& node2);
-int parameterConstruction(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
-void freePara(fdtdMesh* sys);
 int matrixConstruction(fdtdMesh* sys);
-int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
+int portSet(fdtdMesh* sys, unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi);
 int COO2CSR(vector<int>& rowId, vector<int>& ColId, vector<double>& val);
-int mvMulti(vector<int> aRowId, vector<int> aColId, vector<double> aval, vector<int>& bRowId, vector<int>& bColId, vector<double>& bval, double* index_val, int size);
-int nodeAdd(int* index, int size, int total_size, fdtdMesh* sys, int& v0d2num, int& leng_v0d2, int mark);
-int nodeAddLarger(int* index, int size, int total_size, fdtdMesh* sys, int& num, int& leng, int* RowId, int* ColId, double* Val);
-int nodeAdd_count(int* index, int size, int total_size, fdtdMesh* sys, int& v0d2num, int& leng_v0d2);
-int nodeAddAvg(int* index, int size, int total_size, fdtdMesh* sys, int& num, int& leng, int mark);
-int nodeAddAvgLarger(int* index, int size, int total_size, fdtdMesh* sys, int& num, int& leng, int* RowId, int* ColId, double* Val);
-int nodeAddAvg_count(int* index, int size, int total_size, fdtdMesh* sys, int& num, int& leng);
-int interativeSolver(int N, int nrhs, double* rhs, int* ia, int* ja, double* a, int* ib, int* jb, double* b, double* solution, fdtdMesh* sys);
-int output(fdtdMesh* sys);
-int paraGenerator(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi);
-int yParaGenerator(fdtdMesh* sys);
-int solveV0dSystem(fdtdMesh* sys, double* dRhs, double* y0d, int leng_v0d1);
+int paraGenerator(fdtdMesh* sys, unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi);
 int COO2CSR_malloc(myint* rowId, myint* ColId, double* val, myint totalnum, myint leng, myint* rowId1);
 int generateStiff(fdtdMesh* sys);
-int merge_v0d1(fdtdMesh* sys, double block1_x, double block1_y, double block2_x, double block2_y, double block3_x, double block3_y, myint& v0d1num, myint& leng_v0d1, myint& v0d1anum, myint& leng_v0d1a, myint* map, double sideLen);
-int merge_v0c(fdtdMesh* sys, double block_x, double block_y, double block2_x, double block2_y, myint& v0cnum, myint& leng_v0c, myint& v0canum, myint& leng_v0ca, myint* map);
 int setsideLen(int node, double sideLen, int* markLayerNode, int* markProSide, fdtdMesh* sys);
 int generateStiff(fdtdMesh* sys);
 int mklMatrixMulti_nt(fdtdMesh* sys, myint& leng_A, myint* aRowId, myint* aColId, double* aval, myint arow, myint acol, myint* bRowId, myint* bColId, double* bval);
 int find_Vh_central(fdtdMesh* sys, int sourcePort);
-int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat);
+int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval);   // findVh.cpp
 int matrix_multi(char operation, lapack_complex_double* a, myint arow, myint acol, lapack_complex_double* b, myint brow, myint bcol, lapack_complex_double* tmp3);
 int reference(fdtdMesh* sys, int freqNo, myint* RowId, myint* ColId, double* val);
 int plotTime(fdtdMesh* sys, int sourcePort, double* u0d, double* u0c);
-int avg_length(fdtdMesh* sys, int iz, int iy, int ix, double& lx, double& ly, double& lz);
 myint generateLaplacian_count(fdtdMesh* sys);    // count how many nnz in L, and return the number
 int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val);    // generate the Laplacian matrix
 void get1122Block_count(myint leng11, myint leng22, fdtdMesh* sys, myint& leng_A12, myint& leng_A21, myint &leng_A22);   // findVh.cpp
 void get1122Block(myint leng11, myint leng22, fdtdMesh* sys, myint* A12RowId, myint* A12ColId, double* A12val, myint* A21RowId, myint* A21ColId, double* A21val, myint* A22RowId, myint* A22ColId, double* A22val);   // findVh.cpp
-int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat);   // findVh.cpp
+int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat);   // findVh.cpp
 int combine_x(double* x, fdtdMesh* sys, double* xr);   // findVh.cpp
 int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat);   // findVh.cpp
 int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22);    // findVh.cpp
@@ -5150,12 +5341,16 @@ int sparseMatrixVecMul(myint* rowId, myint* colId, double* val, myint leng, doub
 int pardisoSolve(fdtdMesh* sys, myint* rowId, myint* colId, double* val, double* rsc, double* xsol, myint size);   // findVh.cpp
 int storeTimeRespValue(fdtdMesh* sys, double** resp, int ind, double* xr);   // findVh.cpp
 int mklFFT(fdtdMesh* sys, double* time, complex<double>* freq, int N);   // findVh.cpp
-void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows);    // matrixCon.cpp
+void sparseMatrixSum(fdtdMesh* sys, sparse_matrix_t& A, myint* browId1, myint* bcolId, double* bval, myint Rows);   // findVh.cpp
+void sparseMatrixSum1(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows);  // findVh.cpp
 void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint* AoorowId, myint* AoocolId, double* Aooval, double scale);   // matrixCon.cpp
 void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint& leng_Aoo);   // matrixCon.cpp
 void matrixInsideOutside(fdtdMesh* sys, myint* rowId, myint* colId, double* val, myint leng, myint* ooRowId, myint* ooColId, double* ooval, myint* oiRowId, myint* oiColId, double* oival, myint* ioRowId, myint* ioColId, double* ioval);   // matrixCon.cpp
 void matrixInsideOutside_count(fdtdMesh* sys, myint* rowId, myint* colId, myint leng, myint& lengoo, myint& lengoi, myint& lengio);   // matrixCon.cpp
 int mkl_gmres_A(fdtdMesh* sys, double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N);   // findVh.cpp
-int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio);  // findVh.cpp
+int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio);   // findVh.cpp
 int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* xo);  // findVh.cpp
+int solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mooval, myint leng, myint N, double* Jo, double* xo, int rhs_s);   // findVh.cpp
+int checkCSRRepeats(myint* RowIdStart, myint* RowIdEnd, myint* ColId, double* val, myint& leng, myint N);   // matrixCon.cpp
+int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double *val); // generateStiff.cpp
 #endif

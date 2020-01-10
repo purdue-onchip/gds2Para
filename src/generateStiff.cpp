@@ -272,65 +272,65 @@ int generateStiff(fdtdMesh *sys){
             for (indy = 1; indy <= sys->N_cell_y; indy++){
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = -dza[indz - 1] / (dxa[indx - 1] * dza[indz - 1]);
+                Shval[Shnum] = -1 / dxa[indx - 1];
                 Shnum++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + indx*sys->N_cell_y + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = dza[indz - 1] / (dxa[indx] * dza[indz - 1]);
+                Shval[Shnum] = 1 / dxa[indx];
                 Shnum++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = dza[indz - 1] / (dza[indz - 1] * dya[indy - 1]);
+                Shval[Shnum] = 1 / dya[indy - 1];
                 Shnum++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy + 1 - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = -dza[indz - 1] / (dza[indz - 1] * dya[indy]);
+                Shval[Shnum] = -1 / dya[indy];
                 Shnum++;
                 leng_Sh++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dza[indz - 1]);
+                Shval[Shnum] = 1 / dza[indz - 1];
                 Shnum++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = -dxa[indx - 1] / (dxa[indx - 1] * dya[indy - 1]);
+                Shval[Shnum] = -1 / dya[indy - 1];
                 Shnum++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1 + 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dya[indy]);
+                Shval[Shnum] = 1 / dya[indy];
                 Shnum++;
 
                 ShRowId[Shnum] = indz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = -dxa[indx - 1] / (dxa[indx - 1] * dza[indz]);
+                Shval[Shnum] = -1 / dza[indz];
                 Shnum++;
                 leng_Sh++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = -dya[indy - 1] / (dza[indz - 1] * dya[indy - 1]);
+                Shval[Shnum] = -1 / dza[indz - 1];
                 Shnum++;
 
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = dya[indy - 1] / (dxa[indx - 1] * dya[indy - 1]);
+                Shval[Shnum] = 1 / dxa[indx - 1];
                 Shnum++;
 
                 ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx*(sys->N_cell_y + 1) + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = -dya[indy - 1] / (dya[indy - 1] * dxa[indx]);
+                Shval[Shnum] = -1 / dxa[indx];
                 Shnum++;
 
                 ShRowId[Shnum] = indz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
                 ShColId[Shnum] = leng_Sh;
-                Shval[Shnum] = dya[indy - 1] / (dya[indy - 1] * dza[indz]);
+                Shval[Shnum] = 1 / dza[indz];
                 Shnum++;
                 leng_Sh++;
             }
@@ -343,86 +343,86 @@ int generateStiff(fdtdMesh *sys){
         for (indy = 1; indy <= sys->N_cell_y; indy++){
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dza[indz - 1] / (dza[indz - 1] * dxa[indx - 1]);
+            Shval[Shnum] = -1 / dxa[indx - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + indx*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dza[indz - 1] / (dza[indz - 1] * dxa[indx]);
+            Shval[Shnum] = 1 / dxa[indx];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dza[indz - 1] / (dza[indz - 1] * dya[indy - 1]);
+            Shval[Shnum] = 1 / dya[indy - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy + 1 - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dza[indz - 1] / (dza[indz - 1] * dya[indy]);
+            Shval[Shnum] = -1 / dya[indy];
             Shnum++;
             leng_Sh++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dza[indz - 1]);
+            Shval[Shnum] = 1 / dza[indz - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dxa[indx - 1] / (dxa[indx - 1] * dya[indy - 1]);
+            Shval[Shnum] = -1 / dya[indy - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1 + 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dya[indy]);
+            Shval[Shnum] = 1 / dya[indy];
             Shnum++;
 
             ShRowId[Shnum] = indz * (sys->N_edge_s + sys->N_edge_v) + (indx - 1) * sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dxa[indx - 1] / (dxa[indx - 1] * dza[indz]);
+            Shval[Shnum] = -1 / dza[indz];
             Shnum++;
             leng_Sh++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dya[indy - 1] / (dza[indz - 1] * dya[indy - 1]);
+            Shval[Shnum] = -1 / dza[indz - 1];
             Shnum++;
 
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dya[indy - 1] / (dxa[indx - 1] * dya[indy - 1]);
+            Shval[Shnum] = 1 / dxa[indx - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dya[indy - 1] / (dya[indy - 1] * dxa[indx]);
+            Shval[Shnum] = -1 / dxa[indx];
             Shnum++;
 
             ShRowId[Shnum] = indz * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dya[indy - 1] / (dya[indy - 1] * dza[indz]);
+            Shval[Shnum] = 1 / dza[indz];
             Shnum++;
             leng_Sh++;
 
             ShRowId[Shnum] = (indz)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dza[indz - 1] / (dza[indz - 1] * dxa[indx - 1]);
+            Shval[Shnum] = -1 / dxa[indx - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz)*(sys->N_edge_s + sys->N_edge_v) + indx*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dza[indz - 1] / (dza[indz - 1] * dxa[indx]);
+            Shval[Shnum] = 1 / dxa[indx];
             Shnum++;
 
             ShRowId[Shnum] = (indz)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dza[indz - 1] / (dza[indz - 1] * dya[indy - 1]);
+            Shval[Shnum] = 1 / dya[indy - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy + 1 - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dza[indz - 1] / (dza[indz - 1] * dya[indy]);
+			Shval[Shnum] = -1 / dya[indy];
             Shnum++;
             leng_Sh++;
         }
@@ -434,22 +434,22 @@ int generateStiff(fdtdMesh *sys){
         for (indy = 1; indy <= sys->N_cell_y; indy++){
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dza[indz - 1]);
+            Shval[Shnum] = 1 / dza[indz - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dxa[indx - 1] / (dxa[indx - 1] * dya[indy - 1]);
+            Shval[Shnum] = -1 / dya[indy - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy + 1 - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dxa[indx - 1] / (dxa[indx - 1] * dya[indy]);
+            Shval[Shnum] = 1 / dya[indy];
             Shnum++;
 
             ShRowId[Shnum] = (indz)*(sys->N_edge_s + sys->N_edge_v) + (indx - 1)*sys->N_cell_y + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dxa[indx - 1] / (dxa[indx - 1] * dza[indz]);
+            Shval[Shnum] = -1 / dza[indz];
             Shnum++;
             leng_Sh++;
         }
@@ -461,22 +461,22 @@ int generateStiff(fdtdMesh *sys){
         for (indx = 1; indx <= sys->N_cell_x; indx++){
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dya[indy - 1] / (dya[indy - 1] * dza[indz - 1]);
+            Shval[Shnum] = -1 / dza[indz - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dya[indy - 1] / (dya[indy - 1] * dxa[indx - 1]);
+            Shval[Shnum] = 1 / dxa[indx - 1];
             Shnum++;
 
             ShRowId[Shnum] = (indz - 1)*(sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + indx*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = -dya[indy - 1] / (dya[indy - 1] * dxa[indx]);
+            Shval[Shnum] = -1 / dxa[indx];
             Shnum++;
 
             ShRowId[Shnum] = (indz)*(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y*(sys->N_cell_x + 1) + (indx - 1)*(sys->N_cell_y + 1) + indy - 1;
             ShColId[Shnum] = leng_Sh;
-            Shval[Shnum] = dya[indy - 1] / (dya[indy - 1] * dza[indz]);
+            Shval[Shnum] = 1 / dza[indz];
             Shnum++;
             leng_Sh++;
         }
@@ -491,8 +491,8 @@ int generateStiff(fdtdMesh *sys){
     myint ind;
     int status;
     SeColIdo = (myint*)malloc(Senum * sizeof(myint));
-    SeRowIdn = (myint*)malloc(Senum * sizeof(myint));
-    Sevaln = (double*)malloc(Senum * sizeof(double));
+    SeRowIdn = (myint*)malloc(Senum * sizeof(myint));   // SeRowIdn has the exact memory of the nnz of Se
+    Sevaln = (double*)malloc(Senum * sizeof(double));   // Sevaln has the exact memory of the nnz of Se
     for (ind = 0; ind < Senum; ind++){
         SeColIdo[ind] = SeColId[ind];
         SeRowIdn[ind] = SeRowId[ind];
@@ -505,8 +505,8 @@ int generateStiff(fdtdMesh *sys){
 
 
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
-    ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));
-    Shvaln = (double*)malloc(Shnum * sizeof(double));
+    ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));   // ShRowIdn has the exact memory of the nnz of Sh
+    Shvaln = (double*)malloc(Shnum * sizeof(double));   // Shvaln has the exact memory of the nnz of Sh
     for (ind = 0; ind < Shnum; ind++){
         ShColIdo[ind] = ShColId[ind];
         ShRowIdn[ind] = ShRowId[ind];
@@ -528,14 +528,14 @@ int generateStiff(fdtdMesh *sys){
     free(dxa); dxa = NULL;
     free(dya); dya = NULL;
     free(dza); dza = NULL;
-    free(SeRowId); SeRowId = NULL;
+    free(SeRowIdn); SeRowIdn = NULL;
     free(SeColId); SeColId = NULL;
     free(SeColIdo); SeColIdo = NULL;
-    free(Seval); Seval = NULL;
-    free(ShRowId); ShRowId = NULL;
+    free(Sevaln); Sevaln = NULL;
+    free(ShRowIdn); ShRowIdn = NULL;
     free(ShColId); ShColId = NULL;
     free(ShColIdo); ShColIdo = NULL;
-    free(Shval); Shval = NULL;
+    free(Shvaln); Shvaln = NULL;
 
     /*for (int indi = 0; indi < sys->numPorts; indi++){
         for (int indj = 0; indj < sys->numPorts; indj++){
@@ -573,16 +573,6 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
         }
     }
     
-    /* Used in plasma2D for upper and lower excitation */
-    /*myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
-
-    while (current_edge < sys->N_edge - sys->N_edge_s){
-    if (sys->markEdge[current_edge] == 0){
-    J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
-    }
-    current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
-    }*/
-    /* end of Used in plasma2D for upper and lower excitation */
 
     RowId1[k] = 0;
     k++;
@@ -1208,6 +1198,184 @@ int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val) {
     return 0;
 }
 
+myint generateLoo_count(fdtdMesh* sys) {
+	/* count the nnz in the analytical Loo
+	return the nnz */
+
+	myint leng = 0, nedge = sys->N_edge - sys->bden, node1, node2, edgel = sys->N_edge_s + sys->N_edge_v;
+	int indx1, indy1, indz1, indx2, indy2, indz2;
+	double lxa1, lya1, lza1, lxa2, lya2, lza2;
+	
+	for (myint i = 0; i < nedge; ++i) {
+		if (sys->markEdge[sys->mapEdgeR[i]] == 0) {   // if this edge is outside the conductor
+			sys->compute_edgelink(i, node1, node2);
+			sys->compute_node_index(node1, indx1, indy1, indz1);
+			sys->compute_node_index(node2, indx2, indy2, indz2);
+			if (indx1 != indx2) {    // edge along x direction
+				if (indz1 > 0 && sys->markEdge[sys->mapEdgeR[i - edgel]] == 0) {   // has lower x edge and it is outside the conductors
+					leng++;
+				}
+				if (indx1 > 0 && sys->markEdge[sys->mapEdgeR[i - sys->N_cell_y - 1]] == 0) {   // has left x edge and outside the conductors
+					leng++;
+				}
+				if (indy1 > 0 && sys->markEdge[sys->mapEdgeR[i - 1]] == 0) {    // has front x edge and outside the conductor
+					leng++;
+				}
+				if (indx1 < sys->N_cell_x - 1 && sys->markEdge[sys->mapEdgeR[i + sys->N_cell_y + 1]] == 0) {    // has right x edge and outside
+					leng++;
+				}
+				if (indy1 < sys->N_cell_y && sys->markEdge[sys->mapEdgeR[i + 1]] == 0) {   // has back x edge and outside
+					leng++;
+				}
+				if (indz1 < sys->N_cell_z && sys->markEdge[sys->mapEdgeR[i + edgel]] == 0) {   // has upper x edge and outside
+					leng++;
+				}
+				// with itself
+				leng++;
+			}
+			else if (indy1 != indy2) {   // edge is along y direction
+				if (indz1 > 0 && sys->markEdge[sys->mapEdgeR[i - edgel]] == 0) {   // has lower y edge and outside
+					leng++;
+				}
+				if (indx1 > 0 && sys->markEdge[sys->mapEdgeR[i - sys->N_cell_y]] == 0) {   // has left y edge and outside
+					leng++;
+				}
+				if (indy1 > 0 && sys->markEdge[sys->mapEdgeR[i - 1]] == 0) {   // has front y edge and outside
+					leng++;
+				}
+				if (indz1 < sys->N_cell_z && sys->markEdge[sys->mapEdgeR[i + edgel]] == 0) {   // has upper y edge and outside
+					leng++;
+				}
+				if (indy1 < sys->N_cell_y - 1 && sys->markEdge[sys->mapEdgeR[i + 1]] == 0) {   // has back y edge and outside
+					leng++;
+				}
+				if (indx1 < sys->N_cell_x && sys->markEdge[sys->mapEdgeR[i + sys->N_cell_y]] == 0) {   // has right y edge and outside
+					leng++;
+				}
+				// with itself
+				leng++;
+			}
+			else {   // edge is along z direction
+				if (indz1 > 0 && sys->markEdge[sys->mapEdgeR[i - edgel]] == 0) {   // has lower z edge and outside
+					leng++;
+				}
+				if (indx1 > 0 && sys->markEdge[sys->mapEdgeR[i - sys->N_cell_y - 1]] == 0) {   // has left z edge and outside
+					leng++;
+				}
+				if (indy1 > 0 && sys->markEdge[sys->mapEdgeR[i - 1]] == 0) {   // has front z edge and outside
+					leng++;
+				}
+				if (indz1 < sys->N_cell_z - 1 && sys->markEdge[sys->mapEdgeR[i + edgel]] == 0) {   // has upper z edge and outside
+					leng++;
+				}
+				if (indx1 < sys->N_cell_x && sys->markEdge[sys->mapEdgeR[i + sys->N_cell_y + 1]] == 0) {   // has right z edge and outside
+					leng++;
+				}
+				if (indy1 < sys->N_cell_y && sys->markEdge[sys->mapEdgeR[i + 1]] == 0) {    // has back z edge and outside
+					leng++;
+				}
+				// with itself
+				leng++;
+			}
+		}
+	}
+	return leng;
+}
+
+int generateLoo(fdtdMesh* sys, myint* rowId, myint* colId, double* val, myint leng_Loo) {
+	/* Generate the rowId, colId, val of the matrix Loo
+	rowId : Loo's rowId
+	colId : Loo's colId
+	val : Loo's value
+	leng_Loo : nnz of Loo */
+	int ind = 0;
+	myint nedge = sys->N_edge - sys->bden, node1, node2, edgel = sys->N_edge_s + sys->N_edge_v;
+	int indx1, indy1, indz1, indx2, indy2, indz2;
+	double lxa1, lya1, lza1, lxa2, lya2, lza2;
+
+	for (myint i = 0; i < nedge; ++i) {
+		if (sys->markEdge[sys->mapEdgeR[i]] == 0) {   // if this edge is outside the conductor
+			sys->compute_edgelink(i, node1, node2);
+			sys->compute_node_index(node1, indx1, indy1, indz1);
+			sys->compute_node_index(node2, indx2, indy2, indz2);
+			sys->avg_length(indz1, indy1, indx1, lxa1, lya1, lza1);
+			sys->avg_length(indz2, indy2, indx2, lxa2, lya2, lza2);
+			if (indx1 != indx2) {    // edge along x direction
+				if (indz1 > 0 && sys->markEdge[sys->mapEdgeR[i - edgel]] == 0) {   // has lower x edge and outside
+					rowId[ind] = sys->mapio[i];
+					colId[ind] = sys->mapio[i - edgel];
+					val[ind] = -1 / (sys->zn[indz1] - sys->zn[indz1 - 1]) * 1 / lza1;
+					ind++;
+				}
+				if (indx1 > 0 && sys->markEdge[sys->mapEdgeR[i - sys->N_cell_y - 1]] == 0) {   // has left x edge
+					rowId[ind] = sys->mapio[i];
+
+					ind++;
+				}
+				if (indy1 > 0) {    // has front x edge
+					ind++;
+				}
+				if (indx1 < sys->N_cell_x - 1) {    // has right x edge
+					ind++;
+				}
+				if (indy1 < sys->N_cell_y) {   // has back x edge
+					ind++;
+				}
+				if (indz1 < sys->N_cell_z) {   // has upper x edge
+					ind++;
+				}
+				// with itself
+				ind++;
+			}
+			else if (indy1 != indy2) {   // edge is along y direction
+				if (indz1 > 0) {   // has lower y edge
+					ind++;
+				}
+				if (indx1 > 0) {   // has left y edge
+					ind++;
+				}
+				if (indy1 > 0) {   // has front y edge
+					ind++;
+				}
+				if (indz1 < sys->N_cell_z) {   // has upper y edge
+					ind++;
+				}
+				if (indy1 < sys->N_cell_y - 1) {   // has back y edge
+					ind++;
+				}
+				if (indx1 < sys->N_cell_x) {   // has right y edge
+					ind++;
+				}
+				// with itself
+				ind++;
+			}
+			else {   // edge is along z direction
+				if (indz1 > 0) {   // has lower z edge
+					ind++;
+				}
+				if (indx1 > 0) {   // has left z edge
+					ind++;
+				}
+				if (indy1 > 0) {   // has front z edge
+					ind++;
+				}
+				if (indz1 < sys->N_cell_z - 1) {   // has upper z edge
+					ind++;
+				}
+				if (indx1 < sys->N_cell_x) {   // has right z edge
+					ind++;
+				}
+				if (indy1 < sys->N_cell_y) {    // has back z edge
+					ind++;
+				}
+				// with itself
+				ind++;
+			}
+		}
+	}
+
+}
+
 int sparse_mv(int index, myint* RowId, myint* ColId, double* val, myint leng, double* v, double* res) {
 	/* sparse matrix multiply a dense vector
 	index : 0 is no transpose, 1 is transpose
@@ -1225,5 +1393,147 @@ int sparse_mv(int index, myint* RowId, myint* ColId, double* val, myint leng, do
 	for (int ind = 0; ind < leng; ++ind) {
 		res[RowId[ind]] += val[ind] * v[ColId[ind]];
 	}
+	return 0;
+}
+
+int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double *val) {
+
+
+	double freq = sys->freqNo2freq(freqNo);
+	myint size = sys->outside;
+	//myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
+	int count = 0;
+	int indi = 0;
+	int k = 0;
+	//complex<double> *valc;
+	//valc = (complex<double>*)calloc(sys->leng_S, sizeof(complex<double>));
+	//complex<double> *J;
+	double* Jo = (double*)calloc(sys->outside* sys->numPorts, sizeof(double));
+	//J = (complex<double>*)calloc((sys->N_edge - sys->bden) * sys->numPorts, sizeof(complex<double>));
+	int indz, indy, temp;
+	int sourcePort;
+
+	for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
+		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+			for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++) {
+				//J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
+				
+				Jo[sourcePort * (sys->outside) + sys->mapio[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]]] = -sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
+				//cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << endl;
+
+			}
+		}
+	}
+
+	/* Used in plasma2D for upper and lower excitation */
+	/*myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
+
+	while (current_edge < sys->N_edge - sys->N_edge_s){
+	if (sys->markEdge[current_edge] == 0){
+	J[current_edge - sys->N_edge_s] = 0. + (1i) * sys->portCoor[sourcePort].portDirection * freq * 2. * M_PI;
+	}
+	current_edge = current_edge + (sys->N_edge_s + sys->N_edge_v);
+	}*/
+	/* end of Used in plasma2D for upper and lower excitation */
+
+	/*RowId1[k] = 0;
+	k++;
+	myint start;
+	myint nnz = sys->leng_S;
+	//cout << "Start to generate CSR form for S!\n";
+	indi = 0;
+	//ofstream out;
+	//out.open("A1.txt", std::ofstream::out | std::ofstream::trunc);
+	while (indi < nnz) {
+	start = RowId[indi];
+	while (indi < nnz && RowId[indi] == start) {
+	valc[indi] += val[indi]; // val[indi] is real
+	if (RowId[indi] == ColId[indi]) {
+	if (sys->markEdge[sys->mapEdgeR[RowId[indi]]] != 0) {
+	complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
+	valc[indi] += (2. * M_PI * freq) * addedPart;
+	}
+	else {
+	complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
+	valc[indi] += (2. * M_PI * freq) * addedPart;
+	}
+	}
+	//out << valc[indi].real() << " " << valc[indi].imag() << endl;
+	count++;
+	indi++;
+	}
+	RowId1[k] = (count);
+	k++;
+	}*/
+	//out.close();
+	//cout << "(-w^2*D_eps+iw*D_sig+S) is generated!\n" << endl;
+	myint mtype = 11;    /* Real complex unsymmetric matrix */
+	myint nrhs = sys->numPorts;    /* Number of right hand sides */
+	void *pt[64];
+
+	/* Pardiso control parameters */
+	myint iparm[64];
+	myint maxfct, mnum, phase, error, msglvl, solver;
+	double dparm[64];
+	int v0csin;
+	myint perm;
+
+	/* Auxiliary variables */
+	char *var;
+
+	msglvl = 0;    /* print statistical information */
+	solver = 0;    /* use sparse direct solver */
+	error = 0;
+	maxfct = 1;
+	mnum = 1;
+	phase = 13;
+
+	pardisoinit(pt, &mtype, iparm);
+	iparm[38] = 1;
+	iparm[34] = 1;    // 0-based indexing
+	iparm[3] = 2;    // number of processors
+					 //iparm[59] = 2;    // out of core version to solve very large problem
+					 //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
+
+	double * ddum;
+	double* xr = (double*)calloc(sys->outside* sys->numPorts, sizeof(double));
+
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, val, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, Jo, xr, &error);
+	if (error != 0) {
+		printf("\nERROR during numerical factorization: %d\n", error);
+		exit(2);
+	}
+
+	complex<double> *yr;
+	myint nedge = sys->N_edge - sys->bden;
+	yr = (complex<double>*)calloc(nedge * sys->numPorts, sizeof(complex<double>));
+	int ip;
+	for (ip = 0; ip < sourcePort; ip++) {
+		for (indi = 0; indi < size; ++indi) {
+			yr[sys->mapioR[indi] + ip*nedge] = 1i * xr[indi + ip*size];
+		}
+	}
+
+	for (indi = 0; indi < sourcePort; indi++)
+		sys->Construct_Z_V0_Vh(&yr[indi * nedge], freqNo, indi);
+
+	phase = -1;     // Release internal memory
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+
+	/*cout << "The entire norm of xr is ";
+	double total_norm = 0;
+	for (indi = 0; indi < size; indi++) {
+	total_norm += xr[indi].real() * xr[indi].real() + xr[indi].imag() * xr[indi].imag();
+	}
+	cout << sqrt(total_norm) << endl;*/
+
+
+
+
+	free(xr); xr = NULL;
+	free(yr); yr = NULL;
+	//free(RowId1); RowId1 = NULL;
+	//free(valc); valc = NULL;
+	free(Jo); Jo = NULL;
 	return 0;
 }

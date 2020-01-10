@@ -8,29 +8,40 @@ static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b,
     return (pow(a.first.real(), 2) + pow(a.first.imag(), 2)) < (pow(b.first.real(), 2) + pow(b.first.imag(), 2));
 };
 
-int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio) {
+int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio) {
 	/* solve the problem in frequency domain
 	  [-omega^2*D_epsoo+Soo, Soi
 	   Sio,                  i*omega*D_sigii+Sii]
 	   sourcePort : which source is now used
-	   y : the solution */
+	   y : the solution 
+	   MooRowId1 : CSR format of (-omega^2*D_epsoo+Soo)'s RowId
+	   MooColId : (-omega^2*D_epsoo+Soo)'s column id
+	   Mooval1 : (-omega^2*D_epsoo+Soo)'s value */
 	myint nedge = sys->N_edge - sys->bden, inside = nedge - sys->outside;
 	ofstream out;
 
 	/* Solve the outside part */
-	double* Jo = (double*)calloc(sys->outside, sizeof(double));   // Jo
-	for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-		for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
-			/* Set current density for all edges within sides in port to prepare solver */
-			Jo[sys->mapio[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+	double* Jo = (double*)calloc(sys->outside * sys->numPorts, sizeof(double));   // Jo
+	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+				/* Set current density for all edges within sides in port to prepare solver */
+				Jo[sourcePort * sys->outside + sys->mapio[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+			}
 		}
 	}
 	
 
 	/* solve oo part */
 	double freq = sys->freqNo2freq(freqi);
-	double* xo = (double*)calloc(sys->outside, sizeof(double));
-	solveOO(sys, freq, Jo, v0dt, v0dat, xo);   // xo should be imaginary add i later
+	double* xo = (double*)calloc(sys->outside * sys->numPorts, sizeof(double));
+	//clock_t t1 = clock();
+	//solveOO(sys, freq, Jo, v0dt, v0dat, xo);   // xo should be imaginary add i later
+	solveOO_pardiso(sys, MooRowId1, MooColId, Mooval, lengoo, sys->outside, Jo, xo, sys->numPorts);   // use pardiso to solve (-omega^2*D_epsoo+Soo)*xo=Jo
+	for (int ind = 0; ind < sys->outside * sys->numPorts; ++ind) {
+		xo[ind] *= -freq * 2 * M_PI;   // xo is the solution from (-omega^2*D_epsoo+Soo)\(-omega*Jo)
+	}
+	//cout << "Time to solve oo part is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 	/* Begin to check the correctness of OO part */
 	//out.open("Jo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->outside; ++ind) {
@@ -45,24 +56,30 @@ int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sp
 	/* End of checking the correctness of OO part */
 
 	/* solve ii part */
-	double* temp = (double*)calloc(inside, sizeof(double));
-	double* xi = (double*)calloc(inside, sizeof(double));
-	sparseMatrixVecMul(SioRowId, SioColId, Sioval, lengio, xo, temp);   // temp=Sio*xo
-	for (int indi = 0; indi < inside; ++indi) {
+	double* temp = (double*)calloc(inside * sys->numPorts, sizeof(double));
+	double* xi = (double*)calloc(inside * sys->numPorts, sizeof(double));
+	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		sparseMatrixVecMul(SioRowId, SioColId, Sioval, lengio, &xo[sourcePort * sys->outside], &temp[sourcePort * inside]);   // temp=Sio*xo
+	}
+	for (myint indi = 0; indi < inside * sys->numPorts; ++indi) {
 		xi[indi] = -temp[indi] / (2 * M_PI * freq * SIGMA);
 	}
 
-	for (int indi = 0; indi < nedge; ++indi) {
-		if (sys->markEdge[sys->mapEdgeR[indi]]) {
-			y[indi] = xi[sys->mapio[indi] - sys->outside] + 1i * 0;
-		}
-		else {
-			y[indi] = 0 + 1i * xo[sys->mapio[indi]];
+	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		for (myint indi = 0; indi < nedge; ++indi) {
+			if (sys->markEdge[sys->mapEdgeR[indi]]) {
+				y[sourcePort * nedge + indi] = xi[sourcePort * inside + sys->mapio[indi] - sys->outside] + 1i * 0;
+			}
+			else {
+				y[sourcePort * nedge + indi] = 0 + 1i * xo[sourcePort * sys->outside + sys->mapio[indi]];
+			}
 		}
 	}
 	//out.open("y.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int indi = 0; indi < nedge; ++indi) {
-	//	out << y[indi].real() << " " << y[indi].imag() << endl;
+	//for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+	//	for (int indi = 0; indi < nedge; ++indi) {
+	//		out << y[sourcePort * nedge + indi].real() << " " << y[sourcePort * nedge + indi].imag() << endl;
+	//	}
 	//}
 	//out.close();
 
@@ -72,10 +89,11 @@ int solveFreqIO(fdtdMesh* sys, int sourcePort, int freqi, complex<double>* y, sp
 	free(xi); xi = NULL;
 }
 
-int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat) {
+
+int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval) {
 	int t0n = 3;
 	double dt = DT;
-	double tau = 1.e-10;
+	double tau = 1.e-11;
 	double t0 = t0n * tau;
 	myint nt = 2 * t0 / dt;
 	myint SG = 10;
@@ -147,85 +165,9 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
     lapack_complex_double *RR;
 	myint noden = sys->leng_v0c + sys->leng_v0d1;
 	myint edge = sys->N_edge - sys->bden;
-
-    /* Generating left hand matrix (D_eps + dt * D_sig + dt ^ 2 * S) */
-    double* sval = (double*)malloc(sys->leng_S * sizeof(double));   // sys->SRowId, sys->SColId, val, COO format of this matrix
-	myint* rowId1 = (myint*)malloc((edge + 1) * sizeof(myint));    // matrix's CSR form's rowId, with the start index in each row
-    sys->backDiffLeftMatrix(sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sval, dt);
-	status = COO2CSR_malloc(sys->SRowId, sys->SColId, sval, sys->leng_S, edge, rowId1);
-	/* End of generating left hand matrix (D_eps + dt * D_sig + dt ^ 2 * S) */
-
-	// Laplacian matrix
-    myint leng = 0;
-    myint *LrowId, *LcolId;
-    double *Lval;
-    leng = generateLaplacian_count(sys);   // count how many nnz in the matrix
-    LrowId = (myint*)malloc(leng * sizeof(myint));
-    LcolId = (myint*)malloc(leng * sizeof(myint));
-    Lval = (double*)malloc(leng * sizeof(double));
-    status = generateLaplacian(sys, LrowId, LcolId, Lval);
-	//outfile.open("L.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind < leng; ++ind) {
-	//	outfile << LrowId[ind] + 1 << " " << LcolId[ind] + 1 << " " << Lval[ind] << endl;
-	//}
-	//outfile.close();
-
-	/* debug to test L */
-	//double* Lr = (double*)calloc(sys->N_edge - sys->bden, sizeof(double));
-	//Lr[0] = 1;
-	//double* Lx = (double*)calloc(sys->N_edge - sys->bden, sizeof(double));
-	//status = hypreSolve(sys, LrowId, LcolId, Lval, leng, Lr, sys->N_edge - sys->bden, Lx, 1, 3);
-	//free(Lr); Lr = NULL;
-	//free(Lx); Lx = NULL;
-	/* end of debugging to test L */
-
-    double* val = (double*)malloc(leng * sizeof(double));
-    sys->backDiffLeftMatrix(LrowId, LcolId, Lval, leng, val, dt);     // left hand matrix (D_eps + dt * D_sig + dt ^ 2 * L), where L is Laplacian matrix
-	//cout << "Begin to generate L matrix!\n";
-	sys->generateLaplacianLeft(LrowId, LcolId, Lval, leng, dt);    // Compute the matrix [V0a'*D*V0, V0a'*D; D*V0, D+L]
-	//cout << "Already generate L matrix!\n";
- //   outfile.open("Ll.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind < sys->leng_Ll; ++ind) {
-	//	outfile << sys->LlRowId[ind] + 1 << " " << sys->LlColId[ind] + 1 << " " << std::setprecision(15) << sys->Llval[ind] << endl;
-	//}
-	//outfile.close();
-
-	/* transfer Ll's rowId to csr format */
-	//sys->LlRowIdo = (myint*)malloc(sys->leng_Ll * sizeof(myint));
-	//for (int indi = 0; indi < sys->leng_Ll; indi++) {
-	//	sys->LlRowIdo[indi] = sys->LlRowId[indi];
-	//}
-	//free(sys->LlRowId); sys->LlRowId = (myint*)malloc((sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden + 1) * sizeof(myint));
-	//status = COO2CSR_malloc(sys->LlRowIdo, sys->LlColId, sys->Llval, sys->leng_Ll, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys->LlRowId);  
-	//if (status != 0) {
-	//	return status;
-	//}
-
-	//sparse_matrix_t Ll;
-	//sparse_status_t s;
-	//s = mkl_sparse_d_create_csr(&Ll, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, &sys->LlRowId[0], &sys->LlRowId[1], sys->LlColId, sys->Llval);
-
-	/* A11 rowId, colId, val and A22 rowId, colId, val */
-	myint* A12RowId, *A12ColId, *A21RowId, *A21ColId, *A22RowId, *A22ColId;
-	double* A12val, *A21val, * A22val;
 	double* x;
-	myint leng_A12 = 0, leng_A21 = 0, leng_A22 = 0;
-	get1122Block_count(sys->leng_v0d1 + sys->leng_v0c, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys, leng_A12, leng_A21, leng_A22);
-	A12RowId = (myint*)calloc(leng_A12, sizeof(myint));
-	A12ColId = (myint*)calloc(leng_A12, sizeof(myint));
-	A12val = (double*)calloc(leng_A12, sizeof(double));
-	A21RowId = (myint*)calloc(leng_A21, sizeof(myint));
-	A21ColId = (myint*)calloc(leng_A21, sizeof(myint));
-	A21val = (double*)calloc(leng_A21, sizeof(double));
-	A22RowId = (myint*)calloc(leng_A22, sizeof(myint));
-	A22ColId = (myint*)calloc(leng_A22, sizeof(myint));
-	A22val = (double*)calloc(leng_A22, sizeof(double));
-	get1122Block(sys->leng_v0d1 + sys->leng_v0c, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys, A12RowId, A12ColId, A12val, A21RowId, A21ColId, A21val, A22RowId, A22ColId, A22val);
-	//outfile.open("A22.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (int ind = 0; ind < leng_A22; ++ind) {
-	//	outfile << A22RowId[ind] + 1 << " " << A22ColId[ind] + 1 << " " << A22val[ind] << endl;
-	//}
-	//outfile.close();
+
+
 	double normb;
 	int inx, iny, inz;
 	/* Allocate the space for the time response of each port */
@@ -234,14 +176,14 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		resp[ind] = (double*)calloc(nt, sizeof(double));
 	}
 	/* End of allocating the space for the time response of each port */
-	//outfile.open("xr_Intel.txt", std::ofstream::out | std::ofstream::trunc);
+	outfile.open("xt_nand2_new.txt", std::ofstream::out | std::ofstream::trunc);
 	for (int ind = 1; ind <= nt; ind++) {    // time marching to find the repeated eigenvectors
 		// Generate the right hand side
-		for (int indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+		for (int indi = 0; indi < edge; indi++) {
 			rsc[indi] = 0;
-			rsc[indi] -= sys->getEps(sys->mapEdgeR[indi]) * (-2 * xr[sys->N_edge - sys->bden + indi] + xr[indi]);
+			rsc[indi] -= sys->getEps(sys->mapEdgeR[indi]) * (-2 * xr[edge + indi] + xr[indi]);
 			if (sys->markEdge[sys->mapEdgeR[indi]]) {
-				rsc[indi] += dt * SIGMA * xr[sys->N_edge - sys->bden + indi];
+				rsc[indi] += dt * SIGMA * xr[edge + indi];
 			}
 		}
 		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
@@ -261,18 +203,20 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		/* End of backward difference, use HYPRE solve */
 
 		/* Use pardiso to solve backward difference */
-		//status = pardisoSolve(sys, rowId1, sys->SColId, sval, rsc, &xr[edge * 2], edge);
-		//cout << ind << endl;
+		//status = pardisoSolve(sys, SRowId1, SColId, Sval, rsc, &xr[edge * 2], edge);
+		//outfile.open("xr.txt", std::ofstream::trunc | std::ofstream::out);
+		//for (int indi = 0; indi < edge; ++indi) {
+		//	outfile << xr[edge * 2 + indi] << endl;
+		//}
+		//outfile.close();
 		/* End of using pardiso to solve backward difference */
 
+		/* Start to solve [V0a'*(D_eps+dt*D_sig)*V0, V0a'*(D_eps+dt*D_sig)
+		          (D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
+				  for backward difference*/
 		/* Generate [v0a' * b; b] */
-		bm = (double*)calloc(noden + (sys->N_edge - sys->bden), sizeof(double));
+		bm = (double*)calloc(noden + edge, sizeof(double));
 		sys->generateLaplacianRight(bm, rsc);
-		//normb = 0;
-		//for (int indi = 0; indi < noden + (sys->N_edge - sys->bden); ++indi) {
-		//	normb += bm[indi] * bm[indi];
-		//}
-		//cout << "The norm of the right hand side is " << sqrt(normb) << endl;
 		//outfile.open("bm.txt", std::ofstream::trunc | std::ofstream::out);
 		//for (int ind = 0; ind < sys->N_edge - sys->bden + sys->leng_v0d1 + sys->leng_v0c; ++ind) {
 		//	outfile << bm[ind] << endl;
@@ -284,7 +228,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		 solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
 		        (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
 		//x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
-		//status = mkl_gmres(sys, bm, x, Ll, A11RowId, A11ColId, A11val, leng_A11, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
+		//status = mkl_gmres(sys, bm, x, Ll, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
 		/* End of using MKL fgmres to solve the matrix solution */
 
 		/* Use direct solver to solve the matrix solution */
@@ -293,17 +237,22 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
                 (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
 		x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
 		status = solveBackMatrix(sys, bm, x, v0ct, v0cat, v0dt, v0dat, A12RowId, A12ColId, A12val, leng_A12, A21RowId, A21ColId, A21val, leng_A21, A22RowId, A22ColId, A22val, leng_A22);
-		/* End of using direct solver to solve the matrix solution */
+		 /* End of using direct solver to solve the matrix solution */
 
-		//outfile.open("x.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int ind = 0; ind < sys->N_edge - sys->bden + sys->leng_v0d1 + sys->leng_v0c; ++ind) {
-		//	outfile << x[ind] << endl;
-		//}
-		//outfile.close();
 		
 		/* Compute V0 * y0 + xh */
 		status = combine_x(x, sys, &xr[edge * 2]);
-		//cout << ind << endl;
+		//outfile.open("x.txt", std::ofstream::trunc | std::ofstream::out);
+		//for (int indi = 0; indi < edge; ++indi) {
+		//	outfile << xr[edge * 2 + indi] << endl;
+		//}
+		//outfile.close();
+
+		/* End of solving [V0a'*(D_eps+dt*D_sig)*V0, V0a'*(D_eps+dt*D_sig)
+		(D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
+		for backward difference*/
+		
+		cout << ind << endl;
 		//outfile.open("xf.txt", std::ofstream::out | std::ofstream::trunc);
 		//for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
 		//	outfile << xr[sys->N_edge * 2 + ind] << endl;
@@ -314,1002 +263,21 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		
 
 		nn = 0;
-		for (int ind = 0; ind < edge; ind++) {
-			nn += pow(xr[2 * edge + ind], 2);
-			xr[ind] = xr[edge + ind];
-			xr[edge + ind] = xr[(edge) * 2 + ind];
-			xr[(edge) * 2 + ind] = 0;
+		for (int indi = 0; indi < edge; indi++) {
+			//nn += pow(xr[2 * edge + indi], 2);
+			xr[indi] = xr[edge + indi];
+			xr[edge + indi] = xr[(edge) * 2 + indi];
+			xr[(edge) * 2 + indi] = 0;
 		}
-		nn = sqrt(nn);
-		//outfile << nn << endl;
+		//nn = sqrt(nn);
+
+		nn = sys->getVoltage(xr, sourcePort);   // get the voltage
+
+		outfile << nn << endl;
 		free(bm); bm = NULL;
 		free(x); x = NULL;
-
-
-        /* Begin to solve the reduced eigenvalue problem */
-    //    if (ind == SG){
-    //        //outfile << nn << endl;
-
-    //        l++;
-    //        U0.push_back(U0_base);
-    //        temp.push_back(U0_base);
-    //        temp1.push_back(U0_base);
-    //        temp2.push_back(U0_base);
-    //        Cr_p.push_back(Cr_base);
-    //        D_sigr_p.push_back(Cr_base);
-    //        D_epsr_p.push_back(Cr_base);
-    //        for (myint inde = 0; inde < edge; inde++){
-    //            U0[U0_i][inde] = xr[2 * edge + inde] / nn;
-    //        }
-    //        U0_i++;
-    //        Cr = (double*)calloc(l * l, sizeof(double));
-    //        D_sigr = (double*)calloc(l * l, sizeof(double));
-    //        D_epsr = (double*)calloc(l * l, sizeof(double));
-    //        index = 0;
-
-    //        while (index < sys->leng_S){
-    //            start = sys->SRowId[index];
-    //            while (index < sys->leng_S && sys->SRowId[index] == start){
-    //                temp[0][sys->SRowId[index]] += sys->Sval[index] * U0[U0_i - 1][sys->SColId[index]];
-    //                index++;
-    //            }
-    //            if (sys->markEdge[sys->mapEdgeR[start]] != 0) {
-    //                temp1[0][start] = sqrt(SIGMA) * U0[U0_i - 1][start];
-    //                temp2[0][start] = sqrt(sys->getEps(sys->mapEdgeR[start])) * U0[U0_i - 1][start];
-    //            }
-    //            else {
-    //                temp1[0][start] = 0;
-    //                temp2[0][start] = sqrt(sys->getEps(sys->mapEdgeR[start])) * U0[U0_i - 1][start];
-    //            }
-    //        }
-    //        for (myint inde = 0; inde < l; inde++){
-    //            Cr_p.push_back(Cr_base);
-    //            D_sigr_p.push_back(Cr_base);
-    //            D_epsr_p.push_back(Cr_base);
-    //            for (myint inde2 = 0; inde2 < l; inde2++){
-    //                Cr_p[inde].push_back(0);
-    //                D_sigr_p[inde].push_back(0);
-    //                D_epsr_p[inde].push_back(0);
-    //                for (myint inde3 = 0; inde3 < sys->N_edge - 2 * sys->N_edge_s; inde3++){
-    //                    Cr[inde * l + inde2] += U0[inde][inde3] * temp[inde2][inde3];
-    //                    D_sigr[inde * l + inde2] += temp1[inde][inde3] * temp1[inde2][inde3];
-    //                    D_epsr[inde * l + inde2] += temp2[inde][inde3] * temp2[inde2][inde3];
-    //                    Cr_p[inde][inde2] += U0[inde][inde3] * temp[inde2][inde3];
-    //                    D_sigr_p[inde][inde2] += temp1[inde][inde3] * temp1[inde2][inde3];
-    //                    D_epsr_p[inde][inde2] += temp2[inde][inde3] * temp2[inde2][inde3];
-    //                }
-    //            }
-    //        }
-    //        Ar = (double*)malloc(4 * l * l * sizeof(double));
-    //        Br = (double*)malloc(4 * l * l * sizeof(double));
-    //        for (myint inde = 0; inde < l; inde++){
-    //            for (myint inde2 = 0; inde2 < l; inde2++){
-    //                Ar[inde * 2 * l + inde2] = -Cr[inde * l + inde2];
-    //                Br[inde * 2 * l + inde2] = D_sigr[inde * l + inde2] * scale;
-    //            }
-    //        }
-    //        for (myint inde = 0; inde < l; inde++){
-    //            for (myint inde2 = l; inde2 < 2 * l; inde2++){
-    //                Ar[inde * 2 * l + inde2] = 0;
-    //                Br[inde * 2 * l + inde2] = D_epsr[inde * l + inde2 - l] * pow(scale, 2);
-    //            }
-    //        }
-    //        for (myint inde = l; inde < 2 * l; inde++){
-    //            for (myint inde2 = 0; inde2 < l; inde2++){
-    //                Ar[inde * 2 * l + inde2] = 0;
-    //                Br[inde * 2 * l + inde2] = D_epsr[(inde - l) * l + inde2] * pow(scale, 2);
-    //            }
-    //        }
-    //        for (myint inde = l; inde < 2 * l; inde++){
-    //            for (myint inde2 = l; inde2 < 2 * l; inde2++){
-    //                Ar[inde * 2 * l + inde2] = D_epsr[(inde - l) * l + inde2 - l] * pow(scale, 2);
-    //                Br[inde * 2 * l + inde2] = 0;
-    //            }
-    //        }
-
-    //        n = 2 * l;
-    //        jobvl = 'N'; jobvr = 'V';
-    //        lda = 2 * l; ldb = 2 * l;
-    //        ldvl = 2 * l; ldvr = 2 * l;
-    //        alphar = (double*)malloc(2 * l * sizeof(double));
-    //        alphai = (double*)malloc(2 * l * sizeof(double));
-    //        beta = (double*)malloc(2 * l * sizeof(double));
-    //        vl = (double*)malloc(4 * l * l * sizeof(double));
-    //        vr = (double*)malloc(4 * l * l * sizeof(double));
-    //        job = 'B';    // scale only
-    //        lscale = (double*)malloc(n * sizeof(double));
-    //        rscale = (double*)malloc(n * sizeof(double));
-
-    //        info = LAPACKE_dggev(LAPACK_COL_MAJOR, jobvl, jobvr, n, Ar, lda, Br, ldb, alphar, alphai, beta, vl, ldvl, vr, ldvr);
-    //        for (myint inde = 0; inde < 2 * l; inde++){
-    //            //if (alphai[inde] == 0){
-    //            //    dp.push_back(make_pair(alphar[inde] / beta[inde] * scale, inde));
-    //            //}
-    //            //else{
-    //            if (abs(alphai[inde] / beta[inde]) > eps) {   // only those imaginary part larger than 0 eigenvalues are considered
-    //                dp.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
-    //                inde++;
-    //                dp.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
-    //            }
-    //        }
-
-    //        sort(dp.begin(), dp.end(), comp);
-
-    //        free(Cr); Cr = NULL;
-    //        free(D_epsr); D_epsr = NULL;
-    //        free(D_sigr); D_sigr = NULL;
-    //        free(Ar); Ar = NULL;
-    //        free(Br); Br = NULL;
-    //        free(alphar); alphar = NULL;
-    //        free(alphai); alphai = NULL;
-    //        free(beta); beta = NULL;
-    //    }
-    //    else if (ind % SG == 0){
-    //        //outfile << nn << endl;
-
-    //        tmp = (double*)malloc((sys->N_edge - sys->bden) * sizeof(double));
-    //        tmp1 = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));
-    //        tmp2 = (double*)calloc(U0_i, sizeof(double));
-    //        nn = 0;
-    //        nor = 0;
-    //        for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //            tmp[inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
-    //            nor += xr[2 * (sys->N_edge - sys->bden) + inde] * xr[2 * (sys->N_edge - sys->bden) + inde];
-    //        }
-    //        nor = sqrt(nor);
-
-
-
-    //        /* modified Gran Schmidt */
-    //        clock_t t1 = clock();
-
-
-    //        for (myint inde = 0; inde < U0_i; inde++){
-    //            nn = 0;
-    //            for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
-    //                nn += tmp[inde1] * U0[inde][inde1];
-    //            }
-    //            for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
-    //                tmp[inde1] -= nn * U0[inde][inde1];
-    //            }
-    //        }
-    //        nn = 0;
-    //        for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){
-    //            nn += tmp[inde] * tmp[inde];
-    //        }
-    //        nn = sqrt(nn);
-
-    //        //cout << "Modified Gram Schmidt takes " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    //        //cout << "U0_i is " << U0_i << endl;
-    //        /*ofstream out;
-    //        out.open("U0.txt", std::ofstream::out | std::ofstream::trunc);
-    //        for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-    //        for (myint inde2 = 0; inde2 < U0_i; inde2++){
-    //        out << U0[inde2][inde] << " ";
-    //        }
-    //        out << endl;
-    //        }
-    //        out.close();*/
-
-    //        //cout << "New vector after deduction " << nn / nor << endl;
-    //        if (nn / nor > zero_norm){     // this new vector contains new information
-    //            U0.push_back(U0_base);
-    //            temp.push_back(U0_base);
-    //            temp1.push_back(U0_base);
-    //            temp2.push_back(U0_base);
-    //            for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                U0[U0_i][inde] = tmp[inde] / nn;
-    //            }
-    //            U0_i++;
-    //        }
-    //        else{     // no new information go to the next loop
-    //            for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){
-    //                xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
-    //                xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
-    //                xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
-    //            }
-    //            free(tmp); tmp = NULL;
-    //            free(tmp1); tmp1 = NULL;
-    //            free(tmp2); tmp2 = NULL;
-				//
-    //            continue;
-    //        }
-    //        /*tau_qr = (lapack_complex_double*)malloc(U0_i * sizeof(lapack_complex_double));
-
-    //        info = LAPACKE_zgeqrf(LAPACK_COL_MAJOR, (sys->N_edge - 2 * sys->N_edge_s), U0_i, V_re, (sys->N_edge - 2 * sys->N_edge_s), tau_qr);
-
-    //        info = LAPACKE_zungqr(LAPACK_COL_MAJOR, (sys->N_edge - 2 * sys->N_edge_s), i_re, i_re, V_re, (sys->N_edge - 2 * sys->N_edge_s), tau_qr);
-
-    //        free(tau_qr); tau_qr = NULL;*/
-    //        t1 = clock();
-    //        free(tmp); tmp = NULL;
-    //        free(tmp1); tmp1 = NULL;
-    //        free(tmp2); tmp2 = NULL;
-    //        l++;
-    //        Cr = (double*)calloc(U0_i * U0_i, sizeof(double));
-    //        D_sigr = (double*)calloc(U0_i * U0_i, sizeof(double));
-    //        D_epsr = (double*)calloc(U0_i * U0_i, sizeof(double));
-    //        index = 0;
-
-    //        while (index < sys->leng_S){
-    //            start = sys->SRowId[index];
-
-    //            while (index < sys->leng_S && sys->SRowId[index] == start){
-    //                temp[(U0_i - 1)][sys->SRowId[index]] += sys->Sval[index] * U0[(U0_i - 1)][sys->SColId[index]];
-    //                index++;
-    //            }
-    //            if (sys->markEdge[sys->mapEdgeR[start]] != 0) {
-    //                temp1[(U0_i - 1)][start] = sqrt(SIGMA) * U0[U0_i - 1][start];
-    //                temp2[(U0_i - 1)][start] = sqrt(sys->getEps(sys->mapEdgeR[start])) * U0[U0_i - 1][start];
-    //            }
-    //            else {
-    //                temp1[(U0_i - 1)][start] = 0;
-    //                temp2[(U0_i - 1)][start] = sqrt(sys->getEps(sys->mapEdgeR[start])) * U0[U0_i - 1][start];
-    //            }
-    //        }
-    //        index = U0_i - 1;
-    //        Cr_p.push_back(Cr_base);
-    //        D_sigr_p.push_back(Cr_base);
-    //        D_epsr_p.push_back(Cr_base);
-    //        for (myint inde2 = 0; inde2 < U0_i; inde2++){
-    //            for (myint inde3 = 0; inde3 < (sys->N_edge - sys->bden); inde3++){
-    //                Cr[index * U0_i + inde2] += U0[inde2][inde3] * temp[index][inde3];
-    //                D_sigr[index * U0_i + inde2] += temp1[inde2][inde3] * temp1[index][inde3];
-    //                D_epsr[index * U0_i + inde2] += temp2[inde2][inde3] * temp2[index][inde3];
-    //            }
-    //            Cr_p[index].push_back(Cr[index * U0_i + inde2]);
-    //            D_sigr_p[index].push_back(D_sigr[index * U0_i + inde2]);
-    //            D_epsr_p[index].push_back(D_epsr[index * U0_i + inde2]);
-
-    //        }
-
-    //        index = U0_i - 1;
-    //        for (myint inde2 = 0; inde2 < U0_i - 1; inde2++){
-    //            for (myint inde3 = 0; inde3 < (sys->N_edge - sys->bden); inde3++){
-    //                Cr[inde2 * U0_i + index] += U0[index][inde3] * temp[inde2][inde3];
-    //                D_sigr[inde2 * U0_i + index] += temp1[index][inde3] * temp1[inde2][inde3];
-    //                D_epsr[inde2 * U0_i + index] += temp2[index][inde3] * temp2[inde2][inde3];
-
-    //            }
-    //            Cr_p[inde2].push_back(Cr[inde2 * U0_i + index]);
-    //            D_sigr_p[inde2].push_back(D_sigr[inde2 * U0_i + index]);
-    //            D_epsr_p[inde2].push_back(D_epsr[inde2 * U0_i + index]);
-    //        }
-    //        for (myint inde = 0; inde < U0_i - 1; inde++){
-    //            for (myint inde2 = 0; inde2 < U0_i - 1; inde2++){
-    //                Cr[inde * U0_i + inde2] += Cr_p[inde][inde2];
-    //                D_sigr[inde * U0_i + inde2] += D_sigr_p[inde][inde2];
-    //                D_epsr[inde * U0_i + inde2] += D_epsr_p[inde][inde2];
-    //            }
-    //        }
-
-    //        Ar = (double*)malloc(4 * U0_i * U0_i * sizeof(double));
-    //        Br = (double*)malloc(4 * U0_i * U0_i * sizeof(double));
-    //        for (myint inde = 0; inde < U0_i; inde++){
-    //            for (myint inde2 = 0; inde2 < U0_i; inde2++){
-    //                Ar[inde * 2 * U0_i + inde2] = -Cr[inde * U0_i + inde2];
-    //                Br[inde * 2 * U0_i + inde2] = D_sigr[inde * U0_i + inde2] * scale;
-    //            }
-    //        }
-    //        for (myint inde = 0; inde < U0_i; inde++){
-    //            for (myint inde2 = U0_i; inde2 < 2 * U0_i; inde2++){
-    //                Ar[inde * 2 * U0_i + inde2] = 0;
-    //                Br[inde * 2 * U0_i + inde2] = D_epsr[inde * U0_i + inde2 - U0_i] * pow(scale, 2);
-    //            }
-    //        }
-    //        for (myint inde = U0_i; inde < 2 * U0_i; inde++){
-    //            for (myint inde2 = 0; inde2 < U0_i; inde2++){
-    //                Ar[inde * 2 * U0_i + inde2] = 0;
-    //                Br[inde * 2 * U0_i + inde2] = D_epsr[(inde - U0_i) * U0_i + inde2] * pow(scale, 2);
-    //            }
-    //        }
-    //        for (myint inde = U0_i; inde < 2 * U0_i; inde++){
-    //            for (myint inde2 = U0_i; inde2 < 2 * U0_i; inde2++){
-    //                Ar[inde * 2 * U0_i + inde2] = D_epsr[(inde - U0_i) * U0_i + inde2 - U0_i] * pow(scale, 2);
-    //                Br[inde * 2 * U0_i + inde2] = 0;
-    //            }
-    //        }
-
-    //        /*if (ind < 1000){
-    //        cout << "Ar is " << endl;
-    //        for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //        for (myint inde2 = 0; inde2 < 2 * U0_i; inde2++){
-    //        cout << Ar[inde2 * 2 * U0_i + inde] << ", ";
-    //        }
-    //        cout << endl;
-    //        }
-    //        cout << endl;
-    //        cout << "Br is " << endl;
-    //        for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //        for (myint inde2 = 0; inde2 < 2 * U0_i; inde2++){
-    //        cout << Br[inde2 * 2 * U0_i + inde] << ", ";
-    //        }
-    //        cout << endl;
-    //        }
-    //        }*/
-
-
-    //        n = 2 * U0_i;
-    //        jobvl = 'N'; jobvr = 'V';
-    //        lda = 2 * U0_i; ldb = 2 * U0_i;
-    //        ldvl = 2 * U0_i; ldvr = 2 * U0_i;
-    //        alphar = (double*)malloc(2 * U0_i * sizeof(double));
-    //        alphai = (double*)malloc(2 * U0_i * sizeof(double));
-    //        beta = (double*)malloc(2 * U0_i * sizeof(double));
-    //        vl1 = (double*)calloc(4 * U0_i * U0_i, sizeof(double));
-    //        vr1 = (double *)calloc(4 * U0_i * U0_i, sizeof(double));
-    //        //lscale = (double*)calloc(2 * U0_i, sizeof(double));
-    //        //rscale = (double*)calloc(2 * U0_i, sizeof(double));
-    //        //tau1 = (double*)calloc(2 * U0_i, sizeof(double));
-    //        //RR = (double*)calloc(4 * U0_i * U0_i, sizeof(double));    // store the upper triangular matrix
-    //        //QQ = (double*)calloc(4 * U0_i * U0_i, sizeof(double));
-    //        //ZZ = (double*)calloc(4 * U0_i * U0_i, sizeof(double));
-    //        //select = (int*)calloc(2 * U0_i, sizeof(int));
-    //        dp1.clear();
-    //        cout << "Generate eigenvalue problem time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    //        t1 = clock();
-    //        info = LAPACKE_dggev(LAPACK_COL_MAJOR, jobvl, jobvr, 2 * U0_i, Ar, lda, Br, ldb, alphar, alphai, beta, vl1, ldvl, vr1, ldvr);
-    //        /*info = LAPACKE_dggbal(LAPACK_COL_MAJOR, 'B', 2 * U0_i, Ar, lda, Br, ldb, &ilo, &ihi, lscale, rscale);
-    //        info = LAPACKE_dgeqrf(LAPACK_COL_MAJOR, 2 * U0_i, 2 * U0_i, Br, 2 * U0_i, tau1);
-    //        for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //        for (myint inde2 = inde; inde2 < 2 * U0_i; inde2++){
-    //        RR[inde2 * 2 * U0_i + inde] = Br[inde2 * U0_i + inde];
-    //        Br[inde2 * 2 * U0_i + inde] = 0;
-    //        }
-    //        }
-    //        info = LAPACKE_dormqr(LAPACK_COL_MAJOR, 'L', 'T', 2 * U0_i, 2 * U0_i, 2 * U0_i, Br, 2 * U0_i, tau1, Ar, 2 * U0_i);
-    //        info = LAPACKE_dgghrd(LAPACK_COL_MAJOR, 'I', 'I', 2 * U0_i, ilo, ihi, Ar, 2 * U0_i, RR, 2 * U0_i, QQ, 2 * U0_i, ZZ, 2 * U0_i);
-    //        info = LAPACKE_dhgeqz(LAPACK_COL_MAJOR, 'S', 'V', 'V', 2 * U0_i, ilo, ihi, Ar, 2 * U0_i, RR, 2 * U0_i, alphar, alphai, beta, QQ, 2 * U0_i, ZZ, 2 * U0_i);
-    //        info = LAPACKE_dtgevc(LAPACK_COL_MAJOR, 'R', 'B', select, 2 * U0_i, Ar, 2 * U0_i, RR, 2 * U0_i, QQ, 2 * U0_i, ZZ, 2 * U0_i, 2 * U0_i, &m);
-    //        info = LAPACKE_dggbak(LAPACK_COL_MAJOR, 'B', 'R', 2 * U0_i, ilo, ihi, lscale, rscale, m, vr1, 2 * U0_i);*/
-
-
-
-    //        for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //            //if (alphai[inde] == 0){
-    //            //    dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale, inde));
-    //            //}
-    //            //else{
-    //            if (abs(alphai[inde] / beta[inde]) > eps) {    // only those imaginary part larger than 0 eigenvalues are considered
-    //                dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
-    //                inde++;
-    //                dp1.push_back(make_pair(alphar[inde] / beta[inde] * scale + 1i * alphai[inde] / beta[inde] * scale, inde));
-    //            }
-    //        }
-    //        /*if (ind < 1000){
-
-
-    //        outfile.open("vr.txt", std::ofstream::out | std::ofstream::trunc);
-    //        for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //        for (myint inde1 = 0; inde1 < 2 * U0_i; inde1++){
-    //        outfile << vr1[inde1 * (2 * U0_i) + inde] << " ";
-    //        }
-    //        outfile << endl;
-    //        }
-    //        outfile.close();
-
-    //        for (myint inde = 0; inde < dp1.size(); inde++){
-    //        cout << dp1[inde].first << " ";
-    //        }
-    //        cout << endl;
-    //        }*/
-    //        sort(dp1.begin(), dp1.end(), comp);
-
-    //        ind_i = 0;
-    //        ind_j = 0;
-    //        i_re = 0;
-    //        i_nre = 0;
-    //        re.clear();
-    //        nre.clear();
-
-    //        /*for (myint inde = 0; inde < dp1.size(); inde++){
-    //        cout << dp1[inde].first << " ";
-    //        }
-    //        cout << endl;*/
-    //        /* for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //        for (myint inde2 = 0; inde2 < 2 * U0_i; inde2++){
-    //        cout << vr1[inde2 * 2 * U0_i + inde] << " ";
-    //        }
-    //        cout << endl;
-    //        }*/
-    //        /*if (ind == 3 * SG)
-    //        break;*/
-
-    //        while (ind_i < dp.size() && abs(dp[ind_i].first) < zero_value){
-    //            ind_i++;
-    //        }
-    //        while (ind_j < dp1.size() && abs(dp1[ind_j].first) < zero_value){
-    //            ind_j++;
-    //        }
-    //        while (ind_i < dp.size() && ind_j < dp1.size()){
-    //            if (abs(dp[ind_i].first) > maxvalue || abs(dp1[ind_j].first) > maxvalue){
-    //                break;
-    //            }
-    //            if (abs(abs(dp[ind_i].first) - abs(dp1[ind_j].first)) / abs(dp[ind_i].first) < eps2){
-    //                if (dp[ind_i].first.imag() == 0){    // if the eigenvalue is real, only corresponds to one eigenvector
-    //                    re.push_back(ind_i);    // put the eigenvector index into re
-    //                    ind_i++;
-    //                    i_re++;
-    //                }
-    //                else if (abs(dp[ind_i].first.imag() + dp[ind_i + 1].first.imag()) / abs(dp[ind_i].first.imag()) < 1.e-3){    // if the eigenvalue is imaginary, corresponds to two eigenvectors
-    //                    if (dp[ind_i].first.imag() > 0){    // first put the positive eigenvalue and then put the negative eigenvalue
-    //                        re.push_back(ind_i);
-    //                        re.push_back(ind_i + 1);
-    //                    }
-    //                    else if (dp[ind_i].first.imag() < 0){
-    //                        re.push_back(ind_i + 1);
-    //                        re.push_back(ind_i);
-    //                    }
-
-    //                    ind_i += 2;    // two conjugate eigenvalues
-    //                    i_re += 2;
-    //                }
-    //            }
-
-    //            else if (abs(abs(dp[ind_i].first) - abs(dp1[ind_j].first)) / abs(dp[ind_i].first) >= eps2 && abs(dp[ind_i].first) > abs(dp1[ind_j].first)){
-    //                ind_j++;
-    //            }
-    //            else if (abs(abs(dp[ind_i].first) - abs(dp1[ind_j].first)) / abs(dp[ind_i].first) >= eps2 && abs(dp[ind_i].first) < abs(dp1[ind_j].first)){
-    //                if (dp[ind_i].first.imag() == 0){
-    //                    nre.push_back(ind_i);
-    //                    ind_i++;
-    //                    i_nre++;
-    //                }
-    //                else{
-    //                    if (abs(dp[ind_i].first.imag() + dp[ind_i + 1].first.imag()) / abs(dp[ind_i].first.imag()) < 1.e-3){
-    //                        if (dp[ind_i].first.imag() > 0){    // first put the positive eigenvalue and then put the negative eigenvalue
-    //                            nre.push_back(ind_i);
-    //                            nre.push_back(ind_i + 1);
-    //                        }
-    //                        else if (dp[ind_i].first.imag() < 0){
-    //                            nre.push_back(ind_i + 1);
-    //                            nre.push_back(ind_i);
-    //                        }
-    //                    }
-    //                    ind_i += 2;    // two conjugate eigenvalues
-    //                    i_nre += 2;
-    //                }
-    //            }
-    //        }
-
-    //        while (ind_i < dp.size()){
-    //            if (dp[ind_i].first.imag() == 0){
-    //                nre.push_back(ind_i);
-    //                ind_i++;
-    //                i_nre++;
-    //            }
-    //            else if (abs(dp[ind_i].first.imag() + dp[ind_i + 1].first.imag()) / abs(dp[ind_i].first.imag()) < 1.e-5){
-    //                if (dp[ind_i].first.imag() > 0){    // first put the positive eigenvalue and then put the negative eigenvalue
-    //                    nre.push_back(ind_i);
-    //                    nre.push_back(ind_i + 1);
-    //                }
-    //                else if (dp[ind_i].first.imag() < 0){
-    //                    nre.push_back(ind_i + 1);
-    //                    nre.push_back(ind_i);
-    //                }
-    //                ind_i += 2;    // two conjugate eigenvalues
-    //                i_nre += 2;
-    //            }
-    //            else if (abs(dp[ind_i].first) > maxvalue){
-    //                nre.push_back(ind_i);
-    //                ind_i++;
-    //                i_nre++;
-    //            }
-
-    //        }
-    //        /*for (myint inde = 0; inde < dp.size(); inde++){
-    //        cout << dp[inde].first << " ";
-    //        }
-    //        cout << endl;*/
-    //        free(V_re);
-    //        V_re = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * i_re, sizeof(lapack_complex_double));
-    //        free(V_nre);
-    //        V_nre = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * i_nre, sizeof(lapack_complex_double));
-
-    //        i_re = 0;
-
-    //        for (myint rei = 0; rei < re.size(); rei++){
-    //            if (dp[re[rei]].first.imag() == 0){    // one eigenvector corresponding to real eigenvalue
-    //                for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                    for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                        V_re[i_re * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];    // only get the first half eigenvectors
-    //                    }
-    //                }
-    //                i_re++;
-    //            }
-    //            else{    // two eigenvectors corresponding to imaginary eigenvalue
-    //                if (dp[re[rei]].first.imag() > 0){
-    //                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                        for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                            V_re[i_re * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_re[i_re * (sys->N_edge - sys->bden) + inde].imag += U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[(dp[re[rei]].second) * 2 * (U0_i - 1) + inde3];
-    //                            V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].imag -= U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                        }
-    //                    }
-    //                    rei++;
-    //                }
-    //                else if (dp[re[rei]].first.imag() < 0){
-    //                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                        for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                            V_re[i_re * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_re[i_re * (sys->N_edge - sys->bden) + inde].imag -= U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[re[rei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_re[(i_re + 1) * (sys->N_edge - sys->bden) + inde].imag += U0[inde3][inde] * vr[dp[re[rei]].second * 2 * (U0_i - 1) + inde3];
-    //                        }
-    //                    }
-    //                    rei++;
-    //                }
-    //                i_re += 2;
-    //            }
-    //        }
-
-
-    //        i_nre = 0;
-    //        for (myint nrei = 0; nrei < nre.size(); nrei++){
-    //            if (abs(dp[nre[nrei]].first) > maxvalue){    // if this eigenvalue is infinity
-    //                for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                    for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                        V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-    //                    }
-    //                }
-    //                i_nre++;
-    //                continue;
-    //            }
-    //            if (dp[nre[nrei]].first.imag() == 0){    // one eigenvector corresponding to real eigenvalue
-    //                for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                    for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                        V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-    //                    }
-    //                }
-    //                i_nre++;
-    //            }
-    //            else{    // two eigenvectors corresponding to imaginary eigenvalue
-    //                if (dp[nre[nrei]].first.imag() > 0){
-    //                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                        for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                            V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_nre[i_nre * (sys->N_edge - sys->bden) + inde].imag += U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[(dp[nre[nrei]].second) * 2 * (U0_i - 1) + inde3];
-    //                            V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].imag -= U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                        }
-    //                    }
-    //                    nrei++;
-    //                }
-    //                else if (dp[nre[nrei]].first.imag() < 0){
-    //                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                        for (myint inde3 = 0; inde3 < U0_i - 1; inde3++){
-    //                            V_nre[i_nre * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_nre[i_nre * (sys->N_edge - sys->bden) + inde].imag -= U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].real += U0[inde3][inde] * vr[dp[nre[nrei + 1]].second * 2 * (U0_i - 1) + inde3];
-    //                            V_nre[(i_nre + 1) * (sys->N_edge - sys->bden) + inde].imag += U0[inde3][inde] * vr[dp[nre[nrei]].second * 2 * (U0_i - 1) + inde3];
-    //                        }
-    //                    }
-    //                    nrei++;
-    //                }
-    //                i_nre += 2;
-    //            }
-    //        }
-    //        cout << "Solve generalized eigenvale problem time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    //        /*cout << "The step No is " << ind << endl;
-    //        cout << "The repeated eigenvalues are of No. " << i_re << endl;
-    //        cout << "The non-repeated eigenvalues are of No. " << i_nre << endl;*/
-
-    //        t1 = clock();
-    //        // orthogonalized V_re
-    //        if (i_re > 0){
-    //            /*outfile.open("V_re.txt", std::ofstream::out | std::ofstream::trunc);
-    //            for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-    //            for (myint inde2 = 0; inde2 < i_re; inde2++){
-    //            outfile << V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real << " " << V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag << " ";
-    //            }
-    //            outfile << endl;
-    //            }
-    //            outfile.close();*/
-    //            /*tau_qr = (lapack_complex_double*)malloc(i_re * sizeof(lapack_complex_double));
-    //            RR = (lapack_complex_double*)calloc(i_re * i_re, sizeof(lapack_complex_double));
-
-    //            info = LAPACKE_zgeqrf(LAPACK_COL_MAJOR, (sys->N_edge - 2 * sys->N_edge_s), i_re, V_re, (sys->N_edge - 2 * sys->N_edge_s), tau_qr);
-
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //            for (myint inde1 = 0; inde1 <= inde; inde1++){
-    //            RR[inde * i_re + inde1].real = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real;
-    //            RR[inde * i_re + inde1].imag = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag;
-    //            }
-    //            }
-    //            info = LAPACKE_zungqr(LAPACK_COL_MAJOR, (sys->N_edge - 2 * sys->N_edge_s), i_re, i_re, V_re, (sys->N_edge - 2 * sys->N_edge_s), tau_qr);
-
-    //            free(tau_qr); tau_qr = NULL;*/
-
-    //            /* outfile.open("RR.txt", std::ofstream::out | std::ofstream::trunc);
-    //            for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-    //            for (myint inde2 = 0; inde2 < i_re; inde2++){
-    //            outfile << RR[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real << " " << RR[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag << " ";
-    //            }
-    //            outfile << endl;
-    //            }
-    //            outfile.close();*/
-
-
-    //            /*i_re1 = 0;
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //            if (sqrt(pow(RR[inde * i_nre + inde].real, 2) + pow(RR[inde * i_nre + inde].imag, 2)) > 1.e-12){
-    //            i_re1++;
-    //            }
-    //            }
-    //            free(V_re1);
-    //            V_re1 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_re1, sizeof(lapack_complex_double));
-    //            i_re1 = 0;
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //            if (sqrt(pow(RR[inde * i_nre + inde].real, 2) + pow(RR[inde * i_nre + inde].imag, 2)) > 1.e-12){
-    //            for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
-    //            V_re1[i_re1 * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real;
-    //            V_re1[i_re1 * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag;
-    //            }
-    //            i_re1++;
-    //            }
-    //            }
-    //            free(RR); RR = NULL;*/
-    //            /*outfile.open("V_re1.txt", std::ofstream::out | std::ofstream::trunc);
-    //            for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-    //            for (myint inde2 = 0; inde2 < i_re; inde2++){
-    //            outfile << V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real << " " << V_re[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag << " ";
-    //            }
-    //            outfile << endl;
-    //            }
-    //            outfile.close();*/
-
-
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //                nn = 0;
-    //                for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
-    //                    nn += pow(V_re[inde * (sys->N_edge - sys->bden) + inde1].real, 2) + pow(V_re[inde * (sys->N_edge - sys->bden) + inde1].imag, 2);
-    //                }
-    //                nn = sqrt(nn);
-    //                for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
-    //                    V_re[inde * (sys->N_edge - sys->bden) + inde1].real = V_re[inde * (sys->N_edge - sys->bden) + inde1].real / nn;
-    //                    V_re[inde * (sys->N_edge - sys->bden) + inde1].imag = V_re[inde * (sys->N_edge - sys->bden) + inde1].imag / nn;
-    //                }
-    //                /*for (myint inde1 = inde + 1; inde1 < i_re; inde1++){
-    //                nnr = 0;
-    //                nni = 0;
-    //                for (myint inde2 = 0; inde2 < sys->N_edge - 2 * sys->N_edge_s; inde2++){
-    //                nnr += V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * V_re[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real
-    //                + V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag * V_re[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
-    //                nni += -V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag * V_re[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real
-    //                +V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * V_re[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
-    //                }
-
-    //                qc = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-    //                for (myint inde2 = 0; inde2 < sys->N_edge - 2 * sys->N_edge_s; inde2++){
-    //                qc[inde2].real = V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * nnr - nni * V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
-    //                qc[inde2].imag = nnr * V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag + nni * V_re[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real;
-
-
-    //                V_re[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real -= qc[inde2].real;
-    //                V_re[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag -= qc[inde2].imag;
-
-
-    //                }
-    //                free(qc); qc = NULL;
-    //                }*/
-
-    //            }
-
-
-
-    //            if (i_nre > 0){
-    //                tmp3 = (lapack_complex_double*)calloc(i_re * i_nre, sizeof(lapack_complex_double));
-    //                tmp4 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * i_nre, sizeof(lapack_complex_double));
-    //                m_re = (lapack_complex_double*)calloc(i_re * i_re, sizeof(lapack_complex_double));
-
-    //                status = matrix_multi('T', V_re, (sys->N_edge - sys->bden), i_re, V_nre, (sys->N_edge - sys->bden), i_nre, tmp3);
-    //                status = matrix_multi('T', V_re, (sys->N_edge - sys->bden), i_re, V_re, (sys->N_edge - sys->bden), i_re, m_re);
-    //                ipiv = (lapack_int*)malloc((i_nre + i_re) * sizeof(lapack_int));
-    //                info = LAPACKE_zgesv(LAPACK_COL_MAJOR, i_re, i_nre, m_re, i_re, ipiv, tmp3, i_re);// , y_nre1, i_nre + i_re, &iter);
-    //                status = matrix_multi('N', V_re, (sys->N_edge - sys->bden), i_re, tmp3, i_re, i_nre, tmp4);
-    //                free(ipiv); ipiv = NULL;
-    //                free(m_re); m_re = NULL;
-
-    //                //V_nre_norm = (double*)calloc(i_nre, sizeof(double));
-    //                for (myint inde2 = 0; inde2 < i_nre; inde2++){
-    //                    for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                        V_nre[inde2 * (sys->N_edge - sys->bden) + inde].real -= tmp4[inde2 * (sys->N_edge - sys->bden) + inde].real;
-    //                        V_nre[inde2 * (sys->N_edge - sys->bden) + inde].imag -= tmp4[inde2 * (sys->N_edge - sys->bden) + inde].imag;
-    //                        //V_nre_norm[inde2] += pow(V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real, 2) + pow(V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag, 2);
-    //                    }
-    //                    //V_nre_norm[inde2] = sqrt(V_nre_norm[inde2]);
-    //                    //cout << V_nre_norm[inde2] << endl;
-    //                }
-
-    //                // orthogonalize V_nre by using Modified GS
-    //                for (myint inde = 0; inde < i_nre; inde++){
-    //                    nn = 0;
-    //                    for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
-    //                        nn += pow(V_nre[inde * (sys->N_edge - sys->bden) + inde1].real, 2) + pow(V_nre[inde * (sys->N_edge - sys->bden) + inde1].imag, 2);
-    //                    }
-    //                    nn = sqrt(nn);
-    //                    for (myint inde1 = 0; inde1 < sys->N_edge - sys->bden; inde1++){
-    //                        V_nre[inde * (sys->N_edge - sys->bden) + inde1].real = V_nre[inde * (sys->N_edge - sys->bden) + inde1].real / nn;
-    //                        V_nre[inde * (sys->N_edge - sys->bden) + inde1].imag = V_nre[inde * (sys->N_edge - sys->bden) + inde1].imag / nn;
-    //                    }
-    //                    /*for (myint inde1 = inde + 1; inde1 < i_nre; inde1++){
-    //                    nnr = 0;
-    //                    nni = 0;
-    //                    for (myint inde2 = 0; inde2 < sys->N_edge - 2 * sys->N_edge_s; inde2++){
-    //                    nnr += V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * V_nre[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real
-    //                    + V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag * V_nre[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
-    //                    nni += -V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag * V_nre[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real
-    //                    + V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * V_nre[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
-    //                    }
-
-    //                    qc = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s), sizeof(lapack_complex_double));
-    //                    for (myint inde2 = 0; inde2 < sys->N_edge - 2 * sys->N_edge_s; inde2++){
-    //                    qc[inde2].real = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real * nnr - nni * V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag;
-    //                    qc[inde2].imag = nnr * V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag + nni * V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real;
-
-
-    //                    V_nre[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].real -= qc[inde2].real;
-    //                    V_nre[inde1 * (sys->N_edge - 2 * sys->N_edge_s) + inde2].imag -= qc[inde2].imag;
-
-
-    //                    }
-    //                    free(qc); qc = NULL;
-    //                    }*/
-
-    //                }
-
-    //                // make each column vector to be of norm 1
-    //                /*for (myint inde2 = 0; inde2 < i_nre; inde2++){
-
-    //                for (myint inde = 0; inde < (sys->N_edge - 2 * sys->N_edge_s); inde++){
-    //                V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real = V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real / V_nre_norm[inde2];
-    //                V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag = V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag / V_nre_norm[inde2];
-
-    //                }
-    //                }
-    //                free(V_nre_norm); V_nre_norm = NULL;*/
-
-    //                /*tau_qr = (lapack_complex_double*)malloc(i_nre * sizeof(lapack_complex_double));
-    //                RR = (lapack_complex_double*)calloc(i_nre * i_nre, sizeof(lapack_complex_double));
-    //                info = LAPACKE_zgeqrf(LAPACK_COL_MAJOR, (sys->N_edge - 2 * sys->N_edge_s), i_nre, V_nre, (sys->N_edge - 2 * sys->N_edge_s), tau_qr);
-    //                for (myint inde = 0; inde < i_nre; inde++){
-    //                for (myint inde1 = 0; inde1 <= inde; inde1++){
-    //                RR[inde * i_nre + inde1].real = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real;
-    //                RR[inde * i_nre + inde1].imag = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag;
-    //                }
-    //                }
-    //                info = LAPACKE_zungqr(LAPACK_COL_MAJOR, (sys->N_edge - 2 * sys->N_edge_s), i_nre, i_nre, V_nre, (sys->N_edge - 2 * sys->N_edge_s), tau_qr);
-    //                free(tau_qr); tau_qr = NULL;
-    //                i_nre1 = 0;
-    //                for (myint inde = 0; inde < i_nre; inde++){
-    //                if (sqrt(pow(RR[inde * i_nre + inde].real, 2) + pow(RR[inde * i_nre + inde].imag, 2)) > 1.e-12){
-    //                i_nre1++;
-    //                }
-    //                }
-    //                free(V_nre1);
-    //                V_nre1 = (lapack_complex_double*)calloc((sys->N_edge - 2 * sys->N_edge_s) * i_nre1, sizeof(lapack_complex_double));
-    //                i_nre1 = 0;
-    //                for (myint inde = 0; inde < i_nre; inde++){
-    //                if (sqrt(pow(RR[inde * i_nre + inde].real, 2) + pow(RR[inde * i_nre + inde].imag, 2)) > 1.e-12){
-    //                for (myint inde1 = 0; inde1 < sys->N_edge - 2 * sys->N_edge_s; inde1++){
-    //                V_nre1[i_nre1 * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].real;
-    //                V_nre1[i_nre1 * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag = V_nre[inde * (sys->N_edge - 2 * sys->N_edge_s) + inde1].imag;
-    //                }
-    //                i_nre1++;
-    //                }
-    //                }
-    //                free(RR); RR = NULL;*/
-    //                /*outfile.open("V_nre.txt", std::ofstream::out | std::ofstream::trunc);
-    //                for (myint inde = 0; inde < sys->N_edge - 2 * sys->N_edge_s; inde++){
-    //                for (myint inde2 = 0; inde2 < i_nre; inde2++){
-    //                outfile << V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].real << " " << V_nre[inde2 * (sys->N_edge - 2 * sys->N_edge_s) + inde].imag << " ";
-    //                }
-    //                outfile << endl;
-    //                }
-    //                outfile.close();*/
-
-
-    //                free(tmp3); tmp3 = NULL;
-    //                free(tmp4); tmp4 = NULL;
-    //                cout << "Repeated eigenvalues number is " << i_re << " and non-repeated eigenvalues number is " << i_nre << endl;
-    //            }
-    //        }
-    //        cout << "The time to generate orthogonalized V_re and V_nre is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-
-    //        if (i_re == 0){
-    //            dp.clear();
-    //            for (myint inde = 0; inde < dp1.size(); inde++){
-    //                dp.push_back(dp1[inde]);
-    //            }
-    //            free(vr); vr = NULL;
-    //            vr = (double*)malloc(4 * U0_i * U0_i * sizeof(double));
-    //            for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //                for (myint inde2 = 0; inde2 < 2 * U0_i; inde2++){
-    //                    vr[inde * 2 * U0_i + inde2] = vr1[inde * 2 * U0_i + inde2];
-    //                }
-    //            }
-    //            free(vr1); vr1 = NULL;
-    //            free(vl1); vl1 = NULL;
-    //            //free(V_re); V_re = NULL;
-    //            //free(V_nre); V_nre = NULL;
-    //            free(Cr); Cr = NULL;
-    //            free(D_epsr); D_epsr = NULL;
-    //            free(D_sigr); D_sigr = NULL;
-    //            free(Ar); Ar = NULL;
-    //            free(Br); Br = NULL;
-    //            free(alphar); alphar = NULL;
-    //            free(alphai); alphai = NULL;
-    //            free(beta); beta = NULL;
-    //            for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
-    //                xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
-    //                xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
-    //            }
-    //            /*if (ind >= 5000)
-    //            break;*/
-				//cout << endl;
-    //            continue;
-    //        }
-    //        else if (i_nre == 0){    // all the eigenvalues are repeated
-    //            //free(V_nre); V_nre = NULL;
-    //            //free(V_re); V_re = NULL;
-    //            //break;
-    //            dp.clear();
-    //            for (myint inde = 0; inde < dp1.size(); inde++){
-    //                dp.push_back(dp1[inde]);
-    //            }
-    //            free(vr); vr = NULL;
-    //            vr = (double*)malloc(4 * U0_i * U0_i * sizeof(double));
-    //            for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //                for (myint inde2 = 0; inde2 < 2 * U0_i; inde2++){
-    //                    vr[inde * 2 * U0_i + inde2] = vr1[inde * 2 * U0_i + inde2];
-    //                }
-    //            }
-    //            free(vr1); vr1 = NULL;
-    //            free(vl1); vl1 = NULL;
-    //            //free(V_re); V_re = NULL;
-    //            //free(V_nre); V_nre = NULL;
-    //            free(Cr); Cr = NULL;
-    //            free(D_epsr); D_epsr = NULL;
-    //            free(D_sigr); D_sigr = NULL;
-    //            free(Ar); Ar = NULL;
-    //            free(Br); Br = NULL;
-    //            free(alphar); alphar = NULL;
-    //            free(alphai); alphai = NULL;
-    //            free(beta); beta = NULL;
-    //            for (myint inde = 0; inde < (sys->N_edge - sys->bden); inde++){
-    //                xr[inde] = xr[1 * (sys->N_edge - sys->bden) + inde];
-    //                xr[1 * (sys->N_edge - sys->bden) + inde] = xr[2 * (sys->N_edge - sys->bden) + inde];
-    //                xr[2 * (sys->N_edge - sys->bden) + inde] = 0;
-    //            }
-    //            /*if (ind >= 5000)
-    //            break;*/
-				//cout << endl;
-    //            continue;
-    //        }
-    //        else{
-    //            t1 = clock();
-    //            y_new = (lapack_complex_double*)calloc((i_re + i_nre), sizeof(lapack_complex_double));
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //                for (myint inde2 = 0; inde2 < (sys->N_edge - sys->bden); inde2++){
-    //                    y_new[inde].real = y_new[inde].real + (V_re[inde * (sys->N_edge - sys->bden) + inde2].real) * xr[1 * (sys->N_edge - sys->bden) + inde2];    //conjugate transpose
-    //                    y_new[inde].imag = y_new[inde].imag - (V_re[inde * (sys->N_edge - sys->bden) + inde2].imag) * xr[1 * (sys->N_edge - sys->bden) + inde2];    //conjugate transpose
-
-    //                }
-    //            }
-    //            for (myint inde = 0; inde < i_nre; inde++){
-    //                for (myint inde2 = 0; inde2 < (sys->N_edge - sys->bden); inde2++){
-    //                    y_new[inde + i_re].real = y_new[inde + i_re].real + V_nre[inde * (sys->N_edge - sys->bden) + inde2].real * xr[1 * (sys->N_edge - sys->bden) + inde2];    // conjugate transpose
-    //                    y_new[inde + i_re].imag = y_new[inde + i_re].imag - V_nre[inde * (sys->N_edge - sys->bden) + inde2].imag * xr[1 * (sys->N_edge - sys->bden) + inde2];
-    //                }
-    //            }
-
-
-    //            V_new = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * (i_re + i_nre) * sizeof(lapack_complex_double));
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //                for (myint inde2 = 0; inde2 < sys->N_edge - sys->bden; inde2++){
-    //                    V_new[inde * (sys->N_edge - sys->bden) + inde2].real = V_re[inde * (sys->N_edge - sys->bden) + inde2].real;
-    //                    V_new[inde * (sys->N_edge - sys->bden) + inde2].imag = V_re[inde * (sys->N_edge - sys->bden) + inde2].imag;
-    //                }
-    //            }
-    //            for (myint inde = i_re; inde < i_re + i_nre; inde++){
-    //                for (myint inde2 = 0; inde2 < sys->N_edge - sys->bden; inde2++){
-    //                    V_new[inde * (sys->N_edge - sys->bden) + inde2].real = V_nre[(inde - i_re) * (sys->N_edge - sys->bden) + inde2].real;
-    //                    V_new[inde * (sys->N_edge - sys->bden) + inde2].imag = V_nre[(inde - i_re) * (sys->N_edge - sys->bden) + inde2].imag;
-    //                }
-    //            }
-
-
-    //            m_new = (lapack_complex_double*)calloc((i_nre + i_re) * (i_nre + i_re), sizeof(lapack_complex_double));
-    //            ipiv = (lapack_int*)malloc((i_nre + i_re) * sizeof(lapack_int));
-    //            //y_nre1 = (lapack_complex_double*)calloc(i_nre + i_re, sizeof(lapack_complex_double));
-    //            status = matrix_multi('T', V_new, (sys->N_edge - sys->bden), i_nre + i_re, V_new, (sys->N_edge - sys->bden), i_nre + i_re, m_new);
-
-    //            info = LAPACKE_zgesv(LAPACK_COL_MAJOR, i_nre + i_re, 1, m_new, i_nre + i_re, ipiv, y_new, i_nre + i_re);// , y_nre1, i_nre + i_re, &iter);
-    //            x_re = 0;
-    //            x_nre = 0;
-    //            for (myint inde = 0; inde < i_re; inde++){
-    //                x_re += pow(y_new[inde].real, 2) + pow(y_new[inde].imag, 2);
-    //            }
-    //            for (myint inde = i_re; inde < i_nre + i_re; inde++){
-    //                x_nre += pow(y_new[inde].real, 2) + pow(y_new[inde].imag, 2);
-    //            }
-    //            cout << "The weight on step " << ind << " is " << x_nre / x_re << endl;
-    //            //cout << "U0 size is " << U0_i << endl;
-    //            cout << "Weight calculation time is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
-    //            cout << endl;
-    //            free(V_new); V_new = NULL;
-    //            free(y_new); y_new = NULL;
-
-    //            //free(y_nre1); y_nre1 = NULL;
-    //            free(ipiv); ipiv = NULL;
-
-    //            free(m_new); m_new = NULL;
-
-    //            //free(V_nre); V_nre = NULL;
-    //            free(Cr); Cr = NULL;
-
-    //            free(D_epsr); D_epsr = NULL;
-
-    //            free(D_sigr); D_sigr = NULL;
-    //            free(Ar); Ar = NULL;
-    //            free(Br); Br = NULL;
-    //            free(alphar); alphar = NULL;
-    //            free(alphai); alphai = NULL;
-    //            free(beta); beta = NULL;
-    //            if ((x_nre / x_re) < eps1) {
-    //                free(vr1); vr1 = NULL;
-    //                free(vl1); vl1 = NULL;
-    //                break;
-    //            }
-    //            else{
-    //                dp.clear();
-    //                for (myint inde = 0; inde < dp1.size(); inde++){
-    //                    dp.push_back(dp1[inde]);
-    //                }
-    //                free(vr); vr = NULL;
-    //                vr = (double*)malloc(4 * U0_i * U0_i * sizeof(double));
-    //                for (myint inde = 0; inde < 2 * U0_i; inde++){
-    //                    for (myint inde2 = 0; inde2 < 2 * U0_i; inde2++){
-    //                        vr[inde * 2 * U0_i + inde2] = vr1[inde * 2 * U0_i + inde2];
-    //                    }
-    //                }
-    //                free(vr1); vr1 = NULL;
-    //                free(vl1); vl1 = NULL;
-    //                //free(V_re); V_re = NULL;
-				//	cout << endl;
-    //            }
-
-    //        }
-
-    //    }
-
-        //for (myint inde = 0; inde < edge; inde++){
-        //    xr[inde] = xr[1 * edge + inde];
-        //    xr[1 * edge + inde] = xr[2 * edge + inde];
-        //    xr[2 * edge + inde] = 0;
-        //}
 	}
-	//outfile.close();
-	/* Use pardiso to solve backward difference */
-	free(rowId1); rowId1 = NULL;
-	free(sval); sval = NULL;
-	/* End of using pardiso to solve backward difference */
-
-	free(LrowId); LrowId = NULL;
-	free(LcolId); LcolId = NULL;
-	free(Lval); Lval = NULL;
-
-	free(A12RowId); A12RowId = NULL;
-	free(A12ColId); A12ColId = NULL;
-	free(A12val); A12val = NULL;
-	free(A21RowId); A21RowId = NULL;
-	free(A21ColId); A21ColId = NULL;
-	free(A21val); A21val = NULL;
-	free(A22RowId); A22RowId = NULL;
-	free(A22ColId); A22ColId = NULL;
-	free(A22val); A22val = NULL;
+	outfile.close();
 
 	free(rsc); rsc = NULL;
 	free(xr); xr = NULL;
@@ -1338,38 +306,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		free(resp[ind]); resp[ind] = NULL;
 	}
 	free(resp); resp = NULL;
-
-    ////outfile.close();
     free(xr); xr = NULL;
-    //temp.clear();
-    temp1.clear();
-    temp2.clear();
-    U0.clear();
-
-    ////outfile.close();
-    sys->Vh = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * i_re * sizeof(lapack_complex_double));
-    lapack_complex_double *V_re2 = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * i_re * sizeof(lapack_complex_double));
-    for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++){    // A*V_re
-        for (myint inde2 = 0; inde2 < i_re; inde2++){
-            sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real = V_re[inde2 * (sys->N_edge - sys->bden) + inde].real;
-            sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag = V_re[inde2 * (sys->N_edge - sys->bden) + inde].imag;
-        }
-    }
-
-    free(LrowId); LrowId = NULL;
-    free(LcolId); LcolId = NULL;
-    free(Lval); Lval = NULL;
-
-    sys->leng_Vh = i_re;
-
-    free(y_re); y_re = NULL;
-    free(V_re2); V_re2 = NULL;
-    free(tmp3); tmp3 = NULL;
-    free(tmp4); tmp4 = NULL;
-    free(ipiv); ipiv = NULL;
-    free(y_new); y_new = NULL;
-    free(m_new); m_new = NULL;
-    free(val); val = NULL;
 }
 
 int find_Vh_central(fdtdMesh *sys, int sourcePort){
@@ -2680,7 +1617,7 @@ void get1122Block(myint leng11, myint leng22, fdtdMesh* sys, myint* A12RowId, my
 
 }
 
-int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat) {
+int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat) {
 	/* Use MKL fgmres to generate the matrix solution of Ll * x = bm 
 	   Ll = [V0a' * (D_eps + dt * D_sig) * V0, V0a' * (D_eps + dt *  D_sig);
 	         (D_eps + dt * D_sig) * V0, (D_eps + dt * D_sig + dt ^ 2 * L)] 
@@ -2872,7 +1809,7 @@ int mkl_gmres_A(fdtdMesh* sys, double* bm, double* x, myint* ARowId, myint* ACol
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	double dvar;
-	int status;
+	int status, maxit = 500;
 	ofstream out;
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
@@ -2918,7 +1855,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	/* and put the result in vector tmp[ipar[22]-1]
 	/*---------------------------------------------------------------------------*/
 	if (RCI_request == 1) {
-		for (int ind = 0; ind < N; ++ind) {
+		for (myint ind = 0; ind < N; ++ind) {
 			tmp[ipar[22] - 1 + ind] = 0;    // before using sparseMatrixVecMul, the resultant vector should be first initialized
 		}
 		sparseMatrixVecMul(ARowId, AColId, Aval, leng_A, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1]);
@@ -2944,7 +1881,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		dfgmres_get(&ivar, computed_solution, b, &RCI_request, ipar, dpar, tmp, &itercount);
 		/* Compute the current true residual via MKL (Sparse) BLAS routines */
 		
-		for (int ind = 0; ind < N; ++ind) {
+		for (myint ind = 0; ind < N; ++ind) {
 			residual[ind] = 0;   // before using sparseMatrixVecMul, the resultant vector should be first initialized
 		}
 		sparseMatrixVecMul(ARowId, AColId, Aval, leng_A, &b[0], &residual[0]);
@@ -2952,8 +1889,8 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
-		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
-		if (dvar < 0.001) goto COMPLETE;
+		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		if (dvar < 0.001 || itercount > maxit) goto COMPLETE;
 		else goto ONE;
 	}
 
@@ -3027,25 +1964,25 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 	status = hypreSolve(sys, A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);
 
 	/* (V0ca'*(D_sig*dt)*V0c)*y0c=b2 */
-	for (int indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
+	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
 		temp2[indi] = b1[sys->leng_v0d1 + indi] * sys->v0can[indi];
 	}
 	status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp2, sys->leng_v0c, &b2[sys->leng_v0d1], 0, 3);
-	for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
 		b2[sys->leng_v0d1 + indi] /= (DT / sys->v0cn[indi]);
 	}
 
 	/* (V0da'*D_eps*V0d)*y0d+V0da'*D_eps*V0c*y0c=b1 */
-	for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
 		temp2[indi] = b2[sys->leng_v0d1 + indi] / sys->v0cn[indi];
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp2, beta, temp);
-	for (int indi = 0; indi < sys->N_edge - sys->bden; ++indi) {
+	for (myint indi = 0; indi < sys->N_edge - sys->bden; ++indi) {
 		temp[indi] *= sys->getEps(sys->mapEdgeR[indi]);
 	}
 
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp1); // temp1 = V0da'*D_eps*normalized(V0c)*yc
-	for (int indi = 0; indi < sys->leng_v0d1; ++indi) {
+	for (myint indi = 0; indi < sys->leng_v0d1; ++indi) {
 		temp1[indi] = b1[indi] - temp1[indi] / sys->v0dan[indi];   // temp1 = b1 - normalized(V0da)'*D_eps*normalized(V0c)*yc
 	}
 	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp1, sys->leng_v0d1, b2, 0, 3);
@@ -3144,6 +2081,8 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 
 int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22) {
 	/* solve the backward matrix inverse solution
+	[V0a'*(D_eps+dt*D_sig)*V0, V0a'*(D_eps+dt*D_sig);
+	 (D_eps+dt*D_sig)*V0     , (D_eps+dt*D_sig+dt^2*L)]
 	   bm : right hand side
 	   x : solution
 	   Others are system matrices */
@@ -3191,6 +2130,9 @@ int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct,
 }
 
 int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* sol) {
+	/* Solve [V0a'*(D_eps+dt*D_sig)*V0]^(-1)
+	The matrix is [V0da'*D_eps*V0d, V0da'*D_eps*V0c;
+	               V0ca'*D_eps*V0d, V0ca'*(D_eps+dt*D_sig)*V0c] */
 	int status;
 	double alpha = 1, beta = 0;
 	struct matrix_descr descr;
@@ -3204,49 +2146,60 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	double* temp1 = (double*)malloc(sys->leng_v0c * sizeof(double));
 	double* xc = (double*)malloc(sys->leng_v0c * sizeof(double));
 	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, rhs, sys->leng_v0d1, bd1, 1, 3);   // bd1 = (v0da'*D_eps*v0d)^(-1)*(bd)
-	for (int i = 0; i < sys->leng_v0d1; ++i) {
+	//out.open("bd1.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->leng_v0d1; ind++) {
+	//	out << bd1[ind] << endl;
+	//}
+	//out.close();
+	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		bd1[i] /= sys->v0dn[i];    // v0d is normalized
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0dt, descr, bd1, beta, temp); // temp = v0d*(v0da'*D_eps*v0d)^(-1)*bd
-	for (int i = 0; i < edge; ++i) {
+	//out.open("temp.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < edge; ++ind) {
+	//	out << temp[ind] << endl;
+	//}
+	//out.close();
+	for (myint i = 0; i < edge; ++i) {
 		temp[i] = sys->getEps(sys->mapEdgeR[i]) * temp[i];    // temp = D_eps*v0d*(v0da'*D_eps*v0d)^(-1)*bd
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0cat, descr, temp, beta, temp1); // temp1 = v0ca'*D_eps*v0d*(v0da'*D_eps*v0d)^(-1)*bd
-	for (int i = 0; i < sys->leng_v0c; ++i) {
+	for (myint i = 0; i < sys->leng_v0c; ++i) {
 		temp1[i] /= sys->v0can[i];    // v0ca is normalized
 	}
-	for (int i = 0; i < sys->leng_v0c; ++i) {
+	for (myint i = 0; i < sys->leng_v0c; ++i) {
 		temp1[i] = rhs[sys->leng_v0d1 + i] - temp1[i];   // temp1 = bc-v0ca'*D_eps*v0d*(v0da'*D_eps*v0d)^(-1)*bd
 	}
+	
 	/* solve v0ca'*D_sig*dt*v0c */
-	for (int i = 0; i < sys->leng_v0c; ++i) {   // Ac is not normalized with V0ca and V0c
+	for (myint i = 0; i < sys->leng_v0c; ++i) {   // Ac is not normalized with V0ca and V0c
 		temp1[i] = temp1[i] * sys->v0can[i];
 	}
 	status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, xc, 1, 3);
-	for (int i = 0; i < sys->leng_v0c; ++i) {
+	for (myint i = 0; i < sys->leng_v0c; ++i) {
 		xc[i] /= (DT / sys->v0cn[i]);    //xc = (v0ca'*dt*D_sig*v0c)^(-1)*(bc-v0ca'*D_eps*v0d*(v0da'*D_eps*v0d)^(-1)*bd)
 	}
 
-	for (int i = 0; i < sys->leng_v0c; ++i) {
+	for (myint i = 0; i < sys->leng_v0c; ++i) {
 		temp1[i] = xc[i] / sys->v0cn[i];    // v0c is normalized
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp1, beta, temp); // temp = v0c*xc
-	for (int i = 0; i < edge; ++i) {
+	for (myint i = 0; i < edge; ++i) {
 		temp[i] = sys->getEps(sys->mapEdgeR[i]) * temp[i];    // temp = D_eps*v0c*xc
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, bd1); // bd1 = v0da'*D_eps*v0c*xc
-	for (int i = 0; i < sys->leng_v0d1; ++i) {
+	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		bd1[i] /= sys->v0dan[i];
 	}
-	for (int i = 0; i < sys->leng_v0d1; ++i) {
+	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		bd1[i] = rhs[i] - bd1[i];  // bd1 = bd-v0da'*D_eps*v0c*xc
 	}
 	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, bd1, sys->leng_v0d1, bd1, 1, 3);   // bd1 (xd) = (v0da'*D_eps*v0d)^(-1)*(bd-v0da'*D_eps*v0c*xc)
 
-	for (int i = 0; i < sys->leng_v0d1; ++i) {
+	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		sol[i] = bd1[i];
 	}
-	for (int i = 0; i < sys->leng_v0c; ++i) {
+	for (myint i = 0; i < sys->leng_v0c; ++i) {
 		sol[i + sys->leng_v0d1] = xc[i];
 	}
 	free(bd1); bd1 = NULL;
@@ -3265,7 +2218,7 @@ int sparseMatrixVecMul(myint* rowId, myint* colId, double* val, myint leng, doub
 	   v1 : vector
 	   v2 : result vector, 
 	   Note: v2 need to initialize to be 0 first */
-	for (int i = 0; i < leng; ++i) {
+	for (myint i = 0; i < leng; ++i) {
 		v2[rowId[i]] += val[i] * v1[colId[i]];
 	}
 	return 0;
@@ -3435,22 +2388,25 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	double* xh = (double*)calloc(sys->outside, sizeof(double));
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, Jo, beta, temp);   // temp=v0da'*Jo
 	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, temp1, 1, 3);   // temp1=(v0da'*(D_epsoo)*v0d)^(-1)*v0da'*Jo
-	for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
 		temp1[ind] /= (-freq * freq * M_PI * M_PI * 4);    // temp1=(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0dt, descr, temp1, beta, temp2);   // temp2=v0d*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
-	for (int ind = 0; ind < sys->outside; ++ind) {
+	for (myint ind = 0; ind < sys->outside; ++ind) {
 		temp2[ind] *= -freq * freq * M_PI * M_PI * 4 * sys->getEps(sys->mapEdgeR[sys->mapioR[ind]]);   // temp2=(-omega^2*D_epsoo*v0d)*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
 		temp2[ind] = Jo[ind] - temp2[ind];   // temp2=Jo-(-omega^2*D_epsoo*v0d)*(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
 	}
 	double* Looval = (double*)calloc(sys->leng_Loo, sizeof(double));
-	for (int ind = 0; ind < sys->leng_Loo; ++ind) {   // define Looval for (-omega^2*D_epsoo+Loo)
+	for (myint ind = 0; ind < sys->leng_Loo; ++ind) {   // define Looval for (-omega^2*D_epsoo+Loo)
 		Looval[ind] = sys->Looval[ind];
 		if (sys->LooRowId[ind] == sys->LooColId[ind]) {
 			Looval[ind] += -pow(freq * M_PI * 2, 2) * sys->getEps(sys->mapEdgeR[sys->mapioR[sys->LooRowId[ind]]]);
 		}
 	}
 	status = mkl_gmres_A(sys, temp2, xh, sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo), xh is got!
+	//myint* LooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
+	//status = COO2CSR_malloc(sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside, LooRowId1);
+	//solveOO_pardiso(sys, LooRowId1, sys->LooColId, Looval, sys->leng_Loo, sys->outside, temp2, xh, 1);
 	/* Begin to output (Loo-omega^2*D_epsoo) */
 	//out.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->leng_Loo; ++ind) {
@@ -3469,7 +2425,7 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	//out.close();
 	/* End of outputting (Loo-omega^2*(D_epsoo) */
 
-	for (int ind = 0; ind < sys->outside; ++ind) {
+	for (myint ind = 0; ind < sys->outside; ++ind) {
 		temp2[ind] = xh[ind] * (-pow(freq * M_PI * 2, 2)) * sys->getEps(sys->mapEdgeR[sys->mapioR[ind]]);   // temp2=(-omega^2*D_epsoo)*xh
 		temp2[ind] = Jo[ind] - temp2[ind];   // temp2=b-(-omega^2*D_epsoo)*xh
 	}
@@ -3477,14 +2433,14 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp2, beta, temp);   // temp=v0da'*(b-(-omega^2*D_epsoo)*xh)
 	double* yd = (double*)calloc(sys->leng_v0d1, sizeof(double));
 	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, yd, 1, 3);   // get yd
-	for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
 		yd[ind] /= (-pow(freq * 2 * M_PI, 2));
 	}
 
 	/* combine to get the final xo */
 	double* xo1 = (double*)calloc(sys->outside, sizeof(double));
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0dt, descr, yd, beta, xo1);   // xo1=v0d*yd
-	for (int ind = 0; ind < sys->outside; ++ind) {
+	for (myint ind = 0; ind < sys->outside; ++ind) {
 		xo[ind] = - freq * 2 * M_PI * (xh[ind] + xo1[ind]);
 	}
 
@@ -3496,4 +2452,55 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	free(yd); yd = NULL;
 	free(xo1); xo1 = NULL;
 	return 0;
+}
+
+int solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mooval, myint leng, myint N, double* Jo, double* xo, int rhs_s) {
+	/* Use pardiso to solve Moo*xo=Jo
+	MooRowId1 : Moo's CSR rowId
+	MooColId : Moo's column id
+	Mooval : Moo's value
+	leng : nnz in the matrix Moo
+	N : size of the matrix Moo
+	Jo : right hand side is -1i*omega*Jo
+	xo : outside solution
+	rhs_s : right hand side size*/
+
+	myint size = N;
+	myint mtype = 11;    /* Real complex unsymmetric matrix */
+	myint nrhs = rhs_s;    /* Number of right hand sides */
+	void* pt[64];
+
+	/* Pardiso control parameters */
+	myint iparm[64];
+	myint maxfct, mnum, phase, error, msglvl, solver;
+	double dparm[64];
+	int v0csin;
+	myint perm;
+
+	/* Auxiliary variables */
+	char* var;
+
+	msglvl = 0;    /* print statistical information */
+	solver = 0;    /* use sparse direct solver */
+	error = 0;
+	maxfct = 1;
+	mnum = 1;
+	phase = 13;
+
+	pardisoinit(pt, &mtype, iparm);
+	iparm[38] = 1;
+	iparm[34] = 1;    // 0-based indexing
+
+	//cout << "Begin to solve (-w^2*D_epsoo+Soo)x=-iwJ\n";
+	complex<double>* ddum;
+
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, Mooval, MooRowId1, MooColId, &perm, &nrhs, iparm, &msglvl, Jo, xo, &error);
+	if (error != 0) {
+		printf("\nERROR during numerical factorization: %d", error);
+		exit(2);
+	}
+
+	phase = -1;     // Release internal memory
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, MooRowId1, MooColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+
 }

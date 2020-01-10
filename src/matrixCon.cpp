@@ -2,239 +2,243 @@
 #include <ctime>
 #include "fdtd.hpp"
 #include "hypreSolver.h"
-
+//#define TIME (1)   // TIME = 1 run time domain, comment run frequency domain
 
 static bool comp(pair<double, int> a, pair<double, int> b) {
     return a.first <= b.first;
 };
 
-int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<double, int> yi, unordered_map<double, int> zi) {
+int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<double, int>& yi, unordered_map<double, int>& zi) {
 
 
-    int indi, indj, mark, k, l, n;
-    int status = 0;
-    int count = 0;
-    int xcol = 0;
-    vector<int> rowId;
-    vector<int> colId;
-    vector<double> val;
-    vector<int> temp2;
-    double *temp;
-    myint inx = 0, iny = 0, inz = 0;
+	int indi, indj, mark, k, l, n;
+	int status = 0;
+	int count = 0;
+	int xcol = 0;
+	vector<int> rowId;
+	vector<int> colId;
+	vector<int> temp2;
+	double *temp;
+	myint inx = 0, iny = 0, inz = 0;
 
-    /* Construct V0d with row id, col id and its val */
-    sys->leng_v0d1 = 0, sys->v0d1num = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
-    sys->leng_v0d1a = 0, sys->v0d1anum = 0;
-    myint leng_v0d2 = 0, leng_v0d2a = 0, v0d2num = 0, v0d2anum = 0;
-    sys->mapd = (myint*)calloc(sys->N_node, (sizeof(myint)));
-    double block1_x, block1_y, block2_x, block2_y, block3_x, block3_y;
-    double sideLen = 0.; // around the conductor 10um is considered with rapid potential change
-    myint node1 = 0, node2 = 0;
+	/* Construct V0d with row id, col id and its val */
+	sys->leng_v0d1 = 0, sys->v0d1num = 0;    // store the num of v0d1 vectors, which are nodes outside the conductors
+	sys->leng_v0d1a = 0, sys->v0d1anum = 0;
+	myint leng_v0d2 = 0, leng_v0d2a = 0, v0d2num = 0, v0d2anum = 0;
+	sys->mapd = (myint*)calloc(sys->N_node, (sizeof(myint)));
+	double block1_x, block1_y, block2_x, block2_y, block3_x, block3_y;
+	double sideLen = 0.; // around the conductor 10um is considered with rapid potential change
+	myint node1 = 0, node2 = 0;
 
-    block1_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
-    block1_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
-    block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
-    block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
-    block3_x = 0;
-    block3_y = 0;
+	block1_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
+	block1_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
+	block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
+	block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
+	block3_x = 0;
+	block3_y = 0;
 #ifdef PRINT_V0D_BLOCKS
-    cout << "V0d's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
-    cout << "V0d's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
-    cout << "V0d's block3_x and block3_y are " << block3_x << " " << block3_y << endl;
+	cout << "V0d's block1_x and block1_y are " << block1_x << " " << block1_y << endl;
+	cout << "V0d's block2_x and block2_y are " << block2_x << " " << block2_y << endl;
+	cout << "V0d's block3_x and block3_y are " << block3_x << " " << block3_y << endl;
 #endif
 
-    /* Generate V0d1 */
-    sys->merge_v0d1(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, sideLen);
+	/* Generate V0d1 */
+	sys->merge_v0d1(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, sideLen);
 
 
-    cout << "Length of V0d1 is " << sys->leng_v0d1 << ", and number of non-zeros in V0d1 is " << sys->v0d1num << endl;
-    cout << "Length of V0d1a is " << sys->leng_v0d1a << ", and number of non-zeros in V0d1a is " << sys->v0d1anum << endl;
-    cout << "V0d is generated!" << endl;
+	cout << "Length of V0d1 is " << sys->leng_v0d1 << ", and number of non-zeros in V0d1 is " << sys->v0d1num << endl;
+	cout << "Length of V0d1a is " << sys->leng_v0d1a << ", and number of non-zeros in V0d1a is " << sys->v0d1anum << endl;
+	cout << "V0d is generated!" << endl;
 
-    /* Generate Ad = V0da1'*D_eps*V0d */
-    sys->generateAd(sys->mapd, sys->v0d1num, sys->v0d1anum, sys->leng_v0d1);
+	/* Generate Ad = V0da1'*D_eps*V0d */
+	sys->generateAd(sys->mapd, sys->v0d1num, sys->v0d1anum, sys->leng_v0d1);
 
 	/* Begin to map the inside and outside edges */
 	sys->mapEdgeInsideOutside();   // generate mapio and mapioR
 	/* End of mapping the inside and outside edges */
+	cout << "The number of outside conductor edge is " << sys->outside << endl;
+	cout << "The number of inside conductor edge is " << sys->N_edge - sys->bden - sys->outside << endl;
 
-
-    sys->v0d1valo = (double*)malloc(sys->v0d1num * sizeof(double));
-    for (indi = 0; indi < sys->v0d1num; indi++) {
-        sys->v0d1valo[indi] = sys->v0d1val[indi];
-    }
-    for (indi = 0; indi < sys->v0d1num; indi++) {    // compute sqrt(D_eps)*V0d1
-        sys->v0d1val[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
-    }
-    sys->v0d1avalo = (double*)malloc(sys->v0d1anum * sizeof(double));
-    for (indi = 0; indi < sys->v0d1anum; indi++) {
-        sys->v0d1avalo[indi] = sys->v0d1aval[indi];
-    }
-    for (indi = 0; indi < sys->v0d1anum; indi++) {
-        sys->v0d1aval[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
-    }
-
-
-    sys->v0d1ColIdo = (myint*)malloc(sys->v0d1num * sizeof(myint));
-    for (indi = 0; indi < sys->v0d1num; indi++) {
-        sys->v0d1ColIdo[indi] = sys->v0d1ColId[indi];
-    }
-    free(sys->v0d1ColId); sys->v0d1ColId = (myint*)malloc((sys->leng_v0d1 + 1) * sizeof(myint));
-    status = COO2CSR_malloc(sys->v0d1ColIdo, sys->v0d1RowId, sys->v0d1val, sys->v0d1num, sys->leng_v0d1, sys->v0d1ColId);
-    if (status != 0) {
-        return status;
-    }
-	/* Begin to set v0d to be the outside v0d */
+	sys->v0d1valo = (double*)malloc(sys->v0d1num * sizeof(double));
 	for (indi = 0; indi < sys->v0d1num; indi++) {
-		//if (sys->markEdge[sys->v0d1RowId[indi]])
-		//	cout << "Something wrong with V0d!" << endl;
-		sys->v0d1RowId[indi] = sys->mapio[sys->mapEdge[sys->v0d1RowId[indi]]];
+		sys->v0d1valo[indi] = sys->v0d1val[indi];
 	}
+	for (indi = 0; indi < sys->v0d1num; indi++) {    // compute sqrt(D_eps)*V0d1
+		sys->v0d1val[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
+	}
+	sys->v0d1avalo = (double*)malloc(sys->v0d1anum * sizeof(double));
+	for (indi = 0; indi < sys->v0d1anum; indi++) {
+		sys->v0d1avalo[indi] = sys->v0d1aval[indi];
+	}
+	for (indi = 0; indi < sys->v0d1anum; indi++) {
+		sys->v0d1aval[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
+	}
+
+
+	sys->v0d1ColIdo = (myint*)malloc(sys->v0d1num * sizeof(myint));
+	for (indi = 0; indi < sys->v0d1num; indi++) {
+		sys->v0d1ColIdo[indi] = sys->v0d1ColId[indi];
+	}
+	free(sys->v0d1ColId); sys->v0d1ColId = (myint*)malloc((sys->leng_v0d1 + 1) * sizeof(myint));
+	status = COO2CSR_malloc(sys->v0d1ColIdo, sys->v0d1RowId, sys->v0d1val, sys->v0d1num, sys->leng_v0d1, sys->v0d1ColId);
+	if (status != 0) {
+		return status;
+	}
+	/* Begin to set v0d to be the outside v0d */
+	//for (indi = 0; indi < sys->v0d1num; indi++) {
+	//	//if (sys->markEdge[sys->v0d1RowId[indi]])
+	//	//	cout << "Something wrong with V0d!" << endl;
+	//	sys->v0d1RowId[indi] = sys->mapio[sys->mapEdge[sys->v0d1RowId[indi]]];
+	//}
 	/* End of setting v0d to be the outside v0d */
 
 
-    //cout << "Number of NNZ in V0d1 is " << sys->v0d1num << endl;
+	//cout << "Number of NNZ in V0d1 is " << sys->v0d1num << endl;
 
-    sparse_status_t s;
+	sparse_status_t s;
 
-    /* V0d^T's csr form handle for MKL */
-    sparse_matrix_t V0dt;
-    s = mkl_sparse_d_create_csr(&V0dt, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, sys->outside/*sys->N_edge*/, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1valo);
+	/* V0d^T's csr form handle for MKL */
+	myint V0d_row = sys->N_edge;   // sys->outside   // the row size of V0d
 
-    /* V0da^T's csr form handle for MKL */
-    sparse_matrix_t V0dat;
-    s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, sys->outside/*sys->N_edge*/, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
+	sparse_matrix_t V0dt;
+	s = mkl_sparse_d_create_csr(&V0dt, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, V0d_row, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1valo);
+
+	/* V0da^T's csr form handle for MKL */
+	sparse_matrix_t V0dat;
+	s = mkl_sparse_d_create_csr(&V0dat, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, V0d_row, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1avalo);
+	sparse_matrix_t V0da1t;   // Approximation of V0da
+	s = mkl_sparse_d_create_csr(&V0da1t, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1, V0d_row, &sys->v0d1ColId[0], &sys->v0d1ColId[1], sys->v0d1RowId, sys->v0d1aval1);
 
 #ifdef V0_new_schema
-    double * drhs = new double[sys->leng_v0d1 * leng_v0d2];
-    mkl_sparse_d_mm(SPARSE_OPERARION_NON_TRANSPOSE, 1, V0dat, SPARSE_MATRIX_TYPE_GENERAL, SPARSE_LAYOUT_COLUMN_MAJOR, temp, leng_v0d2, (sys->N_edge - sys->bden), 0, drhs, sys->leng_v0d1);
-    delete[] temp;
-    delete[] drhs;
+	double * drhs = new double[sys->leng_v0d1 * leng_v0d2];
+	mkl_sparse_d_mm(SPARSE_OPERARION_NON_TRANSPOSE, 1, V0dat, SPARSE_MATRIX_TYPE_GENERAL, SPARSE_LAYOUT_COLUMN_MAJOR, temp, leng_v0d2, (sys->N_edge - sys->bden), 0, drhs, sys->leng_v0d1);
+	delete[] temp;
+	delete[] drhs;
 #endif
 
-    int *argc;
-    char ***argv;
-    MPI_Init(argc, argv);
+	int *argc;
+	char ***argv;
+	MPI_Init(argc, argv);
 
-    //status = setHYPREMatrix(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_v0d1, ad, parcsr_ad);
-    /* End */
+	//status = setHYPREMatrix(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_v0d1, ad, parcsr_ad);
+	/* End */
 
-    //sys->AdRowId1 = (int*)malloc((sys->leng_v0d1 + 1) * sizeof(int));
-    //status = COO2CSR_malloc(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, sys->leng_v0d1, sys->AdRowId1);
-    //if (status != 0)
+	//sys->AdRowId1 = (int*)malloc((sys->leng_v0d1 + 1) * sizeof(int));
+	//status = COO2CSR_malloc(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, sys->leng_v0d1, sys->AdRowId1);
+	//if (status != 0)
 
-    //    return status;
+	//    return status;
 
-    //cout << "The number of nonzeros in Ad is " << sys->leng_Ad << endl;
+	//cout << "The number of nonzeros in Ad is " << sys->leng_Ad << endl;
 
-    /* Construct V0c with row id, col id and its val */
-    sys->leng_v0c = 0, sys->v0cnum = 0;
-    sys->leng_v0ca = 0, sys->v0canum = 0;
+	/* Construct V0c with row id, col id and its val */
+	sys->leng_v0c = 0, sys->v0cnum = 0;
+	sys->leng_v0ca = 0, sys->v0canum = 0;
 
-    int numPortCdt = 0;
-    count = 0;
+	int numPortCdt = 0;
+	count = 0;
 
 
 
-    sys->cindex.push_back(-1);    // the last index in the sparse form for each conductor in V0c, indi denotes ith conductor (starting from 1)
-    sys->acu_cnno.push_back(0);    // how many v0c are in each conductor (accumulative), indi denotes the ith conductor (starting from 1)
+	sys->cindex.push_back(-1);    // the last index in the sparse form for each conductor in V0c, indi denotes ith conductor (starting from 1)
+	sys->acu_cnno.push_back(0);    // how many v0c are in each conductor (accumulative), indi denotes the ith conductor (starting from 1)
 
-    
-    count = 0;
-    block1_x = 0;// (sys->xlim2 - sys->xlim1) / 3 * sys->lengthUnit;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
-    block1_y = 0;// (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
-    block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
-    block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
 
-    clock_t t1 = clock();
-	
+	count = 0;
+	block1_x = 0;// (sys->xlim2 - sys->xlim1) / 3 * sys->lengthUnit;// (sys->xn[sys->nx - 1] - sys->xn[0]) / 10;
+	block1_y = 0;// (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
+	block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
+	block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
+
+	clock_t t1 = clock();
+
 	sys->mapc = (myint*)calloc(sys->N_node, sizeof(myint));
-    sys->merge_v0c(block1_x, block1_y, block2_x, block2_y);
+	sys->merge_v0c(block1_x, block1_y, block2_x, block2_y);
 
 #ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+	//cout << "Time to generate V0c is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
-    cout << "Length of V0c is " << sys->leng_v0c << " number of non-zeros in V0c is " << sys->v0cnum << endl;
-    cout << "Length of V0ca is " << sys->leng_v0ca << " number of non-zeros in V0ca is " << sys->v0canum << endl;
-    cout << "V0c is generated!" << endl;
+	cout << "Length of V0c is " << sys->leng_v0c << " number of non-zeros in V0c is " << sys->v0cnum << endl;
+	cout << "Length of V0ca is " << sys->leng_v0ca << " number of non-zeros in V0ca is " << sys->v0canum << endl;
+	cout << "V0c is generated!" << endl;
 
-    indj = 0;
+	indj = 0;
 
-    /*for (indi = 0; indi < sys->numCdt + 1; indi++) {
-    cout << sys->acu_cnno[indi] << " ";
-    }
-    cout << endl;*/
-    t1 = clock();
-    sys->generateAc(sys->mapc, sys->v0cnum, sys->v0canum, sys->leng_v0c);
+	/*for (indi = 0; indi < sys->numCdt + 1; indi++) {
+	cout << sys->acu_cnno[indi] << " ";
+	}
+	cout << endl;*/
+	t1 = clock();
+	sys->generateAc(sys->mapc, sys->v0cnum, sys->v0canum, sys->leng_v0c);
 
 #ifdef PRINT_VERBOSE_TIMING
-    cout << "Time to generate Ac is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-    cout << "Number of non-zeros in Ac is " << sys->leng_Ac << endl;
+	//cout << "Time to generate Ac is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+	//cout << "Number of non-zeros in Ac is " << sys->leng_Ac << endl;
 #endif
-    
-    free(sys->markNode); sys->markNode = NULL;
 
-    for (indi = 0; indi < sys->numCdt; indi++) {
-        free(sys->conductor[indi].node); sys->conductor[indi].node = NULL;
-    }
-    free(sys->conductor); sys->conductor = NULL;
-    /*  trial of first set HYPRE matrix Ac */
-    //HYPRE_IJMatrix ac;
-    //HYPRE_ParCSRMatrix parcsr_ac;
-    //status = setHYPREMatrix(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_v0c, ac, parcsr_ac);
-    /* End */
+	free(sys->markNode); sys->markNode = NULL;
+
+	for (indi = 0; indi < sys->numCdt; indi++) {
+		free(sys->conductor[indi].node); sys->conductor[indi].node = NULL;
+	}
+	free(sys->conductor); sys->conductor = NULL;
+	/*  trial of first set HYPRE matrix Ac */
+	//HYPRE_IJMatrix ac;
+	//HYPRE_ParCSRMatrix parcsr_ac;
+	//status = setHYPREMatrix(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_v0c, ac, parcsr_ac);
+	/* End */
 
 
-    sys->v0cvalo = (double*)malloc(sys->v0cnum * sizeof(double));
-    for (indi = 0; indi < sys->v0cnum; indi++)
-        sys->v0cvalo[indi] = sys->v0cval[indi];    // v0cvalo is the v0c values without D_sig
-    for (indi = 0; indi < sys->v0cnum; indi++) {
-        if (sys->markEdge[sys->v0cRowId[indi]] != 0) {
-            sys->v0cval[indi] *= sqrt(SIGMA);       // Compute the sparse form of D_sig*V0c
-        }
-    }
-    sys->v0cavalo = (double*)malloc(sys->v0canum * sizeof(double));
-    for (indi = 0; indi < sys->v0canum; indi++)
-        sys->v0cavalo[indi] = sys->v0caval[indi];
-    for (indi = 0; indi < sys->v0canum; indi++) {
-        if (sys->markEdge[sys->v0cRowId[indi]] != 0) {
-            sys->v0caval[indi] *= sqrt(SIGMA);
-        }
-    }
+	sys->v0cvalo = (double*)malloc(sys->v0cnum * sizeof(double));
+	for (indi = 0; indi < sys->v0cnum; indi++)
+		sys->v0cvalo[indi] = sys->v0cval[indi];    // v0cvalo is the v0c values without D_sig
+	for (indi = 0; indi < sys->v0cnum; indi++) {
+		if (sys->markEdge[sys->v0cRowId[indi]] != 0) {
+			sys->v0cval[indi] *= sqrt(SIGMA);       // Compute the sparse form of D_sig*V0c
+		}
+	}
+	sys->v0cavalo = (double*)malloc(sys->v0canum * sizeof(double));
+	for (indi = 0; indi < sys->v0canum; indi++)
+		sys->v0cavalo[indi] = sys->v0caval[indi];
+	for (indi = 0; indi < sys->v0canum; indi++) {
+		if (sys->markEdge[sys->v0cRowId[indi]] != 0) {
+			sys->v0caval[indi] *= sqrt(SIGMA);
+		}
+	}
 
-    sys->v0cColIdo = (myint*)malloc(sys->v0cnum * sizeof(myint));
-    for (indi = 0; indi < sys->v0cnum; indi++) {
-        sys->v0cColIdo[indi] = sys->v0cColId[indi];
-    }
-    free(sys->v0cColId); sys->v0cColId = (myint*)malloc((sys->leng_v0c + 1) * sizeof(myint));
-    status = COO2CSR_malloc(sys->v0cColIdo, sys->v0cRowId, sys->v0cval, sys->v0cnum, sys->leng_v0c, sys->v0cColId);
-    if (status != 0) {
-        return status;
-    }
+	sys->v0cColIdo = (myint*)malloc(sys->v0cnum * sizeof(myint));
+	for (indi = 0; indi < sys->v0cnum; indi++) {
+		sys->v0cColIdo[indi] = sys->v0cColId[indi];
+	}
+	free(sys->v0cColId); sys->v0cColId = (myint*)malloc((sys->leng_v0c + 1) * sizeof(myint));
+	status = COO2CSR_malloc(sys->v0cColIdo, sys->v0cRowId, sys->v0cval, sys->v0cnum, sys->leng_v0c, sys->v0cColId);
+	if (status != 0) {
+		return status;
+	}
 
 	/* Print out V0d, V0da, V0c, V0ca */
 	ofstream outfile;
 	//outfile.open("V0d.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0d1num; ++indi) {
-	//	outfile << sys->v0d1RowId[indi] + 1 << " " << sys->v0d1ColIdo[indi] + 1 << " " << sys->v0d1valo[indi] << endl;
+	//	outfile << sys->v0d1RowId[indi] + 1 << " " << sys->v0d1ColIdo[indi] + 1 << " " << sys->v0d1valo[indi] / sys->v0dn[sys->v0d1ColIdo[indi]] << endl;
 	//}
 	//outfile.close();
 
 	//outfile.open("V0da.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0d1num; ++indi) {
-	//	outfile << sys->v0d1RowId[indi] + 1 << " " << sys->v0d1ColIdo[indi] + 1 << " " << sys->v0d1avalo[indi] << endl;
+	//	outfile << sys->v0d1RowId[indi] + 1 << " " << sys->v0d1ColIdo[indi] + 1 << " " << sys->v0d1avalo[indi] / sys->v0dan[sys->v0d1ColIdo[indi]] << endl;
 	//}
 	//outfile.close();
 
 	//outfile.open("V0c.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0cnum; ++indi) {
-	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " " << sys->v0cvalo[indi] << endl;
+	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " " << sys->v0cvalo[indi] / sys->v0cn[sys->v0cColIdo[indi]] << endl;
 	//}
 	//outfile.close();
 
 	//outfile.open("V0ca.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0cnum; ++indi) {
-	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " " << sys->v0cavalo[indi] << endl;
+	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " " << sys->v0cavalo[indi] / sys->v0can[sys->v0cColIdo[indi]] << endl;
 	//}
 	//outfile.close();
 
@@ -245,87 +249,87 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	//	}
 	//}
 	//outfile.close();
-    /*for (indi = 0; indi < sys->numCdt + 1; indi++) {
-    cout << sys->acu_cnno[indi] << " ";
-    }
-    cout << endl;
-    for (indi = 0; indi < sys->numCdt + 1; indi++) {
-    cout << sys->cindex[indi] << " ";
-    }
-    cout << endl;*/
+	/*for (indi = 0; indi < sys->numCdt + 1; indi++) {
+	cout << sys->acu_cnno[indi] << " ";
+	}
+	cout << endl;
+	for (indi = 0; indi < sys->numCdt + 1; indi++) {
+	cout << sys->cindex[indi] << " ";
+	}
+	cout << endl;*/
 
 
-    double *a;
-    int *ia, *ja;
+	double *a;
+	int *ia, *ja;
 
 
-    /* Pick up a y0c2 cooresponding to one source port */
-    complex<double> Zresult;
-    double *bd1, *bd2;
-    double *bdc1, *bdc2;
-    double mdone;
-    int ione;
-    lapack_int *ipiv;
-    int info;
-    double *workspace;
-    double *xd2;
-    double *temp1;
-    int startCol;
-    double freq; // Frequency
+	/* Pick up a y0c2 cooresponding to one source port */
+	complex<double> Zresult;
+	double *bd1, *bd2;
+	double *bdc1, *bdc2;
+	double mdone;
+	int ione;
+	lapack_int *ipiv;
+	int info;
+	double *workspace;
+	double *xd2;
+	double *temp1;
+	int startCol;
+	double freq; // Frequency
 
-    startCol = 0;
-    sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
-    sys->x.assign(sys->numPorts * sys->numPorts * sys->nfreq, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve
+	startCol = 0;
+	sys->Y = (complex<double>*)calloc(sys->numPorts * sys->numPorts * sys->nfreq, sizeof(complex<double>));
+	sys->x.assign(sys->numPorts * sys->numPorts * sys->nfreq, complex<double>(0., 0.)); // Use complex double constructor to assign initial output matrix for single-frequency solve
 
-    double *b, *xc;    // the array of the right hand side
-    xcol = 0;
+	double *b, *xc;    // the array of the right hand side
+	xcol = 0;
 
-    int port = 0, sourcePort = 0;    // show which port it is using
-    int node;
-    double *crhs;
+	int port = 0, sourcePort = 0;    // show which port it is using
+	int node;
+	double *crhs;
 
-    char transa;
-    int m;
-    double alpha = 1, beta = 0;
-    char matdescra[6];
-    matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
-    cout << endl << "Begin to solve for network parameters!" << endl;
+	char transa;
+	int m;
+	double alpha = 1, beta = 0;
+	char matdescra[6];
+	matdescra[0] = 'G'; matdescra[3] = 'C';    // general matrix multi, 0-based indexing
+	cout << endl << "Begin to solve for network parameters!" << endl;
 
-    double *ydcp;
-    double *y0c, *y0cs;
-    double *yc, *yca;
-    double *yccp;
-    double *dRhs, *dRhs2, *crhss;
-    complex<double> *yd;
-    double *yd1, *yd2, *yd2a;
-    double *v0caJ, *v0daJ, *y0d, *ydt, *y0d2, *ydat;
-    lapack_complex_double *u0, *u0a;
-    double *u0d, *u0c;
-    double nn, nna;
-    complex<double>* xr;
-    struct matrix_descr descr;
-
-
-    /* V0ca^T's csr form handle for MKL */
-    sparse_matrix_t V0cat;
-    s = mkl_sparse_d_create_csr(&V0cat, SPARSE_INDEX_BASE_ZERO, sys->leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cavalo);
-
-    /* V0c^T's csr form handle for MKL */
-    sparse_matrix_t V0ct;
-    s = mkl_sparse_d_create_csr(&V0ct, SPARSE_INDEX_BASE_ZERO, sys->leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cvalo);
+	double *ydcp;
+	double *y0c, *y0cs;
+	double *yc, *yca;
+	double *yccp;
+	double *dRhs, *dRhs2, *crhss;
+	complex<double> *yd;
+	double *yd1, *yd2, *yd2a;
+	double *v0caJ, *v0daJ, *y0d, *ydt, *y0d2, *ydat;
+	lapack_complex_double *u0, *u0a;
+	double *u0d, *u0c;
+	double nn, nna;
+	complex<double>* xr;
+	struct matrix_descr descr;
 
 
-    lapack_complex_double *tmp;
-    lapack_complex_double *m_h, *m_hc;
-    lapack_complex_double *rhs_h, *rhs_h0;
-    lapack_complex_double *J;
-    lapack_complex_double *y_h;
-    lapack_int info1;
-    lapack_int iter;
-    complex<double> *final_x;
-    lapack_complex_double *J_h;
-    double *ferr, *berr;
-    ofstream out;
+	/* V0ca^T's csr form handle for MKL */
+	sparse_matrix_t V0cat;
+	s = mkl_sparse_d_create_csr(&V0cat, SPARSE_INDEX_BASE_ZERO, sys->leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cavalo);
+
+	/* V0c^T's csr form handle for MKL */
+	sparse_matrix_t V0ct;
+	s = mkl_sparse_d_create_csr(&V0ct, SPARSE_INDEX_BASE_ZERO, sys->leng_v0c, sys->N_edge, &sys->v0cColId[0], &sys->v0cColId[1], sys->v0cRowId, sys->v0cvalo);
+
+
+	lapack_complex_double *tmp;
+	lapack_complex_double *m_h, *m_hc;
+	lapack_complex_double *rhs_h, *rhs_h0;
+	lapack_complex_double *J;
+	lapack_complex_double *y_h;
+	lapack_int info1;
+	lapack_int iter;
+	complex<double> *final_x;
+	lapack_complex_double *J_h;
+	double *ferr, *berr;
+	ofstream out;
 
 
 	/* Begin to generate Soo, Soi, Sio */
@@ -341,57 +345,72 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	myint* SioColId = (myint*)malloc(lengio * sizeof(myint));
 	double* Sioval = (double*)malloc(lengio * sizeof(double));
 	matrixInsideOutside(sys, sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, SooRowId, SooColId, Sooval, SoiRowId, SoiColId, Soival, SioRowId, SioColId, Sioval);   // assign each matrix's rowId, colId, val
+	/* Transfer Soo to CSR format with SooRowId1 */
+	myint* SooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
+	status = COO2CSR_malloc(SooRowId, SooColId, Sooval, lengoo, sys->outside, SooRowId1);
+	/* End of transferring Soo to CSR format with SooRowId1 */
+	double *Sooval_old; //dj
+	Sooval_old = (double*)malloc(lengoo * sizeof(double));
+	for (int ind = 0; ind < lengoo; ++ind) {
+		Sooval_old[ind] = Sooval[ind];
+	}
+
 	/* calculate D_epsoo+dt^2*Soo */
-	//outfile.open("Moo.txt", std::ofstream::out | std::ofstream::trunc);
+	//outfile.open("Soo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < lengoo; ++ind) {
-	//	Sooval[ind] = Sooval[ind] * pow(DT, 2);
-	//	if (SooRowId[ind] == SooColId[ind]) {
-	//		Sooval[ind] += sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[ind]]]);
-	//	}
-	////	outfile << SooRowId[ind] << " " << SooColId[ind] << " " << Sooval[ind] << endl;
+	//	//Sooval[ind] = Sooval[ind] * pow(DT, 2);
+	//	//if (SooRowId[ind] == SooColId[ind]) {
+	//		//Sooval[ind] += sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[ind]]]);
+	//	//}
+	//	outfile << SooRowId[ind] << " " << SooColId[ind] << " ";
+	//	outfile << setprecision(15) << Sooval[ind] << endl;
 	//}
 	//outfile.close();
 	/* End of generating Soo, Soi, Sio */
 
 	/* Begin to generate Loo */
-	myint* AoorowId, *AoocolId;
-	double* Aooval;   // the operator gradient divergence
-	sparse_matrix_t A;
-	sparse_status_t s0;
-	s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, V0dt, V0dat, &A);   // A = v0d*v0da'
-	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
-	myint ARows, ACols, leng_Aoo = 0;
-	MKL_INT *ArowStart, *ArowEnd, *AcolId;
-	double *Aval;
-	s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
-	//cout << "V0d*V0da' row number is " << ARows << " and column number is " << ACols << endl;
-	leng_Aoo = ArowEnd[ARows - 1];    // how many non-zeros are in A
-	myint* AoorowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
-	for (int ind = 0; ind < sys->outside; ++ind) {
-		AoorowId1[ind] = ArowStart[ind];
-	}
-	AoorowId1[sys->outside] = ArowEnd[sys->outside - 1];
-	for (int ind = 0; ind < leng_Aoo; ++ind) {
-		Aval[ind] /= MU;
-	}
+	//sparse_matrix_t A;
+	//sparse_status_t s0;
+	//s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, V0dt, V0da1t, &A);   // A = v0d*v0da'/MU
+	////sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+	////myint ARows, ACols, leng_Aoo = 0;
+	////MKL_INT *ArowStart, *ArowEnd, *AcolId;
+	////double *Aval;
+	////s0 = mkl_sparse_d_export_csr(A, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+	//////cout << "V0d*V0da' row number is " << ARows << " and column number is " << ACols << endl;
+	////leng_Aoo = ArowEnd[ARows - 1];    // how many non-zeros are in A
+	////myint* AoorowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
+	//////out.open("AoorowId1.txt", std::ofstream::out | std::ofstream::trunc);
+	////for (myint ind = 0; ind < sys->outside; ++ind) {
+	////	AoorowId1[ind] = ArowStart[ind];
+	////	//out << AoorowId1[ind] << endl;
+	////}
+	////AoorowId1[sys->outside] = ArowEnd[sys->outside - 1];
+	//////out << AoorowId1[sys->outside] << endl;
+	//////out.close();
+	////for (myint ind = 0; ind < leng_Aoo; ++ind) {
+	////	Aval[ind] /= MU;
+	////}
 
-	myint* SooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
-	status = COO2CSR_malloc(SooRowId, SooColId, Sooval, lengoo, sys->outside, SooRowId1);
-	//outfile.open("Soo.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind < lengoo; ++ind) {
-	//	outfile << SooRowId[ind] << " " << SooColId[ind] << " " << Sooval[ind] << endl;
+	////outfile.open("Soo.txt", std::ofstream::out | std::ofstream::trunc);
+	////for (int ind = 0; ind < lengoo; ++ind) {
+	////	outfile << SooRowId[ind] << " " << SooColId[ind] << " " << Sooval[ind] << endl;
+	////}
+	////outfile.close();
+
+	//if (status != 0) {
+	//	return status;
 	//}
-	//outfile.close();
+	//sparseMatrixSum(sys, A, SooRowId1, SooColId, Sooval, sys->outside);   //do the sparse matrix summation and put the result in Loo
+	////sparseMatrixSum1(sys, AoorowId1, AcolId, Aval, SooRowId1, SooColId, Sooval, sys->outside);
 
-	if (status != 0) {
-		return status;
-	}
-	sparseMatrixSum(sys, AoorowId1, AcolId, Aval, SooRowId1, SooColId, Sooval, sys->outside);   //do the sparse matrix summation and put the result in Loo
-	
-	/* output the Loo and Soo */
+	/* output the Loo */
 	//outfile.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->leng_Loo; ++ind) {
-	//	outfile << sys->LooRowId[ind] << " " << sys->LooColId[ind] << " " << sys->Looval[ind] << endl;
+	//	outfile << sys->LooRowId[ind] << " " << sys->LooColId[ind] << " ";
+	//	outfile << setprecision(15) << sys->Looval[ind] << endl;
+	//	if (sys->Looval[ind] == 0)
+	//		cout << "Wrong!\n";
 	//}
 	//outfile.close();
 	//outfile.open("epsoo.txt", std::ofstream::out | std::ofstream::trunc);
@@ -400,25 +419,129 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 	//}
 	//outfile.close();
 	/* End of generating Loo */
-	myint nedge = sys->N_edge - sys->bden;
-	/* HYPRE solves for each port are messy */
-    for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
-		sys->J = (double*)calloc(sys->N_edge, sizeof(double));
-		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-			//double sourceArea = 0;
-			//sourceArea += sys->portCoor[sourcePort].portArea[sourcePortSide];
-			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
-				/* Set current density for all edges within sides in port to prepare solver */
-				sys->J[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
-			}
-			//cout << "SourcePort " << sourcePort << " area is " << sourceArea << endl;
-		}
-		outfile.open("J.txt", std::ofstream::out | std::ofstream::trunc);
-		for (int ind = 0; ind < nedge; ++ind) {
-			outfile << sys->J[sys->mapEdgeR[ind]] << endl;
-		}
-		outfile.close();
 
+	/* free the space of V0d*V0da' */
+	//free(AoorowId1); AoorowId1 = NULL;
+	//mkl_sparse_destroy(A);
+	/* end of free of the space V0d*V0da' */
+
+	/* Generate analytical Loo */
+	//myint leng_Loo;
+	//leng_Loo = generateLoo_count(sys);
+	//myint* LooRowId, *LooColId;
+	//double* Looval;
+	//LooRowId = (myint*)malloc(leng_Loo * sizeof(myint));
+	//LooColId = (myint*)malloc(leng_Loo * sizeof(myint));
+	//Looval = (double*)malloc(leng_Loo * sizeof(double));
+	//generateLoo(sys, LooRowId, LooColId, Looval, leng_Loo);
+	/* End of generating analytical Loo */
+
+	myint nedge = sys->N_edge - sys->bden;
+#ifdef TIME
+	/* Time domain method to simulate */
+	/* Generating left hand matrix (D_eps + dt * D_sig + dt ^ 2 * S) */
+	double* sval = (double*)malloc(sys->leng_S * sizeof(double));   // sys->SRowId, sys->SColId, val, COO format of this matrix
+	myint* SRowId1 = (myint*)malloc((nedge + 1) * sizeof(myint));    // matrix's CSR form's rowId, with the start index in each row
+	sys->backDiffLeftMatrix(sys->SRowId, sys->SColId, sys->Sval, sys->leng_S, sval, DT);
+	status = COO2CSR_malloc(sys->SRowId, sys->SColId, sval, sys->leng_S, nedge, SRowId1);
+	/* End of generating left hand matrix (D_eps + dt * D_sig + dt ^ 2 * S) */
+	/* Generate the Laplacian matrix */
+	myint leng = 0;
+	myint *LrowId, *LcolId;
+	double *Lval;
+	leng = generateLaplacian_count(sys);   // count how many nnz in the matrix
+	LrowId = (myint*)malloc(leng * sizeof(myint));
+	LcolId = (myint*)malloc(leng * sizeof(myint));
+	Lval = (double*)malloc(leng * sizeof(double));
+	status = generateLaplacian(sys, LrowId, LcolId, Lval);   // generate Laplacian matrix for this mesh
+	//outfile.open("L.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < leng; ++ind) {
+	//	outfile << LrowId[ind] + 1 << " " << LcolId[ind] + 1 << " " << Lval[ind] << endl;
+	//}
+	//outfile.close();
+	/* End of generating the Laplacian matrix */
+
+	/* debug to test L to be solved with HYPRE */
+	//double* Lr = (double*)calloc(sys->N_edge - sys->bden, sizeof(double));
+	//Lr[0] = 1;
+	//double* Lx = (double*)calloc(sys->N_edge - sys->bden, sizeof(double));
+	//status = hypreSolve(sys, LrowId, LcolId, Lval, leng, Lr, sys->N_edge - sys->bden, Lx, 1, 3);
+	//free(Lr); Lr = NULL;
+	//free(Lx); Lx = NULL;
+	/* end of debugging to test L to be solved with HYPRE */
+
+	double* val = (double*)malloc(leng * sizeof(double));
+	sys->backDiffLeftMatrix(LrowId, LcolId, Lval, leng, val, DT);     // left hand matrix (D_eps + dt * D_sig + dt ^ 2 * L), where L is Laplacian matrix, result is put in val
+	//cout << "Begin to generate Ll matrix!\n";
+	sys->generateLaplacianLeft(LrowId, LcolId, Lval, leng, DT);    // Compute the matrix [V0a'*D*V0, V0a'*D; D*V0, D+L] and put in sys->LlrowId, sys->LlcolId, sys->Llval
+	//cout << "Already generate L matrix!\n";
+	//   outfile.open("Ll.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int ind = 0; ind < sys->leng_Ll; ++ind) {
+	   //	outfile << sys->LlRowId[ind] + 1 << " " << sys->LlColId[ind] + 1 << " " << std::setprecision(15) << sys->Llval[ind] << endl;
+	//}
+	//outfile.close();
+
+	/* transfer Ll's rowId to csr format */
+	sys->LlRowIdo = (myint*)malloc(sys->leng_Ll * sizeof(myint));
+	for (int indi = 0; indi < sys->leng_Ll; indi++) {
+		sys->LlRowIdo[indi] = sys->LlRowId[indi];
+	}
+	free(sys->LlRowId); sys->LlRowId = (myint*)malloc((sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden + 1) * sizeof(myint));
+	status = COO2CSR_malloc(sys->LlRowIdo, sys->LlColId, sys->Llval, sys->leng_Ll, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys->LlRowId);
+	if (status != 0) {
+		return status;
+	}
+
+	sparse_matrix_t Ll;
+	s = mkl_sparse_d_create_csr(&Ll, SPARSE_INDEX_BASE_ZERO, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, &sys->LlRowId[0], &sys->LlRowId[1], sys->LlColId, sys->Llval);
+
+	/* A11 rowId, colId, val and A22 rowId, colId, val */
+	myint* A12RowId, *A12ColId, *A21RowId, *A21ColId, *A22RowId, *A22ColId;
+	double* A12val, *A21val, *A22val;
+
+	myint leng_A12 = 0, leng_A21 = 0, leng_A22 = 0;
+	get1122Block_count(sys->leng_v0d1 + sys->leng_v0c, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys, leng_A12, leng_A21, leng_A22);
+	A12RowId = (myint*)calloc(leng_A12, sizeof(myint));
+	A12ColId = (myint*)calloc(leng_A12, sizeof(myint));
+	A12val = (double*)calloc(leng_A12, sizeof(double));
+	A21RowId = (myint*)calloc(leng_A21, sizeof(myint));
+	A21ColId = (myint*)calloc(leng_A21, sizeof(myint));
+	A21val = (double*)calloc(leng_A21, sizeof(double));
+	A22RowId = (myint*)calloc(leng_A22, sizeof(myint));
+	A22ColId = (myint*)calloc(leng_A22, sizeof(myint));
+	A22val = (double*)calloc(leng_A22, sizeof(double));
+	get1122Block(sys->leng_v0d1 + sys->leng_v0c, sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden, sys, A12RowId, A12ColId, A12val, A21RowId, A21ColId, A21val, A22RowId, A22ColId, A22val);
+	//outfile.open("A22.txt", std::ofstream::trunc | std::ofstream::out);
+	//for (int ind = 0; ind < leng_A22; ++ind) {
+	//	outfile << A22RowId[ind] + 1 << " " << A22ColId[ind] + 1 << " " << A22val[ind] << endl;
+	//}
+	//outfile.close();
+
+	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+
+		/* backward difference */
+		find_Vh_back(sys, sourcePort, V0ct, V0cat, V0dt, V0dat, A12RowId, A12ColId, A12val, leng_A12, A21RowId, A21ColId, A21val, leng_A21, A22RowId, A22ColId, A22val, leng_A22, SRowId1, sys->SColId, sval);
+
+
+		/* central difference */
+		//find_Vh_central(sys, sourcePort);
+
+	}
+	free(SRowId1); SRowId1 = NULL;
+	free(sval); sval = NULL;
+	free(A12RowId); A12RowId = NULL;
+	free(A12ColId); A12ColId = NULL;
+	free(A12val); A12val = NULL;
+	free(A21RowId); A21RowId = NULL;
+	free(A21ColId); A21ColId = NULL;
+	free(A21val); A21val = NULL;
+	free(A22RowId); A22RowId = NULL;
+	free(A22ColId); A22ColId = NULL;
+	free(A22val); A22val = NULL;
+	/* End of time domain method to simulate */
+#endif
+	/* Frequency domain to solve inside outside part */
+	for (int ind = 0; ind < sys->nfreq; ++ind) {
 		/* debug testing to see the performance of different solvers */
 		//double* bo = (double*)calloc(sys->outside, sizeof(double));
 		//double* yo = (double*)calloc(sys->outside, sizeof(double));
@@ -431,476 +554,511 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
 		//status = hypreSolve(sys, SooRowId, SooColId, Sooval, lengoo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (dt^2*Soo+D_epsoo)
 		//status = mkl_gmres_A(sys, bo, yo, sys->LooRowId, sys->LooColId, sys->Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo)
 		/* End of debugging to see the performance of different solvers */
-		
-		/* backward difference */
-		//find_Vh_back(sys, sourcePort, V0ct, V0cat, V0dt, V0dat);
-		
-
-		/* central difference */
-		//find_Vh_central(sys, sourcePort);
 
 		/* Frequency domain to solve the inside and outside part
 		[-omega^2*D_epsoo+Soo, Soi;
 		 Sio,                  i*omega*D_sigii+Sii] */
-		complex<double>* y;
-		for (int ind = 0; ind < sys->nfreq; ++ind) {
-			/* Begin to output (-omega^2*D_epsoo+Soo) */
-			//double freq = sys->freqNo2freq(ind);
-			//outfile.open("Moo.txt", std::ofstream::out | std::ofstream::trunc);
-			//for (int ind = 0; ind < lengoo; ++ind) {
-			//	Sooval[ind] = Sooval[ind];
-			//	if (SooRowId[ind] == SooColId[ind]) {
-			//		Sooval[ind] += -sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[ind]]]) * pow(freq * 2 * M_PI, 2);
-			//	}
-			//	outfile << SooRowId[ind] + 1 << " " << SooColId[ind] + 1 << " " << setprecision(15) << Sooval[ind] << endl;
-			//}
-			//outfile.close();
-			/* End of outputting (-omega^2*D_epsoo+Soo) */
-			y = (complex<double>*)calloc(nedge, sizeof(complex<double>));
-			solveFreqIO(sys, sourcePort, ind, y, V0dt, V0dat, SioRowId, SioColId, Sioval, lengio);
-			sys->Construct_Z_V0_Vh(y, ind, sourcePort);
-			free(y); y = NULL;
+		 /* Begin to output (-omega^2*D_epsoo+Soo) */
+		double freq = sys->freqNo2freq(ind);
+		cout << endl << "Frequency oo is " << freq << endl << endl;
+		//outfile.open("Moo.txt", std::ofstream::out | std::ofstream::trunc);
+		for (int indi = 0; indi < lengoo; ++indi) {
+			Sooval[indi] = Sooval_old[indi];
+			if (SooRowId[indi] == SooColId[indi]) {
+				Sooval[indi] += -sys->getEps(sys->mapEdgeR[sys->mapioR[SooRowId[indi]]]) * pow(freq * 2 * M_PI, 2);
+			}
+			//outfile << SooRowId[ind] + 1 << " " << SooColId[ind] + 1 << " " << setprecision(15) << Sooval[ind] << endl;
+		}
+		//outfile.close();
+		/* End of outputting (-omega^2*D_epsoo+Soo) */
+
+		/* Only solve oo part with pardiso */
+		reference_oo(sys, ind, SooRowId1, SooColId, Sooval);
+		/* End of only solving oo part with pardiso */
+
+		/* Solve (-omega^2*D_eps+1i*omega*D_sig+S)*xr = -1i*omega*J */
+		//double freq = sys->freqNo2freq(ind);
+		//cout << endl << "Frequency is " << freq << endl << endl;
+		//reference(sys, ind, sys->SRowId, sys->SColId, sys->Sval);
+		/* End of solving (-omega^2*D_eps+1i*omega*D_sig+S)*xr = -1i*omega*J */
+
+		//complex<double>* y;
+		//sys->J = (double*)calloc(sys->N_edge, sizeof(double));
+		//for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+		//	//double sourceArea = 0;
+		//	//sourceArea += sys->portCoor[sourcePort].portArea[sourcePortSide];
+		//	for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+		//		/* Set current density for all edges within sides in port to prepare solver */
+		//		sys->J[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+		//	}
+		//	//cout << "SourcePort " << sourcePort << " area is " << sourceArea << endl;
+		//}
+		//outfile.open("J.txt", std::ofstream::out | std::ofstream::trunc);
+		//for (myint indi = 0; indi < nedge; ++indi) {
+		//	outfile << sys->J[sys->mapEdgeR[indi]] << endl;
+		//}
+		//outfile.close();
+
+
+		//y = (complex<double>*)calloc(nedge * sys->numPorts, sizeof(complex<double>));
+		//solveFreqIO(sys, ind, y, V0dt, V0dat, SooRowId1, SooColId, Sooval, lengoo, SioRowId, SioColId, Sioval, lengio);
+		//for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		//	sys->Construct_Z_V0_Vh(&y[sourcePort * nedge], ind, sourcePort);
+		//}
+		//free(y); y = NULL;
+
+		//		
+		//		//sys->J = (double*)calloc(sys->N_edge, sizeof(double));
+		//		//for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+		//		//	//double sourceArea = 0;
+		//		//	//sourceArea += sys->portCoor[sourcePort].portArea[sourcePortSide];
+		//		//	for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+		//		//		/* Set current density for all edges within sides in port to prepare solver */
+		//		//		sys->J[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+		//		//	}
+		//		//	//cout << "SourcePort " << sourcePort << " area is " << sourceArea << endl;
+		//		//}
+		//
+#ifdef GENERATE_V0_SOLUTION
+
+		v0daJ = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		y0d = (double*)calloc(sys->leng_v0d1, sizeof(double));
+
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, sys->J, beta, v0daJ);
+		for (indi = 0; indi < sys->leng_v0d1; indi++) {
+			v0daJ[indi] *= -1.0;
+		}
+		/* solve V0d system */
+
+		//status = hypreSolve(sys, ad, parcsr_ad, sys->leng_Ad, v0daJ, sys->leng_v0d1, y0d);
+		status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, v0daJ, sys->leng_v0d1, y0d, 1, 3);
+		/* End of solving */
+
+
+		for (indi = 0; indi < sys->leng_v0d1; indi++) {
+			y0d[indi] /= (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
+		}
+		ydt = (double*)calloc(sys->N_edge, sizeof(double));
+		ydat = (double*)calloc(sys->N_edge, sizeof(double));
+		yd1 = (double*)malloc(sys->N_edge * sizeof(double));
+
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d, beta, ydt);    // -V0d*(D_eps0\(V0da'*rsc))
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d, beta, ydat);    // -V0da*(D_eps0\(V0da'*rsc))
+
+		u0 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
+		u0a = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
+		nn = 0;
+		nna = 0;
+		for (indi = 0; indi < sys->N_edge; indi++) {
+			nn += ydt[indi] * ydt[indi];
+			nna += ydat[indi] * ydat[indi];
+		}
+		nn = sqrt(nn);
+		nna = sqrt(nna);
+		for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+			u0[indi].real = ydt[sys->mapEdgeR[indi]] / nn;    // u0d is one vector in V0
+			u0a[indi].real = ydat[sys->mapEdgeR[indi]] / nna;    // u0da
 		}
 
+		/* Compute C right hand side */
+		y0c = (double*)calloc(sys->leng_v0c, sizeof(double));
+		v0caJ = (double*)calloc(sys->leng_v0c, sizeof(double));
 
-#ifdef GENERATE_V0_SOLUTION
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sys->J, beta, v0caJ);
+		// myint count_non = 0; // This is not used later in the function but was used for printing earlier
+		for (indi = 0; indi < sys->leng_v0c; indi++) {
+			v0caJ[indi] *= -1.0;
+		}
 
+		crhs = (double*)calloc(sys->leng_v0c, sizeof(double));
+		for (indi = 0; indi < sys->N_edge; indi++) {
+			yd1[indi] = ydt[indi];
+			ydt[indi] *= -1.0 * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+		}
 
-        v0daJ = (double*)calloc(sys->leng_v0d1, sizeof(double));
-        y0d = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, ydt, beta, crhs);
+		free(ydt); ydt = NULL;
+		free(ydat); ydat = NULL;
 
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, sys->J, beta, v0daJ);
-        for (indi = 0; indi < sys->leng_v0d1; indi++) {
-            v0daJ[indi] *= -1.0;
-        }
-        /* solve V0d system */
-
-        //status = hypreSolve(sys, ad, parcsr_ad, sys->leng_Ad, v0daJ, sys->leng_v0d1, y0d);
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, v0daJ, sys->leng_v0d1, y0d, 1, 3);
-        /* End of solving */
-        
-
-        for (indi = 0; indi < sys->leng_v0d1; indi++) {
-            y0d[indi] /= (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
-        }
-        ydt = (double*)calloc(sys->N_edge, sizeof(double));
-        ydat = (double*)calloc(sys->N_edge, sizeof(double));
-        yd1 = (double*)malloc(sys->N_edge * sizeof(double));
-
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d, beta, ydt);    // -V0d*(D_eps0\(V0da'*rsc))
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d, beta, ydat);    // -V0da*(D_eps0\(V0da'*rsc))
-        
-        u0 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
-        u0a = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
-        nn = 0;
-        nna = 0;
-        for (indi = 0; indi < sys->N_edge; indi++) {
-            nn += ydt[indi] * ydt[indi];
-            nna += ydat[indi] * ydat[indi];
-        }
-        nn = sqrt(nn);
-        nna = sqrt(nna);
-        for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
-            u0[indi].real = ydt[sys->mapEdgeR[indi]] / nn;    // u0d is one vector in V0
-            u0a[indi].real = ydat[sys->mapEdgeR[indi]] / nna;    // u0da
-        }
-
-        /* Compute C right hand side */
-        y0c = (double*)calloc(sys->leng_v0c, sizeof(double));
-        v0caJ = (double*)calloc(sys->leng_v0c, sizeof(double));
-
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sys->J, beta, v0caJ);
-        // myint count_non = 0; // This is not used later in the function but was used for printing earlier
-        for (indi = 0; indi < sys->leng_v0c; indi++) {
-            v0caJ[indi] *= -1.0;
-        }
-
-        crhs = (double*)calloc(sys->leng_v0c, sizeof(double));
-        for (indi = 0; indi < sys->N_edge; indi++) {
-            yd1[indi] = ydt[indi];
-            ydt[indi] *= -1.0 * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-        }
-        
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, ydt, beta, crhs);
-        free(ydt); ydt = NULL;
-        free(ydat); ydat = NULL;
-
-        double v0caJn, crhsn;
-        v0caJn = 0;
-        crhsn = 0;
-        for (indi = 0; indi < sys->leng_v0c; indi++) {
-            v0caJ[indi] += crhs[indi];
-            v0caJn += v0caJ[indi] * v0caJ[indi];
-            crhsn += crhs[indi] * crhs[indi];
-        }
-        v0caJn = sqrt(v0caJn);
-        crhsn = sqrt(crhsn);
-        free(crhs); crhs = NULL;
+		double v0caJn, crhsn;
+		v0caJn = 0;
+		crhsn = 0;
+		for (indi = 0; indi < sys->leng_v0c; indi++) {
+			v0caJ[indi] += crhs[indi];
+			v0caJn += v0caJ[indi] * v0caJ[indi];
+			crhsn += crhs[indi] * crhs[indi];
+		}
+		v0caJn = sqrt(v0caJn);
+		crhsn = sqrt(crhsn);
+		free(crhs); crhs = NULL;
 
 
-        //cout << "Time between the first and the second HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-        /*solve c system block by block*/
+		//cout << "Time between the first and the second HYPRE is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+		/*solve c system block by block*/
 
-        for (indi = 1; indi <= 1; indi++) {
+		for (indi = 1; indi <= 1; indi++) {
 
-            //a = (double*)malloc((sys->cindex[indi] - sys->cindex[indi - 1]) * sizeof(double));
-            //ia = (int*)malloc((sys->cindex[indi] - sys->cindex[indi - 1]) * sizeof(int));
-            //ja = (int*)malloc((sys->cindex[indi] - sys->cindex[indi - 1]) * sizeof(int));
-            //crhss = (double*)malloc((sys->acu_cnno[indi] - sys->acu_cnno[indi - 1]) * sizeof(double));
-            //y0cs = (double*)calloc((sys->acu_cnno[indi] - sys->acu_cnno[indi - 1]), sizeof(double));
+			//a = (double*)malloc((sys->cindex[indi] - sys->cindex[indi - 1]) * sizeof(double));
+			//ia = (int*)malloc((sys->cindex[indi] - sys->cindex[indi - 1]) * sizeof(int));
+			//ja = (int*)malloc((sys->cindex[indi] - sys->cindex[indi - 1]) * sizeof(int));
+			//crhss = (double*)malloc((sys->acu_cnno[indi] - sys->acu_cnno[indi - 1]) * sizeof(double));
+			//y0cs = (double*)calloc((sys->acu_cnno[indi] - sys->acu_cnno[indi - 1]), sizeof(double));
 
-            //for (indj = sys->acu_cnno[indi - 1]; indj <= sys->acu_cnno[indi] - 1; indj++) {
-            //    crhss[indj - sys->acu_cnno[indi - 1]] = v0caJ[indj];
-            //}
-            //for (indj = sys->cindex[indi - 1] + 1; indj <= sys->cindex[indi]; indj++) {
-            //    a[indj - sys->cindex[indi - 1] - 1] = sys->Acval[indj];
-            //    ia[indj - sys->cindex[indi - 1] - 1] = sys->AcRowId[indj] - sys->AcRowId[sys->cindex[indi - 1] + 1];
-            //    ja[indj - sys->cindex[indi - 1] - 1] = sys->AcColId[indj] - sys->AcColId[sys->cindex[indi - 1] + 1];
-            //    //cout << a[indj - sys->cindex[indi - 1] - 1] << " " << ia[indj - sys->cindex[indi - 1] - 1] << " " << ja[indj - sys->cindex[indi - 1] - 1] << endl;
-            //}
+			//for (indj = sys->acu_cnno[indi - 1]; indj <= sys->acu_cnno[indi] - 1; indj++) {
+			//    crhss[indj - sys->acu_cnno[indi - 1]] = v0caJ[indj];
+			//}
+			//for (indj = sys->cindex[indi - 1] + 1; indj <= sys->cindex[indi]; indj++) {
+			//    a[indj - sys->cindex[indi - 1] - 1] = sys->Acval[indj];
+			//    ia[indj - sys->cindex[indi - 1] - 1] = sys->AcRowId[indj] - sys->AcRowId[sys->cindex[indi - 1] + 1];
+			//    ja[indj - sys->cindex[indi - 1] - 1] = sys->AcColId[indj] - sys->AcColId[sys->cindex[indi - 1] + 1];
+			//    //cout << a[indj - sys->cindex[indi - 1] - 1] << " " << ia[indj - sys->cindex[indi - 1] - 1] << " " << ja[indj - sys->cindex[indi - 1] - 1] << endl;
+			//}
 
-            //status = hypreSolve(sys, ia, ja, a, (sys->cindex[indi] - sys->cindex[indi - 1]), crhss, (sys->acu_cnno[indi] - sys->acu_cnno[indi - 1]), y0cs);
+			//status = hypreSolve(sys, ia, ja, a, (sys->cindex[indi] - sys->cindex[indi - 1]), crhss, (sys->acu_cnno[indi] - sys->acu_cnno[indi - 1]), y0cs);
 
-            //for (indj = sys->acu_cnno[indi - 1]; indj <= sys->acu_cnno[indi] - 1; indj++) {
-            //    y0c[indj] = y0cs[indj - sys->acu_cnno[indi - 1]];
-            //}
-            //if (sys->acu_cnno[indi] - sys->acu_cnno[indi - 1] > 100000) {
-            //    outfile1.open("Ac.txt", std::ofstream::out | std::ofstream::trunc);
-            //    for (indj = 0; indj < sys->cindex[indi] - sys->cindex[indi - 1]; indj++) {
-            //        outfile1 << sys->AcRowId[indi] + 1 << " " << sys->AcColId[indi] + 1 << " " << sys->Acval[indi] << endl;
-            //    }
-            //    outfile1.close();
-            //}
-            //free(a); a = NULL;
-            //free(ia); ia = NULL;
-            //free(ja); ja = NULL;
-            //free(crhss); crhss = NULL;
-            //free(y0cs); y0cs = NULL;
+			//for (indj = sys->acu_cnno[indi - 1]; indj <= sys->acu_cnno[indi] - 1; indj++) {
+			//    y0c[indj] = y0cs[indj - sys->acu_cnno[indi - 1]];
+			//}
+			//if (sys->acu_cnno[indi] - sys->acu_cnno[indi - 1] > 100000) {
+			//    outfile1.open("Ac.txt", std::ofstream::out | std::ofstream::trunc);
+			//    for (indj = 0; indj < sys->cindex[indi] - sys->cindex[indi - 1]; indj++) {
+			//        outfile1 << sys->AcRowId[indi] + 1 << " " << sys->AcColId[indi] + 1 << " " << sys->Acval[indi] << endl;
+			//    }
+			//    outfile1.close();
+			//}
+			//free(a); a = NULL;
+			//free(ia); ia = NULL;
+			//free(ja); ja = NULL;
+			//free(crhss); crhss = NULL;
+			//free(y0cs); y0cs = NULL;
 
-            //status = hypreSolve(sys, ac, parcsr_ac, sys->leng_Ac, v0caJ, sys->leng_v0c, y0c);
-            status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, v0caJ, sys->leng_v0c, y0c, 1, 3);
+			//status = hypreSolve(sys, ac, parcsr_ac, sys->leng_Ac, v0caJ, sys->leng_v0c, y0c);
+			status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, v0caJ, sys->leng_v0c, y0c, 1, 3);
 
-        }
-        
-        free(v0caJ); v0caJ = NULL;
+		}
+
+		free(v0caJ); v0caJ = NULL;
 
 
-        /* V0cy0c */
-        yc = (double*)calloc(sys->N_edge, sizeof(double));
-        yca = (double*)calloc(sys->N_edge, sizeof(double));
-        yccp = (double*)malloc(sys->N_edge * sizeof(double));
-        dRhs2 = (double*)calloc(sys->leng_v0d1, sizeof(double));
-        y0d2 = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		/* V0cy0c */
+		yc = (double*)calloc(sys->N_edge, sizeof(double));
+		yca = (double*)calloc(sys->N_edge, sizeof(double));
+		yccp = (double*)malloc(sys->N_edge * sizeof(double));
+		dRhs2 = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		y0d2 = (double*)calloc(sys->leng_v0d1, sizeof(double));
 
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, y0c, beta, yc);
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0cat, descr, y0c, beta, yca);
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, y0c, beta, yc);
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0cat, descr, y0c, beta, yca);
 
-        free(y0c); y0c = NULL;
+		free(y0c); y0c = NULL;
 
-        for (indi = 0; indi < sys->N_edge; indi++) {
-            yccp[indi] = -yc[indi] * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
-        }
-        
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, yccp, beta, dRhs2);
-        free(yccp); yccp = NULL;
+		for (indi = 0; indi < sys->N_edge; indi++) {
+			yccp[indi] = -yc[indi] * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+		}
 
-        
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, dRhs2, sys->leng_v0d1, y0d2, 1, 3);
-        free(dRhs2); dRhs2 = NULL;
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, yccp, beta, dRhs2);
+		free(yccp); yccp = NULL;
 
-        yd2 = (double*)calloc(sys->N_edge, sizeof(double));
-        yd2a = (double*)calloc(sys->N_edge, sizeof(double));
 
-        alpha = 1;
-        beta = 0;
-        descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d2, beta, yd2);
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d2, beta, yd2a);
-        free(y0d2); y0d2 = NULL;
-        nn = 0;
-        nna = 0;
-        for (indi = 0; indi < sys->N_edge; indi++) {
-            nn += (yd2[indi] + yc[indi]) * (yd2[indi] + yc[indi]);
-            nna += (yd2a[indi] + yca[indi]) * (yd2a[indi] + yca[indi]);
-        }
-        nn = sqrt(nn);
-        nna = sqrt(nna);
-        
-        for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
-            u0[sys->N_edge - sys->bden + indi].real = (yd2[sys->mapEdgeR[indi]] + yc[sys->mapEdgeR[indi]]) / nn;    // u0c is the other vector in u0
-            u0a[sys->N_edge - sys->bden + indi].real = (yd2a[sys->mapEdgeR[indi]] + yca[sys->mapEdgeR[indi]]) / nna;    // u0ca
-        }
-        
-        yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
-        for (int id = 0; id < sys->N_edge; id++) {
-            yd[id] = yd2[id] - (1i)*(yd1[id]);
-        }
+		status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, dRhs2, sys->leng_v0d1, y0d2, 1, 3);
+		free(dRhs2); dRhs2 = NULL;
 
-        free(yd2); yd2 = NULL;
-        free(yd1); yd1 = NULL;
-        free(yd2a); yd2a = NULL;
-        free(yca); yca = NULL;
+		yd2 = (double*)calloc(sys->N_edge, sizeof(double));
+		yd2a = (double*)calloc(sys->N_edge, sizeof(double));
 
-        //sys->y = (complex<double>*)malloc(sys->N_edge*sizeof(complex<double>));
-        for (indi = 0; indi < sys->N_edge; indi++) {
-            yd[indi] += yc[indi];
-        }
-        free(yc); yc = NULL;
-        
-        
-        /*out.open("U0.txt", std::ofstream::out | std::ofstream::trunc);
-        for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
-            for (int inde = 0; inde < 2; inde++) {
-                out << u0[inde * (sys->N_edge - sys->bden) + indi].real << " ";
-            }
-            out << endl;
-        }
-        out.close();
-        out.open("U0a.txt", std::ofstream::out | std::ofstream::trunc);
-        for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
-            for (int inde = 0; inde < 2; inde++) {
-                out << u0a[inde * (sys->N_edge - sys->bden) + indi].real << " ";
-            }
-            out << endl;
-        }
-        out.close();*/
-        //sys->Construct_Z_V0(yd, sourcePort);
+		alpha = 1;
+		beta = 0;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, y0d2, beta, yd2);
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dat, descr, y0d2, beta, yd2a);
+		free(y0d2); y0d2 = NULL;
+		nn = 0;
+		nna = 0;
+		for (indi = 0; indi < sys->N_edge; indi++) {
+			nn += (yd2[indi] + yc[indi]) * (yd2[indi] + yc[indi]);
+			nna += (yd2a[indi] + yca[indi]) * (yd2a[indi] + yca[indi]);
+		}
+		nn = sqrt(nn);
+		nna = sqrt(nna);
+
+		for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+			u0[sys->N_edge - sys->bden + indi].real = (yd2[sys->mapEdgeR[indi]] + yc[sys->mapEdgeR[indi]]) / nn;    // u0c is the other vector in u0
+			u0a[sys->N_edge - sys->bden + indi].real = (yd2a[sys->mapEdgeR[indi]] + yca[sys->mapEdgeR[indi]]) / nna;    // u0ca
+		}
+
+		yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
+		for (int id = 0; id < sys->N_edge; id++) {
+			yd[id] = yd2[id] - (1i)*(yd1[id]);
+		}
+
+		free(yd2); yd2 = NULL;
+		free(yd1); yd1 = NULL;
+		free(yd2a); yd2a = NULL;
+		free(yca); yca = NULL;
+
+		//sys->y = (complex<double>*)malloc(sys->N_edge*sizeof(complex<double>));
+		for (indi = 0; indi < sys->N_edge; indi++) {
+			yd[indi] += yc[indi];
+		}
+		free(yc); yc = NULL;
+
+
+		/*out.open("U0.txt", std::ofstream::out | std::ofstream::trunc);
+		for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+			for (int inde = 0; inde < 2; inde++) {
+				out << u0[inde * (sys->N_edge - sys->bden) + indi].real << " ";
+			}
+			out << endl;
+		}
+		out.close();
+		out.open("U0a.txt", std::ofstream::out | std::ofstream::trunc);
+		for (indi = 0; indi < sys->N_edge - sys->bden; indi++) {
+			for (int inde = 0; inde < 2; inde++) {
+				out << u0a[inde * (sys->N_edge - sys->bden) + indi].real << " ";
+			}
+			out << endl;
+		}
+		out.close();*/
+		//sys->Construct_Z_V0(yd, sourcePort);
 #endif
 
-        /* Calculate the Vh part */
+/* Calculate the Vh part */
 #ifndef SKIP_VH
 		cout << "Begin to solve Vh!\n";
-        // u0a = V0a*(V0a'*V0a)*V0a'*u0
-        /*for (indi = 0; indi < 2; indi++) {
+		// u0a = V0a*(V0a'*V0a)*V0a'*u0
+		/*for (indi = 0; indi < 2; indi++) {
 
-        }*/
+		}*/
 
-        // find the Vh eigenmodes
-        //cout << "Begin to find Vh!\n";
-        //status = find_Vh_central(sys, u0, u0a, sourcePort);
-        //status = find_Vh_back(sys, sourcePort);
-        //cout << "Finish finding Vh!\n";
+		// find the Vh eigenmodes
+		//cout << "Begin to find Vh!\n";
+		//status = find_Vh_central(sys, u0, u0a, sourcePort);
+		//status = find_Vh_back(sys, sourcePort);
+		//cout << "Finish finding Vh!\n";
 
-        for (indi = 0; indi < sys->nfreq; indi++){
-            // this point's frequency
+		for (indi = 0; indi < sys->nfreq; indi++) {
+			// this point's frequency
 
-            freq = sys->freqNo2freq(indi);
-            
-
-            // Vh = Vh - u0*((u0a'*A*u0)\(u0a'*A*Vh))
-            lapack_complex_double* V_re2 = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * sys->leng_Vh * sizeof(lapack_complex_double));
-            for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*Vh
-                for (myint inde2 = 0; inde2 < sys->leng_Vh; inde2++) {
-                    if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {    // if this edge is inside the conductor
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde])
-                            - 2 * M_PI * freq * sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * SIGMA;
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (freq * 2 * M_PI) * SIGMA
-                            - sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
-                    }
-                    else {
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
-                        V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = -sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
-                    }
-                }
-            }
-           
-            
-            lapack_complex_double *y_re = (lapack_complex_double*)calloc(2 * sys->leng_Vh, sizeof(lapack_complex_double));    // u0a'*A*Vh
-            status = matrix_multi('T', u0a, (sys->N_edge - sys->bden), 2, V_re2, (sys->N_edge - sys->bden), sys->leng_Vh, y_re);
-            free(V_re2); V_re2 = NULL;
-            
-            lapack_complex_double *tmp3 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
-            for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*u0
-                for (myint inde2 = 0; inde2 < 2; inde2++) {
-                    if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde])
-                            - 2 * M_PI * freq * u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * SIGMA;
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (freq * 2 * M_PI) * SIGMA
-                            - u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
-                    }
-                    else {
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
-                        tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = -u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
-                    }
-                }
-            }
-            
-            lapack_complex_double *tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
-            status = matrix_multi('T', u0a, (sys->N_edge - sys->bden), 2, tmp3, (sys->N_edge - sys->bden), 2, tmp4);    // u0a'*A*u0
-            ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
-            lapack_complex_double *y_new = (lapack_complex_double*)calloc(2 * sys->leng_Vh, sizeof(lapack_complex_double));
-            /*outfile.open("ma.txt", std::ofstream::out | std::ofstream::trunc);
-            for (myint inde = 0; inde < 2; inde++){
-            for (myint inde1 = 0; inde1 < 2; inde1++){
-            outfile << tmp4[inde1 * 2 + inde].real << " " << tmp4[inde1 * 2 + inde].imag << " ";
-            }
-            outfile << endl;
-            }*/
-            info = LAPACKE_zcgesv(LAPACK_COL_MAJOR, 2, sys->leng_Vh, tmp4, 2, ipiv, y_re, 2, y_new, 2, &iter);    // (u0a'*A*u0)\(u0a'*A*V_re)
-            free(ipiv); ipiv = NULL;
-            free(y_re); y_re = NULL;
-            free(tmp3); tmp3 = NULL;
-            free(tmp4); tmp4 = NULL;
-            
-            lapack_complex_double *m_new = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * sys->leng_Vh, sizeof(lapack_complex_double));
-            status = matrix_multi('N', u0, (sys->N_edge - sys->bden), 2, y_new, 2, sys->leng_Vh, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
-            free(y_new); y_new = NULL;
-            lapack_complex_double* Vh = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * (sys->leng_Vh), sizeof(lapack_complex_double));
-            for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {
-                for (myint inde2 = 0; inde2 < sys->leng_Vh; inde2++) {
-                    Vh[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real - m_new[inde2 * (sys->N_edge - sys->bden) + inde].real;
-                    Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag - m_new[inde2 * (sys->N_edge - sys->bden) + inde].imag;
-                }
-            }
-            free(m_new); m_new = NULL;
-            
-            
-            // Vh'*(A+C)*Vh
-            int inde;
-            myint start;
-            tmp = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * sys->leng_Vh, sizeof(lapack_complex_double));
-            for (myint j = 0; j < sys->leng_Vh; j++){    // calculate (A+C)*V_re1
-                inde = 0;
-                while (inde < sys->leng_S){
-                    start = sys->SRowId[inde];
-                    while (inde < sys->leng_S && sys->SRowId[inde] == start){
-
-                        tmp[j * (sys->N_edge - sys->bden) + sys->SRowId[inde]].real += sys->Sval[inde] * Vh[j * (sys->N_edge - sys->bden) + sys->SColId[inde]].real;
-                        tmp[j * (sys->N_edge - sys->bden) + sys->SRowId[inde]].imag += sys->Sval[inde] * Vh[j * (sys->N_edge - sys->bden) + sys->SColId[inde]].imag;
+			freq = sys->freqNo2freq(indi);
 
 
-                        inde++;
-                    }
-                }
-
-                for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
-                    if (sys->markEdge[sys->mapEdgeR[inde]] != 0){
-                        tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].real
-                            - freq * 2 * M_PI * SIGMA * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
-                        tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].imag
-                            + freq * 2 * M_PI * SIGMA * Vh[j * (sys->N_edge - sys->bden) + inde].real;
-                    }
-                    else {
-                        tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].real;
-                        tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
-                    }
-                }
-            }
-
-
-            m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
-            status = matrix_multi('T', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, tmp, (sys->N_edge - sys->bden), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
-            
-            rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
-            J = (lapack_complex_double*)calloc(sys->N_edge - sys->bden, sizeof(lapack_complex_double));
-            for (inde = 0; inde < sys->N_edge; inde++){
-                if (sys->J[inde] != 0) {
-                    J[sys->mapEdge[inde]].imag = -1 * freq * 2 * M_PI;
-                }
-            }
-            
-            status = matrix_multi('T', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, J, (sys->N_edge - sys->bden), 1, rhs_h);    // -1i*omega*V_re1'*J
-            free(J); J = NULL;
-            
-
-            /* V_re1'*A*u */
-            free(tmp);
-            tmp = (lapack_complex_double*)calloc((sys->N_edge - sys->bden), sizeof(lapack_complex_double));
-            for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
-                if (sys->markEdge[sys->mapEdgeR[inde]] != 0){
-                    tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].real() - freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
-                    tmp[inde].imag = freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].real() - pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
-                }
-                else {
-                    tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].real();
-                    tmp[inde].imag = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
-                }
-            }
-            rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
-            status = matrix_multi('T', Vh, sys->N_edge - sys->bden, sys->leng_Vh, tmp, sys->N_edge - sys->bden, 1, rhs_h0);    // V_re1'*A*u
-            for (inde = 0; inde < sys->leng_Vh; inde++){
-                rhs_h[inde].real = rhs_h[inde].real - rhs_h0[inde].real;
-                rhs_h[inde].imag = rhs_h[inde].imag - rhs_h0[inde].imag;
-            }
-            free(rhs_h0); rhs_h0 = NULL;
-            free(tmp); tmp = NULL;
+			// Vh = Vh - u0*((u0a'*A*u0)\(u0a'*A*Vh))
+			lapack_complex_double* V_re2 = (lapack_complex_double*)malloc((sys->N_edge - sys->bden) * sys->leng_Vh * sizeof(lapack_complex_double));
+			for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*Vh
+				for (myint inde2 = 0; inde2 < sys->leng_Vh; inde2++) {
+					if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {    // if this edge is inside the conductor
+						V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde])
+							- 2 * M_PI * freq * sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * SIGMA;
+						V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (freq * 2 * M_PI) * SIGMA
+							- sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+					}
+					else {
+						V_re2[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+						V_re2[inde2 * (sys->N_edge - sys->bden) + inde].imag = -sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+					}
+				}
+			}
 
 
-            ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
-            info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
-            free(ipiv); ipiv = NULL;
-            free(m_h); m_h = NULL;
+			lapack_complex_double *y_re = (lapack_complex_double*)calloc(2 * sys->leng_Vh, sizeof(lapack_complex_double));    // u0a'*A*Vh
+			status = matrix_multi('T', u0a, (sys->N_edge - sys->bden), 2, V_re2, (sys->N_edge - sys->bden), sys->leng_Vh, y_re);
+			free(V_re2); V_re2 = NULL;
 
-            y_h = (lapack_complex_double*)calloc((sys->N_edge - sys->bden), sizeof(lapack_complex_double));
-            status = matrix_multi('N', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
-            
-            final_x = (complex<double>*)malloc((sys->N_edge - sys->bden) * sizeof(complex<double>));
-            for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
-                final_x[inde] = yd[sys->mapEdgeR[inde]].real() + y_h[inde].real + 1i * (yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq + y_h[inde].imag);
-            }
+			lapack_complex_double *tmp3 = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * 2, sizeof(lapack_complex_double));
+			for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {    // A*u0
+				for (myint inde2 = 0; inde2 < 2; inde2++) {
+					if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {
+						tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde])
+							- 2 * M_PI * freq * u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * SIGMA;
+						tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (freq * 2 * M_PI) * SIGMA
+							- u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+					}
+					else {
+						tmp3[inde2 * (sys->N_edge - sys->bden) + inde].real = u0[inde2 * (sys->N_edge - sys->bden) + inde].real * (-freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+						tmp3[inde2 * (sys->N_edge - sys->bden) + inde].imag = -u0[inde2 * (sys->N_edge - sys->bden) + inde].imag * (freq * freq * 4 * pow(M_PI, 2)) * sys->getEps(sys->mapEdgeR[inde]);
+					}
+				}
+			}
 
-            free(y_h); y_h = NULL;
-            free(rhs_h); rhs_h = NULL;
-            
-            xr = (complex<double>*)calloc(sys->N_edge - sys->bden, sizeof(complex<double>));
-            
-            sys->reference1(indi, sourcePort, xr);
-            
-            // Construct Z parameters
-            sys->Construct_Z_V0_Vh(final_x, indi, sourcePort);
+			lapack_complex_double *tmp4 = (lapack_complex_double*)calloc(2 * 2, sizeof(lapack_complex_double));    // u0a'*A*u0
+			status = matrix_multi('T', u0a, (sys->N_edge - sys->bden), 2, tmp3, (sys->N_edge - sys->bden), 2, tmp4);    // u0a'*A*u0
+			ipiv = (lapack_int*)malloc(2 * sizeof(lapack_int));
+			lapack_complex_double *y_new = (lapack_complex_double*)calloc(2 * sys->leng_Vh, sizeof(lapack_complex_double));
+			/*outfile.open("ma.txt", std::ofstream::out | std::ofstream::trunc);
+			for (myint inde = 0; inde < 2; inde++){
+			for (myint inde1 = 0; inde1 < 2; inde1++){
+			outfile << tmp4[inde1 * 2 + inde].real << " " << tmp4[inde1 * 2 + inde].imag << " ";
+			}
+			outfile << endl;
+			}*/
+			info = LAPACKE_zcgesv(LAPACK_COL_MAJOR, 2, sys->leng_Vh, tmp4, 2, ipiv, y_re, 2, y_new, 2, &iter);    // (u0a'*A*u0)\(u0a'*A*V_re)
+			free(ipiv); ipiv = NULL;
+			free(y_re); y_re = NULL;
+			free(tmp3); tmp3 = NULL;
+			free(tmp4); tmp4 = NULL;
+
+			lapack_complex_double *m_new = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * sys->leng_Vh, sizeof(lapack_complex_double));
+			status = matrix_multi('N', u0, (sys->N_edge - sys->bden), 2, y_new, 2, sys->leng_Vh, m_new);    // u0*((u0a'*A*u0)\(u0a'*A*V_re))
+			free(y_new); y_new = NULL;
+			lapack_complex_double* Vh = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * (sys->leng_Vh), sizeof(lapack_complex_double));
+			for (myint inde = 0; inde < sys->N_edge - sys->bden; inde++) {
+				for (myint inde2 = 0; inde2 < sys->leng_Vh; inde2++) {
+					Vh[inde2 * (sys->N_edge - sys->bden) + inde].real = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].real - m_new[inde2 * (sys->N_edge - sys->bden) + inde].real;
+					Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag = sys->Vh[inde2 * (sys->N_edge - sys->bden) + inde].imag - m_new[inde2 * (sys->N_edge - sys->bden) + inde].imag;
+				}
+			}
+			free(m_new); m_new = NULL;
 
 
-            /* Compare with the solution from (-w^2*D_eps+iw*D_sig+S)xr=-iwJ */
-            double err = 0, total_norm = 0, err0 = 0;
-            for (inde = 0; inde < sys->N_edge - sys->bden; inde++){
-                err += (xr[inde].real() - final_x[inde].real()) * (xr[inde].real() - final_x[inde].real()) + (xr[inde].imag() - final_x[inde].imag()) * (xr[inde].imag() - final_x[inde].imag());
-                err0 += (xr[inde].real() - yd[sys->mapEdgeR[inde]].real()) * (xr[inde].real() - yd[sys->mapEdgeR[inde]].real()) + (xr[inde].imag() - yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq) * (xr[inde].imag() - yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq);
-                total_norm += (xr[inde].real()) * (xr[inde].real()) + (xr[inde].imag()) * (xr[inde].imag());
-            }
-            err = sqrt(err);
-            err0 = sqrt(err0);
-            total_norm = sqrt(total_norm);
+			// Vh'*(A+C)*Vh
+			int inde;
+			myint start;
+			tmp = (lapack_complex_double*)calloc((sys->N_edge - sys->bden) * sys->leng_Vh, sizeof(lapack_complex_double));
+			for (myint j = 0; j < sys->leng_Vh; j++) {    // calculate (A+C)*V_re1
+				inde = 0;
+				while (inde < sys->leng_S) {
+					start = sys->SRowId[inde];
+					while (inde < sys->leng_S && sys->SRowId[inde] == start) {
 
-            cout << "Freq " << freq << " the y0 total error is " << err0 / total_norm << endl;
-            cout << "Freq " << freq << " the total error is " << err / total_norm << endl;
-          
-            free(final_x); final_x = NULL;
-            free(Vh); Vh = NULL;
-            free(xr); xr = NULL;
-        }
-        free(sys->Vh); sys->Vh = NULL;
-        free(u0); u0 = NULL;
-        free(u0a); u0a = NULL;
+						tmp[j * (sys->N_edge - sys->bden) + sys->SRowId[inde]].real += sys->Sval[inde] * Vh[j * (sys->N_edge - sys->bden) + sys->SColId[inde]].real;
+						tmp[j * (sys->N_edge - sys->bden) + sys->SRowId[inde]].imag += sys->Sval[inde] * Vh[j * (sys->N_edge - sys->bden) + sys->SColId[inde]].imag;
+
+
+						inde++;
+					}
+				}
+
+				for (inde = 0; inde < sys->N_edge - sys->bden; inde++) {
+					if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {
+						tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].real
+							- freq * 2 * M_PI * SIGMA * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
+						tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].imag
+							+ freq * 2 * M_PI * SIGMA * Vh[j * (sys->N_edge - sys->bden) + inde].real;
+					}
+					else {
+						tmp[j * (sys->N_edge - sys->bden) + inde].real += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].real;
+						tmp[j * (sys->N_edge - sys->bden) + inde].imag += -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * Vh[j * (sys->N_edge - sys->bden) + inde].imag;
+					}
+				}
+			}
+
+
+			m_h = (lapack_complex_double*)calloc(sys->leng_Vh * sys->leng_Vh, sizeof(lapack_complex_double));
+			status = matrix_multi('T', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, tmp, (sys->N_edge - sys->bden), sys->leng_Vh, m_h);    // V_re1'*(A+C)*V_re1
+
+			rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
+			J = (lapack_complex_double*)calloc(sys->N_edge - sys->bden, sizeof(lapack_complex_double));
+			for (inde = 0; inde < sys->N_edge; inde++) {
+				if (sys->J[inde] != 0) {
+					J[sys->mapEdge[inde]].imag = -1 * freq * 2 * M_PI;
+				}
+			}
+
+			status = matrix_multi('T', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, J, (sys->N_edge - sys->bden), 1, rhs_h);    // -1i*omega*V_re1'*J
+			free(J); J = NULL;
+
+
+			/* V_re1'*A*u */
+			free(tmp);
+			tmp = (lapack_complex_double*)calloc((sys->N_edge - sys->bden), sizeof(lapack_complex_double));
+			for (inde = 0; inde < sys->N_edge - sys->bden; inde++) {
+				if (sys->markEdge[sys->mapEdgeR[inde]] != 0) {
+					tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].real() - freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
+					tmp[inde].imag = freq * 2 * M_PI * SIGMA * yd[sys->mapEdgeR[inde]].real() - pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
+				}
+				else {
+					tmp[inde].real = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].real();
+					tmp[inde].imag = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[inde]) * yd[sys->mapEdgeR[inde]].imag() * sys->freqStart * sys->freqUnit / freq;
+				}
+			}
+			rhs_h0 = (lapack_complex_double*)calloc(sys->leng_Vh, sizeof(lapack_complex_double));
+			status = matrix_multi('T', Vh, sys->N_edge - sys->bden, sys->leng_Vh, tmp, sys->N_edge - sys->bden, 1, rhs_h0);    // V_re1'*A*u
+			for (inde = 0; inde < sys->leng_Vh; inde++) {
+				rhs_h[inde].real = rhs_h[inde].real - rhs_h0[inde].real;
+				rhs_h[inde].imag = rhs_h[inde].imag - rhs_h0[inde].imag;
+			}
+			free(rhs_h0); rhs_h0 = NULL;
+			free(tmp); tmp = NULL;
+
+
+			ipiv = (lapack_int*)malloc(sys->leng_Vh * sizeof(lapack_int));
+			info1 = LAPACKE_zgesv(LAPACK_COL_MAJOR, sys->leng_Vh, 1, m_h, sys->leng_Vh, ipiv, rhs_h, sys->leng_Vh);// , y_h, sys->leng_Vh, &iter);    // yh is generated
+			free(ipiv); ipiv = NULL;
+			free(m_h); m_h = NULL;
+
+			y_h = (lapack_complex_double*)calloc((sys->N_edge - sys->bden), sizeof(lapack_complex_double));
+			status = matrix_multi('N', Vh, (sys->N_edge - sys->bden), sys->leng_Vh, rhs_h, sys->leng_Vh, 1, y_h);
+
+			final_x = (complex<double>*)malloc((sys->N_edge - sys->bden) * sizeof(complex<double>));
+			for (inde = 0; inde < sys->N_edge - sys->bden; inde++) {
+				final_x[inde] = yd[sys->mapEdgeR[inde]].real() + y_h[inde].real + 1i * (yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq + y_h[inde].imag);
+			}
+
+			free(y_h); y_h = NULL;
+			free(rhs_h); rhs_h = NULL;
+
+			xr = (complex<double>*)calloc(sys->N_edge - sys->bden, sizeof(complex<double>));
+
+			sys->reference1(indi, sourcePort, xr);
+
+			// Construct Z parameters
+			sys->Construct_Z_V0_Vh(final_x, indi, sourcePort);
+
+
+			/* Compare with the solution from (-w^2*D_eps+iw*D_sig+S)xr=-iwJ */
+			double err = 0, total_norm = 0, err0 = 0;
+			for (inde = 0; inde < sys->N_edge - sys->bden; inde++) {
+				err += (xr[inde].real() - final_x[inde].real()) * (xr[inde].real() - final_x[inde].real()) + (xr[inde].imag() - final_x[inde].imag()) * (xr[inde].imag() - final_x[inde].imag());
+				err0 += (xr[inde].real() - yd[sys->mapEdgeR[inde]].real()) * (xr[inde].real() - yd[sys->mapEdgeR[inde]].real()) + (xr[inde].imag() - yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq) * (xr[inde].imag() - yd[sys->mapEdgeR[inde]].imag() *sys->freqStart * sys->freqUnit / freq);
+				total_norm += (xr[inde].real()) * (xr[inde].real()) + (xr[inde].imag()) * (xr[inde].imag());
+			}
+			err = sqrt(err);
+			err0 = sqrt(err0);
+			total_norm = sqrt(total_norm);
+
+			cout << "Freq " << freq << " the y0 total error is " << err0 / total_norm << endl;
+			cout << "Freq " << freq << " the total error is " << err / total_norm << endl;
+
+			free(final_x); final_x = NULL;
+			free(Vh); Vh = NULL;
+			free(xr); xr = NULL;
+		}
+		free(sys->Vh); sys->Vh = NULL;
+		free(u0); u0 = NULL;
+		free(u0a); u0a = NULL;
 #endif
 
 #ifdef GENERATE_V0_SOLUTION
-        free(yd); yd = NULL;
+		free(yd); yd = NULL;
+		free(sys->J); sys->J = NULL;
+		/*free(u0); u0 = NULL;*/
+		//free(sys->y); sys->y = NULL;
+		xcol++;
+
 #endif
 
-		free(sys->J); sys->J = NULL;
-        /*free(u0); u0 = NULL;*/
-        //free(sys->y); sys->y = NULL;
-        xcol++;
-    }
+	}
+	
+	
     MPI_Finalize();
 
 #ifndef SKIP_STIFF_REFERENCE
@@ -946,18 +1104,39 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
     sys->cindex.clear();
     sys->acu_cnno.clear();
     sys->stackEpsn.clear();
+	
     
     mkl_sparse_destroy(V0dt);
     mkl_sparse_destroy(V0dat);
     mkl_sparse_destroy(V0ct);
     mkl_sparse_destroy(V0cat);
-	//mkl_sparse_destroy(A);
+	
+	/* free Soo matrix */
+	free(SooRowId); SooRowId = NULL;
+	free(SooRowId1); SooRowId1 = NULL;
+	free(SooColId); SooColId = NULL;
+	free(Sooval); Sooval = NULL;
+	/* end of freeing Soo matrix */
+
+	/* free Soi matrix */
+	free(SoiRowId); SoiRowId = NULL;
+	free(SoiColId); SoiColId = NULL;
+	free(Soival); Soival = NULL;
+	/* end of freeing Soi matrix */
+
+	/* free Sio matrix */
+	free(SioRowId); SioRowId = NULL;
+	free(SioColId); SioColId = NULL;
+	free(Sioval); Sioval = NULL;
+	/* end of freeing Sio matrix */
 
     //HYPRE_IJMatrixDestroy(ad);
     //HYPRE_IJMatrixDestroy(ac);
 
     return 0;
 }
+
+
 
 
 int COO2CSR(vector<int> &rowId, vector<int> &ColId, vector<double> &val) {
@@ -1091,7 +1270,7 @@ void matrixInsideOutside_count(fdtdMesh* sys, myint* rowId, myint* colId, myint 
 	   lengoi : oi nnz
 	   lengio : io nnz */
 
-	for (int ind = 0; ind < leng; ++ind) {
+	for (myint ind = 0; ind < leng; ++ind) {
 		if (sys->mapio[rowId[ind]] >= 0 && sys->mapio[rowId[ind]] < sys->outside && sys->mapio[colId[ind]] >= 0 && sys->mapio[colId[ind]] < sys->outside) {
 			lengoo++;
 		}
@@ -1115,7 +1294,7 @@ void matrixInsideOutside(fdtdMesh* sys, myint* rowId, myint* colId, double* val,
 	lengoi : count the nnz in oi
 	lengio : count the nnz in io*/
 	myint lengoo = 0, lengoi = 0, lengio = 0;
-	for (int ind = 0; ind < leng; ++ind) {
+	for (myint ind = 0; ind < leng; ++ind) {
 		if (sys->mapio[rowId[ind]] >= 0 && sys->mapio[rowId[ind]] < sys->outside && sys->mapio[colId[ind]] >= 0 && sys->mapio[colId[ind]] < sys->outside) {
 			ooRowId[lengoo] = sys->mapio[rowId[ind]];
 			ooColId[lengoo] = sys->mapio[colId[ind]];
@@ -1146,8 +1325,8 @@ void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint*
 	Aval : value of this matrix
 	ARows : how many rows are there in the matrix
 	leng_Aoo : the nnz of this matrix as output */
-	for (int ind = 0; ind < ARows; ++ind) {
-		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+	for (myint ind = 0; ind < ARows; ++ind) {
+		for (myint indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
 			leng_Aoo++;
 		}
 	}
@@ -1165,8 +1344,8 @@ void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolI
 	Aooval : output, the outside part of value
 	scale : scalar scale of the value */
 	myint leng_Aoo = 0;
-	for (int ind = 0; ind < ARows; ++ind) {
-		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+	for (myint ind = 0; ind < ARows; ++ind) {
+		for (myint indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
 			AoorowId[leng_Aoo] = ind;
 			AoocolId[leng_Aoo] = AcolId[indi];
 			Aooval[leng_Aoo] = Aval[indi] * scale;
@@ -1175,7 +1354,65 @@ void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolI
 	}
 }
 
-void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows) {
+void sparseMatrixSum(fdtdMesh* sys, sparse_matrix_t& A, myint* browId1, myint* bcolId, double* bval, myint Rows) {
+	/* Add two sparse matrices
+	arowId1 : csr form of rowId of matrix a
+	acolId : a matrix colId
+	aval : a matrix value
+	browId : csr form of rowId of matrix b
+	bcolId : b matrix colId
+	bval : b matrix value
+	Rows : row # of matrices a or b
+	rrowId : resultant matrix rowId
+	rcolId : resultant matrix colId
+	rval : resultant matrix value
+	rleng : resultant matrix nnz */
+
+	sparse_operation_t operation = SPARSE_OPERATION_NON_TRANSPOSE;
+	sparse_matrix_t a, b, r;
+	sparse_status_t s0;
+	double alpha = 1.0;
+
+	//s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &arowId1[0], &arowId1[1], acolId, aval);
+	////if (s0 == SPARSE_STATUS_SUCCESS)
+	////	cout << "SPARSE_STATUS_SUCCESS\n";
+	
+	s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &browId1[0], &browId1[1], bcolId, bval);
+	//if (s0 == SPARSE_STATUS_SUCCESS)
+	//	cout << "SPARSE_STATUS_SUCCESS";
+
+	s0 = mkl_sparse_d_add(operation, A, alpha, b, &r);   // add the two sparse matrices
+
+	myint ARows, ACols;
+	MKL_INT *ArowStart, *ArowEnd;
+	MKL_INT *AcolId;
+	double *Aval;
+	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+	s0 = mkl_sparse_d_export_csr(r, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
+	sys->leng_Loo = ArowEnd[ARows - 1];
+	
+	checkCSRRepeats(ArowStart, ArowEnd, AcolId, Aval, sys->leng_Loo, sys->outside);
+
+	sys->LooRowId = (myint*)malloc(sys->leng_Loo * sizeof(myint));
+	sys->LooColId = (myint*)malloc(sys->leng_Loo * sizeof(myint));
+	sys->Looval = (double*)malloc(sys->leng_Loo * sizeof(double));
+
+	myint count = 0;
+	for (myint ind = 0; ind < ARows; ++ind) {
+		for (myint indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+			sys->LooRowId[count] = ind;
+			sys->LooColId[count] = AcolId[indi];
+			sys->Looval[count] = Aval[indi];
+			count++;
+		}
+	}
+
+	//mkl_sparse_destroy(a);
+	mkl_sparse_destroy(b);
+	mkl_sparse_destroy(r);
+}
+
+void sparseMatrixSum1(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows) {
 	/* Add two sparse matrices
 	arowId1 : csr form of rowId of matrix a
 	acolId : a matrix colId
@@ -1197,7 +1434,7 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 	s0 = mkl_sparse_d_create_csr(&a, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &arowId1[0], &arowId1[1], acolId, aval);
 	//if (s0 == SPARSE_STATUS_SUCCESS)
 	//	cout << "SPARSE_STATUS_SUCCESS\n";
-	
+
 	s0 = mkl_sparse_d_create_csr(&b, SPARSE_INDEX_BASE_ZERO, Rows, Rows, &browId1[0], &browId1[1], bcolId, bval);
 	//if (s0 == SPARSE_STATUS_SUCCESS)
 	//	cout << "SPARSE_STATUS_SUCCESS";
@@ -1212,19 +1449,18 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 	s0 = mkl_sparse_d_export_csr(r, &indexing, &ARows, &ACols, &ArowStart, &ArowEnd, &AcolId, &Aval);
 	sys->leng_Loo = ArowEnd[ARows - 1];
 
+	checkCSRRepeats(ArowStart, ArowEnd, AcolId, Aval, sys->leng_Loo, sys->outside);
+
 	sys->LooRowId = (myint*)malloc(sys->leng_Loo * sizeof(myint));
 	sys->LooColId = (myint*)malloc(sys->leng_Loo * sizeof(myint));
 	sys->Looval = (double*)malloc(sys->leng_Loo * sizeof(double));
 
 	myint count = 0;
-	for (int ind = 0; ind < ARows; ++ind) {
-		for (int indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
+	for (myint ind = 0; ind < ARows; ++ind) {
+		for (myint indi = ArowStart[ind]; indi < ArowEnd[ind]; ++indi) {
 			sys->LooRowId[count] = ind;
 			sys->LooColId[count] = AcolId[indi];
 			sys->Looval[count] = Aval[indi];
-			//if (sys->LooRowId[count] == sys->LooColId[count]) {
-			//	sys->Looval[count] += sys->getEps(sys->mapEdgeR[sys->mapioR[sys->LooRowId[count]]]);
-			//}
 			count++;
 		}
 	}
@@ -1232,4 +1468,48 @@ void sparseMatrixSum(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval,
 	mkl_sparse_destroy(a);
 	mkl_sparse_destroy(b);
 	mkl_sparse_destroy(r);
+}
+
+int checkCSRRepeats(myint* RowIdStart, myint* RowIdEnd, myint* ColId, double* val, myint& leng, myint N) {
+	/* check the CSR matrix format repeat elements and remove the 0 elements
+	This matrix should be rowwise
+	RowIdStart : matrix rowId start
+	RowIdEnd : matrix rowId end, RowIdStart and RowIdEnd are actually the same array
+	ColId : matrix colId
+	val : matrix value
+	leng : matrix nnz
+	N : size of the matrix */
+	myint i = 0, j = 0;   // i denotes the old array checking index, j denotes the new array index
+	myint row = 0;
+	
+	while (row < N) {
+		map<myint, double> col_val;   // the column number and its value and sort the column number
+		myint start = j;   // new row start
+		myint end;   // new row end
+		while (i < RowIdEnd[row]) {
+			if (col_val.find(ColId[i]) == col_val.end() && abs(val[i]) != 0) {   // this column hasn't shown up and this element's value is not zero
+				col_val[ColId[i]] = val[i];
+			}
+			else if (col_val.find(ColId[i]) != col_val.end() && abs(val[i]) != 0) {   // this column has shown up
+				col_val[ColId[i]] += val[i];
+				if (col_val[ColId[i]] == 0)
+					col_val.erase(ColId[i]);
+			}
+			i++;
+		}
+		end = start + col_val.size();
+		i = RowIdEnd[row];    // the next row's start position
+		RowIdStart[row] = start;
+		RowIdEnd[row] = end;
+		for (auto ci : col_val) {
+			ColId[j] = ci.first;
+			val[j] = ci.second;
+			j++;
+		}
+		row++;
+		col_val.clear();
+	}
+	leng = j;
+
+	return 0;
 }
