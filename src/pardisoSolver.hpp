@@ -11,7 +11,7 @@
 //#define DEBUG_SOLVE_REORDERED_S   // debug mode: directly solve the entire reordered S (growZ, rmPEC)
 
 // Compute y = alpha * A * x + beta * y and store computed dense matrix in y
-int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of csr A
+int csrMultiplyDense(const sparse_matrix_t *csrA_mklHandle,     // mkl handle of csr A
     myint N_rows_x, complex<double> *xval,     // x,y ~ dense matrix stored in continuous memory array 
     denseFormatOfMatrix *y) {
     /* see doc: https://software.intel.com/en-us/onemkl-developer-reference-c-mkl-sparse-mm
@@ -35,9 +35,9 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
     }
 
     // Compute y = alpha * A * x + beta * y
-    mkl_sparse_z_mm(SPARSE_OPERATION_NON_TRANSPOSE,
+    sparse_status_t returnStatus = mkl_sparse_z_mm(SPARSE_OPERATION_NON_TRANSPOSE,
         alpha,                              // alpha = -1.0
-        csrA_mklHandle,                     // A
+        *csrA_mklHandle,                    // A
         descrA,
         SPARSE_LAYOUT_COLUMN_MAJOR,         // Describes the storage scheme for the dense matrix
         xval_mklComplex.data(),
@@ -46,6 +46,12 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
         beta,                               // beta = 1.0
         yval_mklComplex.data(),             // Pointer to the memory array used by the vector to store its owned elements
         y->N_rows);
+    if (returnStatus != SPARSE_STATUS_SUCCESS) {
+        cout << "ERROR! Return from mkl_sparse_z_mm is: " << returnStatus << endl;
+        exit(2);
+    }
+
+    y->copyFromMKL_Complex16(yval_mklComplex.data());
 
     return 0;
 }
@@ -87,7 +93,11 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     
     // Combine B21 and B23 in order to be sloved in one Pardiso run.
     BlockType vB21B23(layerS[3]);
-    move(layerS[5].begin(), layerS[5].end(), back_inserter(vB21B23));
+    BlockType vB23_newColInd(layerS[5]);
+    for (auto &nnz : vB23_newColInd) {
+        nnz.col_ind += N_surfE;
+    }   // shift the col index of COO B23 in order to combine [B21, B23] correctly
+    move(vB23_newColInd.begin(), vB23_newColInd.end(), back_inserter(vB21B23));
     denseFormatOfMatrix denseB21B23(N_volE, 2 * N_surfE);       // combined dense [B21, B23]
     denseB21B23.convertBlockTypeToDense(vB21B23);
     vB21B23.clear();
@@ -97,6 +107,10 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     csrB22.convertBlockTypeToCsr(layerS[4]);
     denseFormatOfMatrix denseD0sD1s = 
         csrB22.backslashDense(denseB21B23);                     // combined dense [D0s, D1s]
+    
+    /*denseB21B23.writeToFile("blockB21B23.txt");
+    denseD0sD1s.writeToFile("blockD.txt");*/
+
     denseB21B23.~denseFormatOfMatrix();                         // free combined dense [B21, B23]
 
     // Convert B12, B32 to mkl internal CSR matrix handles
@@ -116,18 +130,23 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
 
     // Solve reducedS blocks C11 = B11 - B12*D0s, C12 = B13 - B12*D1s
     preducedS->convertBlockTypeToDense(layerS[0]);              // dense B11 & dense C11
-    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS);
+    csrMultiplyDense(&csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS);
     myint matrixSizeD0s = N_volE * N_surfE;
     (preducedS + 1)->convertBlockTypeToDense(layerS[2]);        // dense B13 & dense C12
-    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 1);
+    csrMultiplyDense(&csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 1);
     mkl_sparse_destroy(csrB12_mklHandle);                       // free mkl CSR B12 handle
 
     // Solve reducedS blocks C21 = B31 - B32*D0s, C22 = B33 - B32*D1s
     (preducedS + 2)->convertBlockTypeToDense(layerS[6]);        // dense B31 & dense C21
-    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS + 2);
+    csrMultiplyDense(&csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS + 2);
     (preducedS + 3)->convertBlockTypeToDense(layerS[8]);        // dense B33 & dense C22
-    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 3);
+    csrMultiplyDense(&csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 3);
     mkl_sparse_destroy(csrB32_mklHandle);                       // free mkl CSR B32 handle
+
+    /*preducedS->writeToFile("block_C0.txt");
+    (preducedS + 1)->writeToFile("block_C1.txt");
+    (preducedS + 2)->writeToFile("block_C2.txt");
+    (preducedS + 3)->writeToFile("block_C3.txt");*/
 
     denseD0sD1s.~denseFormatOfMatrix();                         // free combined dense [D0s, D1s]
     return 0;
@@ -295,10 +314,19 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
         coo_reorderedS.push_back({ nnzS_rowId, nnzS_colId, cascadedS_val });
     }
 
-    /*csrFormatOfMatrix csrS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC, psys->leng_S);
+    ofstream file_obj;
+    file_obj.open("sys_cooS_growYrmPEC.txt", ios::out);
+    file_obj << "rowInd  colInd  val.real val.imag \n";
     sort(coo_reorderedS.begin(), coo_reorderedS.end(), ascendByRowIndThenByColInd);
-    csrS_reordered.convertBlockTypeToCsr(coo_reorderedS);
-    return csrS_reordered;*/
+    for (const auto &nnz : coo_reorderedS) {
+        file_obj << nnz.row_ind << ' ' << nnz.col_ind << ' ' << nnz.val.real() << ' ' << nnz.val.imag() << endl;
+    }
+    file_obj.close();
+
+    //csrFormatOfMatrix csrS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC, psys->leng_S);
+    //sort(coo_reorderedS.begin(), coo_reorderedS.end(), ascendByRowIndThenByColInd);
+    //csrS_reordered.convertBlockTypeToCsr(coo_reorderedS);
+    //return csrS_reordered;
     denseFormatOfMatrix denseS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC);
     denseS_reordered.convertBlockTypeToDense(coo_reorderedS);
     return denseS_reordered;
@@ -359,6 +387,18 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
     for (auto &block : Blocks) {
         sort(block.begin(), block.end(), ascendByRowIndThenByColInd);
     }
+
+    /*ofstream file_obj;
+    for (int i_block = 0; i_block < Blocks.size(); i_block++) {
+        string filename = "block_B" + to_string(i_block) + ".txt";
+        file_obj.open(filename, ios::out);
+        file_obj << "rowInd  colInd  val.real val.imag \n";
+        for (const auto &nnz : Blocks[i_block]) {
+            file_obj << nnz.row_ind << ' ' << nnz.col_ind << ' ' << nnz.val.real() << ' ' << nnz.val.imag() << endl;
+        }
+        file_obj.close();
+    }*/
+    
 
     // Half the value of overlapped ns-ns blocks between adjcent two layers
     /* The partitioned blocks no longer mean physical curl-curl opeartor, but mamatically, this is doable to

@@ -33,6 +33,18 @@ public:
         this->vals.assign(this->matrixSize, { 0.0, 0.0 });
     }
 
+    void writeToFile(string filename) {
+        ofstream file_obj;
+        file_obj.open(filename, ios::out);
+        file_obj << "N_rows  N_cols \n";
+        file_obj << this->N_rows << ' ' << this->N_cols << endl;
+        file_obj << "val.real  val.imag \n";
+        for (const auto val : this->vals) {
+            file_obj << val.real() << ' ' << val.imag() << endl;
+        }
+        file_obj.close();
+    }
+
     // Convert BlockType (COO) to dense format.
     void convertBlockTypeToDense(const BlockType &block) {
         for (const auto &onennz : block) {
