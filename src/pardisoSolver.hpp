@@ -8,9 +8,10 @@
 #include "fdtd.hpp"
 #include "matrixTypeDef.hpp"
 #include "mapIndex.hpp"
+//#define DEBUG_SOLVE_REORDERED_S   // debug mode: directly solve the entire reordered S (growZ, rmPEC)
 
 // Compute y = alpha * A * x + beta * y and store computed dense matrix in y
-int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of csr A
+int csrMultiplyDense(const sparse_matrix_t *csrA_mklHandle,     // mkl handle of csr A
     myint N_rows_x, complex<double> *xval,     // x,y ~ dense matrix stored in continuous memory array 
     denseFormatOfMatrix *y) {
     /* see doc: https://software.intel.com/en-us/onemkl-developer-reference-c-mkl-sparse-mm
@@ -34,9 +35,9 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
     }
 
     // Compute y = alpha * A * x + beta * y
-    mkl_sparse_z_mm(SPARSE_OPERATION_NON_TRANSPOSE,
+    sparse_status_t returnStatus = mkl_sparse_z_mm(SPARSE_OPERATION_NON_TRANSPOSE,
         alpha,                              // alpha = -1.0
-        csrA_mklHandle,                     // A
+        *csrA_mklHandle,                    // A
         descrA,
         SPARSE_LAYOUT_COLUMN_MAJOR,         // Describes the storage scheme for the dense matrix
         xval_mklComplex.data(),
@@ -45,6 +46,12 @@ int csrMultiplyDense(const sparse_matrix_t &csrA_mklHandle,     // mkl handle of
         beta,                               // beta = 1.0
         yval_mklComplex.data(),             // Pointer to the memory array used by the vector to store its owned elements
         y->N_rows);
+    if (returnStatus != SPARSE_STATUS_SUCCESS) {
+        cout << "ERROR! Return from mkl_sparse_z_mm is: " << returnStatus << endl;
+        exit(2);
+    }
+
+    y->copyFromMKL_Complex16(yval_mklComplex.data());
 
     return 0;
 }
@@ -56,11 +63,11 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     Inputs:
         layerS: a vector containing 9 blocks of the whole matrix S, ~ within one layer
         N_surfE: number of {e}_surface at one surface, e.g. 0s
-        N_volE: number of {e}_volumn at one layer, e.g. 0v
+        N_volE: number of {e}_volume at one layer, e.g. 0v
     Output:
         preducedS: pointing to memory of a vector storing 4 reduced dense blocks as {C11, C12, C21, C22}
 
-    Each isolated layer here contains 2 surfaces and 1 middle volumn e, namely 0s-0v-1s. 
+    Each isolated layer here contains 2 surfaces and 1 middle volume e, namely 0s-0v-1s. 
     A symbolic form is (each number represents the blockId in vector<BlockType>):
                 
                  0s  0v  1s                                    0s  1s
@@ -86,7 +93,11 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     
     // Combine B21 and B23 in order to be sloved in one Pardiso run.
     BlockType vB21B23(layerS[3]);
-    move(layerS[5].begin(), layerS[5].end(), back_inserter(vB21B23));
+    BlockType vB23_newColInd(layerS[5]);
+    for (auto &nnz : vB23_newColInd) {
+        nnz.col_ind += N_surfE;
+    }   // shift the col index of COO B23 in order to combine [B21, B23] correctly
+    move(vB23_newColInd.begin(), vB23_newColInd.end(), back_inserter(vB21B23));
     denseFormatOfMatrix denseB21B23(N_volE, 2 * N_surfE);       // combined dense [B21, B23]
     denseB21B23.convertBlockTypeToDense(vB21B23);
     vB21B23.clear();
@@ -96,6 +107,10 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     csrB22.convertBlockTypeToCsr(layerS[4]);
     denseFormatOfMatrix denseD0sD1s = 
         csrB22.backslashDense(denseB21B23);                     // combined dense [D0s, D1s]
+    
+    /*denseB21B23.writeToFile("blockB21B23.txt");
+    denseD0sD1s.writeToFile("blockD.txt");*/
+
     denseB21B23.~denseFormatOfMatrix();                         // free combined dense [B21, B23]
 
     // Convert B12, B32 to mkl internal CSR matrix handles
@@ -105,28 +120,33 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     vector<MKL_Complex16> csrB12vals_mklCompl(csrB12.N_nnz);
     csrB12.copyToMKL_Complex16(csrB12vals_mklCompl.data());
     mkl_sparse_z_create_csr(&csrB12_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB12.N_rows, csrB12.N_cols,
-        csrB12.rows, csrB12.rows + 1, csrB12.cols, csrB12vals_mklCompl.data());
+        csrB12.rows.data(), csrB12.rows.data() + 1, csrB12.cols.data(), csrB12vals_mklCompl.data());
     csrFormatOfMatrix csrB32(N_surfE, N_volE, layerS[7].size());
     csrB32.convertBlockTypeToCsr(layerS[7]);
     vector<MKL_Complex16> csrB32vals_mklCompl(csrB32.N_nnz);
     csrB32.copyToMKL_Complex16(csrB32vals_mklCompl.data());
     mkl_sparse_z_create_csr(&csrB32_mklHandle, SPARSE_INDEX_BASE_ZERO, csrB32.N_rows, csrB32.N_cols,
-        csrB32.rows, csrB32.rows + 1, csrB32.cols, csrB32vals_mklCompl.data());
+        csrB32.rows.data(), csrB32.rows.data() + 1, csrB32.cols.data(), csrB32vals_mklCompl.data());
 
     // Solve reducedS blocks C11 = B11 - B12*D0s, C12 = B13 - B12*D1s
     preducedS->convertBlockTypeToDense(layerS[0]);              // dense B11 & dense C11
-    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS);
+    csrMultiplyDense(&csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS);
     myint matrixSizeD0s = N_volE * N_surfE;
     (preducedS + 1)->convertBlockTypeToDense(layerS[2]);        // dense B13 & dense C12
-    csrMultiplyDense(csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 1);
+    csrMultiplyDense(&csrB12_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 1);
     mkl_sparse_destroy(csrB12_mklHandle);                       // free mkl CSR B12 handle
 
     // Solve reducedS blocks C21 = B31 - B32*D0s, C22 = B33 - B32*D1s
     (preducedS + 2)->convertBlockTypeToDense(layerS[6]);        // dense B31 & dense C21
-    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS + 2);
+    csrMultiplyDense(&csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data(), preducedS + 2);
     (preducedS + 3)->convertBlockTypeToDense(layerS[8]);        // dense B33 & dense C22
-    csrMultiplyDense(csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 3);
+    csrMultiplyDense(&csrB32_mklHandle, denseD0sD1s.N_rows, denseD0sD1s.vals.data() + matrixSizeD0s, preducedS + 3);
     mkl_sparse_destroy(csrB32_mklHandle);                       // free mkl CSR B32 handle
+
+    /*preducedS->writeToFile("block_C0.txt");
+    (preducedS + 1)->writeToFile("block_C1.txt");
+    (preducedS + 2)->writeToFile("block_C2.txt");
+    (preducedS + 3)->writeToFile("block_C3.txt");*/
 
     denseD0sD1s.~denseFormatOfMatrix();                         // free combined dense [D0s, D1s]
     return 0;
@@ -219,20 +239,31 @@ vector<myint> findSurfLocationOfPort(fdtdMesh *psys) {
         returned surfLocationOfPort = { 0, 2 }      */
 
     vector<myint> surfLocationOfPort;
+    double dyErrorUpperBound = (psys->yn[1] - psys->yn[0]) * MINDISFRACY; // used to compare two equal y coordinates
 
     for (myint sourcePort = 0; sourcePort < psys->numPorts; sourcePort++) {
         double y_thisPort = psys->portCoor[sourcePort].y1[0];
         for (myint indy = 0; indy < psys->N_cell_y + 1; indy++) {   // search over all y nodes
-            if (y_thisPort == psys->yn[indy]) {
+            if (fabs(y_thisPort - psys->yn[indy]) < dyErrorUpperBound) {
                 surfLocationOfPort.push_back(indy);
                 break;
             }
         }
     }
 
+    if (surfLocationOfPort.size() != psys->numPorts) {
+        cout << "ERROR! Missed some ports." << endl;
+        exit(2);
+    }
+
     // Sort vector and erase duplicated surface index
     sort(surfLocationOfPort.begin(), surfLocationOfPort.end());
     surfLocationOfPort.erase( unique(surfLocationOfPort.begin(), surfLocationOfPort.end()), surfLocationOfPort.end() );
+
+    if (surfLocationOfPort.size() != psys->numPorts) {
+        cout << "ERROR! Unsupported port setting! Ports should not locate at the same surface" << endl;
+        exit(2);
+    }
 
     return surfLocationOfPort;
 }
@@ -248,13 +279,59 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
     Return:
         - cascadedS: matrix "(-w^2*D_eps+iw*D_sig+ShSe/mu)" with only {e}_portSurf left    */
 
-    
-
     // Num of {e} at each surface or each layer, index mode (growY, removed PEC)
     myint n_surfExEz            = indexMap.N_surfExEz_rmPEC;
     myint n_volEy               = indexMap.N_volEy_rmPEC;
     myint n_layerE_growY        = n_surfExEz + n_volEy;
     myint N_layers              = psys->N_cell_y;       // num of layers
+
+#ifdef DEBUG_SOLVE_REORDERED_S
+    BlockType coo_reorderedS;
+    coo_reorderedS.reserve(psys->leng_S);
+    for (myint i_nnz = 0; i_nnz < psys->leng_S; i_nnz++) {
+        // (rowId, colId, val) of this nnz element in ShSe/mu, index mode (growZ, removed PEC)
+        myint nnzS_rowId_rmPECz = psys->SRowId[i_nnz];
+        myint nnzS_colId_rmPECz = psys->SColId[i_nnz];
+        complex<double> cascadedS_val = psys->Sval[i_nnz];
+
+        // Map row and col index from (growZ, removed PEC) to (growY, removed PEC)
+        myint nnzS_rowId = indexMap.eInd_map_rmPEC_z2y[nnzS_rowId_rmPECz];
+        myint nnzS_colId = indexMap.eInd_map_rmPEC_z2y[nnzS_colId_rmPECz];
+
+        // For diagonal nnz, add "-w^2*eps+iw*sig" to psys->Sval (ShSe/mu)
+        if (nnzS_rowId == nnzS_colId) {     // if at diagonal
+            myint nnzS_rowId_growZ = psys->mapEdgeR[nnzS_rowId_rmPECz];
+            myint layerInd_alongZ = (nnzS_rowId_growZ + psys->N_edge_v) / (psys->N_edge_s + psys->N_edge_v);
+            double epsi_thisnnz = psys->stackEpsn[layerInd_alongZ] * EPSILON0;
+            double sigma_thisnnz = 0;
+            if (psys->markEdge[nnzS_rowId_growZ] != 0) {
+                sigma_thisnnz = SIGMA;
+            }   // if inside a conductor 
+
+            complex<double> epsi_sigma = { -omegaHz*omegaHz*epsi_thisnnz, omegaHz*sigma_thisnnz };
+            cascadedS_val += epsi_sigma;    // -w^2*D_eps+iw*D_sig+ShSe/mu
+        }
+        coo_reorderedS.push_back({ nnzS_rowId, nnzS_colId, cascadedS_val });
+    }
+
+    ofstream file_obj;
+    file_obj.open("sys_cooS_growYrmPEC.txt", ios::out);
+    file_obj << "rowInd  colInd  val.real val.imag \n";
+    sort(coo_reorderedS.begin(), coo_reorderedS.end(), ascendByRowIndThenByColInd);
+    for (const auto &nnz : coo_reorderedS) {
+        file_obj << nnz.row_ind << ' ' << nnz.col_ind << ' ' << nnz.val.real() << ' ' << nnz.val.imag() << endl;
+    }
+    file_obj.close();
+
+    //csrFormatOfMatrix csrS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC, psys->leng_S);
+    //sort(coo_reorderedS.begin(), coo_reorderedS.end(), ascendByRowIndThenByColInd);
+    //csrS_reordered.convertBlockTypeToCsr(coo_reorderedS);
+    //return csrS_reordered;
+    denseFormatOfMatrix denseS_reordered(indexMap.N_totEdges_rmPEC, indexMap.N_totEdges_rmPEC);
+    denseS_reordered.convertBlockTypeToDense(coo_reorderedS);
+    return denseS_reordered;
+
+#endif
 
     // Determine the block id of each nnz element of S and store in corresponding block matrix
     vector< BlockType > Blocks(8 * N_layers + 1);       // store all bolck matrices of S in a 2D vector
@@ -305,11 +382,23 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
     myint N_surfE = indexMap.N_surfExEz_rmPEC;
     myint N_volE = indexMap.N_volEy_rmPEC;
 
-    // Sort each block matrix by its row indices, 1st element of the tuple
+    // Sort nnzs in each block matrix by row index first then by col index
     /* The purpose is to allow easy convert from COO to CSR format*/
     for (auto &block : Blocks) {
-        sort(block.begin(), block.end(), ascendByRowInd);
+        sort(block.begin(), block.end(), ascendByRowIndThenByColInd);
     }
+
+    /*ofstream file_obj;
+    for (int i_block = 0; i_block < Blocks.size(); i_block++) {
+        string filename = "block_B" + to_string(i_block) + ".txt";
+        file_obj.open(filename, ios::out);
+        file_obj << "rowInd  colInd  val.real val.imag \n";
+        for (const auto &nnz : Blocks[i_block]) {
+            file_obj << nnz.row_ind << ' ' << nnz.col_ind << ' ' << nnz.val.real() << ' ' << nnz.val.imag() << endl;
+        }
+        file_obj.close();
+    }*/
+    
 
     // Half the value of overlapped ns-ns blocks between adjcent two layers
     /* The partitioned blocks no longer mean physical curl-curl opeartor, but mamatically, this is doable to
@@ -320,7 +409,7 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
         }
     }
 
-    // Eliminate e_volumn at each layer and store 4 reduced dense blocks of each layer
+    // Eliminate e_volume at each layer and store 4 reduced dense blocks of each layer
     vector<vector<denseFormatOfMatrix>> surfSurfBlocks(N_layers);   // N_layers*4 dense blocks
     for (myint i_layer = 0; i_layer < N_layers; i_layer++) {
         // Init and allocate memory for 4 dense blocks of each layer
@@ -465,9 +554,13 @@ denseFormatOfMatrix assignRhsJForAllPorts(fdtdMesh *psys, double omegaHz, const 
         }
     }
 
+#ifdef DEBUG_SOLVE_REORDERED_S
+    return RhsJ_SI;
+#endif
+
     // Only keep -iw{j} at port surfaces (cascading)
     myint N_surfExEz = indexMap.N_surfExEz_rmPEC;                               // number of edges at one surface
-    myint n_volEy = indexMap.N_volEy_rmPEC;                                     // number of volumn edges in one layer
+    myint n_volEy = indexMap.N_volEy_rmPEC;                                     // number of volume edges in one layer
     myint N_allCascadedEdges = psys->numPorts * N_surfExEz;                     // number of all edges in kept surfaces
     denseFormatOfMatrix cascadedRhsJ_SI(N_allCascadedEdges, psys->numPorts);    // -iw{j} only at port surfaces
     vector<myint> surfLocationOfPort = findSurfLocationOfPort(psys);
@@ -500,7 +593,7 @@ denseFormatOfMatrix reconstruct_e(fdtdMesh *psys, const mapIndex &indexMap, cons
             - eField_oneExcit: of size (psys->N_edge - psys->bden) * 1, mode (growZ, removed PEC)    */
 
     myint N_surfExEz = indexMap.N_surfExEz_rmPEC;                               // number of edges at one surface
-    myint n_volEy = indexMap.N_volEy_rmPEC;                                     // number of volumn edges in one layer
+    myint n_volEy = indexMap.N_volEy_rmPEC;                                     // number of volume edges in one layer
     myint N_allCascadedEdges = psys->numPorts * N_surfExEz;                     // number of all edges in kept surfaces
     myint N_edgesNotAtPEC = psys->N_edge - psys->bden;                          // num of all edges after removing PEC
     vector<myint> surfLocationOfPort = findSurfLocationOfPort(psys);            // surf index of the port's location
@@ -523,6 +616,19 @@ denseFormatOfMatrix reconstruct_e(fdtdMesh *psys, const mapIndex &indexMap, cons
             eField_oneExcit.vals[eInd_growZrmPEC] = cascadedeField_SI.vals[eInd_cascaded];
         }
     }
+
+#ifdef DEBUG_SOLVE_REORDERED_S
+    for (myint e_ind = 0; e_ind < N_allCascadedEdges; e_ind++) {
+        myint eInd_cascaded = e_ind + excitedPort * N_allCascadedEdges;
+
+        myint eInd_growY = indexMap.eInd_map_rmPEC2y[e_ind];                // Step 1: -> index at (growY, no PEC removal)
+        myint eInd_growZ = indexMap.eInd_map_y2z[eInd_growY];               // Step 2: map (growY, no PEC removal) to (growZ, no PEC removal)
+        myint eInd_growZrmPEC = psys->mapEdge[eInd_growZ];                  // Step 3: map (growZ, no PEC removal) to (growZ, removed PEC)
+
+        eField_oneExcit.vals[eInd_growZrmPEC] = cascadedeField_SI.vals[eInd_cascaded];
+    }
+    return eField_oneExcit;
+#endif
 
     return eField_oneExcit;
 }
