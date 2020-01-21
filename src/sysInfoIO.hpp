@@ -3,6 +3,9 @@
 
 #include "fdtd.hpp"
 
+#include <sys/types.h>
+#include <sys/stat.h>   // "mkdir" in linux
+
 using namespace std;
 
 inline void WriteVectorIn1Line(ofstream &file_obj, const vector<double> &vec_x) {
@@ -23,12 +26,23 @@ void Write2DVectorIn1Line(ofstream &file_obj, const vector<vector<myint>> &vec_2
 	file_obj << endl;
 }
 
-// Write object sys to files
+// Write object sys to files (only works for Linux system due to paths)
 void WriteSysToFile(const fdtdMesh &sys) {
 	ofstream file_obj;
+	
+    // Create folder (if not exists) to store txt files, only in linux system
+#ifdef __linux__
+    struct stat st = { 0 };
+    if (stat("../temp_sysInfoIO", &st) == -1) {
+        if (mkdir("../temp_sysInfoIO", 0777) == -1) {
+            cerr << "Error in creating folder /temp_sysInfoIO!" << endl;
+            exit(2);
+        }
+    }
+#endif
 
 	// Write primitive types like a bool, int, or float in one txt file
-	file_obj.open("sys_PrimitiveType.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_PrimitiveType.txt", ios::out);
 	file_obj << sys.numCdtRow << endl;
 	file_obj << sys.lengthUnit << endl;
 	file_obj << sys.freqUnit << endl;
@@ -48,34 +62,34 @@ void WriteSysToFile(const fdtdMesh &sys) {
 	file_obj.close();
 
 	// Write each vector in independent file
-	file_obj.open("sys_vec_stackEps.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_stackEps.txt", ios::out);
 	for (const auto& i : sys.stackEps)
 		file_obj << i << endl;
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackSig.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_stackSig.txt", ios::out);
 	for (const auto& i : sys.stackSig)
 		file_obj << i << endl;
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackBegCoor.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_stackBegCoor.txt", ios::out);
 	for (const auto& i : sys.stackBegCoor)
 		file_obj << i << endl;
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackEndCoor.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_stackEndCoor.txt", ios::out);
 	for (const auto& i : sys.stackEndCoor)
 		file_obj << i << endl;
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackName.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_stackName.txt", ios::out);
 	for (const auto& i : sys.stackName)
 		file_obj << i << endl;
 	file_obj.close();
 
 	// Write sys.portCoor. Every object of class fdtdPort takes n lines, being one element of vector portCoor
 	// output format: multiplicity ~ 1st line; x1 ~ 2nd line; ... someattri ~ n-th line.
-	file_obj.open("sys_vec_portCoor.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_portCoor.txt", ios::out);
 	for (int i = 0; i < sys.portCoor.size(); i++) {
 		const fdtdPort &ofdtdPort = sys.portCoor[i];
 
@@ -94,7 +108,7 @@ void WriteSysToFile(const fdtdMesh &sys) {
 	file_obj.close();
 
 	// Write sys.conductorIn, only export what is used by function meshAndMark
-	file_obj.open("sys_vec_conductorIn.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_vec_conductorIn.txt", ios::out);
 	for (int i = 0; i < sys.conductorIn.size(); i++) {
 		const fdtdOneCondct &ofdtdOneCondct = sys.conductorIn[i];
 
@@ -114,7 +128,7 @@ void WriteSysToFile(const fdtdMesh &sys) {
 
 
 	// Write *pointer to file 
-	file_obj.open("sys_ptr_stackCdtMark.txt", ios::out);
+	file_obj.open("../temp_sysInfoIO/sys_ptr_stackCdtMark.txt", ios::out);
 	for (int i = 0; i < sys.numStack; i++)
 		file_obj << sys.stackCdtMark[i] << endl;
 	file_obj.close();
@@ -186,7 +200,7 @@ void ReadSysFromFile(fdtdMesh *psys) {
 	ifstream file_obj;
 
 	// Read primitive types like a bool, int, or float
-	file_obj.open("sys_PrimitiveType.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_PrimitiveType.txt", ios::in);
 	if (!file_obj.is_open()) {
 		perror("Error open");
 		exit(EXIT_FAILURE);
@@ -210,31 +224,31 @@ void ReadSysFromFile(fdtdMesh *psys) {
 	file_obj.close();
 
 	// Read each vector from independent file
-	file_obj.open("sys_vec_stackEps.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_stackEps.txt", ios::in);
 	while (file_obj >> doubVecValue) {
 		psys->stackEps.push_back(doubVecValue);
 	}
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackSig.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_stackSig.txt", ios::in);
 	while (file_obj >> doubVecValue) {
 		psys->stackSig.push_back(doubVecValue);
 	}
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackBegCoor.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_stackBegCoor.txt", ios::in);
 	while (file_obj >> doubVecValue) {
 		psys->stackBegCoor.push_back(doubVecValue);
 	}
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackEndCoor.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_stackEndCoor.txt", ios::in);
 	while (file_obj >> doubVecValue) {
 		psys->stackEndCoor.push_back(doubVecValue);
 	}
 	file_obj.close();
 
-	file_obj.open("sys_vec_stackName.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_stackName.txt", ios::in);
 	while (file_obj >> strVecValue) {
 		psys->stackName.push_back(strVecValue);
 	}
@@ -242,7 +256,7 @@ void ReadSysFromFile(fdtdMesh *psys) {
 
 	// Read sys.portCoor. Every object of class fdtdPort takes n lines, being one element of vector portCoor
 	// Input format: multiplicity ~ 1st line; x1 ~ 2nd line; ... someattri ~ n-th line.
-	file_obj.open("sys_vec_portCoor.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_portCoor.txt", ios::in);
 
 	num_line = 0;
 	while (getline(file_obj, line)) {
@@ -275,7 +289,7 @@ void ReadSysFromFile(fdtdMesh *psys) {
 	file_obj.close();
 
 	// Read sys.conductorIn, only input what is used by function meshAndMark
-	file_obj.open("sys_vec_conductorIn.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_vec_conductorIn.txt", ios::in);
 
 	num_line = 0;
 	while (getline(file_obj, line)) {
@@ -300,7 +314,7 @@ void ReadSysFromFile(fdtdMesh *psys) {
 
 
 	// Read *pointer from file 
-	file_obj.open("sys_ptr_stackCdtMark.txt", ios::in);
+	file_obj.open("temp_sysInfoIO/sys_ptr_stackCdtMark.txt", ios::in);
 	psys->stackCdtMark = (double *)malloc(psys->numStack * sizeof(double));
 	for (int i = 0; i < psys->numStack; i++) {
 		file_obj >> psys->stackCdtMark[i];
