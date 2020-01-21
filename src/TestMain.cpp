@@ -351,13 +351,21 @@ int main(int argc, char** argv)
 #endif
 
             // Write object sys to files
-#ifndef SKIP_WRITE_SYS_TO_FILE
+#ifndef SKIP_LAYERED_FD
             WriteSysToFile(sys);
 #endif
 
             // Parameter generation
             clock_t t6 = clock();
+#ifndef SKIP_LAYERED_FD     // Run layered Finite-Difference solver
+            cout << endl << endl << "Results from Layered Finite-Difference Solver: " << endl;
+            status = solveE_Zpara_layered(&sys);
+            //cout << endl << endl << "Results from Reference (direct backslash with PARDISO): " << endl;
+            //solveE_Zpara_reference(&sys);
+#else                       // Run VoVh solver
+            cout << endl << endl << "Results from V0Vh Solver: " << endl;
             status = paraGenerator(&sys, xi, yi, zi);
+#endif
             if (status == 0)
             {
                 cout << "paraGenerator Success!" << endl;

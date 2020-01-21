@@ -24,10 +24,12 @@
 #include <algorithm>
 #include <utility>
 
+//#define SKIP_LAYERED_FD   // Comment out if you want to run layered FD code in Linux, doesn't matter for Windows system
+
 // HYPRE and MKL data type control
-#define LARGE_SYSTEM (1) // Must leave defined with the current makefile. Comment out in windows system
-#ifdef LARGE_SYSTEM
-#define MKL_ILP64 (1) // Must define before including mkl.h if using long long int 
+#define LARGE_SYSTEM (1) // Must leave defined with the current makefile
+#if defined(LARGE_SYSTEM) && defined(__linux__)
+#define MKL_ILP64 (1) // Must define before including mkl.h if using long long int, MKL_ILP64 only works for Linux not for Windows
 typedef long long int myint;
 #else
 typedef int myint;
@@ -73,10 +75,6 @@ using namespace std;
 #define SKIP_VH
 //#define SKIP_GENERATE_STIFF
 #define SKIP_STIFF_REFERENCE 
-
-// Disable layered FDTD code (comment out if you want to test layered FDTD)
-#define SKIP_WRITE_SYS_TO_FILE        // Skip writing sys obj to txt files
-#define SKIP_LAYERED_FDTD             // Skip the main function's calling layeredFdtd code
 
 // Function-like macros
 #define NELEMENT(x) ((sizeof x) / (sizeof x[0]))

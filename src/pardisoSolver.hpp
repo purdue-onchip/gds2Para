@@ -111,7 +111,7 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     /*denseB21B23.writeToFile("blockB21B23.txt");
     denseD0sD1s.writeToFile("blockD.txt");*/
 
-    denseB21B23.~denseFormatOfMatrix();                         // free combined dense [B21, B23]
+    //denseB21B23.~denseFormatOfMatrix();                         // free combined dense [B21, B23]
 
     // Convert B12, B32 to mkl internal CSR matrix handles
     sparse_matrix_t csrB12_mklHandle, csrB32_mklHandle;
@@ -148,7 +148,7 @@ int eliminateVolumE(const vector<BlockType> &layerS, myint N_surfE, myint N_volE
     (preducedS + 2)->writeToFile("block_C2.txt");
     (preducedS + 3)->writeToFile("block_C3.txt");*/
 
-    denseD0sD1s.~denseFormatOfMatrix();                         // free combined dense [D0s, D1s]
+    //denseD0sD1s.~denseFormatOfMatrix();                         // free combined dense [D0s, D1s]
     return 0;
 }
 
@@ -634,7 +634,7 @@ denseFormatOfMatrix reconstruct_e(fdtdMesh *psys, const mapIndex &indexMap, cons
 }
 
 // Solve E field and Z-parameters in Pardiso, solve layer by layer. (under developing)
-void solveE_Zpara_layered(fdtdMesh *psys) {
+int solveE_Zpara_layered(fdtdMesh *psys) {
 
     // Initilize Z-parameters for all frequencies
     psys->x.assign(psys->numPorts * psys->numPorts * psys->nfreq, complex<double>(0., 0.));
@@ -666,6 +666,7 @@ void solveE_Zpara_layered(fdtdMesh *psys) {
     // Print Z-parameters
     psys->print_z_V0_Vh();
 
+    return 0;
 }
 
 // Solve E field and Z-parameters in Pardiso, solve the whole structure as reference
