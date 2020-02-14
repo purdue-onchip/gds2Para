@@ -305,6 +305,21 @@ public:
         return newPt;
     }
 
+    // Apply the "wrong order" (rotation, then x-axis mirroring) transformation to a point
+    vector<double> counterTransform(vector<double> oldPt)
+    {
+        // Error checking on input point
+        if (oldPt.size() != 2)
+        {
+            cerr << "Coordinates of point to transform must be a length-2 vector. Returning same point unaltered." << endl;
+            return oldPt;
+        }
+        vector<double> newPt = oldPt;
+
+        // Rotation and then reflection is the rotation matrix with the first row negated (interpret as reflection then rotation by _negative_ angle).
+        return strans(this->mirrored, this->absMagnify, this->absRotate, this->magnify, -this->getRotation()).applyTranform(newPt);
+    }
+
     // Print function
     void print()
     {

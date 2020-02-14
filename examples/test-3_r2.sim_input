@@ -1,0 +1,6 @@
+FREQUENCY
+freqUnit = 1.0e+6
+freqStart = 1.0
+freqEnd = 1000.0
+nfreq = 31
+freqScale = 0

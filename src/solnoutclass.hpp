@@ -13,6 +13,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <cctype>
@@ -20,6 +21,8 @@
 #include <complex>
 #include <ctime>
 #include <algorithm>
+#include <utility>
+#include <tinyxml2.h>
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Core>
 #include <Eigen/LU>
@@ -31,6 +34,12 @@
 //#define EIGEN_SPARSE // Enable to use sparse matrices for parasitics reporting
 //#define EIGEN_COMPRESS // Enable to allow compressed sparse row (CSR) format for sparse matrices
 #define WRITE_THRESH (1.e-5) // Threshold for saving a parasitic value to file as fraction of total represented in matrix
+
+// File geometry approximation macros
+#define CIRC_PTS (24) // Number of vertices in regular polygon approximation to a complete circle
+#define OUTLINE_LAYER (1) // Layer for outline information
+#define OUTLINE_PROFILE_DATATYPE (1) // Datatype for non-physical profile of outline
+#define OUTLINE_CUTOUT_DATATYPE (2) // Datatype for non-physical cutouts of outline
 
 // Define types for Eigen
 typedef Eigen::Triplet<double, int> dTriplet;
@@ -73,14 +82,15 @@ struct myPruneFunctor
 class Aperture
 {
   public:
-    int aperNum;      // D-code aperture number
-    char stanTemp;    // Standard aperture template (aperture macros disallowed)
-    double circumDia; // Circumdiameter (m, twice radius of circumcircle)
-    double xSize;     // Maximum extent in x-direction (m)
-    double ySize;     // Maximum extent in y-direction (m)
-    double holeDia;   // Diameter of center hole (m)
-    int numVert;      // Number of vertices (for regular polygon template only)
-    double rotation;  // Rotation angle (rad, for regular polygon template)
+    int aperNum;         // D-code aperture number
+    char stanTemp;       // Standard aperture template (aperture macros disallowed)
+    double circumDia;    // Circumdiameter (m, twice radius of circumcircle)
+    double xSize;        // Maximum extent in x-direction (m)
+    double ySize;        // Maximum extent in y-direction (m)
+    double holeDia;      // Diameter of center hole (m)
+    int numVert;         // Number of vertices (for regular polygon template only)
+    strans transform;    // Linear transformations (reflection, rotation, and scaling) of aperture
+    vector<double> pts;  // List of point coordinates (m, alternating x then y)
   public:
     // Default constructor
     Aperture()
@@ -92,7 +102,8 @@ class Aperture
         this->ySize = 0.0;
         this->holeDia = 0.0;
         this->numVert = 0;
-        this->rotation = 0.0;
+        this->transform = strans(false, false, false, 1.0, 0.0);
+        this->pts = vector<double>{};
     }
 
     // Parametrized constructor (circles only)
@@ -105,7 +116,8 @@ class Aperture
         this->ySize = circumDia; // Circle presents diameter as maximum extent in y-direction
         this->holeDia = holeDia;
         this->numVert = 0;
-        this->rotation = 0.0; // Perfect circle cannot have an overall rotation
+        this->transform = strans(false, false, false, 1.0, 0.0); // Perfect circle cannot have an overall rotation
+        this->pts = this->findPts(0., 0.);
     }
 
     // Parametrized constructor (rectangles and obrounds/stadia)
@@ -118,7 +130,8 @@ class Aperture
             this->stanTemp = 'R';
             this->circumDia = hypot(xSize, ySize); // Circumdiameter of a rectangle is the diagonal length
             this->numVert = 4;
-            this->rotation = atan2(-ySize, xSize); // Effective rotation of diagonal to the horizontal (xSize > ySize) or vertical (ySize > xSize) orientation
+            double rotation = atan2(-ySize, xSize); // Effective rotation of diagonal to the horizontal (xSize > ySize) or vertical (ySize > xSize) orientation
+            this->transform = strans(false, false, false, 1.0, rotation);
         }
         else if ((stanTemp == 'C') && (this->xSize == this->ySize))
         {
@@ -126,7 +139,8 @@ class Aperture
             this->stanTemp = 'C';
             this->circumDia = xSize;
             this->numVert = 0;
-            this->rotation = 0.0;
+            double rotation = 0.0;
+            this->transform = strans(false, false, false, 1.0, rotation);
         }
         else if ((stanTemp == 'C') && (this->xSize != this->ySize))
         {
@@ -134,7 +148,9 @@ class Aperture
             this->stanTemp = 'O';
             this->circumDia = (xSize > ySize) ? xSize : ySize; // Ternary operator to select the larger dimension as the circumdiameter
             this->numVert = 0;
-            this->rotation = (xSize > ySize) ? atan2(-ySize, xSize - ySize) : atan2(-(ySize - xSize), xSize); // Lower-right point of rectangle within stadium has rotation found by removing semicircle
+            //double rotation = (xSize > ySize) ? atan2(-ySize, xSize - ySize) : atan2(-(ySize - xSize), xSize); // Lower-right point of rectangle within stadium has rotation found by removing semicircle
+            double rotation = 0.0; // Default rotation is parallel to axes
+            this->transform = strans(false, false, false, 1.0, rotation);
         }
         else if (stanTemp == 'P')
         {
@@ -142,25 +158,31 @@ class Aperture
             this->stanTemp = 'R';
             this->circumDia = hypot(xSize, ySize);
             this->numVert = 4;
-            this->rotation = atan2(-ySize, xSize);
+            double rotation = atan2(-ySize, xSize); // Rotation angle (rad, for regular polygon template)
+            this->transform = strans(false, false, false, 1.0, rotation);
         }
         else if (stanTemp == 'R')
         {
             this->stanTemp = 'R';
             this->circumDia = hypot(xSize, ySize);
             this->numVert = 4;
-            this->rotation = atan2(-ySize, xSize); // Effective rotation of diagonal to the horizontal (xSize > ySize) or vertical (ySize > xSize) orientation
+            //double rotation = atan2(-ySize, xSize); // Effective rotation of diagonal to the horizontal (xSize > ySize) or vertical (ySize > xSize) orientation
+            double rotation = 0.0; // Default rotation is parallel to axes
+            this->transform = strans(false, false, false, 1.0, rotation);
         }
         else
         {
             this->stanTemp = 'O'; // Obround is only option left
             this->circumDia = (xSize > ySize) ? xSize : ySize; // Ternary operator to select the larger dimension as the circumdiameter
             this->numVert = 0;
-            this->rotation = (xSize > ySize) ? atan2(-ySize, xSize - ySize) : atan2(-(ySize - xSize), xSize); // Lower-right point of rectangle within stadium has rotation found by removing semicircle
+            //double rotation = (xSize > ySize) ? atan2(-ySize, xSize - ySize) : atan2(-(ySize - xSize), xSize); // Lower-right point of rectangle within stadium has rotation found by removing semicircle
+            double rotation = 0.0; // Default rotation is parallel to axes
+            this->transform = strans(false, false, false, 1.0, rotation);
         }
         this->xSize = xSize;
         this->ySize = ySize;
         this->holeDia = holeDia;
+        this->pts = this->findPts(0., 0.);
     }
 
     // Parametrized constructor (regular polygons only)
@@ -181,11 +203,44 @@ class Aperture
         }
         this->stanTemp = 'P';
         this->circumDia = circumDia;
-        this->xSize = circumDia; // This is not the true extent, but the calculation is too complicated for the value here
-        this->ySize = circumDia; // Same inaccuracy as xSize mentioned above
+        this->transform = strans(false, false, false, 1.0, rotation); // Linear transformation with rotation angle (rad, for regular polygon template)
+        this->pts = this->findPts(0., 0.);
+        this->findXYSize(); // True extents in x-direction and y-direction
         this->holeDia = holeDia;
         this->numVert = numVert;
-        this->rotation = rotation;
+    }
+
+    // Parametrized constructor (macro definitions only)
+    Aperture(int aperNum, vector<double> pts, double rotation)
+    {
+        this->aperNum = aperNum;
+        this->transform = strans(false, false, false, 1.0, rotation); // Linear transformation with rotation angle (rad, for regular polygon template)
+        if (pts.size() % 2 != 0)
+        {
+            cerr << "Aperture exterior coordinates must be stored in vector of even length. Removing extra x-coordinate and replacing with first two coordinates." << endl;
+            this->pts = pts;
+            this->pts.pop_back(); // Remove extra x-coordinate
+            this->pts.push_back(this->pts[0]); // Push first point to close shape
+            this->pts.push_back(this->pts[1]);
+            this->pts = this->findPts(0., 0.); // Apply rotation if needed
+        }
+        else if ((pts[0] != pts[pts.size() - 2]) || (pts[1] != pts[pts.size() - 1]))
+        {
+            cerr << "Aperture exterior coordinates are not closed. Repeating first two coordinates to close." << endl;
+            this->pts.push_back(this->pts[0]); // Push first point to close shape
+            this->pts.push_back(this->pts[1]);
+            this->pts = this->findPts(0., 0.); // Apply rotation if needed
+        }
+        else
+        {
+            this->pts = pts;
+            this->pts = this->findPts(0., 0.); // Apply rotation if needed
+        }
+        this->stanTemp = 'M'; // Only option is macro-defined
+        this->findCircumDia(); // True circumdiameter
+        this->findXYSize(); // True extents in x-direction and y-direction
+        this->holeDia = 0.0; // No explicit hole allowed for aperture macro
+        this->numVert = this->pts.size() / 2;
     }
 
     // Get D-code aperture number
@@ -195,7 +250,7 @@ class Aperture
     }
 
     // Get the standard aperture template used (aperture macros disallowed)
-    // ('C' = circle, 'R' = rectangle, 'O' = obround/stadium, 'P' = regular polygon)
+    // ('C' = circle, 'R' = rectangle, 'O' = obround/stadium, 'P' = regular polygon, 'M' = macro-defined)
     char getStanTemp() const
     {
         return this->stanTemp;
@@ -232,11 +287,17 @@ class Aperture
         return this->numVert;
     }
 
-    // Get the rotation of the regular polgyon standard aperture (rad)
+    // Get the linear transformation (reflection, rotation in radians, and scaling) of the aperture
     // (zero rotation has one vertex on positive x-axis)
-    double getRotation() const
+    strans getTransform() const
     {
-        return this->rotation;
+        return this->transform;
+    }
+
+    // Get existing list of exterior point coordinates without recalculation (m)
+    vector<double> getPts()
+    {
+        return this->pts;
     }
 
     // Is the aperture a circle?
@@ -273,33 +334,109 @@ class Aperture
         }
     }
 
-    // Draw aperture as GDSII boundary at given position
-    boundary drawAsBound(double xo, double yo)
+    // Find x-extent and y-extent of aperture with known exterior points
+    void findXYSize()
     {
-        // Find coordinates of boundary based on standard aperture template
-        vector<double> bounds;
-        if (this->isCircle())
+        if (this->pts.size() == 0)
         {
-            // Approximate circle as 24-gon with ending point same as starting point at phi=0
-            for (size_t indi = 0; indi <= 24; indi++)
+            // Find points defining aperture if not done yet
+            this->pts = this->findPts(0., 0.);
+        }
+        else
+        {
+            // Use exterior points of aperture to find coordinate extrema
+            double xmin = this->pts[0]; // Initialize to first exterior points
+            double xmax = this->pts[0];
+            double ymin = this->pts[1];
+            double ymax = this->pts[1];
+            for (size_t indi = 2; indi < this->pts.size(); indi++)
             {
-                bounds.push_back(xo + 0.5 * this->circumDia * cos(2.0 * M_PI * indi / 24)); // x-coordinate
-                bounds.push_back(yo + 0.5 * this->circumDia * sin(2.0 * M_PI * indi / 24)); // y-coordinate
+                double coord = this->pts[indi]; // Considered coordinate (m)
+                if (indi % 2 == 1)
+                {
+                    // Compare x-coordinates
+                    xmin = min(xmin, coord);
+                    xmax = max(xmax, coord);
+                }
+                else
+                {
+                    // Compare y-coordinates
+                    ymin = min(ymin, coord);
+                    ymax = max(ymax, coord);
+                }
+            }
+
+            // Set x-size and y-size
+            this->xSize = xmax - xmin; // Total x-size (m)
+            this->ySize = ymax - ymin; // Total y-size (m)
+        }
+    }
+
+    // Find circumdiameter for aperture based on origin-centered circles
+    void findCircumDia()
+    {
+        if (this->pts.size() == 0)
+        {
+            // Find points defining aperture if not done yet
+            this->pts = this->findPts(0., 0.);
+        }
+        else
+        {
+            // Use exterior points of aperture to find circumdiameter
+            double circumRad = 0.; // Initialize as radius of zero (m)
+            for (size_t indi = 0; indi < this->pts.size(); indi += 2)
+            {
+                // Compare radius from origin to point
+                circumRad = max(circumRad, hypot(this->pts[indi], this->pts[indi + 1]));
+            }
+
+            // Set circumdiameter
+            this->circumDia = 2.0 * circumRad; // Circumdiameter is twice circumradius (m)
+        }
+    }
+
+    // Find points defining aperture exterior translated to given position
+    vector<double> findPts(double xo, double yo)
+    {
+        // Find coordinates of aperture based on standard aperture template
+        vector<double> pts;
+        if (this->circumDia == 0.)
+        {
+            pts.push_back(xo); // Just return the position x-coordinate (m)
+            pts.push_back(yo); // Just return the position y-coordinate (m)
+        }
+        else if (this->isCircle())
+        {
+            // Approximate circle as polygon with ending point same as starting point at phi=0
+            for (size_t indi = 0; indi <= CIRC_PTS; indi++)
+            {
+                pts.push_back(xo + 0.5 * this->circumDia * cos(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate (m)
+                pts.push_back(yo + 0.5 * this->circumDia * sin(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate (m)
             }
         }
         else if (this->stanTemp == 'R')
         {
             // Push back pairs of coordinates for the 5 rectangle points CCW starting from lower-right with first point repeated
-            bounds.push_back(xo + 0.5 * this->xSize); // Lower-right
-            bounds.push_back(yo - 0.5 * this->ySize);
-            bounds.push_back(xo + 0.5 * this->xSize); // Upper-right
-            bounds.push_back(yo + 0.5 * this->ySize);
-            bounds.push_back(xo - 0.5 * this->xSize); // Upper-left
-            bounds.push_back(yo + 0.5 * this->ySize);
-            bounds.push_back(xo - 0.5 * this->xSize); // Lower-left
-            bounds.push_back(yo - 0.5 * this->ySize);
-            bounds.push_back(xo + 0.5 * this->xSize); // Lower-right repeated
-            bounds.push_back(yo - 0.5 * this->ySize);
+            pts.push_back(xo + 0.5 * this->xSize); // Lower-right
+            pts.push_back(yo - 0.5 * this->ySize);
+            pts.push_back(xo + 0.5 * this->xSize); // Upper-right
+            pts.push_back(yo + 0.5 * this->ySize);
+            pts.push_back(xo - 0.5 * this->xSize); // Upper-left
+            pts.push_back(yo + 0.5 * this->ySize);
+            pts.push_back(xo - 0.5 * this->xSize); // Lower-left
+            pts.push_back(yo - 0.5 * this->ySize);
+            pts.push_back(xo + 0.5 * this->xSize); // Lower-right repeated
+            pts.push_back(yo - 0.5 * this->ySize);
+            //pts.push_back(xo + 0.5 * (+this->xSize * cos(this->rotation) - this->ySize * sin(this->rotation))); // Lower-right before rotation
+            //pts.push_back(yo - 0.5 * (+this->xSize * sin(this->rotation) + this->ySize * cos(this->rotation)));
+            //pts.push_back(xo + 0.5 * (+this->xSize * cos(this->rotation) - this->ySize * sin(this->rotation))); // Upper-right before rotation
+            //pts.push_back(yo + 0.5 * (+this->xSize * sin(this->rotation) + this->ySize * cos(this->rotation)));
+            //pts.push_back(xo - 0.5 * (+this->xSize * cos(this->rotation) - this->ySize * sin(this->rotation))); // Upper-left before rotation
+            //pts.push_back(yo + 0.5 * (+this->xSize * sin(this->rotation) + this->ySize * cos(this->rotation)));
+            //pts.push_back(xo - 0.5 * (+this->xSize * cos(this->rotation) - this->ySize * sin(this->rotation))); // Lower-left before rotation
+            //pts.push_back(yo - 0.5 * (+this->xSize * sin(this->rotation) + this->ySize * cos(this->rotation)));
+            //pts.push_back(xo + 0.5 * (+this->xSize * cos(this->rotation) - this->ySize * sin(this->rotation))); // Lower-right before rotation repeated
+            //pts.push_back(yo - 0.5 * (+this->xSize * sin(this->rotation) + this->ySize * cos(this->rotation)));
         }
         else if (this->stanTemp == 'O')
         {
@@ -307,67 +444,101 @@ class Aperture
             if (this->xSize > this->ySize)
             {
                 // Horizontal stadium
-                bounds.push_back(xo + 0.5 * (this->xSize - this->ySize)); // Lower-right point of rectangle determined by half the size difference
-                bounds.push_back(yo - 0.5 * this->ySize); // Lower-right point of rectangle has simple y-coordinate of half the width
-                for (size_t indi = 0; indi <= 12; indi++)
+                pts.push_back(xo + 0.5 * (this->xSize - this->ySize)); // Lower-right point of rectangle determined by half the size difference
+                pts.push_back(yo - 0.5 * this->ySize); // Lower-right point of rectangle has simple y-coordinate of half the width
+                for (size_t indi = 1; indi <= CIRC_PTS / 2; indi++)
                 {
-                    bounds.push_back(xo + 0.5 * (this->xSize - this->ySize) + 0.5 * this->ySize * sin(2.0 * M_PI * indi / 24)); // x-coordinate has offset, rectangle point arithmetic, and semicircle radius determined by half the width
-                    bounds.push_back(yo - 0.5 * this->ySize * cos(2.0 * M_PI * indi / 24)); // y-coordinate has offset and semicircle radius
+                    pts.push_back(xo + 0.5 * (this->xSize - this->ySize) + 0.5 * this->ySize * sin(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate has offset, rectangle point arithmetic, and semicircle radius determined by half the width
+                    pts.push_back(yo - 0.5 * this->ySize * cos(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate has offset and semicircle radius
                 }
-                bounds.push_back(xo - 0.5 * (this->xSize - this->ySize)); // Upper-left point of rectangle drawn from upper-right point where semicircle ends
-                bounds.push_back(yo + 0.5 * this->ySize);
-                for (size_t indi = 0; indi <= 12; indi++)
+                pts.push_back(xo - 0.5 * (this->xSize - this->ySize)); // Upper-left point of rectangle drawn from upper-right point where semicircle ends
+                pts.push_back(yo + 0.5 * this->ySize);
+                for (size_t indi = 1; indi <= CIRC_PTS / 2; indi++)
                 {
-                    bounds.push_back(xo - 0.5 * (this->xSize - this->ySize) - 0.5 * this->ySize * sin(2.0 * M_PI * indi / 24));
-                    bounds.push_back(yo + 0.5 * this->ySize * cos(2.0 * M_PI * indi / 24));
+                    pts.push_back(xo - 0.5 * (this->xSize - this->ySize) - 0.5 * this->ySize * sin(2.0 * M_PI * indi / CIRC_PTS));
+                    pts.push_back(yo + 0.5 * this->ySize * cos(2.0 * M_PI * indi / CIRC_PTS));
                 }
-                bounds.push_back(xo + 0.5 * (this->xSize - this->ySize)); // Lower-right point of rectangle repeated from lower-left point where semicircle ends
-                bounds.push_back(yo - 0.5 * this->ySize);
+                pts.push_back(xo + 0.5 * (this->xSize - this->ySize)); // Lower-right point of rectangle repeated from lower-left point where semicircle ends
+                pts.push_back(yo - 0.5 * this->ySize);
             }
             else if (this->ySize > this->xSize)
             {
                 // Vertical stadium
-                bounds.push_back(xo + 0.5 * this->xSize); // Lower-right point of rectangle has simple x-coordinate of half the length
-                bounds.push_back(yo - 0.5 * (this->ySize - this->xSize)); // Lower-right point of rectangle determined by half the size difference
-                bounds.push_back(xo + 0.5 * this->xSize); // Upper-right point of rectangle has simple x-coordinate of half the length
-                bounds.push_back(yo + 0.5 * (this->ySize - this->xSize)); // Upper-right point of rectangle determined by half the size difference
-                for (size_t indi = 0; indi <= 12; indi++)
+                pts.push_back(xo + 0.5 * this->xSize); // Lower-right point of rectangle has simple x-coordinate of half the length
+                pts.push_back(yo - 0.5 * (this->ySize - this->xSize)); // Lower-right point of rectangle determined by half the size difference
+                pts.push_back(xo + 0.5 * this->xSize); // Upper-right point of rectangle has simple x-coordinate of half the length
+                pts.push_back(yo + 0.5 * (this->ySize - this->xSize)); // Upper-right point of rectangle determined by half the size difference
+                for (size_t indi = 1; indi <= CIRC_PTS / 2; indi++)
                 {
-                    bounds.push_back(xo + 0.5 * this->xSize * cos(2.0 * M_PI * indi / 24)); // x-coordinate has offset and semicircle radius
-                    bounds.push_back(yo + 0.5 * (this->ySize - this->xSize) + 0.5 * this->xSize * sin(2.0 * M_PI * indi / 24)); // y-coordinate has offset, rectangle point arithmetic, and semicircle radius determined by half the length
+                    pts.push_back(xo + 0.5 * this->xSize * cos(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate has offset and semicircle radius
+                    pts.push_back(yo + 0.5 * (this->ySize - this->xSize) + 0.5 * this->xSize * sin(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate has offset, rectangle point arithmetic, and semicircle radius determined by half the length
                 }
-                bounds.push_back(xo - 0.5 * this->xSize); // Lower-left point of rectangle drawn from upper-left point where semicircle ends
-                bounds.push_back(yo - 0.5 * (this->ySize - this->xSize));
-                for (size_t indi = 0; indi <= 12; indi++)
+                pts.push_back(xo - 0.5 * this->xSize); // Lower-left point of rectangle drawn from upper-left point where semicircle ends
+                pts.push_back(yo - 0.5 * (this->ySize - this->xSize));
+                for (size_t indi = 1; indi <= CIRC_PTS / 2; indi++)
                 {
-                    bounds.push_back(xo - 0.5 * this->xSize * cos(2.0 * M_PI * indi / 24));
-                    bounds.push_back(yo - 0.5 * (this->ySize - this->xSize) - 0.5 * this->xSize * sin(2.0 * M_PI * indi / 24));
+                    pts.push_back(xo - 0.5 * this->xSize * cos(2.0 * M_PI * indi / CIRC_PTS));
+                    pts.push_back(yo - 0.5 * (this->ySize - this->xSize) - 0.5 * this->xSize * sin(2.0 * M_PI * indi / CIRC_PTS));
                 } // Lower-right point of rectangle repeated where semicircle ends
             } // Equality case handled by circle drawing
         }
         else if (this->stanTemp == 'P')
         {
-            // Push back pairs of coordinates for the numVert + 1 polygon points CCW starting from phi=0+rotation
+            // Push back pairs of coordinates for the numVert + 1 polygon points CCW starting from phi=0
             for (size_t indi = 0; indi <= this->numVert; indi++)
             {
-                bounds.push_back(xo + 0.5 * this->circumDia * cos(2.0 * M_PI * indi / this->numVert + this->rotation)); // x-coordinate
-                bounds.push_back(yo + 0.5 * this->circumDia * sin(2.0 * M_PI * indi / this->numVert + this->rotation)); // y-coordinate
+                pts.push_back(xo + 0.5 * this->circumDia * cos(2.0 * M_PI * indi / this->numVert)); // x-coordinate (m)
+                pts.push_back(yo + 0.5 * this->circumDia * sin(2.0 * M_PI * indi / this->numVert)); // y-coordinate (m)
             }
         }
+        else
+        {
+            // Treat as previously macro-defined with valid points stored
+            for (size_t indi = 0; indi < this->getPts().size(); indi += 2)
+            {
+                pts.push_back(xo + this->pts[indi]); // Translation for x-coordinate (m)
+                pts.push_back(yo + this->pts[indi + 1]); // Translation for y-coordinate (m)
+            }
+        }
+
+        // Apply linear transformation (rotation, reflection, and scaling)
+        if (!this->isCircle())
+        {
+            for (size_t indi = 0; indi < pts.size(); indi += 2)
+            {
+                vector<double> newPt = this->transform.counterTransform({ pts[indi], pts[indi + 1] }); // Must apply rotation before reflection
+                pts[indi] = newPt[0]; // Overwrite with new x-coordinate
+                pts[indi + 1] = newPt[1]; // Overwrite with new y-coordinate
+            }
+        }
+
+        // Return points
+        return pts;
+    }
+
+    // Draw aperture as GDSII boundary at given position
+    boundary drawAsBound(double xo, double yo)
+    {
+        // Find coordinates of boundary based on standard aperture template
+        vector<double> bounds = this->findPts(xo, yo);
 
         // Create re-entrant part of boundary only if there is a valid hole
         if ((this->holeDia > 0) && (this->holeDia < this->circumDia))
         {
-            // Approximate center hole as 24-gon starting and ending at the current rotation meticulously calculated for this purpose
-            for (size_t indi = 0; indi <= 24; indi++)
+            // Fine points of the valid hole (treat as negative aperture)
+            double holeRotation = atan2(-bounds[bounds.size() - 2], bounds[bounds.size() - 1]); // Current rotation meticulously calculated for this purpose
+            vector<double> holePts = Aperture(0, 'P', this->getHoleDia(), 0.0, CIRC_PTS, holeRotation).findPts(0., 0.); // Hole uses regular polygon approximation with same rotation
+
+            // Send center hole points to boundary
+            for (size_t indi = 0; indi < holePts.size() / 2; indi++)
             {
-                bounds.push_back(xo + 0.5 * this->holeDia * cos(2.0 * M_PI * indi / 24 + this->rotation)); // x-coordinate
-                bounds.push_back(yo + 0.5 * this->holeDia * sin(2.0 * M_PI * indi / 24 + this->rotation)); // y-coordinate
+                bounds.push_back(holePts[indi]); // x-coordinate (m)
+                bounds.push_back(holePts[indi + 1]); // y-coordinate (m)
             }
         }
 
         // Return the complete boundary in preferred order
-        boundary outBound = boundary(bounds, 1, { });
+        boundary outBound = boundary(bounds, OUTLINE_LAYER, { });
         outBound.reorder();
         return outBound;
     }
@@ -386,13 +557,13 @@ class Aperture
         else if (this->isSquare())
         {
             cout << "  Maximum aperture extents of square: " << this->xSize << " m in x-direction and " << this->ySize << " m in y-direction" << endl;
-            cout << "  Rotation angle of square (4 vertices): " << this->rotation << " rad" << endl;
+            cout << "  Rotation angle of square (4 vertices): " << this->transform.getRotation() << " rad" << endl;
         }
         else if (this->stanTemp == 'P')
         {
             cout << "  Maximum aperture extents: " << this->xSize << " m in x-direction and " << this->ySize << " m in y-direction" << endl;
             cout << "  Number of regular polygon vertices: " << this->numVert << endl;
-            cout << "  Rotation angle of polygon: " << this->rotation << " rad" << endl;
+            cout << "  Rotation angle of polygon: " << this->transform.getRotation() << " rad" << endl;
         }
         else
         {
@@ -2960,14 +3131,14 @@ struct SolverDataBase
                             }
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
                             for (size_t indi = 1; indi < nArcPt; indi++)
                             {
-                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
-                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
                             paths.push_back(yEnd); // y-coordinate of end point
@@ -3138,7 +3309,7 @@ struct SolverDataBase
                             }
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
@@ -3146,9 +3317,9 @@ struct SolverDataBase
                             //cout << " path points: ";
                             for (size_t indi = 1; indi < nArcPt; indi++)
                             {
-                                paths.push_back(xCent + arcRad * cos(2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
-                                paths.push_back(yCent + arcRad * sin(2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
-                                //cout << "(" << xCent + arcRad * cos(2.0 * M_PI * indi / 24 + startAngle) << ", " << yCent + arcRad * sin(2.0 * M_PI * indi / 24 + startAngle) << ") ";
+                                paths.push_back(xCent + arcRad * cos(2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                                paths.push_back(yCent + arcRad * sin(2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
+                                //cout << "(" << xCent + arcRad * cos(2.0 * M_PI * indi / CIRC_PTS + startAngle) << ", " << yCent + arcRad * sin(2.0 * M_PI * indi / CIRC_PTS + startAngle) << ") ";
                             }
                             //cout << endl;
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -3382,7 +3553,7 @@ struct SolverDataBase
                             }
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
@@ -3390,16 +3561,16 @@ struct SolverDataBase
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
-                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
                                 }
                             }
                             else
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
-                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
                                 }
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -3595,7 +3766,7 @@ struct SolverDataBase
                             }
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
@@ -3603,16 +3774,16 @@ struct SolverDataBase
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
-                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
                                 }
                             }
                             else
                             {
                                 for (size_t indi = 1; indi < nArcPt; indi++)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
-                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
                                 }
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -4169,14 +4340,14 @@ struct SolverDataBase
                             double arcAngle = startAngle - endAngle; // Difference of angles CW
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
                             for (size_t indi = 1; indi < nArcPt; indi++)
                             {
-                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
-                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                                paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
                             paths.push_back(yEnd); // y-coordinate of end point
@@ -4371,14 +4542,14 @@ struct SolverDataBase
                             double arcAngle = endAngle - startAngle; // Difference of angles CCW
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
                             for (size_t indi = 1; indi < nArcPt; indi++)
                             {
-                                paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
-                                paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                                paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
                             paths.push_back(yEnd); // y-coordinate of end point
@@ -4619,7 +4790,7 @@ struct SolverDataBase
                             }
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
@@ -4627,13 +4798,13 @@ struct SolverDataBase
                             {
                                 if (graphicsMode == 2)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
-                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
                                 }
                                 else
                                 {
-                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
-                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
                                 }
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -4833,7 +5004,7 @@ struct SolverDataBase
                             }
 
                             // Calculate points along arc with irregular 24-gon approximation
-                            size_t nArcPt = ceil(arcAngle / (M_PI / 12.));
+                            size_t nArcPt = ceil(arcAngle / (M_PI / (CIRC_PTS / 2.0)));
                             vector<double> paths; // Initialize vector of path coordinates
                             paths.push_back(xStart); // x-coordinate of current point
                             paths.push_back(yStart); // y-coordinate of current point
@@ -4841,13 +5012,13 @@ struct SolverDataBase
                             {
                                 if (graphicsMode == 2)
                                 {
-                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CW
-                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CW
+                                    paths.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                                    paths.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
                                 }
                                 else
                                 {
-                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / 24 + startAngle)); // x-coordinate CCW
-                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / 24 + startAngle)); // y-coordinate CCW
+                                    paths.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                                    paths.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
                                 }
                             }
                             paths.push_back(xEnd); // x-coordinate of end point
@@ -5880,6 +6051,1211 @@ struct SolverDataBase
         else
         {
             // File could not be opened
+            return false;
+        }
+    }
+
+    // Length unit processor in IPC-2581 XML file (m)
+    double lengthUnitIPC2581(std::string units)
+    {
+        double lengthUnit = 1.0; // Length units for this context (m)
+        if (units.compare("INCH") == 0)
+        {
+            lengthUnit = 0.0254;
+        }
+        else if (units.compare("MILLIMETER") == 0)
+        {
+            lengthUnit = 1.e-3;
+        }
+        else if (units.compare("MICRON") == 0)
+        {
+            lengthUnit = 1.e-6;
+        }
+        return lengthUnit;
+    }
+
+    // Simple line processor in IPC-2581 XML file (arbitrary line attributes)
+    path lineIPC2581(tinyxml2::XMLElement *line, double lengthUnit, std::string nextXAttr, std::string nextYAttr, vector<double> oldPts, map<std::string, path> lineDescDict)
+    {
+        // Save two points to path
+        double xEnd = line->DoubleAttribute(nextXAttr.c_str()) * lengthUnit; // End point x-coordinate (m)
+        double yEnd = line->DoubleAttribute(nextYAttr.c_str()) * lengthUnit; // End point y-coordinate (m)
+        oldPts.insert(oldPts.end(), { xEnd, yEnd }); // Add new end point to points list
+        path linedesc = this->lineDescIPC2581(line, lengthUnit, path(oldPts, OUTLINE_LAYER, {}, 1, 0.0), lineDescDict); // Handle any line description
+        return linedesc;
+    }
+
+    // Simple line processor in IPC-2581 XML file (point found)
+    vector<double> lineIPC2581(vector<double> endPt, vector<double> oldPts)
+    {
+        oldPts.insert(oldPts.end(), endPt.begin(), endPt.end()); // Add new end point to points list
+        return oldPts; // Ignore LineDescGroup
+    }
+
+    // Simple arc processor in IPC-2581 XML file
+    path arcIPC2581(tinyxml2::XMLElement *arc, double lengthUnit, vector<double> currentPt, vector<double> endPt, vector<double> oldPts, map<std::string, path> lineDescDict)
+    {
+        // Circular arc math (direction, radius, and covered angle)
+        double xStart = currentPt[0]; // Arc starting point coordinates (m)
+        double yStart = currentPt[1];
+        double xEnd = endPt[0]; // Arc ending point coordinates (m)
+        double yEnd = endPt[1];
+        double xCent = arc->DoubleAttribute("centerX") * lengthUnit; // Arc center x-coordinate (m)
+        double yCent = arc->DoubleAttribute("centerY") * lengthUnit; // Arc center y-coordiante (m)
+        bool isCW = false; // Does the arc go clockwise from the starting point? (true = CW, false = CCW)
+        tinyxml2::XMLError clockwiseError = arc->QueryBoolAttribute("clockwise", &isCW);
+        double arcRad = 0.5 * (hypot(xStart - xCent, yStart - yCent) + hypot(xEnd - xCent, yEnd - yCent)); // Arithmetic mean radius (m) because rounding errors prevent perfect circle
+        double startAngle = atan2(yStart - yCent, xStart - xCent); // Starting angle from +x-axis reference (rad)
+        double endAngle = atan2(yEnd - yCent, xEnd - xCent); // Ending angle from +x-axis reference (rad)
+        double arcAngle = acos(((xStart - xCent) * (xEnd - xCent) + (yStart - yCent) * (yEnd - yCent)) / (hypot(xStart - xCent, yStart - yCent) * hypot(xEnd - xCent, yEnd - yCent))); // Dot product formula for subtended angle (rad)
+
+        // Calculate points along arc with irregular polygon approximation
+        size_t nArcPt = ceil(arcAngle / (2.0 * M_PI / CIRC_PTS));
+        vector<double> arcPts; // Initialize vector of path coordinates (m)
+        arcPts.push_back(xStart); // x-coordinate of current point
+        arcPts.push_back(yStart); // y-coordinate of current point
+        if (isCW)
+        {
+            for (size_t indi = 1; indi < nArcPt; indi++)
+            {
+                arcPts.push_back(xCent + arcRad * cos(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CW
+                arcPts.push_back(yCent + arcRad * sin(-2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CW
+            }
+        }
+        else
+        {
+            for (size_t indi = 1; indi < nArcPt; indi++)
+            {
+                arcPts.push_back(xCent + arcRad * cos(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // x-coordinate CCW
+                arcPts.push_back(yCent + arcRad * sin(+2.0 * M_PI * indi / CIRC_PTS + startAngle)); // y-coordinate CCW
+            }
+        }
+        arcPts.push_back(xEnd); // x-coordinate of end point
+        arcPts.push_back(yEnd); // y-coordinate of end point
+
+        // Push new arc segment to points list and save to path
+        oldPts.insert(oldPts.end(), arcPts.begin(), arcPts.end());
+        path linedesc = this->lineDescIPC2581(arc, lengthUnit, path(oldPts, OUTLINE_LAYER, {}, 1, 0.0), lineDescDict); // Handle any line description
+        return linedesc;
+    }
+
+    // Simple polyline/polygon processor in IPC-2581 XML file
+    path polylineIPC2581(tinyxml2::XMLElement *poly, double lengthUnit, vector<double> oldPts, map<std::string, path> lineDescDict)
+    {
+        // Create the polyline
+        tinyxml2::XMLElement *polyBegin = poly->FirstChildElement("PolyBegin");
+        //cout << "   polyline begin" << endl;
+        vector<double> currentPt = { polyBegin->DoubleAttribute("x") * lengthUnit, polyBegin->DoubleAttribute("y") * lengthUnit }; // Coordinates of current point (m)
+        oldPts.insert(oldPts.end(), currentPt.begin(), currentPt.end());
+        tinyxml2::XMLElement *polyStep = polyBegin->NextSiblingElement();
+        while (polyStep != nullptr)
+        {
+            // Handle all polyline steps after the first
+            //cout << "   polyline step: " << polyStep->Name() << endl;
+            if ((strcmp(polyStep->Name(), "LineDesc") == 0) || strcmp(polyStep->Name(), "LineDescRef") == 0 || (strcmp(polyStep->Name(), "FillDesc") == 0) || strcmp(polyStep->Name(), "FillDescRef") == 0)
+            {
+                break; // Stop if line description found at end of polyline
+            }
+            double xEnd = polyStep->DoubleAttribute("x") * lengthUnit; // End point x-coordinate (m)
+            double yEnd = polyStep->DoubleAttribute("y") * lengthUnit; // End point y-coordinate (m)
+            if (strcmp(polyStep->Name(), "PolyStepSegment") == 0)
+            {
+                // Push new line segment to the polyline
+                oldPts = this->lineIPC2581({ xEnd, yEnd }, oldPts);
+            }
+            else if (strcmp(polyStep->Name(), "PolyStepCurve") == 0)
+            {
+                // Push new arc approximation to the polyline
+                path arc = this->arcIPC2581(polyStep, lengthUnit, currentPt, { xEnd, yEnd }, oldPts, lineDescDict);
+                oldPts = arc.getPaths();
+            }
+
+            // Proceed to next polygon step
+            currentPt = { xEnd , yEnd }; // Update current point coordinates (m)
+            polyStep = polyStep->NextSiblingElement(); // Get next polygon step (segment or curve) if it exists
+        }
+        path linedesc = this->lineDescIPC2581(poly, lengthUnit, path(oldPts, OUTLINE_LAYER, {}, 1, 0.0), lineDescDict); // Handle any line description
+        return linedesc;
+    }
+
+    // Simple outline processor in IPC-2581 XML file
+    path outlineIPC2581(tinyxml2::XMLElement *outline, double lengthUnit, vector<double> oldPts, map<std::string, path> lineDescDict)
+    {
+        // Create the outline
+        tinyxml2::XMLElement *poly = outline->FirstChildElement("Polygon");
+        while (poly != nullptr)
+        {
+            // Append points from each polygon to outline
+            path polygon = this->polylineIPC2581(poly, lengthUnit, oldPts, lineDescDict);
+            oldPts = polygon.getPaths();
+            poly = poly->NextSiblingElement("Polygon"); // Get next polygon in outline if it exists
+        }
+        path linedesc = this->lineDescIPC2581(outline, lengthUnit, path(oldPts, OUTLINE_LAYER, {}, 1, 0.0), lineDescDict); // Handle any line description
+        return linedesc;
+    }
+
+    // Line description processor in IPC-2581 XML file
+    path lineDescIPC2581(tinyxml2::XMLElement *parent, double lengthUnit, path oldDesc, map<std::string, path> lineDescDict)
+    {
+        // Find line description or line description reference
+        tinyxml2::XMLElement *linedesc = parent->FirstChildElement("LineDesc");
+        if (linedesc != nullptr)
+        {
+            // Decipher properties and use constructor
+            //cout << "   Found explicit line description" << endl;
+            const char *endType;
+            tinyxml2::XMLError typeError = linedesc->QueryStringAttribute("lineEnd", &endType);
+            int lineType = 1; // Default to round line ends, (0 = square ends flush at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width)
+            if (strcmp(endType, "NONE") == 0)
+            {
+                lineType = 0;
+            }
+            else if (strcmp(endType, "ROUND") == 0)
+            {
+                lineType = 1;
+            }
+            else if (strcmp(endType, "SQUARE") == 0)
+            {
+                lineType = 2;
+            }
+            const char *lineProp = NULL;
+            tinyxml2::XMLError propError = linedesc->QueryStringAttribute("lineProperty", &lineProp);
+            oldDesc.setType(lineType);
+            oldDesc.setWidth(linedesc->DoubleAttribute("lineWidth") * lengthUnit);
+            if (lineProp != nullptr)
+            {
+                //cout << "    Setting path properties: " << lineProp << endl;
+                oldDesc.setProps({ lineProp });
+            }
+        }
+        else
+        {
+            linedesc = parent->FirstChildElement("LineDescRef");
+            if (linedesc != nullptr)
+            {
+                // Look up line properties from dictionary if specification referenced
+                std::string userRef = linedesc->Attribute("id");
+                if (lineDescDict.count(userRef) == 1)
+                {
+                    //cout << "   Found line information for user-defined primitive: " << userRef << endl;
+                    path line = lineDescDict.at(userRef); // Look up line description from dictionary
+                    oldDesc.setType(line.getType()); // Replace everything but the points defining the path
+                    oldDesc.setWidth(line.getWidth());
+                    oldDesc.setProps(line.getProps());
+                }
+            }
+        }
+        return oldDesc;
+    }
+
+    // Linear transformation processor in IPC-2581 XML file
+    pair<strans, vector<double>> xformIPC2581(tinyxml2::XMLElement *parent, double lengthUnit, vector<double> origin, double prevRotation)
+    {
+        tinyxml2::XMLElement *xform = parent->FirstChildElement("Xform"); // Get any transformation
+        if (xform != nullptr)
+        {
+            // Extract transformation attributes
+            double xo = origin[0]; // x-direction translation (m)
+            double yo = origin[1]; // y-direction translation (m)
+            double rotation = 0.0; // Rotation about origin (rad)
+            bool isMirrored = false; // Is the shape mirrored in the x-direction?
+            double scale = 1.0; // Magnification in all directions is non-negative
+            tinyxml2::XMLError xoError = xform->QueryDoubleAttribute("xOffset", &xo);
+            tinyxml2::XMLError yoError = xform->QueryDoubleAttribute("yOffset", &yo);
+            tinyxml2::XMLError rotError = xform->QueryDoubleAttribute("rotation", &rotation);
+            tinyxml2::XMLError mirrorError = xform->QueryBoolAttribute("mirror", &isMirrored);
+            tinyxml2::XMLError scaleError = xform->QueryDoubleAttribute("scale", &scale);
+
+            // Fix offsets and rotation
+            xo *= lengthUnit;
+            yo *= lengthUnit;
+            rotation *= M_PI / 180.; // Convert rotation from degrees to radians
+            rotation += prevRotation; // Add back any pre-existing rotation
+
+            // Correct standard primitive under the linear counter transformation
+            return make_pair(strans(isMirrored, false, false, scale, rotation), vector<double>({ xo, yo }));
+        }
+        else
+        {
+            return make_pair(strans(false, false, false, 1.0, prevRotation), vector<double>({ 0., 0. })); // Resort to just previous rotation
+        }
+    }
+
+    // All simple primitives processor in IPC-2581 XML file
+    vector<path> userSimpleIPC2581(tinyxml2::XMLElement *userShape, double lengthUnit, map<std::string, path> lineDescDict)
+    {
+        vector<path> simplePrimi; // Store simple primitives using vector with path class
+        tinyxml2::XMLElement *simple = userShape->FirstChildElement(); // Get simple shape
+        while (simple != nullptr)
+        {
+            // Treat each simple shape appropriately
+            path thisSimple;
+            //cout << "  Simple shape: " << simple->Name() << endl;
+            if (strcmp(simple->Name(), "Arc") == 0)
+            {
+                // Send arc points to this part of the user-defined shape
+                vector<double> startPt = { simple->DoubleAttribute("startX") * lengthUnit, simple->DoubleAttribute("startY") * lengthUnit }; // Coordinates of starting point (m)
+                vector<double> endPt = { simple->DoubleAttribute("endX") * lengthUnit, simple->DoubleAttribute("endY") * lengthUnit }; // Coordinates of ending point (m)
+                thisSimple = this->arcIPC2581(simple, lengthUnit, startPt, endPt, vector<double>(), lineDescDict);
+            }
+            else if (strcmp(simple->Name(), "Line") == 0)
+            {
+                // Send line points to this part of the user-defined shape
+                vector<double> startPt = { simple->DoubleAttribute("startX") * lengthUnit, simple->DoubleAttribute("startY") * lengthUnit }; // Coordinates of starting point (m)
+                thisSimple = this->lineIPC2581(simple, lengthUnit, "endX", "endY", startPt, lineDescDict);
+            }
+            else if (strcmp(simple->Name(), "Outline") == 0)
+            {
+                // Send outline points to this part of the user-defined shape
+                thisSimple = this->outlineIPC2581(simple, lengthUnit, vector<double>(), lineDescDict);
+            }
+            else if (strcmp(simple->Name(), "Polyline") == 0)
+            {
+                // Send polyline points to this part of the user-defined shape
+                thisSimple = this->polylineIPC2581(simple, lengthUnit, vector<double>(), lineDescDict);
+            }
+            else
+            {
+                simple = simple->NextSiblingElement(); // Move on to next simple primitive if it exists
+                continue; // Do not assign to path if simple primitive not found
+            }
+
+            // Handle any overall line description of this simple shape
+            path lineInfo = this->lineDescIPC2581(simple, lengthUnit, thisSimple, lineDescDict);
+            simplePrimi.push_back(lineInfo);
+
+            // Move on to next simple shape within entry
+            simple = simple->NextSiblingElement();
+        }
+        return simplePrimi;
+    }
+
+    // All standard primitives processor in IPC-2581 XML file
+    map<std::string, Aperture> standardPrimitiveIPC2581(tinyxml2::XMLElement *standardShape, double lengthUnit, size_t numPrimitive, std::string entryID, map<std::string, Aperture> dictPrimitives)
+    {
+        Aperture primiShape;
+        tinyxml2::XMLElement *shape = standardShape->FirstChildElement(); // Get the shape defining the primitive
+        while (shape != nullptr)
+        {
+            // Treat each standard primitive shape appropriately
+            //cout << "  Standard primitive shape: " << shape->Name() << endl;
+            if (strcmp(shape->Name(), "Circle") == 0)
+            {
+                // Create aperture with primitive directly
+                primiShape = Aperture(numPrimitive, shape->DoubleAttribute("diameter") * lengthUnit, 0.0); // Create a circle
+            }
+            else if (strcmp(shape->Name(), "Contour") == 0)
+            {
+                // Read polygon
+                vector<double> pts;
+                tinyxml2::XMLElement *poly = shape->FirstChildElement("Polygon");
+                path polyInfo = this->polylineIPC2581(poly, lengthUnit, pts, map<std::string, path>()); // Get polygon information
+                //cout << "   Contour polygon read" << endl;
+                pts = polyInfo.getPaths(); // Start points list with polygon
+
+                // Read cutouts
+                tinyxml2::XMLElement *cutout = shape->FirstChildElement("Cutout");
+                while (cutout != nullptr)
+                {
+                    // Handle this cutout in the contour (violation of Aperture interpretation)
+                    path cutoutInfo = this->polylineIPC2581(cutout, lengthUnit, pts, map<std::string, path>()); // Get cutout information
+                    //cout << "   Contour cutout read" << endl;
+                    pts = cutoutInfo.getPaths(); // Points for everything up to this cutout
+                    pts.push_back(pts[0]); // Duplicate very first point again to complete boundary
+                    pts.push_back(pts[1]);
+
+                    // Proceed to next cutout if it exists
+                    cutout = cutout->NextSiblingElement("Cutout");
+                    //cout << "   Size of points list: " << pts.size() << endl;
+                }
+
+                // Create aperture
+                primiShape = Aperture(numPrimitive, pts, 0.0);
+            }
+            else if (strcmp(shape->Name(), "Diamond") == 0)
+            {
+                // Get diamond width and height
+                double width = shape->DoubleAttribute("width") * lengthUnit;
+                double height = shape->DoubleAttribute("height") * lengthUnit;
+
+                // Find exterior points
+                vector<double> pts;
+                pts.push_back(+0.5 * width); // Right point
+                pts.push_back(0.0);
+                pts.push_back(0.0); // Top point
+                pts.push_back(+0.5 * height);
+                pts.push_back(-0.5 * width); // Left point
+                pts.push_back(0.0);
+                pts.push_back(0.0); // Bottom point
+                pts.push_back(-0.5 * height);
+                pts.push_back(+0.5 * width); // Repeat right point
+                pts.push_back(0.0);
+
+                // Create aperture
+                primiShape = Aperture(numPrimitive, pts, 0.0);
+            }
+            else if (strcmp(shape->Name(), "Ellipse") == 0)
+            {
+                // Get ellipse width and height
+                double width = shape->DoubleAttribute("width") * lengthUnit;
+                double height = shape->DoubleAttribute("height") * lengthUnit;
+
+                // Find exterior points, approximating ellipse as irregular polygon with ending point same as starting point at phi=0
+                vector<double> pts;
+                for (size_t indi = 0; indi <= CIRC_PTS; indi++)
+                {
+                    pts.push_back(0.5 * width * cos(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate using width as axis (m)
+                    pts.push_back(0.5 * height * sin(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate using height as axis (m)
+                }
+
+                // Create aperture
+                primiShape = Aperture(numPrimitive, pts, 0.0);
+            }
+            else if (strcmp(shape->Name(), "Hexagon") == 0)
+            {
+                // Create aperture with primitive directly
+                primiShape = Aperture(numPrimitive, 'P', shape->DoubleAttribute("length") * lengthUnit, 0.0, 6, M_PI / 6.0); // Create hexagon without hole with a vertex facing up
+            }
+            else if (strcmp(shape->Name(), "Octagon") == 0)
+            {
+                // Create aperture with primitive directly
+                primiShape = Aperture(numPrimitive, 'P', shape->DoubleAttribute("length") * lengthUnit, 0.0, 8, 0.0); // Create hexagon without hole with a vertex naturally facing up
+            }
+            else if (strcmp(shape->Name(), "Oval") == 0)
+            {
+                // Create aperture with primitive directly
+                primiShape = Aperture(numPrimitive, 'O', shape->DoubleAttribute("width") * lengthUnit, shape->DoubleAttribute("height") * lengthUnit, 0.0); // Create oval/stadium without hole
+            }
+            else if (strcmp(shape->Name(), "RectCenter") == 0)
+            {
+                // Create aperture with primitive directly
+                primiShape = Aperture(numPrimitive, 'R', shape->DoubleAttribute("width") * lengthUnit, shape->DoubleAttribute("height") * lengthUnit, 0.0); // Create rectangle without hole
+            }
+            else if (strcmp(shape->Name(), "RectCham") == 0)
+            {
+                // Chamfered rectangle parameters (width, height, and applied corners)
+                double width = shape->DoubleAttribute("width") * lengthUnit; // Complete rectangle width on x-axis (m)
+                double height = shape->DoubleAttribute("height") * lengthUnit; // Complete rectangle width on y-axis (m)
+                double chamfer = shape->DoubleAttribute("chamfer") * lengthUnit; // Chamfer length on each 45-degree corner cut (m)
+                bool isChamUR = false; // Is the upper right corner chamfered?
+                bool isChamUL = false; // Is the upper left corner chamfered?
+                bool isChamLL = false; // Is the lower left corner chamfered?
+                bool isChamLR = false; // Is the lower right corner chamfered?
+                tinyxml2::XMLError chamErrorUR = shape->QueryBoolAttribute("upperRight", &isChamUR);
+                tinyxml2::XMLError chamErrorUL = shape->QueryBoolAttribute("upperLeft", &isChamUL);
+                tinyxml2::XMLError chamErrorLL = shape->QueryBoolAttribute("lowerLeft", &isChamLL);
+                tinyxml2::XMLError chamErrorLR = shape->QueryBoolAttribute("lowerRight", &isChamLR);
+
+                // Find exterior points (all chamfers applied with 45-degree cuts, so cos(M_PI_2) = sin(M_PI_2) = M_SQRT1_2)
+                vector<double> pts;
+                if (isChamLR)
+                {
+                    pts.push_back(+(0.5 * width - M_SQRT1_2 * chamfer)); // Lower-lower right point
+                    pts.push_back(-0.5 * height);
+                    pts.push_back(+0.5 * width); // Right-lower right point
+                    pts.push_back(-(0.5 * height - M_SQRT1_2 * chamfer));
+                }
+                else
+                {
+                    pts.push_back(+0.5 * width); // Lower right point
+                    pts.push_back(-0.5 * height);
+                }
+                if (isChamUR)
+                {
+                    pts.push_back(+0.5 * width); // Right-upper right point
+                    pts.push_back(+(0.5 * height - M_SQRT1_2 * chamfer));
+                    pts.push_back(+(0.5 * width - M_SQRT1_2 * chamfer)); // Upper-upper right point
+                    pts.push_back(+0.5 * height);
+                }
+                else
+                {
+                    pts.push_back(+0.5 * width); // Upper right point
+                    pts.push_back(+0.5 * height);
+                }
+                if (isChamUL)
+                {
+                    pts.push_back(-(0.5 * width - M_SQRT1_2 * chamfer)); // Upper-upper left point
+                    pts.push_back(+0.5 * height);
+                    pts.push_back(-0.5 * width); // Left-upper left point
+                    pts.push_back(+(0.5 * height - M_SQRT1_2 * chamfer));
+                }
+                else
+                {
+                    pts.push_back(-0.5 * width); // Upper left point
+                    pts.push_back(+0.5 * height);
+                }
+                if (isChamLL)
+                {
+                    pts.push_back(-0.5 * width); // Left-lower left point
+                    pts.push_back(-(0.5 * height - M_SQRT1_2 * chamfer));
+                    pts.push_back(-(0.5 * width - M_SQRT1_2 * chamfer)); // Lower-lower left point
+                    pts.push_back(-0.5 * height);
+                }
+                else
+                {
+                    pts.push_back(-0.5 * width); // Lower left point
+                    pts.push_back(-0.5 * height);
+                }
+                pts.push_back(pts[0]); // Repeat first point
+                pts.push_back(pts[1]);
+
+                // Create aperture
+                primiShape = Aperture(numPrimitive, pts, 0.0);
+            }
+            else if (strcmp(shape->Name(), "RectCorner") == 0)
+            {
+                // Get lower left and upper right point coordinates
+                double xLL = shape->DoubleAttribute("lowerLeftX") * lengthUnit;  // x-coordinate of lower left point (m)
+                double yLL = shape->DoubleAttribute("lowerLeftY") * lengthUnit;  // y-coordinate of lower left point (m)
+                double xUR = shape->DoubleAttribute("upperRightX") * lengthUnit; // x-coordinate of upper right point (m)
+                double yUR = shape->DoubleAttribute("upperRightY") * lengthUnit; // y-coordinate of upper right point (m)
+
+                // Translated (corner-defined) rectangle math
+                double width = xUR - xLL; // Rectangle width (m)
+                double height = yUR - yLL; // Rectangle height (m)
+                double xo = 0.5 * (xUR + xLL); // Rectangle center x-coordinate (m)
+                double yo = 0.5 * (yUR + yLL); // Rectangle center y-coordinate (m)
+
+                // Create aperture with primitive directly
+                primiShape = Aperture(numPrimitive, Aperture(numPrimitive, 'R', width, height, 0.0).findPts(xo, yo), 0.0); // Create translated rectangle without hole by using untranslated intermediary
+            }
+            else if (strcmp(shape->Name(), "RectRound") == 0)
+            {
+                // Rounded (exterior radius-type fillet) rectangle parameters (width, height, and applied corners)
+                double width = shape->DoubleAttribute("width") * lengthUnit; // Complete rectangle width on x-axis (m)
+                double height = shape->DoubleAttribute("height") * lengthUnit; // Complete rectangle width on y-axis (m)
+                double radius = shape->DoubleAttribute("radius") * lengthUnit; // Radius for corner trim (m)
+                bool isRoundUR = false; // Is the upper right corner rounded?
+                bool isRoundUL = false; // Is the upper left corner rounded?
+                bool isRoundLL = false; // Is the lower left corner rounded?
+                bool isRoundLR = false; // Is the lower right corner rounded?
+                tinyxml2::XMLError roundErrorUR = shape->QueryBoolAttribute("upperRight", &isRoundUR);
+                tinyxml2::XMLError roundErrorUL = shape->QueryBoolAttribute("upperLeft", &isRoundUL);
+                tinyxml2::XMLError roundErrorLL = shape->QueryBoolAttribute("lowerLeft", &isRoundLL);
+                tinyxml2::XMLError roundErrorLR = shape->QueryBoolAttribute("lowerRight", &isRoundLR);
+
+                // Find exterior points (approximating rounds as quarter of irregular polygon)
+                vector<double> pts;
+                if (isRoundLR)
+                {
+                    // Lower right round
+                    for (size_t indi = 0; indi <= CIRC_PTS / 4; indi++)
+                    {
+                        pts.push_back(+(0.5 * width - radius) + radius * sin(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate (m)
+                        pts.push_back(-(0.5 * height - radius) - radius * cos(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate (m)
+                    }
+                }
+                else
+                {
+                    pts.push_back(+0.5 * width); // Lower right point
+                    pts.push_back(-0.5 * height);
+                }
+                if (isRoundUR)
+                {
+                    // Upper right round
+                    for (size_t indi = 0; indi <= CIRC_PTS / 4; indi++)
+                    {
+                        if ((pts[pts.back() - 1] == +0.5 * width) && (pts[pts.back()] == +0.5 * height - radius))
+                        {
+                            continue; // Skip point if it repeats the last point of previous round
+                        }
+                        pts.push_back(+(0.5 * width - radius) + radius * cos(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate (m)
+                        pts.push_back(+(0.5 * height - radius) + radius * sin(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate (m)
+                    }
+                }
+                else
+                {
+                    pts.push_back(+0.5 * width); // Upper right point
+                    pts.push_back(+0.5 * height);
+                }
+                if (isRoundUL)
+                {
+                    // Lower right round
+                    for (size_t indi = 0; indi <= CIRC_PTS / 4; indi++)
+                    {
+                        if ((pts[pts.back() - 1] == -0.5 * width + radius) && (pts[pts.back()] == +0.5 * height))
+                        {
+                            continue; // Skip point if it repeats the last point of previous round
+                        }
+                        pts.push_back(-(0.5 * width - radius) - radius * sin(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate (m)
+                        pts.push_back(+(0.5 * height - radius) + radius * cos(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate (m)
+                    }
+                }
+                else
+                {
+                    pts.push_back(-0.5 * width); // Upper left point
+                    pts.push_back(+0.5 * height);
+                }
+                if (isRoundLL)
+                {
+                    // Lower left round
+                    for (size_t indi = 0; indi <= CIRC_PTS / 4; indi++)
+                    {
+                        if ((pts[pts.back() - 1] == -0.5 * width) && (pts[pts.back()] == -0.5 * height + radius))
+                        {
+                            continue; // Skip point if it repeats the last point of previous round
+                        }
+                        pts.push_back(-(0.5 * width - radius) - radius * cos(2.0 * M_PI * indi / CIRC_PTS)); // x-coordinate (m)
+                        pts.push_back(-(0.5 * height - radius) - radius * sin(2.0 * M_PI * indi / CIRC_PTS)); // y-coordinate (m)
+                    }
+                }
+                else
+                {
+                    pts.push_back(-0.5 * width); // Lower left point
+                    pts.push_back(-0.5 * height);
+                }
+                if ((pts[pts.size() - 2] != pts[0]) || (pts[pts.size() - 1] != pts[1]))
+                {
+                    pts.push_back(pts[0]); // Repeat first point if first point is not last point
+                    pts.push_back(pts[1]);
+                }
+
+                // Create aperture
+                primiShape = Aperture(numPrimitive, pts, 0.0);
+            }
+            else if (strcmp(shape->Name(), "Triangle") == 0)
+            {
+                // Get isosceles triangle base and height
+                double base = shape->DoubleAttribute("base") * lengthUnit;
+                double height = shape->DoubleAttribute("height") * lengthUnit;
+
+                // Find exterior points
+                vector<double> pts;
+                pts.push_back(+0.5 * base); // Lower right point
+                pts.push_back(-0.5 * height);
+                pts.push_back(0.0); // Top point (vertex that naturally points up)
+                pts.push_back(+0.5 * height);
+                pts.push_back(-0.5 * base); // Lower left point
+                pts.push_back(-0.5 * height);
+                pts.push_back(+0.5 * base); // Repeat lower right point
+                pts.push_back(-0.5 * height);
+
+                // Create aperture
+                primiShape = Aperture(numPrimitive, pts, 0.0);
+            }
+            else
+            {
+                shape = shape->NextSiblingElement(); // Move on to next shape in primitive if it exists
+                continue; // Do not assign to aperture if primitive not found
+            }
+            // Other possible: Butterfly, Donut, Moire, and Thermal
+
+            // Modify with Xform before inserting into dictionary
+            pair<strans, vector<double>> xform = this->xformIPC2581(shape, lengthUnit, { 0., 0. }, primiShape.getTransform().getRotation());
+            primiShape.transform = xform.first; // First, update stored transformation for standard primitive
+            primiShape.pts = primiShape.findPts(xform.second[0], xform.second[1]); // Second, recalculate the points list for the aperture, applying translation then anything in the linear transformation
+            /*if (strcmp(entryID.c_str(), "userSpecial1") == 0)
+            {
+                cout << " Assigning standard primitive " << entryID << " to dictionary" << endl;
+            }*/
+            /*if (primiShape.pts.size() == 0)
+            {
+                cerr << "   Aperture was assigned with 0 points!" << endl;
+            }*/
+            dictPrimitives.insert_or_assign(entryID, primiShape); // Add to dictionary of standard primitives
+            shape = shape->NextSiblingElement(); // Move on to next shape in primitive if it exists
+        }
+        return dictPrimitives;
+    }
+
+    // Read IPC-2581 printed circuit board (PCB) XML file into the solver database
+    bool readIPC2581(std::string ipcFileName)
+    {
+        // Attempt to open IPC-2581 XML file
+        tinyxml2::XMLDocument pcb;
+        tinyxml2::XMLError fileLoadStatus = pcb.LoadFile(ipcFileName.c_str());
+        if (fileLoadStatus == tinyxml2::XML_SUCCESS)
+        {
+            // Get root element
+            tinyxml2::XMLElement *root = pcb.RootElement();
+            if (root == nullptr)
+            {
+                cerr << "XML Parsing Element Error for Root: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                return false;
+            }
+            const char *revision;
+            tinyxml2::XMLError revError = root->QueryStringAttribute("revision", &revision);
+            if (revError == tinyxml2::XML_SUCCESS)
+            {
+                cout << root->Name() << " Revision " << root->FindAttribute("revision")->Value() << endl;
+            }
+
+            // Get content child element
+            tinyxml2::XMLElement *content = root->FirstChildElement("Content");
+            if (content == nullptr)
+            {
+                cerr << "XML Parsing Element Error for Content: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                return false;
+            }
+            vector<std::string> stepRefName;
+            tinyxml2::XMLElement *stepRef = content->FirstChildElement("StepRef");
+            while (stepRef != nullptr)
+            {
+                // Add manufacturing step names for each step reference
+                stepRefName.push_back(stepRef->Attribute("name"));
+                stepRef = stepRef->NextSiblingElement("StepRef"); // Get next manufacturing step reference if it exists
+            }
+            vector<std::string> layerRefName;
+            tinyxml2::XMLElement *layerRef = content->FirstChildElement("LayerRef");
+            while (layerRef != nullptr)
+            {
+                // Add layer names for each layer reference
+                layerRefName.push_back(layerRef->Attribute("name"));
+                layerRef = layerRef->NextSiblingElement("LayerRef"); // Get next layer reference if it exists
+            }
+            // cout << "Last layer's name: " << layerRefName.back() << endl;
+            // Ignoring roleRef attribute, FunctionMode, BomRef, AviRef, DictionaryFont, DictionaryFillDesc, and DictionaryFirmware
+
+            // Get DictionaryStandard grandchild element
+            map<std::string, Aperture> primitives; // Dictionary of standard primitives (reusing Gerber apertures) with name as key
+            tinyxml2::XMLElement *dictStandard = content->FirstChildElement("DictionaryStandard");
+            if (dictStandard != nullptr)
+            {
+                //cout << "Working on dictionary of standard primitives" << endl;
+                std::string units = dictStandard->Attribute("units");
+                double standardUnit = this->lengthUnitIPC2581(units); // Standard primitives length units (m)
+                size_t numPrimitive = 0;
+                tinyxml2::XMLElement *entry = dictStandard->FirstChildElement("EntryStandard");
+                while (entry != nullptr)
+                {
+                    // Handle each standard primitive entry
+                    numPrimitive++;
+                    std::string entryID = entry->Attribute("id");
+                    //cout << " Found standard primitive " << entryID << endl;
+                    primitives = this->standardPrimitiveIPC2581(entry, standardUnit, numPrimitive, entryID, primitives); // Add new shape to dictionary
+                    entry = entry->NextSiblingElement("EntryStandard"); // Get the next entry if it exists
+                }
+            }
+
+            // Get DictionaryUser grandchild element
+            map<std::string, vector<path>> user; // Dictionary of user-defined primitives (reusing Gerber apertures) with name as key
+            tinyxml2::XMLElement *dictUser = content->FirstChildElement("DictionaryUser");
+            if (dictUser != nullptr)
+            {
+                //cout << "Working on dictionary of user-defined primitives" << endl;
+                std::string units = dictStandard->Attribute("units");
+                double userUnit = this->lengthUnitIPC2581(units); // Standard primitives length units (m)
+                size_t numPrimitive = 0;
+                tinyxml2::XMLElement *entry = dictUser->FirstChildElement("EntryUser");
+                while (entry != nullptr)
+                {
+                    // Handle each user-defined primitive entry
+                    numPrimitive++;
+                    std::string entryID = entry->Attribute("id");
+                    vector<path> userShape; // List of paths with points for each user-defined primitive contained
+                    tinyxml2::XMLElement *shape = entry->FirstChildElement(); // Get the shape defining the primitive
+                    while (shape != nullptr)
+                    {
+                        // Treat each user-defined primitive shape appropriately
+                        if (strcmp(shape->Name(), "Simple") == 0)
+                        {
+                            // Treat all simple shapes found appropriately
+                            //cout << " Working with a simple shape" << endl;
+                            vector<path> simpleShape = this->userSimpleIPC2581(shape, userUnit, map<std::string, path>());
+                            userShape.insert(userShape.end(), simpleShape.begin(), simpleShape.end()); // Put each simple shape discovered into the list of paths
+                        }
+                        else if (strcmp(shape->Name(), "Text") == 0)
+                        {
+                            cout << " Not handling text definition in user primitives" << endl;
+                        }
+                        else if (strcmp(shape->Name(), "UserSpecial") == 0)
+                        {
+                            // Handle the features (standard shapes or user shapes)
+                            //cout << " Working with UserSpecial shape" << endl;
+                            tinyxml2::XMLElement *feature = shape->FirstChildElement();
+
+                            // First, see which special features are simple shapes
+                            vector<path> simpleShape = this->userSimpleIPC2581(shape, userUnit, map<std::string, path>());
+                            userShape.insert(userShape.end(), simpleShape.begin(), simpleShape.end()); // Put each simple shape discovered into the list of paths
+
+                            // Second, see which special features are standard primitives
+                            size_t numSpecial = 1;
+                            std::string specialID = "userSpecial1";
+                            map<std::string, Aperture> primitives = this->standardPrimitiveIPC2581(shape, userUnit, numSpecial, specialID, map<std::string, Aperture>()); // Add new shape to dictionary
+                            path standShape = path(primitives[specialID].findPts(0., 0.), OUTLINE_LAYER, { "standardPrimitive conversion" }, 1, 0.0);
+                            userShape.insert(userShape.end(), { standShape }); // Quickly convert aperture to path before inserting into list of paths
+                            //userShape.push_back(primitives[specialID].findPts(0., 0.)); // Extract points from standard primitives
+                        }
+                        shape = shape->NextSiblingElement(); // Move on to the next shape in this user definition
+                    }
+                    //cout << " Assigning user-defined primitive " << entryID << " to dictionary" << endl;
+                    user.insert_or_assign(entryID, userShape); // Add to dictionary of user-defined primitives
+                    entry = entry->NextSiblingElement("EntryUser");
+                }
+            }
+
+            // Get DictionaryLineDesc grandchild element
+            map<std::string, path> lineDesc; // Dictionary of line descriptions with name as key
+            tinyxml2::XMLElement *dictLine = content->FirstChildElement("DictionaryLineDesc");
+            if (dictLine != nullptr)
+            {
+                //cout << "Working on dictionary of line descriptions" << endl;
+                std::string units = dictLine->Attribute("units");
+                double lineUnit = this->lengthUnitIPC2581(units); // Standard primitives length units (m)
+                size_t numDescription = 0;
+                tinyxml2::XMLElement *entry = dictLine->FirstChildElement("EntryLineDesc");
+                while (entry != nullptr)
+                {
+                    // Handle each line description entry
+                    numDescription++;
+                    std::string entryID = entry->Attribute("id");
+                    //cout << " Found line description " << entryID << endl;
+                    path line = this->lineDescIPC2581(entry, lineUnit, path(), lineDesc); // Path to store line description
+                    lineDesc.insert_or_assign(entryID, line); // Add to dictionary of line descriptions
+                    entry = entry->NextSiblingElement("EntryLineDesc");
+                }
+            }
+
+            // Get DictionaryColor grandchild element
+            map<std::string, vector<int>> colors; // Dictionary of colors with name as key
+            tinyxml2::XMLElement *dictColor = content->FirstChildElement("DictionaryColor");
+            if (dictColor != nullptr)
+            {
+                tinyxml2::XMLElement *entryColor = dictColor->FirstChildElement("EntryColor");
+                while (entryColor != nullptr)
+                {
+                    // Add colors for each color entry
+                    tinyxml2::XMLElement *color = entryColor->FirstChildElement("Color"); // Only handle first color in entry
+                    if (color != nullptr)
+                    {
+                        vector<int> rgb = { color->IntAttribute("r"), color->IntAttribute("g"), color->IntAttribute("b") };
+                        colors.insert_or_assign(entryColor->Attribute("id"), rgb); // Add to dictionary of colors
+                    }
+                    entryColor = entryColor->NextSiblingElement("EntryColor"); // Get next color entry if it exists
+                }
+                // cout << "Last color's RGB values: [" << colors[colors.size() - 1][0] << ", " << colors[colors.size() - 1][1] << ", " << colors[colors.size() - 1][0] << "]" << endl;
+            }
+
+            // Get ECAD (electronic computer-aided design) child element
+            tinyxml2::XMLElement *ecad = root->FirstChildElement("Ecad");
+            if (ecad == nullptr)
+            {
+                cerr << "XML Parsing Element Error for ECAD: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                return false;
+            }
+            this->setDesignName(ecad->Attribute("name")); // Set design name
+
+            // Get CAD header grandchild element
+            tinyxml2::XMLElement *cadHeader = ecad->FirstChildElement("CadHeader");
+            if (cadHeader == nullptr)
+            {
+                cerr << "XML Parsing Element Error for CAD Header: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                return false;
+            }
+            std::string units = cadHeader->Attribute("units");
+            double lengthUnit = this->lengthUnitIPC2581(units); // File length units (m)
+            map<std::string, std::string> material; // Dictionaries to look up material name with specification name as key
+            map<std::string, double> epsilon_r;
+            map<std::string, double> lossTan;
+            map<std::string, double> sigma;
+            tinyxml2::XMLElement *spec = cadHeader->FirstChildElement("Spec");
+            while (spec != nullptr)
+            {
+                // Handle each specification if it describes layers
+                //cout << " Handling specification: " << spec->Attribute("name") << endl;
+                tinyxml2::XMLElement *dielectric = spec->FirstChildElement("Dielectric");
+                if (dielectric != nullptr)
+                {
+                    // Get layer information
+                    std::string specName = spec->Attribute("name"); // Go back and grab name of specification for described layer
+                    double layerEpsR =  1.0; // Default relative permittivity
+                    double layerTan = 0.0; // Default loss tangent
+                    while (dielectric != nullptr)
+                    {
+                        // Layer contains dielectric information
+                        const char *diel_attr;
+                        tinyxml2::XMLError dielError = dielectric->QueryStringAttribute("type", &diel_attr);
+                        //cout << "  Dielectric record type: " << diel_attr << endl;
+                        if ((dielError == tinyxml2::XML_SUCCESS) && (strcmp(diel_attr, "DIELECTRIC_CONSTANT") == 0))
+                        {
+                            // Found a dielectric constant
+                            tinyxml2::XMLElement *prop = dielectric->FirstChildElement("Property");
+                            if (prop != nullptr)
+                            {
+                                layerEpsR = prop->DoubleAttribute("value"); // New relative permittivity
+                            }
+                        }
+                        else if ((dielError == tinyxml2::XML_SUCCESS) && (strcmp(diel_attr, "LOSS_TANGENT") == 0))
+                        {
+                            // Found a loss tangent
+                            tinyxml2::XMLElement *prop = dielectric->FirstChildElement("Property");
+                            if (prop != nullptr)
+                            {
+                                layerTan = prop->DoubleAttribute("value"); // New loss tangent
+                            }
+                        }
+                        // Possible: GLASS_TYPE, GLASS_STYLE, RESIN_CONTENT, PROCESSABILITY_TEMPERATURE, and OTHER
+                        dielectric = dielectric->NextSiblingElement("Dielectric"); // Get next dielectric record if it exists
+                    }
+                    epsilon_r.insert_or_assign(specName, layerEpsR);
+                    lossTan.insert_or_assign(specName, layerTan);
+                    tinyxml2::XMLElement *conductor = spec->FirstChildElement("Conductor");
+                    double layerCond = 0.0; // Default layer conductivity (S/m)
+                    while (conductor != nullptr)
+                    {
+                        // Layer contains conductor information
+                        const char *cond_attr;
+                        tinyxml2::XMLError condError = conductor->QueryStringAttribute("type", &cond_attr);
+                        //cout << "  Conductor record type: " << cond_attr << endl;
+                        if ((condError == tinyxml2::XML_SUCCESS) && (strcmp(cond_attr, "CONDUCTIVITY") == 0))
+                        {
+                            // Found a conductivity
+                            tinyxml2::XMLElement *prop = conductor->FirstChildElement("Property");
+                            if (prop != nullptr)
+                            {
+                                layerCond = prop->DoubleAttribute("value"); // New conductivity
+                                const char *cond_units;
+                                tinyxml2::XMLError unitError = prop->QueryStringAttribute("unit", &cond_units);
+                                if ((unitError == tinyxml2::XML_SUCCESS) && (strcmp(cond_units, "MHO/CM") == 0))
+                                {
+                                    layerCond *= 100.; // Covert from mho/cm to S/m
+                                }
+                                else if ((unitError == tinyxml2::XML_SUCCESS) && (strcmp(cond_units, "S/M") == 0))
+                                {
+                                    layerCond *= 1.0; // Already in S/m
+                                }
+                            }
+                        }
+                        // Possible: SURFACE_ROUGHNESS_UPFACING, SURFACE_ROUGHNESS_DOWNFACING, SURFACE_ROUGHNESS_TREATED, ETCH_FACTOR, FINISHED_HEIGHT, and OTHER
+                        conductor = conductor->NextSiblingElement("Conductor"); // Get next conductor record if it exists
+                    }
+                    sigma.insert_or_assign(specName, layerCond);
+                    tinyxml2::XMLElement *general = spec->FirstChildElement("General");
+                    std::string layerMat = "UNKNOWN"; // Default material
+                    while (general != nullptr)
+                    {
+                        // Layer contains general information
+                        const char *gen_attr;
+                        tinyxml2::XMLError genError = general->QueryStringAttribute("type", &gen_attr);
+                        //cout << "  General record type: " << gen_attr << endl;
+                        if ((genError == tinyxml2::XML_SUCCESS) && (strcmp(gen_attr, "MATERIAL") == 0))
+                        {
+                            // Found a material
+                            tinyxml2::XMLElement *prop = general->FirstChildElement("Property");
+                            if (prop != nullptr)
+                            {
+                                layerMat = prop->Attribute("text"); // New material
+                            }
+                        }
+                        // Possible: ELECTRICAL, THERMAL, INSTRUCTION, STANDARD, and OTHER
+                        general = general->NextSiblingElement("General"); // Get next general record if it exists
+                    }
+                    material.insert_or_assign(specName, layerMat);
+                    // Future implementation: Impedance
+                    // Possible: Backdrill, Technology, Temperature, and Tool
+                }
+                spec = spec->NextSiblingElement("Spec"); // Get next specification if it exists
+            }
+            //cout << "Number of layer specifications: " << epsilon_r.size() << endl; // Not handling ChangeRec
+
+            // Get CAD Data grandchild element
+            tinyxml2::XMLElement *cadData = ecad->FirstChildElement("CadData");
+            if (cadData == nullptr)
+            {
+                cerr << "XML Parsing Element Error for CAD Data: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                return false;
+            }
+            /*map<std::string, std::string> layerFunction; // Dictionaries to look up layer function text with layer name as key
+            map<std::string, std::string> layerSide; // Layer applies to top, bottom, both, internal, all, or other
+            map<std::string, bool> layerPolarity; // Do layer features represent copper? (true = yes, false = no)
+            tinyxml2::XMLElement *layer = cadData->FirstChildElement("Layer");
+            while (layer != nullptr)
+            {
+                // Handle each layer record
+                std::string layerName = layer->Attribute("name"); // Layer name in CAD data
+                //cout << " Handling layer: " << layerName << endl;
+                layerFunction.insert_or_assign(layerName, layer->Attribute("layerFunction"));
+                layerSide.insert_or_assign(layerName, layer->Attribute("side"));
+                layerPolarity.insert_or_assign(layerName, strcmp(layer->Attribute("polarity"), "NEGATIVE") != 0); // String comparison for negative polarity logic (otherwise POSITIVE)
+                // Possible: SpecRef and Span
+                layer = layer->NextSiblingElement("Layer"); // Get next layer record if it exists
+            }
+            //cout << "Number of layer polarities: " << layerPolarity.size() << endl;*/
+            double zmin = 0., zmax = 0.; // Design extents in z-direction (length units)
+            double tolPlus = 0., tolMinus = 0.; // Tolerance on nominal board thickness (length units)
+            std::string locThickness; // Location of thickness measurement is laminate, metal, mask, or other
+            map<std::string, int> layerGDSII; // Dictionary of GDSII layer numbers using layer name as key
+            tinyxml2::XMLElement *stackup = cadData->FirstChildElement("Stackup");
+            if (stackup != nullptr)
+            {
+                // Handle the single stackup
+                //cout << stackup->Name() << ": " << stackup->FindAttribute("name")->Value() << endl;
+                zmax = stackup->DoubleAttribute("overallThickness"); // Maximum z-coordinate set to overall thickness (length units)
+                tolPlus = stackup->DoubleAttribute("tolPlus");
+                tolMinus = stackup->DoubleAttribute("tolMinus");
+                locThickness = stackup->Attribute("whereMeasured");
+                // Possible: MatDes and SpecRef
+                double zEnd = zmax; // Initialize running layer ending z-coordinate (length units)
+                double groupThick = 0.; // Stackup group thickness (length units)
+                tinyxml2::XMLElement *group = stackup->FirstChildElement("StackupGroup");
+                while (group != nullptr)
+                {
+                    // Handle each stackup group
+                    //cout << " " << group->Name() << ": " << group->FindAttribute("name")->Value() << endl;
+                    groupThick = group->DoubleAttribute("thickness"); // Thickness of this stackup group (length units)
+                    tinyxml2::XMLElement *stackLayer = group->FirstChildElement("StackupLayer");
+                    while (stackLayer != nullptr)
+                    {
+                        // Handle each stackup layer
+                        std::string layerRef = stackLayer->Attribute("layerOrGroupRef");
+                        //cout << "  Layer name: " << layerRef << endl;
+                        /*if (layerFunction.count(layerRef) == 1)
+                        {
+                            std::string layerFunc = layerFunction.at(layerRef); // Look up layer function from dictionary
+                            cout << "   Layer function: " << layerFunc << endl;
+                        }*/
+                        double layerThick = stackLayer->DoubleAttribute("thickness"); // Thickness of this layer (length units)
+                        int sequence;
+                        tinyxml2::XMLError seqError = stackLayer->QueryIntAttribute("sequence", &sequence);
+                        if ((seqError == tinyxml2::XML_SUCCESS) && (sequence >= 1))
+                        {
+                            // Hunt for z-coordinates of layer to insert into layer field
+                            size_t indDestLayer = sequence - 1; // Destination index of layer in field
+                            double layerEpsR = 1.0; // Default relative permittivity
+                            double layerTan = 0.0; // Default loss tangent
+                            double layerCond = 0.0; // Default conductivity (S/m)
+                            tinyxml2::XMLElement *specRef = stackLayer->FirstChildElement("SpecRef");
+                            if (specRef != nullptr)
+                            {
+                                // Look up material properties from dictionaries if specification is referenced
+                                std::string specRefID = specRef->Attribute("id"); // Only handle first spec reference found
+                                //cout << "   Found layer " << sequence <<  " specification reference: " << specRefID << endl;
+                                layerEpsR = epsilon_r.at(specRefID);
+                                layerTan = lossTan.at(specRefID);
+                                layerCond = sigma.at(specRefID);
+                                //cout << "    epsilon_r = " << layerEpsR << ", tan(delta_d) = " << layerTan << ", and sigma = " << layerCond << " S/m" << endl;
+                            }
+
+                            // Register a new layer in the layer field
+                            double zStart = max((zEnd - layerThick) * lengthUnit, 0.0); // Specific layer starting z-coordinate always nonnegative (m)
+                            double zHeight = max(layerThick * lengthUnit, 0.0); // Layer height (m)
+                            //cout << "   Layer " << sequence << " calculated zStart = " << zStart << " m and h = " << zHeight << " m" << endl;
+                            (this->layers).insert(this->layers.begin() + indDestLayer, Layer(layerRef, sequence, zStart, zHeight, layerEpsR, layerTan, layerCond));
+                            zEnd -= layerThick; // Update ending z-coordinate
+                            layerGDSII.insert_or_assign(layerRef, sequence); // Add GDSII layer number to dictionary
+                        }
+                        // Possible: tolPlus, tolMinus, comment, and MatDes
+                        stackLayer = stackLayer->NextSiblingElement("StackupLayer"); // Get next stackup layer if it exists
+                    }
+                    // Possible: tolPlus, tolMinus, comment, MatDes, SpecRef, and CADDataLayerRef
+                    group = group->NextSiblingElement("StackupGroup"); // Get next stackup group if it exists
+                }
+            }
+            AsciiDataBase adbIPC; // Build ASCII database of design geometry (forget about timestamps)
+            adbIPC.setFileName(ipcFileName.substr(0, ipcFileName.find_last_of(".")) + ".gds");
+            tinyxml2::XMLElement *step = cadData->FirstChildElement("Step");
+            while (step != nullptr)
+            {
+                // Handle each manufacturing step
+                cout << step->Name() << ": " << step->FindAttribute("name")->Value() << endl;
+                tinyxml2::XMLElement *datum = step->FirstChildElement("Datum");
+                if (datum == nullptr)
+                {
+                    cerr << "XML Parsing Element Error for CAD Data manufacturing step origin: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                    return false;
+                }
+                vector<double> origin = { datum->DoubleAttribute("x") * lengthUnit, datum->DoubleAttribute("y") * lengthUnit }; // Datum contains origin (m)
+                tinyxml2::XMLElement *profile = step->FirstChildElement("Profile");
+                if (profile == nullptr)
+                {
+                    cerr << "XML Parsing Element Error for CAD Data manufacturing step profile: " << tinyxml2::XML_ERROR_PARSING_ELEMENT << endl;
+                    return false;
+                }
+                GeoCell cellProf; // Build single geometric cell from limboint.h to store information (forget about timestamps)
+                cellProf.cellName = "profile";
+                vector<double> profBounds; // Coordinates of the design outline (m)
+                tinyxml2::XMLElement *profilePoly = profile->FirstChildElement("Polygon");
+                if (profilePoly != nullptr)
+                {
+                    // Create the polygon of the design outline
+                    //cout << " Working on profile polygon" << endl;
+                    path lineProfile = this->polylineIPC2581(profilePoly, lengthUnit, profBounds, lineDesc); // Create polygon of the design outline
+                    profBounds = lineProfile.getPaths();
+                    cellProf.boundaries.emplace_back(boundary(profBounds, OUTLINE_LAYER, {}));
+                    cellProf.boundaries.back().setDataType(OUTLINE_PROFILE_DATATYPE); // Mark as nonphysical datatype on designated outline layer
+                }
+                tinyxml2::XMLElement *cutout = profile->FirstChildElement("Cutout");
+                while (cutout != nullptr)
+                {
+                    // Create the polygon of the design outline
+                    //cout << " Working on a cutout polygon" << endl;
+                    profBounds.clear();
+                    path lineCutout = this->polylineIPC2581(cutout, lengthUnit, profBounds, lineDesc);
+                    profBounds = lineCutout.getPaths();
+                    cellProf.boundaries.emplace_back(boundary(profBounds, OUTLINE_LAYER, {}));
+                    cellProf.boundaries.back().setDataType(OUTLINE_CUTOUT_DATATYPE); // Mark as nonphysical datatype on designated outline layer
+
+                    // Proceed to next cutout if it exists
+                    cutout = cutout->NextSiblingElement("Cutout");
+                }
+                adbIPC.appendCell(cellProf); // Add profile cell to ASCII database
+                GeoCell cellFeature; // Build single geometric cell for layer features
+                cellFeature.cellName = "design";
+                tinyxml2::XMLElement *layerFeature = step->FirstChildElement("LayerFeature");
+                while (layerFeature != nullptr)
+                {
+                    // Handle the loads of information in each layerFeature
+                    std::string layerRefID = layerFeature->Attribute("layerRef");
+                    cout << " Working on features of layer: " << layerRefID << endl;
+                    tinyxml2::XMLElement *set = layerFeature->FirstChildElement("Set");
+                    while (set != nullptr)
+                    {
+                        // Skip sets belonging to nonphysical layers
+                        if (layerGDSII.count(layerRefID) == 0)
+                        {
+                            set = set->NextSiblingElement("Set"); // Get the next set in the layerFeature if it exists
+                            continue;
+                        }
+
+                        // Handle graphical information in each set
+                        const char *net;
+                        tinyxml2::XMLError netError = set->QueryStringAttribute("net", &net);
+                        /*if (netError == tinyxml2::XML_SUCCESS)
+                        {
+                            cout << "  Set applies to net: " << net << endl;
+                        }*/
+                        tinyxml2::XMLElement *features = set->FirstChildElement("Features");
+                        while (features != nullptr)
+                        {
+                            // Handle location of features
+                            double xo = origin[0]; // Initialize feature location to step datum
+                            double yo = origin[1];
+                            tinyxml2::XMLElement *location = features->FirstChildElement("Location");
+                            if (location != nullptr)
+                            {
+                                // Update location by translating in local coordinate system
+                                xo += location->DoubleAttribute("x") * lengthUnit;
+                                yo += location->DoubleAttribute("y") * lengthUnit;
+                            }
+
+                            // Handle translation and linear transformation (rotation, reflection, and scaling) of features
+                            pair<strans, vector<double>> xform = this->xformIPC2581(features, lengthUnit, { xo, yo }, 0.0);
+
+                            // Handle the features (standard shapes or user shapes)
+                            tinyxml2::XMLElement *feature = features->FirstChildElement();
+                            //cout << "  Working with features in a set" << endl;
+
+                            // First, see which special features are simple shapes
+                            vector<path> simpleShape = this->userSimpleIPC2581(features, lengthUnit, lineDesc);
+
+                            // Turn simple shape features into paths in the geometric cell
+                            for (size_t indi = 0; indi < simpleShape.size(); indi++)
+                            {
+                                // Handle each shape in simpleShape
+                                path lineFeature = simpleShape[indi];
+                                vector<double> paths = lineFeature.getPaths();
+                                for (size_t indj = 0; indj < paths.size(); indj += 2)
+                                {
+                                    double xCoord = paths[indj] + xform.second[0]; // Apply translation to each point
+                                    double yCoord = paths[indj + 1] + xform.second[1];
+                                    vector<double> newPt = xform.first.counterTransform({ xCoord, yCoord }); // Rotate, reflect, and scale as needed
+                                    paths[indj] = newPt[0]; // Replace each point for this shape with the transformed one
+                                    paths[indj + 1] = newPt[1];
+                                }
+                                lineFeature.setPaths(paths); // Use the transformed paths
+                                lineFeature.setWidth(lineFeature.getWidth() * xform.first.getMagnify()); // Use the magnified path width
+                                lineFeature.setLayer(layerGDSII[layerRefID]); // Remember to set the current layer
+                                cellFeature.paths.push_back(lineFeature); // Add linear feature to geometric cell
+                            }
+
+                            // Second, see which special features are standard primitives
+                            size_t numSpecial = 1;
+                            std::string specialID = "userSpecial1";
+                            map<std::string, Aperture> primiShape = this->standardPrimitiveIPC2581(features, lengthUnit, numSpecial, specialID, map<std::string, Aperture>()); // Add new shape to dictionary
+
+                            // Turn standard primitive features into boundaries in the geometric cell
+                            if (primiShape.size() > 0)
+                            {
+                                //cout << "   Special feature is standard primitive" << endl;
+                                Aperture planeFeature = primiShape[specialID];
+                                vector<double> bounds = planeFeature.findPts(0., 0.); // Extract points from standard primitive
+                                /*if (bounds.size() == 0)
+                                {
+                                    cerr << "   Aperture had 0 points!" << endl;
+                                }*/
+                                for (size_t indi = 0; indi < bounds.size(); indi++)
+                                {
+                                    double xCoord = bounds[indi] + xform.second[0]; // Apply translation to each point
+                                    double yCoord = bounds[indi + 1] + xform.second[1];
+                                    vector<double> newPt = xform.first.counterTransform({ xCoord, yCoord }); // Rotate, reflect, and scale as needed
+                                    bounds[indi] = newPt[0]; // Replace each point for this shape with the transformed one
+                                    bounds[indi + 1] = newPt[1];
+                                }
+                                cellFeature.boundaries.push_back(boundary(bounds, layerGDSII[layerRefID], {}));
+                            }
+
+                            // Get the next features group in the set if it exists
+                            features = features->NextSiblingElement("Features");
+                        }
+                        tinyxml2::XMLElement *pads = set->FirstChildElement("Pad");
+                        while (pads != nullptr)
+                        {
+                            // Handle location of pads
+                            double xo = origin[0]; // Initialize feature location to step datum
+                            double yo = origin[1];
+                            tinyxml2::XMLElement *location = pads->FirstChildElement("Location");
+                            if (location != nullptr)
+                            {
+                                // Update location by translating in local coordinate system
+                                xo += location->DoubleAttribute("x") * lengthUnit;
+                                yo += location->DoubleAttribute("y") * lengthUnit;
+                            }
+
+                            // Handle translation and linear transformation (rotation, reflection, and scaling) of pads
+                            pair<strans, vector<double>> xform = this->xformIPC2581(pads, lengthUnit, { xo, yo }, 0.0);
+
+                            // Handle the pads if they are standard primitive references
+                            //cout << "  Working with pads in a set" << endl;
+                            tinyxml2::XMLElement *primiRef = pads->FirstChildElement("StandardPrimitiveRef");
+                            if (primiRef != nullptr)
+                            {
+                                // Search for the aperture before converting to boundary in the geometric cell
+                                std::string refID = primiRef->Attribute("id");
+                                //cout << "   Pad references " << refID << endl;
+                                Aperture thisPad = primitives[refID];
+                                vector<double> bounds = thisPad.findPts(0., 0.); // Extract points from standard primitive
+                                for (size_t indi = 0; indi < bounds.size(); indi++)
+                                {
+                                    double xCoord = bounds[indi] + xform.second[0]; // Apply translation to each point
+                                    double yCoord = bounds[indi + 1] + xform.second[1];
+                                    vector<double> newPt = xform.first.counterTransform({ xCoord, yCoord }); // Rotate, reflect, and scale as needed
+                                    bounds[indi] = newPt[0]; // Replace each point for this shape with the transformed one
+                                    bounds[indi + 1] = newPt[1];
+                                }
+                                cellFeature.boundaries.push_back(boundary(bounds, layerGDSII[layerRefID], {}));
+                            }
+
+                            // Get the next pads group in the set if it exists
+                            pads = pads->NextSiblingElement("Pad");
+                        }
+                        // Possible attributes: net, polarity, padUsage, testPoint, geometry, plate, and componentRef
+                        // Possible subelements: NonstandardAttribute, Fiducial, Hole, SlotCavity, SpecRef, ColorGroup, and LineDescGroup
+                        set = set->NextSiblingElement("Set"); // Get the next set in the layerFeature if it exists
+                    }
+                    layerFeature = layerFeature->NextSiblingElement("LayerFeature"); // Get the next layerFeature if it exists
+                }
+                // Specific future implementation: PadStack, PadStackDef, and PhyNetGroup
+                // Other possible subelements: NonstandardAttribute, Route, StepRepeat, Package, Component, LogicalNet, and DfxMeasurementList
+                cellFeature.sreferences.push_back(sref(origin, {}, "profile", strans())); // Reference the profile in the features cell
+                adbIPC.appendCell(cellFeature); // Add features cell to ASCII database
+                step = step->NextSiblingElement("Step"); // Get next manufacturing step if it exists
+            }
+
+            // Create simulation settings
+            double xmin = 0., xmax = 0., ymin = 0., ymax = 0.;
+            this->settings = SimSettings(lengthUnit, {xmin * lengthUnit, xmax * lengthUnit, ymin * lengthUnit, ymax * lengthUnit, zmin * lengthUnit, zmax * lengthUnit}, 1., 0., {});
+
+            // Propagate port list to parasitics data structure now
+            //this->para = Parasitics(ports, dMat(numPort, numPort), dMat(numPort, numPort), (this->settings).getFreqsHertz());
+
+            // Return
+            adbIPC.print({ adbIPC.getNumCell() - 1 });
+            return true;
+        }
+        else
+        {
+            // File could not be loaded
+            cerr << "IPC-2581 file returned " << fileLoadStatus << " upon load attempt. Stopping execution." << endl;
             return false;
         }
     }

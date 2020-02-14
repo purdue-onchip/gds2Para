@@ -49,6 +49,8 @@ int main(int argc, char** argv)
             cout << "  -sp, --spef           Read GDSII and sim input files into memory, simulate, and write solution to SPEF file." << endl;
             cout << "  -sc, --citi           Read GDSII and sim input files into memory, simulate, and write solution to CITIfile." << endl;
             cout << "  -st, --touchstone     Read GDSII and sim input files into memory, simulate, and write solution to Touchstone file." << endl;
+            cout << "  -b, --board           Read IPC-2581 and sim input files, analyze board, and write solution to Xyce subcircuit." << endl;
+            cout << "  -bx, --xycePCB        Identical to \"-b\"." << endl;
             cout << endl << "Comments:" << endl;
             cout << " The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
@@ -58,6 +60,7 @@ int main(int argc, char** argv)
             cout << " The first file passed after -sp or --spef must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
             cout << " The first file passed after -sc or --citi must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank CITIfile." << endl;
             cout << " The first file passed after -sc or --citi must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Touchstone file." << endl;
+            cout << " The first file pased after -b or --board (or -bx or --xycePCB) must be an IPC-2581 XML file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gds2Para>" << endl;
         }
@@ -428,12 +431,40 @@ int main(int argc, char** argv)
                 cout << "File ready at " << outXyceFile << endl;
             }
         }
+        else if ((strcmp(argv[1], "-b") == 0) || (strcmp(argv[1], "--board") == 0) || (strcmp(argv[1], "-bx") == 0) || (strcmp(argv[1], "--xycePCB") == 0))
+        {
+            // Initialize SolverDataBase, mesh, and set variables for performance tracking
+            clock_t t1 = clock();
+            SolverDataBase sdb;
+            fdtdMesh sys;
+            int status = 0; // Initialize as able to return successfully
+            bool adbIsGood, sdbIsGood, sdbCouldDump;
+
+            // Get file names
+            string inIPCFile = argv[2];
+            string inSimFile = argv[3];
+            size_t indExtension = inIPCFile.find_last_of(".");
+
+            // Read IPC-2581 file
+            sdbIsGood = sdb.readIPC2581(inIPCFile);
+            if (sdbIsGood)
+            {
+                cout << "IPC-2581 board file read" << endl;
+            }
+            else
+            {
+                cerr << "Unable to read in IPC-2581 board file" << endl;
+                status = 1;
+                return status;
+            }
+        }
         else
         {
             cerr << "Must pass a GDSII file, sim_input file, and blank Xyce file to write after \"-s\" or \"-sx\" flag" << endl;
             cerr << "Must pass a GDSII file, sim_input file, and blank SPEF file to write after \"-sp\" flag" << endl;
             cerr << "Must pass a GDSII file, sim_input file, and blank CITI file to write after \"-sc\" flag" << endl;
             cerr << "Must pass a GDSII file, sim_input file, and blank Touchstone file to write after \"-st\" flag" << endl;
+            cerr << "Must pass an IPC-2581 file, sim_input file, and blank Xyce file to write after \"-b\" or \"-bx\" flag" << endl;
             cerr << "Rerun with \"--help\" flag for details" << endl;
         }
     }
