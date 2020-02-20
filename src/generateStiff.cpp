@@ -5,8 +5,8 @@ using namespace std::complex_literals;
 
 int generateStiff(fdtdMesh *sys){
 
-    myint Senum, leng_Se;    // Se's size is (N_patch - 2 * N_patch_s) * (N_edge - 2 * N_edge_s)
-    myint Shnum, leng_Sh;    // Sh's size is (N_edge - 2 * N_edge_s) * (N_patch - 2 * N_patch_s)
+    myint Senum, leng_Se;    
+    myint Shnum, leng_Sh;    
     myint *SeRowId, *SeColId;
     double *Seval;
     myint *ShRowId, *ShColId;
@@ -583,7 +583,9 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
-                J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 0. - (1i) * sys->portCoor[sourcePort].portDirection[sourcePortSide] * freq * 2. * M_PI;
+                J[sourcePort * (sys->N_edge - sys->bden) + sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]]] = 
+                    0. - (1i) * (double) (sys->portCoor[sourcePort].portDirection[sourcePortSide]) * freq * 2. * M_PI;
+                //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portEdge[sourcePortSide][inde] << endl;
                 //cout << "SourcePort " << sourcePort << " sourcePortSide " << sourcePortSide << " is " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << endl;
 
             }
@@ -656,9 +658,10 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
 
     pardisoinit(pt, &mtype, iparm);
     iparm[38] = 1;
-    iparm[34] = 1;    // 0-based indexing
-    iparm[3] = 2;    // number of processors
-    //iparm[59] = 2;    // out of core version to solve very large problem
+    iparm[34] = 1;          // 0-based indexing
+    iparm[3] = 0;           /* No iterative-direct algorithm */
+    //iparm[3] = 2;         // CGS iteration for symmetric positive definite matrices replaces the computation of LLT
+    //iparm[59] = 2;        // out of core version to solve very large problem
     //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
 
     //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
@@ -940,6 +943,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
     ofstream out;
     //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
 
+    // Generate S matrix in COO format and Remove {e} at PEC BC. Layer growth along z
     for (myint i = 0; i < ARows; i++){
         if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
             continue;
@@ -965,6 +969,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         }
         v.clear();
     }
+
     //out.close();
     leng_A = j;
 
