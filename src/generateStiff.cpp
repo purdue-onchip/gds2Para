@@ -872,7 +872,7 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
     ofstream out;
-    //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
+    out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < ARows; i++){
         if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
             continue;
@@ -889,15 +889,16 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
             sys->SRowId[j] = sys->mapEdge[i];
             sys->SColId[j] = sys->mapEdge[v[count].first];
             sys->Sval[j] = v[count].second / MU;
-            //out << sys->SRowId[j] << " " << sys->SColId[j] << " ";
-            //out << setprecision(15) << sys->Sval[j] << endl;
+            out << sys->SRowId[j] + 1 << " " << sys->SColId[j] + 1 << " ";
+            out << setprecision(15) << sys->Sval[j] << endl;
 
             j++;
             count++;
         }
         v.clear();
     }
-    //out.close();
+    out.close();
+	cout << "S is generated!\n";
     leng_A = j;
 
     mkl_sparse_destroy(a);
@@ -1154,13 +1155,13 @@ int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val) {
             colId[leng] = ind;
             val[leng] = 0;
 #ifdef LOWER_BOUNDARY_PEC
-            if (indz1 > 0)
+            //if (indz1 > 0)
                 val[leng] += 1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #else
             val[leng] += 1 / lza1 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #endif
 #ifdef UPPER_BOUNDARY_PEC
-            if (indz2 < sys->N_cell_z)
+            //if (indz2 < sys->N_cell_z)
                 val[leng] += 1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;
 #else
             val[leng] += 1 / lza2 * 1 / (sys->zn[indz2] - sys->zn[indz1]) / MU;

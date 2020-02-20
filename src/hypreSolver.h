@@ -11,5 +11,5 @@
 #define HYPRE_MAX_ITER (500) // Maximum iterations for HYPRE
 
 //int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution);
-int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution, int info_show, int solve);
+int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution, int info_show, int solve);
 int hypre_FlexGMRESModifyPCAMG(void *precond_data, HYPRE_Int iterations, double rel_residual_norm);

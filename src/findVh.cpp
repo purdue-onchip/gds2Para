@@ -3,12 +3,20 @@
 #include <mkl_service.h>
 #include <mkl_dfti.h>
 
+void applyPrecond_P(myint* PRowId1, myint* PColId, double* Pval, myint leng_P, myint N, double* x1, double* x2);
+int generate_bm(fdtdMesh* sys, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0cat, myint leng_v0c, double freq, double* J, double* bm, myint N);
+int multi_matrixvec(fdtdMesh* sys, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, double freq, myint* LrowId, myint* LcolId, double* Lval, myint leng, double* x, double* y, myint N);
+int realMatrixVec(fdtdMesh* sys, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, double freq, myint* LrowId, myint* LcolId, double* Lval, myint leng, double* x, double* y, myint N);
+int imagMatrixVec(fdtdMesh* sys, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, double freq, double* x, double* y, myint N);
+int applyPrecond_freq(fdtdMesh* sys, double* b1, complex<double>* b2, myint* L1RowId, myint* L1ColId, double* L1val, myint leng_L1, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double freq);
+
+
 static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat)
 {
     return (pow(a.first.real(), 2) + pow(a.first.imag(), 2)) < (pow(b.first.real(), 2) + pow(b.first.imag(), 2));
 };
 
-int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio) {
+int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* MooRowId, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio, myint* PRowId1, myint* PColId, double* Pval, myint leng_P) {
 	/* solve the problem in frequency domain
 	  [-omega^2*D_epsoo+Soo, Soi
 	   Sio,                  i*omega*D_sigii+Sii]
@@ -37,7 +45,10 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v
 	double* xo = (double*)calloc(sys->outside * sys->numPorts, sizeof(double));
 	//clock_t t1 = clock();
 	//solveOO(sys, freq, Jo, v0dt, v0dat, xo);   // xo should be imaginary add i later
-	solveOO_pardiso(sys, MooRowId1, MooColId, Mooval, lengoo, sys->outside, Jo, xo, sys->numPorts);   // use pardiso to solve (-omega^2*D_epsoo+Soo)*xo=Jo
+	//solveOO_pardiso(sys, MooRowId1, MooColId, Mooval, lengoo, sys->outside, Jo, xo, sys->numPorts);   // use pardiso to solve (-omega^2*D_epsoo+Soo)*xo=Jo
+	for (int ind = 0; ind < sys->numPorts; ++ind) {
+		mkl_gmres_A_P(&Jo[ind * sys->outside], &xo[ind * sys->outside], MooRowId, MooColId, Mooval, lengoo, sys->outside, PRowId1, PColId, Pval, leng_P);
+	}
 	for (int ind = 0; ind < sys->outside * sys->numPorts; ++ind) {
 		xo[ind] *= -freq * 2 * M_PI;   // xo is the solution from (-omega^2*D_epsoo+Soo)\(-omega*Jo)
 	}
@@ -56,19 +67,19 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v
 	/* End of checking the correctness of OO part */
 
 	/* solve ii part */
-	double* temp = (double*)calloc(inside * sys->numPorts, sizeof(double));
-	double* xi = (double*)calloc(inside * sys->numPorts, sizeof(double));
-	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
-		sparseMatrixVecMul(SioRowId, SioColId, Sioval, lengio, &xo[sourcePort * sys->outside], &temp[sourcePort * inside]);   // temp=Sio*xo
-	}
-	for (myint indi = 0; indi < inside * sys->numPorts; ++indi) {
-		xi[indi] = -temp[indi] / (2 * M_PI * freq * SIGMA);
-	}
+	//double* temp = (double*)calloc(inside * sys->numPorts, sizeof(double));
+	//double* xi = (double*)calloc(inside * sys->numPorts, sizeof(double));
+	//for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+	//	sparseMatrixVecMul(SioRowId, SioColId, Sioval, lengio, &xo[sourcePort * sys->outside], &temp[sourcePort * inside]);   // temp=Sio*xo
+	//}
+	//for (myint indi = 0; indi < inside * sys->numPorts; ++indi) {
+	//	xi[indi] = -temp[indi] / (2 * M_PI * freq * SIGMA);
+	//}
 
 	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
 		for (myint indi = 0; indi < nedge; ++indi) {
 			if (sys->markEdge[sys->mapEdgeR[indi]]) {
-				y[sourcePort * nedge + indi] = xi[sourcePort * inside + sys->mapio[indi] - sys->outside] + 1i * 0;
+				//y[sourcePort * nedge + indi] = xi[sourcePort * inside + sys->mapio[indi] - sys->outside] + 1i * 0;
 			}
 			else {
 				y[sourcePort * nedge + indi] = 0 + 1i * xo[sourcePort * sys->outside + sys->mapio[indi]];
@@ -85,12 +96,12 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v
 
 	free(Jo); Jo = NULL;
 	free(xo); xo = NULL;
-	free(temp); temp = NULL;
-	free(xi); xi = NULL;
+	//free(temp); temp = NULL;
+	//free(xi); xi = NULL;
 }
 
 
-int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval) {
+int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval, sparse_matrix_t& Ll) {
 	int t0n = 3;
 	double dt = DT;
 	double tau = 1.e-11;
@@ -176,7 +187,12 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		resp[ind] = (double*)calloc(nt, sizeof(double));
 	}
 	/* End of allocating the space for the time response of each port */
-	outfile.open("xt_nand2_new.txt", std::ofstream::out | std::ofstream::trunc);
+
+	/* pardiso solve the backward difference matrix --- factorization */
+	//pardisoSolve_factorize(SRowId1, SColId, Sval, sys->leng_S, edge);
+	/* End of pardiso solve the backward difference matrix --- factorization */
+
+	outfile.open("xt_nand2_fine_ref.txt", std::ofstream::out | std::ofstream::trunc);
 	for (int ind = 1; ind <= nt; ind++) {    // time marching to find the repeated eigenvectors
 		// Generate the right hand side
 		for (int indi = 0; indi < edge; indi++) {
@@ -198,12 +214,12 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		//outfile.close();
 
 		/* backward difference, use HYPRE solve */
-		//status = hypreSolve(sys, sys->SRowId, sys->SColId, val, sys->leng_S, rsc, sys->N_edge - sys->bden, &xr[(sys->N_edge - sys->bden) * 2], 1, 3);   // reference backward by solving (D_eps+dt*D_sig+dt^2*S)
-		//status = hypreSolve(sys, LrowId, LcolId, val, leng, rsc, sys->N_edge - sys->bden, &xr[edge * 2], 0, 3);   // solve (D_eps + dt * D_sig + dt ^ 2 * L)
+		//status = hypreSolve(sys->SRowId, sys->SColId, val, sys->leng_S, rsc, sys->N_edge - sys->bden, &xr[(sys->N_edge - sys->bden) * 2], 1, 3);   // reference backward by solving (D_eps+dt*D_sig+dt^2*S)
+		//status = hypreSolve(LrowId, LcolId, val, leng, rsc, sys->N_edge - sys->bden, &xr[edge * 2], 0, 3);   // solve (D_eps + dt * D_sig + dt ^ 2 * L)
 		/* End of backward difference, use HYPRE solve */
 
 		/* Use pardiso to solve backward difference */
-		//status = pardisoSolve(sys, SRowId1, SColId, Sval, rsc, &xr[edge * 2], edge);
+		status = pardisoSolve(SRowId1, SColId, Sval, rsc, &xr[edge * 2], edge);
 		//outfile.open("xr.txt", std::ofstream::trunc | std::ofstream::out);
 		//for (int indi = 0; indi < edge; ++indi) {
 		//	outfile << xr[edge * 2 + indi] << endl;
@@ -215,38 +231,41 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t v0ct, sparse_mat
 		          (D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
 				  for backward difference*/
 		/* Generate [v0a' * b; b] */
-		bm = (double*)calloc(noden + edge, sizeof(double));
-		sys->generateLaplacianRight(bm, rsc);
-		//outfile.open("bm.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int ind = 0; ind < sys->N_edge - sys->bden + sys->leng_v0d1 + sys->leng_v0c; ++ind) {
-		//	outfile << bm[ind] << endl;
-		//}
-		//outfile.close();
+		//bm = (double*)calloc(noden + edge, sizeof(double));
+		//sys->generateLaplacianRight(bm, rsc);
+		////outfile.open("bm.txt", std::ofstream::trunc | std::ofstream::out);
+		////for (int ind = 0; ind < sys->N_edge - sys->bden + sys->leng_v0d1 + sys->leng_v0c; ++ind) {
+		////	outfile << bm[ind] << endl;
+		////}
+		////outfile.close();
 
-		/* Use MKL fgmres to solve the matrix solution */
-		/* When dt^2*Loo is much larger than dt*D_sig+D_eps, the step number is small
-		 solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
-		        (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
+		///* Use MKL fgmres to solve the matrix solution */
+		///* solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
+		//        (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] with diagonal as the preconditioner */
+		////x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
+		////status = mkl_gmres(sys, bm, x, Ll, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
+		///* End of using MKL fgmres to solve the matrix solution */
+
+		///* Use direct solver to solve the matrix solution */
+		///* When dt^2*Loo is much larger than dt*D_sig+D_eps, this way is accurate
+		// solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
+  //              (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
 		//x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
-		//status = mkl_gmres(sys, bm, x, Ll, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
-		/* End of using MKL fgmres to solve the matrix solution */
+		//status = solveBackMatrix(sys, bm, x, v0ct, v0cat, v0dt, v0dat, A12RowId, A12ColId, A12val, leng_A12, A21RowId, A21ColId, A21val, leng_A21, A22RowId, A22ColId, A22val, leng_A22);
+		// /* End of using direct solver to solve the matrix solution */
 
-		/* Use direct solver to solve the matrix solution */
-		/* When dt^2*Loo is much larger than dt*D_sig+D_eps, this way is accurate
-		 solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
-                (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
-		x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
-		status = solveBackMatrix(sys, bm, x, v0ct, v0cat, v0dt, v0dat, A12RowId, A12ColId, A12val, leng_A12, A21RowId, A21ColId, A21val, leng_A21, A22RowId, A22ColId, A22val, leng_A22);
-		 /* End of using direct solver to solve the matrix solution */
-
-		
-		/* Compute V0 * y0 + xh */
-		status = combine_x(x, sys, &xr[edge * 2]);
-		//outfile.open("x.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int indi = 0; indi < edge; ++indi) {
-		//	outfile << xr[edge * 2 + indi] << endl;
-		//}
-		//outfile.close();
+		///* Use pardiso to solve the matrix solution */
+		////x = (double*)calloc((noden + sys->N_edge - sys->bden), sizeof(double));
+		////status = pardisoSolve(sys->LlRowId, sys->LlColId, sys->Llval, bm, x, edge + noden);
+		///* End of using pardiso to solve the matrix solution */
+		//
+		///* Compute V0 * y0 + xh */
+		//status = combine_x(x, sys, &xr[edge * 2]);
+		////outfile.open("x.txt", std::ofstream::trunc | std::ofstream::out);
+		////for (int indi = 0; indi < edge; ++indi) {
+		////	outfile << xr[edge * 2 + indi] << endl;
+		////}
+		////outfile.close();
 
 		/* End of solving [V0a'*(D_eps+dt*D_sig)*V0, V0a'*(D_eps+dt*D_sig)
 		(D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
@@ -1669,7 +1688,7 @@ int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A
 	/* Initialize the initial guess
 	/*--------------------------------------------------------------------------*/
 	for (i = 0; i < N; ++i) {
-		computed_solution[i] = 0;// bm[i];
+		computed_solution[i] =  bm[i];
 	}
 	double bmn = 0;
 
@@ -1736,14 +1755,14 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		//cout << "The solution is " << bmn << endl;
 
 		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
-		if (dvar < 0.001) goto COMPLETE;
+		if (dvar < 0.0001) goto COMPLETE;
 		else goto ONE;
 	}
 
 	/* apply the preconditioner on the vector tmp[ipar[21]-1] and put the result in vector tmp[ipar[22]-1] */
 	if (RCI_request == 3) {
 		
-		status = applyPrecond(sys, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1], A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
+		status = applyPrecond(sys, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1], A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat, 2);
 		goto ONE;
 	}
 
@@ -1774,8 +1793,8 @@ SUCCEDED: free(b); b = NULL;
 	return 0;
 }
 
-int mkl_gmres_A(fdtdMesh* sys, double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N) {
-	/* Use MKL fgmres to generate the matrix solution of (D_epsoo + dt^2 * Loo)
+int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N) {
+	/* Use MKL fgmres to generate the matrix solution of (D_epsoo + dt^2 * Loo) with no preconditioner
 	(D_epsoo + dt^2 * Loo)
 	x solution 
 	N : size of the matrix*/
@@ -1809,7 +1828,7 @@ int mkl_gmres_A(fdtdMesh* sys, double* bm, double* x, myint* ARowId, myint* ACol
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	double dvar;
-	int status, maxit = 500;
+	int status, maxit = 5000;
 	ofstream out;
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
@@ -1859,17 +1878,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 			tmp[ipar[22] - 1 + ind] = 0;    // before using sparseMatrixVecMul, the resultant vector should be first initialized
 		}
 		sparseMatrixVecMul(ARowId, AColId, Aval, leng_A, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1]);
-		//out.open("x1.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
-		//	out << tmp[ipar[21] - 1 + indi] << endl;
-		//}
-		//out.close();
-
-		//out.open("b1.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
-		//	out << tmp[ipar[22] - 1 + indi] << endl;
-		//}
-		//out.close();
+		
 
 		goto ONE;
 	}
@@ -1889,8 +1898,8 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
-		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
-		if (dvar < 0.001 || itercount > maxit) goto COMPLETE;
+		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		if (dvar < 0.01 || itercount > maxit) goto COMPLETE;
 		else goto ONE;
 	}
 
@@ -1912,7 +1921,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 
 COMPLETE: ipar[12] = 0;
 	dfgmres_get(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp, &itercount);
-	cout << "Number of iterations: " << itercount << endl;
+	//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
 	for (i = 0; i < ivar; ++i) {
 		x[i] = computed_solution[i];
 	}
@@ -1925,6 +1934,7 @@ SUCCEDED: free(b); b = NULL;
 	free(residual); residual = NULL;
 	return 0;
 }
+
 
 
 int combine_x(double* x, fdtdMesh* sys, double* xr) {
@@ -1945,138 +1955,229 @@ int combine_x(double* x, fdtdMesh* sys, double* xr) {
 	return 0;
 }
 
-int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat) {
+int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, sparse_matrix_t v0ct, sparse_matrix_t v0cat, sparse_matrix_t v0dt, sparse_matrix_t v0dat, int choice) {
+	/* b1 : right hand side
+	   b2 : solution */
 	ofstream out;
-	/* Preconditioner : [v0da'*D_eps*v0d,v0da'*D_eps*v0c,   0;
-	                     0,              v0ca'*dt*D_sig*v0c,0;
-						 0,              0,                ,D_eps+dt*D_sig+dt^2*L] */
-	int status;
-	double alpha = 1, beta = 0;
-	struct matrix_descr descr;
-	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-	sparse_status_t s;
+	if (choice == 1) {
+		/* Preconditioner : [v0da'*D_eps*v0d,v0da'*D_eps*v0c,   0;
+							 0,              v0ca'*dt*D_sig*v0c,0;
+							 0,              0,                ,D_eps+dt*D_sig+dt^2*L] */
+		int status;
+		double alpha = 1, beta = 0;
+		struct matrix_descr descr;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		sparse_status_t s;
 
 
-	/* Apply the preconditioner to a vector b1 and get b2 */
-	double* temp = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));
-	double* temp1 = (double*)calloc(sys->leng_v0d1, sizeof(double));
-	double* temp2 = (double*)calloc(sys->leng_v0c, sizeof(double));
-	status = hypreSolve(sys, A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);
+		/* Apply the preconditioner to a vector b1 and get b2 */
+		double* temp = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));
+		double* temp1 = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		double* temp2 = (double*)calloc(sys->leng_v0c, sizeof(double));
+		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);
 
-	/* (V0ca'*(D_sig*dt)*V0c)*y0c=b2 */
-	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
-		temp2[indi] = b1[sys->leng_v0d1 + indi] * sys->v0can[indi];
+		/* (V0ca'*(D_sig*dt)*V0c)*y0c=b2 */
+		for (myint indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
+			temp2[indi] = b1[sys->leng_v0d1 + indi] * sys->v0can[indi];
+		}
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp2, sys->leng_v0c, &b2[sys->leng_v0d1], 0, 3);
+		for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
+			b2[sys->leng_v0d1 + indi] /= (DT / sys->v0cn[indi]);
+		}
+
+		/* (V0da'*D_eps*V0d)*y0d+V0da'*D_eps*V0c*y0c=b1 */
+		for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
+			temp2[indi] = b2[sys->leng_v0d1 + indi] / sys->v0cn[indi];
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp2, beta, temp);
+		for (myint indi = 0; indi < sys->N_edge - sys->bden; ++indi) {
+			temp[indi] *= sys->getEps(sys->mapEdgeR[indi]);
+		}
+
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp1); // temp1 = V0da'*D_eps*normalized(V0c)*yc
+		for (myint indi = 0; indi < sys->leng_v0d1; ++indi) {
+			temp1[indi] = b1[indi] - temp1[indi] / sys->v0dan[indi];   // temp1 = b1 - normalized(V0da)'*D_eps*normalized(V0c)*yc
+		}
+		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp1, sys->leng_v0d1, b2, 0, 3);
+
+		//out.open("b1.txt", std::ofstream::trunc | std::ofstream::out);
+		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
+		//	out << b1[indi] << endl;
+		//}
+		//out.close();
+
+		//out.open("x1.txt", std::ofstream::trunc | std::ofstream::out);
+		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
+		//	out << b2[indi] << endl;
+		//}
+		//out.close();
+
+
+
+		free(temp); temp = NULL;
+		free(temp1); temp1 = NULL;
+		free(temp2); temp2 = NULL;
+
 	}
-	status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp2, sys->leng_v0c, &b2[sys->leng_v0d1], 0, 3);
-	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
-		b2[sys->leng_v0d1 + indi] /= (DT / sys->v0cn[indi]);
+	else if (choice == 2) {
+
+
+		/* Preconditioner : [v0da'*D_eps*v0d,v0da'*D_eps*v0c,   v0da'*D_eps;
+							 0,              v0ca'*dt*D_sig*v0c,v0ca'*(D_eps+dt*D_sig);
+							 0,              0,                 D_eps+dt*D_sig+dt^2*L] */
+		/* Solve (D_eps+dt*D_sig+dt^2*L) */
+		int status;
+		double alpha = 1, beta = 0;
+		struct matrix_descr descr;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		sparse_status_t s;
+
+		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);  // solve y3
+
+		/* v0ca' line */
+		double* temp = (double*)malloc((sys->N_edge - sys->bden) * sizeof(double));
+		double* temp1 = (double*)malloc(sys->leng_v0c * sizeof(double));
+		for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {   // temp = (D_eps+dt*D_sig)*y3;
+			if (sys->markEdge[sys->mapEdgeR[ind]]) {
+				temp[ind] = b2[sys->leng_v0d1 + sys->leng_v0c + ind] * (sys->getEps(sys->mapEdgeR[ind]) + DT * SIGMA);
+			}
+			else {
+				temp[ind] = b2[sys->leng_v0d1 + sys->leng_v0c + ind] * (sys->getEps(sys->mapEdgeR[ind]));
+			}
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0cat, descr, temp, beta, temp1);   // temp1 = v0ca'*(D_eps+dt*D_sig)*y3
+		for (int ind = 0; ind < sys->leng_v0c; ++ind) {
+			temp1[ind] /= sys->v0can[ind];   // normalized v0ca
+		}
+		// b2-v0ca'*(D_eps+dt*D_sig)*y3
+		for (int ind = 0; ind < sys->leng_v0c; ++ind) {
+			temp1[ind] = b1[sys->leng_v0d1 + ind] - temp1[ind];   // temp1 = b2-v0ca'*(D_eps+dt*D_sig)*y3
+		}
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
+			temp1[indi] *= sys->v0can[indi];
+		}
+
+		// solve (v0ca'*dt*D_sig*v0c)
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, &b2[sys->leng_v0d1], 0, 3);
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+			b2[sys->leng_v0d1 + indi] /= (DT / sys->v0cn[indi]);
+		}
+
+		/* v0da' line */
+		double* temp2 = (double*)malloc(sys->leng_v0d1 * sizeof(double));
+		double* temp3 = (double*)malloc(sys->leng_v0d1 * sizeof(double));
+		for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
+			temp[ind] = b2[sys->leng_v0d1 + sys->leng_v0c + ind] * (sys->getEps(sys->mapEdgeR[ind]));   // temp = D_eps*y3
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp2);   // temp2 = v0da'*D_eps*y3
+		for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+			temp2[ind] /= sys->v0dan[ind];    // normalized v0da
+		}
+		for (int ind = 0; ind < sys->leng_v0c; ++ind) {
+			temp1[ind] = b2[sys->leng_v0d1 + ind] / sys->v0cn[ind];   //temp1 = y2 first normalized
+		}
+
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp1, beta, temp);   // temp = v0c*y2
+		for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
+			temp[ind] *= (sys->getEps(sys->mapEdgeR[ind]));   // temp = D_eps*V0c*y2
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp3);   // temp = v0da'*D_eps*v0c*y2
+		for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+			temp3[ind] /= sys->v0dan[ind];   // v0da is normalized
+		}
+
+		for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+			temp2[ind] += temp3[ind];   // temp2 = v0da'*D_eps*v0c*y2+v0da'*D_eps*y3
+			temp2[ind] = b1[ind] - temp2[ind];   // temp2 = b1-v0da1'*D_eps*v0c*y2-v0da'*D_eps*y3
+		}
+		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp2, sys->leng_v0d1, b2, 0, 3);   // solve y1
+
+
+		free(temp);
+		free(temp1);
+		free(temp2);
+		free(temp3);
 	}
+	else if (choice == 3) {
+		/* Preconditioner : [v0da'*D_eps*v0d, v0da'*D_eps*v0c,   0;
+							 V0ca'*D_eps*V0c, v0ca'*dt*D_sig*v0c,0;
+							 0,               0,                 D_eps+dt*D_sig+dt^2*L] */
+		/* Solve (D_eps+dt*D_sig+dt^2*L) */
+		int status;
+		double alpha = 1, beta = 0;
+		struct matrix_descr descr;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		sparse_status_t s;
+		myint edge = sys->N_edge - sys->bden;
 
-	/* (V0da'*D_eps*V0d)*y0d+V0da'*D_eps*V0c*y0c=b1 */
-	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
-		temp2[indi] = b2[sys->leng_v0d1 + indi] / sys->v0cn[indi];
+		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);  // solve y3
+
+		double* temp = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		double* temp1 = (double*)calloc(sys->leng_v0c, sizeof(double));
+		double* temp2 = (double*)calloc(sys->leng_v0c, sizeof(double));
+		double* temp3 = (double*)calloc(edge, sizeof(double));
+		double* xd = (double*)calloc(sys->leng_v0d1, sizeof(double));
+		double* xc = (double*)calloc(sys->leng_v0c, sizeof(double));
+		for (int i = 0; i < sys->leng_v0c; ++i) {
+			temp1[i] = b1[sys->leng_v0d1 + i] * sys->v0can[i];
+		}
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, temp2, 0, 3);
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+			temp2[indi] /= (DT / sys->v0cn[indi]);   // temp2 = (V0ca'*D_sig*dt*V0c)\(bc)
+		}
+
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+			temp2[indi] /= sys->v0cn[indi];
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp2, beta, temp3);   // temp3 = V0c*(V0ca'*D_sig*V0c)\(bc)
+		for (int indi = 0; indi < edge; ++indi) {
+			temp3[indi] *= sys->getEps(sys->mapEdgeR[indi]);    // temp3 = D_eps*V0c*(V0ca'*D_sig*dt*V0c)\bc
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp3, beta, temp);   // temp = V0da'*D_eps*V0c*(V0ca'*D_sig*V0c)\(bc)
+		for (int indi = 0; indi < sys->leng_v0d1; ++indi) {
+			temp[indi] = b1[indi] - temp[indi] / sys->v0dan[indi];   // temp = bd-V0da'*D_eps*V0c*(V0ca'*D_sig*V0c)\(bc)
+		}
+		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, xd, 0, 3);   // xd=(V0da'*D_eps*V0d)\(bd-V0da'*D_eps*V0c*((V0ca'*D_sig*dt*V0c)\bc))
+
+		for (int indi = 0; indi < sys->leng_v0d1; ++indi) {
+			b2[indi] = xd[indi];
+			temp[indi] = xd[indi] / sys->v0dn[indi];
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0dt, descr, temp, beta, temp3);   // temp3 = V0d*xd
+		for (int indi = 0; indi < edge; ++indi) {
+			temp3[indi] *= sys->getEps(sys->mapEdgeR[indi]);   // temp3 = D_eps*V0d*xd
+		}
+		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0cat, descr, temp3, beta, temp1);   // temp1 = V0ca'*D_eps*V0d*xd
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+			temp2[indi] = b1[sys->leng_v0d1 + indi] - temp1[indi] / sys->v0can[indi];   // temp2 = bc-V0ca'*D_eps*V0d*xd
+		}
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+			temp2[indi] *= sys->v0can[indi];
+		}
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp2, sys->leng_v0c, xc, 0, 3);
+		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
+			b2[sys->leng_v0d1 + indi] = xc[indi] / (DT / sys->v0cn[indi]);   // xc = (V0ca'*D_sig*dt*V0c)\(bc-V0ca'*D_eps*V0d*xd)
+		}
+		free(temp); temp = NULL;
+		free(temp1); temp1 = NULL;
+		free(temp2); temp2 = NULL;
+		free(temp3); temp3 = NULL;
+		free(xd); xd = NULL;
+		free(xc); xc = NULL;
 	}
-	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp2, beta, temp);
-	for (myint indi = 0; indi < sys->N_edge - sys->bden; ++indi) {
-		temp[indi] *= sys->getEps(sys->mapEdgeR[indi]);
-	}
+	
+}
 
-	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp1); // temp1 = V0da'*D_eps*normalized(V0c)*yc
-	for (myint indi = 0; indi < sys->leng_v0d1; ++indi) {
-		temp1[indi] = b1[indi] - temp1[indi] / sys->v0dan[indi];   // temp1 = b1 - normalized(V0da)'*D_eps*normalized(V0c)*yc
-	}
-	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp1, sys->leng_v0d1, b2, 0, 3);
-
-	//out.open("b1.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
-	//	out << b1[indi] << endl;
-	//}
-	//out.close();
-
-	//out.open("x1.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
-	//	out << b2[indi] << endl;
-	//}
-	//out.close();
-
-
-
-	free(temp); temp = NULL;
-	free(temp1); temp1 = NULL;
-	free(temp2); temp2 = NULL;
-
-
-
-
-	/* Preconditioner : [v0da'*D_eps*v0d,v0da'*D_eps*v0c,   v0da'*D_eps;
-	                     0,              v0ca'*dt*D_sig*v0c,v0ca'*(D_eps+dt*D_sig);
-						 0,              0,                 D_eps+dt*D_sig+dt^2*L] */
-	/* Solve (D_eps+dt*D_sig+dt^2*L) */
-	//status = hypreSolve(sys, A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);  // solve y3
-	//
-	///* v0ca' line */
-	//double* temp = (double*)malloc((sys->N_edge - sys->bden) * sizeof(double));
-	//double* temp1 = (double*)malloc(sys->leng_v0c * sizeof(double));
-	//for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {   // temp = (D_eps+dt*D_sig)*y3;
-	//	if (sys->markEdge[sys->mapEdgeR[ind]]) {
-	//		temp[ind] = b2[sys->leng_v0d1 + sys->leng_v0c + ind] * (sys->mapEdgeR[ind] + DT * SIGMA);
-	//	}
-	//	else {
-	//		temp[ind] = b2[sys->leng_v0d1 + sys->leng_v0c + ind] * (sys->mapEdgeR[ind]);
-	//	}
-	//}
-	//s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0cat, descr, temp, beta, temp1);   // temp1 = v0ca'*(D_eps+dt*D_sig)*y3
-	//for (int ind = 0; ind < sys->leng_v0c; ++ind) {
-	//	temp1[ind] /= sys->v0can[ind];   // normalized v0ca
-	//}
-	//// b2-v0ca'*(D_eps+dt*D_sig)*y3
-	//for (int ind = 0; ind < sys->leng_v0c; ++ind) {
-	//	temp1[ind] = b1[sys->leng_v0d1 + ind] - temp1[ind];   // temp1 = b2-v0ca'*(D_eps+dt*D_sig)*y3
-	//}
-	//for (int indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
-	//	temp1[indi] *= sys->v0can[indi];
-	//}
-	//
-	//// solve (v0ca'*dt*D_sig*v0c)
-	//status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, &b2[sys->leng_v0d1], 0, 3);
-	//for (int indi = 0; indi < sys->leng_v0c; ++indi) {
-	//	b2[sys->leng_v0d1 + indi] /= (DT / sys->v0cn[indi]);
-	//}
-	//
-	///* v0da' line */
-	//double* temp2 = (double*)malloc(sys->leng_v0d1 * sizeof(double));
-	//double* temp3 = (double*)malloc(sys->leng_v0d1 * sizeof(double));
-	//for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
-	//	temp[ind] = b2[sys->leng_v0d1 + sys->leng_v0c + ind] * (sys->mapEdgeR[ind]);   // temp = D_eps*y3
-	//}
-	//s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp2);   // temp2 = v0da'*D_eps*y3
-	//for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
-	//	temp2[ind] /= sys->v0dan[ind];    // normalized v0da
-	//}
-	//for (int ind = 0; ind < sys->leng_v0c; ++ind) {
-	//	temp1[ind] = b2[sys->leng_v0d1 + ind] / sys->v0cn[ind];   //temp1 = y2 first normalized
-	//}
-	//
-	//s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp1, beta, temp);   // temp = v0c*y2
-	//for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
-	//	temp[ind] *= (sys->mapEdgeR[ind]);   // temp = D_eps*V0c*y2
-	//}
-	//s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp3);   // temp = v0da'*D_eps*v0c*y2
-	//for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
-	//	temp3[ind] /= sys->v0dan[ind];   // v0da is normalized
-	//}
-	//
-	//for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
-	//	temp2[ind] += temp3[ind];   // temp2 = v0da'*D_eps*v0c*y2+v0da'*D_eps*y3
-	//	temp2[ind] = b1[ind] - temp2[ind];   // temp2 = b1-v0da1'*D_eps*v0c*y2-v0da'*D_eps*y3
-	//}
-	//status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp2, sys->leng_v0d1, b2, 0, 3);   // solve y1
-
-
-	//free(temp);
-	//free(temp1);
-	//free(temp2);
-	//free(temp3);
+void applyPrecond_P(myint* PRowId1, myint* PColId, double* Pval, myint leng_P, myint N, double* x1, double* x2) {
+	/* Apply the preconditioner P
+	PRowId1 : CSR format of the rowId of matrix P
+	PColId : matrix P's colId (the Id is in ascending order in one row)
+	Pval : matrix P's value
+	leng_P : nnz in P
+	N : size of P
+	x1 : the right hand side
+	x2 : the result */
+	pardisoSolve(PRowId1, PColId, Pval, x1, x2, N);
 }
 
 int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22) {
@@ -2110,7 +2211,7 @@ int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct,
 	for (int i = 0; i < edge; ++i) {
 		temp1[i] = bm[lengv0 + i] - temp1[i];    // temp1 = b2-A21*A11^(-1)*b1
 	}
-	status = hypreSolve(sys, A22RowId, A22ColId, A22val, leng_A22, temp1, edge, temp1, 1, 3);    // temp1 (x2) = A22^(-1)*(b2-A21*A11^(-1)*b1)
+	status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, temp1, edge, temp1, 1, 3);    // temp1 (x2) = A22^(-1)*(b2-A21*A11^(-1)*b1)
 	free(temp); temp = (double*)calloc(lengv0, sizeof(double));
 	status = sparseMatrixVecMul(A12RowId, A12ColId, A12val, leng_A12, temp1, temp);    // temp = A12*x2
 	for (int i = 0; i < lengv0; ++i) {
@@ -2145,7 +2246,7 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	double* temp = (double*)malloc(edge * sizeof(double));
 	double* temp1 = (double*)malloc(sys->leng_v0c * sizeof(double));
 	double* xc = (double*)malloc(sys->leng_v0c * sizeof(double));
-	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, rhs, sys->leng_v0d1, bd1, 1, 3);   // bd1 = (v0da'*D_eps*v0d)^(-1)*(bd)
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, rhs, sys->leng_v0d1, bd1, 1, 3);   // bd1 = (v0da'*D_eps*v0d)^(-1)*(bd)
 	//out.open("bd1.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->leng_v0d1; ind++) {
 	//	out << bd1[ind] << endl;
@@ -2175,7 +2276,7 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	for (myint i = 0; i < sys->leng_v0c; ++i) {   // Ac is not normalized with V0ca and V0c
 		temp1[i] = temp1[i] * sys->v0can[i];
 	}
-	status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, xc, 1, 3);
+	status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, xc, 1, 3);
 	for (myint i = 0; i < sys->leng_v0c; ++i) {
 		xc[i] /= (DT / sys->v0cn[i]);    //xc = (v0ca'*dt*D_sig*v0c)^(-1)*(bc-v0ca'*D_eps*v0d*(v0da'*D_eps*v0d)^(-1)*bd)
 	}
@@ -2194,7 +2295,7 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		bd1[i] = rhs[i] - bd1[i];  // bd1 = bd-v0da'*D_eps*v0c*xc
 	}
-	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, bd1, sys->leng_v0d1, bd1, 1, 3);   // bd1 (xd) = (v0da'*D_eps*v0d)^(-1)*(bd-v0da'*D_eps*v0c*xc)
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, bd1, sys->leng_v0d1, bd1, 1, 3);   // bd1 (xd) = (v0da'*D_eps*v0d)^(-1)*(bd-v0da'*D_eps*v0c*xc)
 
 	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		sol[i] = bd1[i];
@@ -2219,12 +2320,13 @@ int sparseMatrixVecMul(myint* rowId, myint* colId, double* val, myint leng, doub
 	   v2 : result vector, 
 	   Note: v2 need to initialize to be 0 first */
 	for (myint i = 0; i < leng; ++i) {
+
 		v2[rowId[i]] += val[i] * v1[colId[i]];
 	}
 	return 0;
 }
 
-int pardisoSolve(fdtdMesh* sys, myint* rowId, myint* colId, double* val, double* rsc, double* xsol, myint size) {
+int pardisoSolve(myint* rowId, myint* colId, double* val, double* rsc, double* xsol, myint size) {
 	/* Use pardiso to solve the matrix solution
 	   rowId : matrix rowId, csr form, the start index for each row
 	   colId : matrix colId
@@ -2263,7 +2365,7 @@ int pardisoSolve(fdtdMesh* sys, myint* rowId, myint* colId, double* val, double*
 					 //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
 
 					 //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
-	double* ddum;
+	double ddum;
 
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, val, rowId, colId, &perm, &nrhs, iparm, &msglvl, rsc, xsol, &error);
 	if (error != 0) {
@@ -2363,7 +2465,7 @@ failed:
 	goto cleanup;
 }
 
-int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* xo) {
+void solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* xo) {
 	/* solve (-omega^2*D_epsoo+Soo)xo=bo
 	  freq : frequency
 	  Jo : bo=-i*omega*Jo
@@ -2387,7 +2489,7 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	double* temp2 = (double*)calloc(sys->outside, sizeof(double));
 	double* xh = (double*)calloc(sys->outside, sizeof(double));
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, Jo, beta, temp);   // temp=v0da'*Jo
-	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, temp1, 1, 3);   // temp1=(v0da'*(D_epsoo)*v0d)^(-1)*v0da'*Jo
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, temp1, 1, 3);   // temp1=(v0da'*(D_epsoo)*v0d)^(-1)*v0da'*Jo
 	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
 		temp1[ind] /= (-freq * freq * M_PI * M_PI * 4);    // temp1=(v0da'*(-omega^2*D_epsoo)*v0d)^(-1)*v0da'*Jo
 	}
@@ -2403,7 +2505,7 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 			Looval[ind] += -pow(freq * M_PI * 2, 2) * sys->getEps(sys->mapEdgeR[sys->mapioR[sys->LooRowId[ind]]]);
 		}
 	}
-	status = mkl_gmres_A(sys, temp2, xh, sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo), xh is got!
+	status = mkl_gmres_A(temp2, xh, sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo), xh is got!
 	//myint* LooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
 	//status = COO2CSR_malloc(sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside, LooRowId1);
 	//solveOO_pardiso(sys, LooRowId1, sys->LooColId, Looval, sys->leng_Loo, sys->outside, temp2, xh, 1);
@@ -2432,7 +2534,7 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	free(temp); temp = (double*)calloc(sys->leng_v0d1, sizeof(double));
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp2, beta, temp);   // temp=v0da'*(b-(-omega^2*D_epsoo)*xh)
 	double* yd = (double*)calloc(sys->leng_v0d1, sizeof(double));
-	status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, yd, 1, 3);   // get yd
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, yd, 1, 3);   // get yd
 	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
 		yd[ind] /= (-pow(freq * 2 * M_PI, 2));
 	}
@@ -2451,10 +2553,10 @@ int solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spars
 	free(Looval); Looval = NULL;
 	free(yd); yd = NULL;
 	free(xo1); xo1 = NULL;
-	return 0;
+	
 }
 
-int solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mooval, myint leng, myint N, double* Jo, double* xo, int rhs_s) {
+void solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mooval, myint leng, myint N, double* Jo, double* xo, int rhs_s) {
 	/* Use pardiso to solve Moo*xo=Jo
 	MooRowId1 : Moo's CSR rowId
 	MooColId : Moo's column id
@@ -2492,7 +2594,7 @@ int solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mo
 	iparm[34] = 1;    // 0-based indexing
 
 	//cout << "Begin to solve (-w^2*D_epsoo+Soo)x=-iwJ\n";
-	complex<double>* ddum;
+	complex<double> ddum;
 
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, Mooval, MooRowId1, MooColId, &perm, &nrhs, iparm, &msglvl, Jo, xo, &error);
 	if (error != 0) {
@@ -2503,4 +2605,728 @@ int solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mo
 	phase = -1;     // Release internal memory
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, MooRowId1, MooColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
 
+}
+
+int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N, myint* PRowId1, myint* PColId, double* Pval, myint leng_P) {
+	/* Use MKL fgmres to generate the matrix solution of A with preconditioner
+	bm : rhs
+	x solution
+	N : size of the matrix
+	ARowId : rowId of the matrix A
+	AColId : colId of the matrix A
+	Aval : value of the matrix A
+	PRowId1 : Preconditioner matrix rowId, CSR format of the rowId
+	PColId : Preconditioner matrix colId
+	Pval : Preconditioner matrix value */
+
+
+	myint size = 128;
+
+	/*------------------------------------------------------------------------------------
+	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
+	/*------------------------------------------------------------------------------------*/
+	MKL_INT ipar[size];
+	ipar[14] = 100;
+	//double b[N];
+	//double expected_solution[N];
+	//double computed_solution[N];
+	//double residual[N];
+	double* b = (double*)malloc(N * sizeof(double));
+	double* expected_solution = (double*)malloc(N * sizeof(double));
+	double* computed_solution = (double*)malloc(N * sizeof(double));
+	double* residual = (double*)malloc(N * sizeof(double));
+	double dpar[size];
+	double* tmp = (double*)calloc(N*(2 * ipar[14] + 1) + (ipar[14] * (ipar[14] + 9)) / 2 + 1, sizeof(double));
+	/*---------------------------------------------------------------------------
+	/* Some additional variables to use with the RCI (P)FGMRES solver
+	/*---------------------------------------------------------------------------*/
+	MKL_INT itercount;
+	MKL_INT RCI_request, i, ivar;
+	ivar = N;
+	double alpha = 1, beta = 0;
+	struct matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+	sparse_status_t s;
+	double dvar;
+	int status, maxit = 500;
+	ofstream out;
+	/*---------------------------------------------------------------------------
+	/* Save the right-hand side in vector b for future use
+	/*---------------------------------------------------------------------------*/
+	i = 0;
+	for (i = 0; i < N; ++i) {
+		b[i] = bm[i];
+	}
+	/*--------------------------------------------------------------------------
+	/* Initialize the initial guess
+	/*--------------------------------------------------------------------------*/
+	for (i = 0; i < N; ++i) {
+		computed_solution[i] = 0;// bm[i];
+	}
+	double bmn = 0;
+
+	/*--------------------------------------------------------------------------
+	/* Initialize the solver
+	/*--------------------------------------------------------------------------*/
+	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
+	if (RCI_request != 0) goto FAILED;
+	ipar[10] = 1;   // preconditioner
+	ipar[14] = 100;   // restart number
+	ipar[7] = 0;
+	dpar[0] = 1.0E-3;
+	/*---------------------------------------------------------------------------
+	/* Check the correctness and consistency of the newly set parameters
+	/*---------------------------------------------------------------------------*/
+	dfgmres_check(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
+	if (RCI_request != 0) goto FAILED;
+ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
+	//bmn = 0;
+	//for (int ind = 0; ind < ivar; ++ind) {
+	//	bmn += computed_solution[ind] * computed_solution[ind];
+	//}
+	//cout << "Right hand side norm is " << bmn << endl;
+	if (RCI_request == 0) {
+		goto COMPLETE;
+	}
+
+	/*---------------------------------------------------------------------------
+	/* If RCI_request=1, then compute the vector A*tmp[ipar[21]-1]
+	/* and put the result in vector tmp[ipar[22]-1]
+	/*---------------------------------------------------------------------------*/
+	if (RCI_request == 1) {
+		for (myint ind = 0; ind < N; ++ind) {
+			tmp[ipar[22] - 1 + ind] = 0;    // before using sparseMatrixVecMul, the resultant vector should be first initialized
+		}
+		sparseMatrixVecMul(ARowId, AColId, Aval, leng_A, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1]);
+
+
+		goto ONE;
+	}
+
+	/* do the user-defined stopping test */
+	if (RCI_request == 2) {
+		ipar[12] = 1;
+		/* Get the current FGMRES solution in the vector b[N] */
+		dfgmres_get(&ivar, computed_solution, b, &RCI_request, ipar, dpar, tmp, &itercount);
+		/* Compute the current true residual via MKL (Sparse) BLAS routines */
+
+		for (myint ind = 0; ind < N; ++ind) {
+			residual[ind] = 0;   // before using sparseMatrixVecMul, the resultant vector should be first initialized
+		}
+		sparseMatrixVecMul(ARowId, AColId, Aval, leng_A, &b[0], &residual[0]);
+		dvar = -1.0E0;
+		i = 1;
+		daxpy(&ivar, &dvar, bm, &i, residual, &i);
+		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
+		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		if (dvar < 0.001 || itercount > maxit) goto COMPLETE;
+		else goto ONE;
+	}
+
+	/* apply the preconditioner on the vector tmp[ipar[21]-1] and put the result in vector tmp[ipar[22]-1] */
+	if (RCI_request == 3) {
+		applyPrecond_P(PRowId1, PColId, Pval, leng_P, N, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1]);    // apply the preconditioner to tmp[ipar[21] - 1] and put the result in tmp[ipar[22] - 1]
+		//hypreSolve(PRowId, PColId, Pval, leng_P, &tmp[ipar[21] - 1], N, &tmp[ipar[22] - 1], 0, 3);
+		goto ONE;
+	}
+
+	/* check if the norm of the next generated vector is not zero up to rounding and computational errors. */
+	if (RCI_request == 4) {
+		//if (dpar[6] < 1.0E-12) goto COMPLETE;
+		//else goto ONE;
+		goto ONE;
+	}
+
+	else {
+		goto FAILED;
+	}
+
+COMPLETE: ipar[12] = 0;
+	dfgmres_get(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp, &itercount);
+	cout << "Number of iterations: " << itercount << endl;
+	for (i = 0; i < ivar; ++i) {
+		x[i] = computed_solution[i];
+	}
+	goto SUCCEDED;
+FAILED: cout << "The solver has returned the ERROR code " << RCI_request << endl;
+
+SUCCEDED: free(b); b = NULL;
+	free(expected_solution); expected_solution = NULL;
+	free(computed_solution); computed_solution = NULL;
+	free(residual); residual = NULL;
+	return 0;
+}
+
+
+int pardisoSolve_factorize(myint* RowId1, myint* ColId, double* val, myint leng, myint size, myint nrhs) {
+	/* Use pardiso to solve the matrix solution ----factorization
+	RowId1 : matrix rowId, csr form, the start index for each row
+	ColId : matrix colId
+	val : matrix values
+	leng : nnz in the matrix
+	size : dimension size of the problem
+	nrhs : number of right hand side
+	*/
+
+	myint mtype = 11;    /* Real and unsymmetric matrix */
+	void* pt[64];
+
+	/* Pardiso control parameters */
+	myint iparm[64];
+	myint maxfct, mnum, phase, error, msglvl, solver;
+	double dparm[64];
+	int v0csin;
+	myint perm;
+
+	/* Auxiliary variables */
+	char* var;
+
+	msglvl = 0;    /* print statistical information */
+	solver = 0;    /* use sparse direct solver */
+	error = 0;
+	maxfct = 1;
+	mnum = 1;
+	phase = 12;   /* analysis and numerical factorization */
+
+	pardisoinit(pt, &mtype, iparm);
+	iparm[38] = 1;
+	iparm[34] = 1;    // 0-based indexing
+	iparm[3] = 2;    // number of processors
+					 //iparm[59] = 2;    // out of core version to solve very large problem
+					 //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
+
+					 //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
+	double ddum;
+
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, val, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+	if (error != 0) {
+		printf("\nERROR during numerical factorization: %d", error);
+		exit(2);
+	}
+
+
+	return 0;
+
+}
+
+int solveV0L(fdtdMesh* sys, int freqNo, myint* LrowId, myint* LcolId, double* Lval, myint leng, myint N, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat) {
+	/* solve matrix [V0da'*(-omega^2*D_eps)*V0d, V0da'*(-omega^2*D_eps)*V0c, V0da'*(-omega^2*D_eps)*0;
+	                 V0ca'*(-omega^2*D_eps)*V0d, V0ca'*(-omega^2*D_eps+1i*omega*D_sig)*V0c, V0ca'*(-omega^2*D_eps+1i*omega*D_sig);
+					 (-omega^2*D_eps)*V0d, (-omega^2*D_eps+1i*omega*D_sig)*V0c, -omega^2*D_eps+1i*omega*D_sig+L] with upper matrix as the preconditioner
+				b = [V0da'*(-1i*omega*J); V0ca'*(-1i*omega*J); -1i*omega*J]
+				N is this matrix size * 2
+				*/
+	myint nedge = sys->N_edge - sys->bden;
+	double freq = sys->freqNo2freq(freqNo);
+	/* Start to generate matrix [-omega^2*D_eps+L, -omega*D_sig;
+								omega*D_sig,      -omega^2*D_eps+L] */
+	myint leng_L1 = (leng + sys->inside - sys->outside) * 2;
+	myint* L1RowId = (myint*)malloc(leng_L1 * sizeof(myint));
+	myint* L1ColId = (myint*)malloc(leng_L1 * sizeof(myint));
+	double* L1val = (double*)malloc(leng_L1 * sizeof(double));
+	ofstream out;
+	generateL1(sys, freq, LrowId, LcolId, Lval, leng, nedge, L1RowId, L1ColId, L1val, leng_L1);
+
+	double* J;
+	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		J = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));   // J
+		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+				/* Set current density for all edges within sides in port to prepare solver */
+				J[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+			}
+		}
+
+
+		myint size = 128;
+
+		/*------------------------------------------------------------------------------------
+		/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
+		/*------------------------------------------------------------------------------------*/
+		MKL_INT ipar[size];
+		ipar[14] = 100;
+		//double b[N];
+		//double expected_solution[N];
+		//double computed_solution[N];
+		//double residual[N];
+		double* b = (double*)calloc(N, sizeof(double));
+		double* bm = (double*)calloc(N, sizeof(double));
+		double* expected_solution = (double*)malloc(N * sizeof(double));
+		double* computed_solution = (double*)malloc(N * sizeof(double));
+		double* residual = (double*)malloc(N * sizeof(double));
+		double* x = (double*)calloc(N, sizeof(double));
+		double dpar[size];
+		double* tmp = (double*)calloc(N*(2 * ipar[14] + 1) + (ipar[14] * (ipar[14] + 9)) / 2 + 1, sizeof(double));
+		generate_bm(sys, V0dat, sys->leng_v0d1, V0cat, sys->leng_v0c, freq, J, bm, N);   // bm = [0; 0; 0; V0da'*(-omega*J); V0ca'*(-omega*J); -omega*J] the upper part is real and lower part is imaginary
+		/*---------------------------------------------------------------------------
+		/* Some additional variables to use with the RCI (P)FGMRES solver
+		/*---------------------------------------------------------------------------*/
+		MKL_INT itercount;
+		MKL_INT RCI_request, i, ivar;
+		ivar = N;
+		double alpha = 1, beta = 0;
+		struct matrix_descr descr;
+		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+		sparse_status_t s;
+		double dvar;
+		int status, maxit = 500;
+		ofstream out;
+		/*---------------------------------------------------------------------------
+		/* Save the right-hand side in vector b for future use
+		/*---------------------------------------------------------------------------*/
+		i = 0;
+		//double nn = 0;
+		for (i = 0; i < N; ++i) {
+			b[i] = bm[i];
+			//nn += b[i] * b[i];
+		}
+		//cout << "Norm of b is " << nn << endl;
+		/*--------------------------------------------------------------------------
+		/* Initialize the initial guess
+		/*--------------------------------------------------------------------------*/
+		for (i = 0; i < N; ++i) {
+			computed_solution[i] = 0;// bm[i];
+		}
+		double bmn = 0;
+
+		/*--------------------------------------------------------------------------
+		/* Initialize the solver
+		/*--------------------------------------------------------------------------*/
+		dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
+		if (RCI_request != 0) goto FAILED;
+		ipar[10] = 1;   // preconditioner
+		ipar[14] = 100;   // restart number
+		ipar[7] = 0;
+		dpar[0] = 1.0E-3;
+		/*---------------------------------------------------------------------------
+		/* Check the correctness and consistency of the newly set parameters
+		/*---------------------------------------------------------------------------*/
+		dfgmres_check(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
+		if (RCI_request != 0) goto FAILED;
+	ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
+		//bmn = 0;
+		//for (int ind = 0; ind < ivar; ++ind) {
+		//	bmn += computed_solution[ind] * computed_solution[ind];
+		//}
+		//cout << "Right hand side norm is " << bmn << endl;
+		if (RCI_request == 0) {
+			goto COMPLETE;
+		}
+
+		/*---------------------------------------------------------------------------
+		/* If RCI_request=1, then compute the vector A*tmp[ipar[21]-1]
+		/* and put the result in vector tmp[ipar[22]-1]
+		/*---------------------------------------------------------------------------*/
+		if (RCI_request == 1) {
+			/* do the specific matrix vector multiplication and put the result in tmp[ipar[22] - 1] */
+			multi_matrixvec(sys, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, freq, LrowId, LcolId, Lval, leng, &tmp[ipar[21] - 1], &tmp[ipar[22] - 1], N);
+			double nn = 0;
+			//out.open("x1.txt", std::ofstream::out | std::ofstream::trunc);
+			//for (int ind = 0; ind < N; ++ind) {
+			//	out << tmp[ipar[21] - 1 + ind] << " " << tmp[ipar[22] - 1 + ind] << endl;
+			//	nn += pow(tmp[ipar[21] - 1 + ind], 2);
+			//}
+			//out.close();
+			cout << nn << endl;
+			goto ONE;
+		}
+
+		/* do the user-defined stopping test */
+		if (RCI_request == 2) {
+			ipar[12] = 1;
+			/* Get the current FGMRES solution in the vector b[N] */
+			dfgmres_get(&ivar, computed_solution, b, &RCI_request, ipar, dpar, tmp, &itercount);
+			/* Compute the current true residual via MKL (Sparse) BLAS routines */
+
+			for (myint ind = 0; ind < N; ++ind) {
+				residual[ind] = 0;   // before using sparseMatrixVecMul, the resultant vector should be first initialized
+			}
+			multi_matrixvec(sys, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, freq, LrowId, LcolId, Lval, leng, b, residual, N);
+			dvar = -1.0E0;
+			i = 1;
+			daxpy(&ivar, &dvar, bm, &i, residual, &i);
+			dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
+			cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+			if (dvar < 0.001 || itercount > maxit) goto COMPLETE;
+			else goto ONE;
+		}
+
+		/* apply the preconditioner on the vector tmp[ipar[21]-1] and put the result in vector tmp[ipar[22]-1] */
+		if (RCI_request == 3) {
+			complex<double>* realRhsSoln = (complex<double>*)calloc(N / 2, sizeof(complex<double>));
+			complex<double>* imagRhsSoln = (complex<double>*)calloc(N / 2, sizeof(complex<double>));
+			applyPrecond_freq(sys, &tmp[ipar[21] - 1], realRhsSoln, L1RowId, L1ColId, L1val, leng_L1, V0ct, V0cat, V0dt, V0dat, freq);   // use upper triangular matrix as the preconditioner [V0da'*(-omega^2*D_eps)*V0d, V0da'*(-omega^2*D_eps)*V0c, 0;
+			// 0, V0ca'*(1i*omega*D_sig)*V0c, V0ca'*(1i*omega*D_sig);
+			// 0, 0, -omega ^ 2 * D_eps + 1i*omega*D_sig + L]
+			applyPrecond_freq(sys, &tmp[ipar[21] - 1 + N / 2], imagRhsSoln, L1RowId, L1ColId, L1val, leng_L1, V0ct, V0cat, V0dt, V0dat, freq);
+
+			for (myint ind = 0; ind < N / 2; ++ind) {
+				tmp[ipar[22] - 1 + ind] = realRhsSoln[ind].real() - imagRhsSoln[ind].imag();
+				tmp[ipar[22] - 1 + ind + N / 2] = imagRhsSoln[ind].real() + realRhsSoln[ind].imag();
+			}
+			goto ONE;
+		}
+
+		/* check if the norm of the next generated vector is not zero up to rounding and computational errors. */
+		if (RCI_request == 4) {
+			//if (dpar[6] < 1.0E-12) goto COMPLETE;
+			//else goto ONE;
+			goto ONE;
+		}
+
+		else {
+			goto FAILED;
+		}
+
+	COMPLETE: ipar[12] = 0;
+		dfgmres_get(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp, &itercount);
+		
+		for (i = 0; i < ivar; ++i) {
+			x[i] = computed_solution[i];
+		}
+		goto SUCCEDED;
+	FAILED: cout << "The solver has returned the ERROR code " << RCI_request << endl;
+
+	SUCCEDED: free(b); b = NULL;
+		free(expected_solution); expected_solution = NULL;
+		free(computed_solution); computed_solution = NULL;
+		free(residual); residual = NULL;
+		free(J); J = NULL;
+		//complex<double>* xc = (complex<double>*)calloc(N / 2, sizeof(complex<double>));
+		//for (myint ind = 0; ind < N / 2; ++ind) {
+		//	xc[ind] = x[ind] + 1i * x[N / 2 + ind];   // combine the real and imaginary parts to get the final complex vector
+		//}
+		//sys->Construct_Z_V0_Vh(xc, freqNo, sourcePort);
+		//free(xc); xc = NULL;
+		free(x); x = NULL;
+	}
+	return 0;
+}
+
+int applyPrecond_freq(fdtdMesh* sys, double* b1, complex<double>* b2, myint* L1RowId, myint* L1ColId, double* L1val, myint leng_L1, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, double freq) {
+	/* Preconditioner [V0da'*(-omega^2*D_eps)*V0d, V0da'*(-omega^2*D_eps)*V0c, 0;
+	0, V0ca'*(1i*omega*D_sig)*V0c, V0ca'*(1i*omega*D_sig);
+	0, 0, -omega^2*D_eps+1i*omega*D_sig+L] */
+
+	/* solve (-omega^2*D_eps+1i*omega*D_sig+L)^(-1)*b3 */
+	myint nedge = sys->N_edge - sys->bden;
+	int status;
+	double nn = 0;
+	double* r3 = (double*)calloc(2 * nedge, sizeof(double));
+	double* x3 = (double*)calloc(2 * nedge, sizeof(double));   // upper part is real and lower part is imaginary
+	for (int ind = 0; ind < nedge; ++ind) {
+		r3[ind] = b1[sys->leng_v0d1 + sys->leng_v0c + ind];
+		nn += r3[ind] * r3[ind];
+	}
+	if (nn != 0)
+		mkl_gmres_A(r3, x3, L1RowId, L1ColId, L1val, leng_L1, 2 * nedge);
+
+	double* sigx3 = (double*)calloc(nedge * 2, sizeof(double));
+	for (int ind = 0; ind < nedge; ++ind) {
+		if (sys->markEdge[sys->mapEdgeR[ind]]) {
+			sigx3[ind] = freq * 2 * M_PI * SIGMA * x3[ind];   // sigx = omega*D_sig*x3, upper is imaginary and lower is real
+			sigx3[ind + nedge] = -freq * 2 * M_PI * SIGMA * x3[ind + nedge];
+		}
+		else {
+			sigx3[ind] = 0;
+			sigx3[ind + nedge] = 0;
+		}
+	}
+	double* r2r = (double*)calloc(sys->leng_v0c, sizeof(double));
+	double* r2i = (double*)calloc(sys->leng_v0c, sizeof(double));
+	double* x2r = (double*)calloc(sys->leng_v0c, sizeof(double));
+	double* x2i = (double*)calloc(sys->leng_v0c, sizeof(double));
+	sparse_status_t s;
+	double alpha = 1, beta = 0;
+	struct matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, &sigx3[nedge], beta, r2r);   // r2r = right hand side real part for V0c line
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sigx3, beta, r2i);   // r2i = right hand side imag part for V0c line
+	for (int ind = 0; ind < sys->leng_v0c; ++ind) {
+		r2r[ind] /= sys->v0can[ind];
+		r2i[ind] /= sys->v0can[ind];
+	}
+	for (int ind = 0; ind < sys->leng_v0c; ++ind) {
+		r2r[ind] = b1[sys->leng_v0d1 + ind] - r2r[ind];
+		r2i[ind] *= -1;
+	}
+	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
+		r2r[indi] *= sys->v0can[indi];
+		r2i[indi] *= sys->v0can[indi];
+	}
+	status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, r2r, sys->leng_v0c, x2i, 0, 3);
+	status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, r2i, sys->leng_v0c, x2r, 0, 3);
+	for (myint indi = 0; indi < sys->leng_v0c; ++indi) {
+		x2i[indi] /= (-freq * 2 * M_PI / sys->v0cn[indi]);   // x2 = (V0ca'*(1i*omega)*V0c)\(b2-V0ca'*(1i*omega*D_sig)*x3)
+		x2r[indi] /= (freq * 2 * M_PI / sys->v0cn[indi]);   // x2r is real part and x2i is imaginary part
+	}
+
+	double* x2rc = (double*)calloc((unsigned)sys->leng_v0c, sizeof(double));   // x2rc is x2r's copy which is used to divide v0cn and then multiply V0c
+	double* x2ic = (double*)calloc((unsigned)sys->leng_v0c, sizeof(double));   // x2ic is x2i's copy which is used to divide v0cn and then multiply V0c
+	for (myint ind = 0; ind < sys->leng_v0c; ++ind) {
+		x2rc[ind] = x2r[ind] / sys->v0cn[ind];
+		x2ic[ind] = x2i[ind] / sys->v0cn[ind];
+	}
+	double* V0cx2r = (double*)calloc(nedge, sizeof(double));
+	double* V0cx2i = (double*)calloc(nedge, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, x2rc, beta, V0cx2r);   // V0cx2r = V0c*x2r the real part
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, x2ic, beta, V0cx2i);   // V0cx2i = V0c*x2i the imaginary part
+	for (myint ind = 0; ind < nedge; ++ind) {
+		V0cx2r[ind] *= (-pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]));
+		V0cx2i[ind] *= (-pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]));
+	}
+	double* r1r = (double*)calloc(sys->leng_v0d1, sizeof(double));
+	double* r1i = (double*)calloc(sys->leng_v0d1, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, V0cx2r, beta, r1r);   // r1r = V0da'*(-omega^2*D_eps)*V0c*x2r the real part
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, V0cx2i, beta, r1i);   // r1i = V0da'*(-omega^2*D_eps)*V0c*x2i the imaginary part
+	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
+		r1r[ind] /= sys->v0dan[ind];
+		r1i[ind] /= sys->v0dan[ind];
+		r1r[ind] = b1[ind] - r1r[ind];
+		r1i[ind] = -r1i[ind];
+	}
+	double* x1r = (double*)calloc(sys->leng_v0d1, sizeof(double));
+	double* x1i = (double*)calloc(sys->leng_v0d1, sizeof(double));
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, r1r, sys->leng_v0d1, x1r, 0, 3);
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, r1i, sys->leng_v0d1, x1i, 0, 3);
+	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
+		x1r[ind] /= (-pow(freq * 2 * M_PI, 2));
+		x1i[ind] /= (-pow(freq * 2 * M_PI, 2));
+	}
+
+	for (myint ind = 0; ind < sys->leng_v0d1; ++ind) {
+		b2[ind] = x1r[ind] + 1i * x1i[ind];
+	}
+	for (myint ind = 0; ind < sys->leng_v0c; ++ind) {
+		b2[ind] = x2r[ind] + 1i * x2i[ind];
+	}
+	for (myint ind = 0; ind < nedge; ++ind) {
+		b2[ind] = x3[ind] + 1i * x3[nedge + ind];
+	}
+
+	free(r3); r3 = NULL;
+	free(x3); x3 = NULL;
+	free(sigx3); sigx3 = NULL;
+	free(r2r); r2r = NULL;
+	free(r2i); r2i = NULL;
+	free(x2r); x2r = NULL;
+	free(x2i); x2i = NULL;
+	free(x2rc); x2rc = NULL;
+	free(x2ic); x2ic = NULL;
+	free(V0cx2r); V0cx2r = NULL;
+	free(V0cx2i); V0cx2i = NULL;
+	free(r1r); r1r = NULL;
+	free(r1i); r1i = NULL;
+	free(x1r); x1r = NULL;
+	free(x1i); x1i = NULL;
+	return 0;
+}
+
+int generate_bm(fdtdMesh* sys, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0cat, myint leng_v0c, double freq, double* J, double* bm, myint N) {
+	/* generate [0; 0; 0; V0da'*(-omega*J); V0ca'*(-omega*J); -omega*J]
+	bm : resultant vector
+	N : length of the vector */
+	double* V0daJ = (double*)calloc(leng_v0d, sizeof(double));
+	sparse_status_t s;
+	double alpha = 1, beta = 0;
+	struct matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, J, beta, V0daJ);
+
+	double* V0caJ = (double*)calloc(leng_v0c, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, J, beta, V0caJ);
+
+	for (int ind = N / 2; ind < N / 2 + leng_v0d; ++ind) {
+		bm[ind] = -freq * 2 * M_PI * V0daJ[ind - N / 2] / sys->v0dan[ind - N / 2];
+	}
+	for (int ind = N / 2 + leng_v0d; ind < N / 2 + leng_v0d + leng_v0c; ++ind) {
+		bm[ind] = -freq * 2 * M_PI * V0caJ[ind - N / 2 - leng_v0d] / sys->v0can[ind - N / 2 - leng_v0d];
+	}
+	for (int ind = N / 2 + leng_v0d + leng_v0c; ind < N; ++ind) {
+		bm[ind] = -freq * 2 * M_PI * J[ind - N / 2 - leng_v0d - leng_v0c];
+	}
+	free(V0daJ); V0daJ = NULL;
+	free(V0caJ); V0caJ = NULL;
+	return 0;
+}
+
+int multi_matrixvec(fdtdMesh* sys, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, double freq, myint* LrowId, myint* LcolId, double* Lval, myint leng, double* x, double* y, myint N) {
+	/* do the matrix vector multiplication
+	[V0da'*(-omega^2*D_eps)*V0d, V0da'*(-omega^2*D_eps)*V0c, 0, 0, 0, 0;
+	V0ca'*(-omega^2*D_eps)*V0d, V0ca'*(-omega^2*D_eps)*V0c, V0ca'*(-omega^2*D_eps), 0, -V0ca'*omega*D_sig*V0c, -V0ca'*omega*D_sig;
+	0, -omega^2*D_eps*V0c, -omega^2*D_eps+L, 0, -omega*D_sig*V0c, -omega*D_sig;
+	0, 0, 0, V0da'*(-omega^2*D_eps)*V0d, V0da'*(-omega^2*D_eps)*V0c, 0;
+	0, V0ca'*omega*D_sig*V0c, V0ca'*omega*D_sig, V0ca'*(-omega^2*D_eps)*V0d, V0ca'*(-omega^2*D_eps)*V0c, V0ca'*(-omega^2*D_eps);
+	0, omega*D_sig*V0c, omega*D_sig, 0, -omega^2*D_eps*V0c, -omega^2*D_eps+L]
+	x : the vector
+	y : the resultant vector */
+	double* y1 = (double*)calloc(N / 2, sizeof(double));
+	double* y2 = (double*)calloc(N / 2, sizeof(double));
+	realMatrixVec(sys, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, freq, LrowId, LcolId, Lval, leng, x, y1, N / 2);   // A11*x1
+	imagMatrixVec(sys, leng_v0d, V0ct, V0cat, leng_v0c, freq, &x[N / 2], y2, N / 2);   // A12*x2
+	for (int ind = 0; ind < N / 2; ++ind) {
+		y[ind] = y1[ind] - y2[ind];
+	}
+
+	imagMatrixVec(sys, leng_v0d, V0ct, V0cat, leng_v0c, freq, x, y1, N / 2);   // A21*x1
+	realMatrixVec(sys, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, freq, LrowId, LcolId, Lval, leng, &x[N / 2], y2, N / 2);   // A22*x2
+	for (int ind = N / 2; ind < N; ++ind) {
+		y[ind] = y1[ind - N / 2] + y2[ind - N / 2];
+	}
+
+	free(y1); y1 = NULL;
+	free(y2); y2 = NULL;
+	return 0;
+}
+
+int realMatrixVec(fdtdMesh* sys, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, double freq, myint* LrowId, myint* LcolId, double* Lval, myint leng, double* x, double* y, myint N) {
+	/* [V0da'*(-omega^2*D_eps)*V0d, V0da'*(-omega^2*D_eps)*V0c, 0;
+	    V0ca'*(-omega^2*D_eps)*V0c, V0ca'*(-omega^2*D_eps)*V0c, V0ca'*(-omega^2*D_eps);
+		0, -omega^2*D_eps*V0c, -omega^2*D_eps+L] do matrix vector multiplication */
+	double* x1 = (double*)calloc(N, sizeof(double));
+	for (int ind = 0; ind < leng_v0d; ++ind) {
+		x1[ind] = x[ind] / sys->v0dn[ind];
+	}
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		x1[ind + leng_v0d] = x[ind + leng_v0d] / sys->v0cn[ind];
+	}
+	sparse_status_t s;
+	int status;
+	double alpha = 1, beta = 0;
+	struct matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+	double* V0dx = (double*)calloc(sys->N_edge, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0dt, descr, &x1[0], beta, V0dx);   // V0dx = V0d*x1
+	double* epsV0dx = (double*)calloc(sys->N_edge, sizeof(double));
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		epsV0dx[ind] = V0dx[ind] * (-pow(freq * 2 * M_PI, 2) * sys->getEps(ind));   // epsV0dx = (-omega^2*D_eps)*V0d*x1
+	}
+	double* V0daepsV0d = (double*)calloc(leng_v0d, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, epsV0dx, beta, V0daepsV0d);   // V0daepsV0d = V0da'*(-omega^2*D_eps)*V0d*x1
+	for (int ind = 0; ind < leng_v0d; ++ind) {
+		V0daepsV0d[ind] /= sys->v0dan[ind];
+	}
+	double* V0caepsV0d = (double*)calloc(leng_v0c, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, epsV0dx, beta, V0caepsV0d);   // V0caepsV0d = V0ca'*(-omega^2*D_eps)*V0d*x1
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		V0caepsV0d[ind] /= sys->v0can[ind];
+	}
+
+	double* V0cx = (double*)calloc(sys->N_edge, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, &x1[leng_v0d], beta, V0cx);   // V0cx = V0c*x2
+	double* epsV0cx = (double*)calloc(sys->N_edge, sizeof(double));
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		epsV0cx[ind] = V0cx[ind] * (-pow(freq * 2 * M_PI, 2) * sys->getEps(ind));   // epsV0cx = (-omega^2*D_eps)*V0c*x2
+	}
+	double* V0daepsV0c = (double*)calloc(leng_v0d, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0dat, descr, epsV0cx, beta, V0daepsV0c);   // V0daepsV0c = V0da'*(-omega^2*D_eps)*V0c*x2
+	for (int ind = 0; ind < leng_v0d; ++ind) {
+		V0daepsV0c[ind] /= sys->v0dan[ind];
+	}
+	double* V0caepsV0c = (double*)calloc(leng_v0c, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, epsV0cx, beta, V0caepsV0c);   // V0caepsV0c = V0ca'*(-omega^2*D_eps)*V0c*x2
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		V0caepsV0c[ind] /= sys->v0can[ind];
+	}
+
+	double* Lx = (double*)calloc(sys->N_edge, sizeof(double));
+	status = sparseMatrixVecMul(LrowId, LcolId, Lval, leng, &x1[leng_v0d + leng_v0c], Lx);   // Lx = L*x3
+	double* epsx = (double*)calloc(sys->N_edge, sizeof(double));
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		epsx[ind] = (-pow(freq * 2 * M_PI, 2) * sys->getEps(ind)) * x1[leng_v0d + leng_v0c + ind] + Lx[ind];
+	}
+	double* V0caeps = (double*)calloc(leng_v0c, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, epsx, beta, V0caeps);
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		V0caeps[ind] /= sys->v0can[ind];
+	}
+
+	for (int ind = 0; ind < leng_v0d; ++ind) {
+		y[ind] = V0daepsV0d[ind] + V0daepsV0c[ind];
+	}
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		y[ind + leng_v0d] = V0caepsV0d[ind] + V0caepsV0c[ind] + V0caeps[ind];
+	}
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		y[ind + leng_v0d + leng_v0c] = epsx[ind] + epsV0cx[ind];
+	}
+	free(x1); x1 = NULL;
+	free(V0dx); V0dx = NULL;
+	free(epsV0dx); epsV0dx = NULL;
+	free(V0daepsV0d); V0daepsV0d = NULL;
+	free(V0caepsV0d); V0caepsV0d = NULL;
+	free(V0cx); V0cx = NULL;
+	free(epsV0cx); epsV0cx = NULL;
+	free(V0daepsV0c); V0daepsV0c = NULL;
+	free(V0caepsV0c); V0caepsV0c = NULL;
+	free(Lx); Lx = NULL;
+	free(epsx); epsx = NULL;
+	free(V0caeps); V0caeps = NULL;
+
+	return 0;
+}
+
+int imagMatrixVec(fdtdMesh* sys, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, double freq, double* x, double* y, myint N) {
+	/* [0, 0, 0;
+	    0, V0ca'*omega*D_sig*V0c, V0ca'*omega*D_sig;
+		0, omega*D_sig*V0c, omega*D_sig] matrix vector multiplication */
+	sparse_status_t s;
+	double alpha = 1, beta = 0;
+	struct matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+
+	double* x1 = (double*)calloc(N, sizeof(double));
+	for (int ind = 0; ind < leng_v0d; ++ind) {
+		x1[ind] = x[ind] / sys->v0dn[ind];
+	}
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		x1[ind + leng_v0d] = x[ind + leng_v0d] / sys->v0cn[ind];
+	}
+	double* V0cx = (double*)calloc(sys->N_edge, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, V0ct, descr, &x1[leng_v0d], beta, V0cx);   // V0cx = V0c*x2
+	double* sigV0cx = (double*)calloc(sys->N_edge, sizeof(double));
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		if (sys->markEdge[ind]) {
+			sigV0cx[ind] = freq * 2 * M_PI * SIGMA * V0cx[ind];   // sigV0cx = omega*D_sig*V0c*x2
+		}
+		else {
+			sigV0cx[ind] = 0;
+		}
+	}
+	double* V0casigV0c = (double*)calloc(leng_v0c, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sigV0cx, beta, V0casigV0c);   // V0casigV0c = V0ca'*omega*D_sig*V0c*x2
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		V0casigV0c[ind] /= sys->v0can[ind];
+	}
+
+	double* sigx = (double*)calloc(sys->N_edge, sizeof(double));
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		if (sys->markEdge[ind]) {
+			sigx[ind] = x[leng_v0d + leng_v0c + ind] * SIGMA * freq * 2 * M_PI;   // sigx = omega*D_sig*x3
+		}
+		else {
+			sigx[ind] = 0;
+		}
+	}
+	double* V0casig = (double*)calloc(leng_v0c, sizeof(double));
+	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, sigx, beta, V0casig);   // V0casig = V0ca'*omega*D_sig*x3
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		V0casigV0c[ind] /= sys->v0can[ind];
+	}
+
+	for (int ind = 0; ind < leng_v0c; ++ind) {
+		y[ind + leng_v0d] = V0casigV0c[ind] + V0casig[ind];
+	}
+	for (int ind = 0; ind < sys->N_edge; ++ind) {
+		y[ind + leng_v0d + leng_v0c] = sigV0cx[ind] + sigx[ind];
+	}
+
+	free(x1); x1 = NULL;
+	free(V0cx); V0cx = NULL;
+	free(sigV0cx); sigV0cx = NULL;
+	free(V0casigV0c); V0casigV0c = NULL;
+	free(sigx); sigx = NULL;
+	free(V0casig); V0casig = NULL;
+
+	return 0;
 }

@@ -5,8 +5,8 @@
 #include "vis.c"
 
 
-//int hypreSolve(fdtdMesh *sys, HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution) {
-int hypreSolve(fdtdMesh *sys, myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution, int info_show, int solve_id) {
+//int hypreSolve(HYPRE_IJMatrix A, HYPRE_ParCSRMatrix parcsr_A, myint leng_A, double *bin, myint leng_v0, double *solution) {
+int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double *bin, myint leng_v0, double *solution, int info_show, int solve_id) {
 	/* ARowId : matrix rowId
 	   AColId : matrix colId
 	   Aval : matrix value

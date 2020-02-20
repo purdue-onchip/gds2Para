@@ -467,22 +467,22 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	ofstream out;
 #ifdef PRINT_NODE_COORD
     //out.open("x.txt", std::ofstream::out | std::ofstream::trunc);
-    //for (indi = 0; indi < sys->nx; indi++) {
-    //    out << setprecision(15) << sys->xn[indi] << " ";
-    //}
-    //out<< endl << endl;
+    for (indi = 0; indi < sys->nx; indi++) {
+        cout << setprecision(15) << sys->xn[indi] << " ";
+    }
+    cout<< endl << endl;
     //out.close();
     //out.open("y.txt", std::ofstream::out | std::ofstream::trunc);
-    //for (indi = 0; indi < sys->ny; indi++) {
-    //    out << sys->yn[indi] << " ";
-    //}
-    //out << endl << endl;
+    for (indi = 0; indi < sys->ny; indi++) {
+        cout << sys->yn[indi] << " ";
+    }
+    cout << endl << endl;
     //out.close();
     //out.open("z.txt", std::ofstream::out | std::ofstream::trunc);
-    //for (indi = 0; indi < sys->nz; indi++) {
-    //    out << sys->zn[indi] << " ";
-    //}
-    //out << endl << endl;
+    for (indi = 0; indi < sys->nz; indi++) {
+        cout << sys->zn[indi] << " ";
+    }
+    cout << endl << endl;
     //out.close();
 #endif
 
@@ -654,6 +654,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	//}
 	//out.close();
 	/* End of outputting markEdge */
+	
+	/*out.open("Poly.txt", std::ofstream::out | std::ofstream::trunc);
+	for (int ind = 0; ind < sys->numCdtRow; ++ind) {
+		if (sys->conductorIn[ind].zmin >= sys->zn[1] && sys->conductorIn[ind].zmax <= sys->zn[2]) {
+			out << ind << ": " << sys->conductorIn[ind].zmin << " " << sys->conductorIn[ind].zmax << endl;
+			for (int indx = 0; indx < sys->conductorIn[ind].numVert; ++indx) {
+				out << " (" << sys->conductorIn[ind].x[indx] << ", " << sys->conductorIn[ind].y[indx] << ") ";
+			}
+			out << endl;
+		}
+	}
+	out.close();*/
 
     myint eno, nno;
 
@@ -1062,6 +1074,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 
     sys->bden = sys->lbde.size() + sys->ubde.size();    // the boundary edge number
+	cout << "Boundary edge number is " << sys->bden << endl;
     sys->setMapEdge();   // map the original edge to the new edge # with upper and lower boundaries
     /*outc.open("mapEdge.txt", std::ofstream::out | std::ofstream::trunc);
     for (int i = 0; i < sys->N_edge; i++) {
@@ -1243,23 +1256,24 @@ int matrixConstruction(fdtdMesh *sys) {
 #endif
         }
     }*/
-    ofstream out;
-    out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
-    for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
-        out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->getEps(sys->mapEdgeR[indi]) << endl;
-    }
-    out.close();
+   // ofstream out;
+   // out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
+   // for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
+   //     out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->getEps(sys->mapEdgeR[indi]) << endl;
+   // }
+   // out.close();
 
-    out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
-    for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
-        if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
-            out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << SIGMA << endl;
-        }
-        else{
-            out << 0 << endl;
-        }
-    }
-    out.close();
+   // out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
+   // for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
+   //     if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
+   //         out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << SIGMA << endl;
+			////out << indi + 1 << endl;
+   //     }
+   //     else{
+   //         out << 0 << endl;
+   //     }
+   // }
+   // out.close();
 
     sys->edgeCell.clear();
     sys->edgeCellArea.clear();
