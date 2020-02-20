@@ -5,7 +5,7 @@ lengthUnit = 1e-6
 FREQUENCY
 freqUnit = 1.0e+9
 freqStart = 10
-freqEnd = 10.0
+freqEnd = 10
 nfreq = 1
 freqScale = 0
 

@@ -4,9 +4,9 @@ lengthUnit = 1
 
 FREQUENCY
 freqUnit = 1.0e+6
-freqStart = 0.740
-freqEnd = 74.0
-nfreq = 101
+freqStart = 1000
+freqEnd = 20000
+nfreq = 10
 freqScale = 1
 
 DIELECTRIC STACK
