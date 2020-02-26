@@ -580,7 +580,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     myint nnz = sys->leng_S;
     //cout << "Start to generate CSR form for S!\n";
     indi = 0;
-    //ofstream out;
+    ofstream out;
     //out.open("A1.txt", std::ofstream::out | std::ofstream::trunc);
     while (indi < nnz){
         start = RowId[indi];
@@ -646,6 +646,11 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     
     for (indi = 0; indi < sourcePort; indi++)
         sys->Construct_Z_V0_Vh(&xr[indi * (sys->N_edge - sys->bden)], freqNo, indi);
+	//out.open("xr.txt", ofstream::out | ofstream::trunc);
+	//for (indi = 0; indi < size; ++indi) {
+	//	out << xr[indi] << endl;
+	//}
+	//out.close();
 
     phase = -1;     // Release internal memory
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);

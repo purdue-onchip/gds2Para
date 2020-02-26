@@ -378,9 +378,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	/* End of generating Soo, Soi, Sio */
 
 	/* Begin to generate Loo */
-	sparse_matrix_t A;
-	sparse_status_t s0;
-	s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, V0dt, V0da1t, &A);   // A = v0d*v0da'/MU
+	//sparse_matrix_t A;
+	//sparse_status_t s0;
+	//s0 = mkl_sparse_spmm(SPARSE_OPERATION_TRANSPOSE, V0dt, V0da1t, &A);   // A = v0d*v0da'/MU
 	//sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
 	//myint ARows, ACols, leng_Aoo = 0;
 	//MKL_INT *ArowStart, *ArowEnd, *AcolId;
@@ -408,22 +408,22 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	//}
 	//outfile.close();
 
-	if (status != 0) {
-		return status;
-	}
-	myint* LooRowId = NULL;
-	myint* LooRowId1 = NULL;
-	myint* LooColId = NULL;
-	double* Looval = NULL;
-	myint leng_Loo;
-	sparseMatrixSum(sys, A, SooRowId1, SooColId, Sooval, sys->outside, &LooRowId, &LooColId, &Looval, leng_Loo);   //do the sparse matrix summation and put the result in Loo
-	LooRowId1 = (myint*)calloc(sys->outside + 1, sizeof(myint));
-	COO2CSR_malloc(LooRowId, LooColId, Looval, leng_Loo, sys->outside, LooRowId1);
-	double* Looval_old = (double*)calloc(leng_Loo, sizeof(double));
-	for (int ind = 0; ind < leng_Loo; ind++) {
-		Looval_old[ind] = Looval[ind];
-	}
-	free(Looval); Looval = NULL;
+	//if (status != 0) {
+	//	return status;
+	//}
+	//myint* LooRowId = NULL;
+	//myint* LooRowId1 = NULL;
+	//myint* LooColId = NULL;
+	//double* Looval = NULL;
+	//myint leng_Loo;
+	//sparseMatrixSum(sys, A, SooRowId1, SooColId, Sooval, sys->outside, &LooRowId, &LooColId, &Looval, leng_Loo);   //do the sparse matrix summation and put the result in Loo
+	//LooRowId1 = (myint*)calloc(sys->outside + 1, sizeof(myint));
+	//COO2CSR_malloc(LooRowId, LooColId, Looval, leng_Loo, sys->outside, LooRowId1);
+	//double* Looval_old = (double*)calloc(leng_Loo, sizeof(double));
+	//for (int ind = 0; ind < leng_Loo; ind++) {
+	//	Looval_old[ind] = Looval[ind];
+	//}
+	//free(Looval); Looval = NULL;
 	//sparseMatrixSum1(sys, AoorowId1, AcolId, Aval, SooRowId1, SooColId, Sooval, sys->outside);
 	
 #endif
@@ -451,8 +451,8 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 
 
 	/* generate Laplacian matrix for this mesh */
-	//myint nedge = sys->N_edge - sys->bden;
-	///* Generate the Laplacian matrix */
+	myint nedge = sys->N_edge - sys->bden;
+	/* Generate the Laplacian matrix */
 	myint leng = 0;
 	myint *LrowId, *LcolId;
 	double *Lval;
@@ -462,13 +462,13 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	Lval = (double*)malloc(leng * sizeof(double));
 	status = generateLaplacian(sys, LrowId, LcolId, Lval);   
 
-	//outfile.open("L.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind < leng; ++ind) {
-	//	outfile << LrowId[ind] + 1 << " " << LcolId[ind] + 1 << " ";
-	//	outfile << setprecision(15) << Lval[ind] << endl;
-	//} 
-	//outfile.close();
-	//cout << "L is generated!\n";
+	outfile.open("L.txt", std::ofstream::out | std::ofstream::trunc);
+	for (int ind = 0; ind < leng; ++ind) {
+		outfile << LrowId[ind] + 1 << " " << LcolId[ind] + 1 << " ";
+		outfile << setprecision(15) << Lval[ind] << endl;
+	} 
+	outfile.close();
+	cout << "L is generated!\n";
 	/* End of generating the Laplacian matrix */
 
 	/* debug to test L to be solved with HYPRE */
@@ -564,22 +564,22 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 #endif
 
 	/* Print out current */
-	////out.open("J.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
-	//	double* cur = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));   // current
-	//	for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-	//		for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
-	//			/* Set current density for all edges within sides in port to prepare solver */
-	//			cur[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
-	//		}
-	//	}
-	//	//for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
-	//	//	out << cur[ind] << endl;
-	//	//}
-	//	free(cur); cur = NULL;
-	//}
-	////out.close();
-	//cout << "current is generated!\n";
+	out.open("J.txt", std::ofstream::out | std::ofstream::trunc);
+	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		double* cur = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));   // current
+		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+				/* Set current density for all edges within sides in port to prepare solver */
+				cur[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+			}
+		}
+		for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
+			out << cur[ind] << endl;
+		}
+		free(cur); cur = NULL;
+	}
+	out.close();
+	cout << "current is generated!\n";
 
 	
 	/* Frequency domain to solve inside outside part */
@@ -603,15 +603,18 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 		/* debug testing to see the performance of different solvers */
 		//double* bo = (double*)calloc(sys->outside, sizeof(double));
 		//double* yo = (double*)calloc(sys->outside, sizeof(double));
-		//for (int ind = 0; ind < sys->N_edge; ++ind) {
-		//	if (sys->markEdge[ind] == 0) {
-		//		bo[sys->mapio[ind]] = 1;   // test right hand side
+		//for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+		//	for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+		//		for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+		//			/* Set current density for all edges within sides in port to prepare solver */
+		//			bo[sys->mapio[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+		//		}
 		//	}
-		//}
-		//status = hypreSolve(LooRowId, LooColId, Looval, leng_Loo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (Loo-omega^2*D_epsoo)
-		//status = hypreSolve(SooRowId, SooColId, Sooval, lengoo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (Soo-omega^2*D_epsoo)
-		//status = mkl_gmres_A(bo, yo, LooRowId, LooColId, Looval, leng_Loo, sys->outside);   // gmres to solve (Loo-omega^2*D_epsoo)
 
+		//	//status = hypreSolve(LooRowId, LooColId, Looval, leng_Loo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (Loo-omega^2*D_epsoo)
+		//	status = hypreSolve(SooRowId, SooColId, Sooval, lengoo, bo, sys->outside, yo, 1, 3);   // HYPRE to solve (Soo-omega^2*D_epsoo)
+		//	//status = mkl_gmres_A(bo, yo, LooRowId, LooColId, Looval, leng_Loo, sys->outside);   // gmres to solve (Loo-omega^2*D_epsoo)
+		//}
 		/* End of debugging to see the performance of different solvers */
 
 
@@ -620,7 +623,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 		/* End of only solving oo part with pardiso */
 
 		/* Solve (-omega^2*D_eps+1i*omega*D_sig+S)*xr = -1i*omega*J */
-		//cout << endl << "Frequency is " << freq << endl << endl;
+		cout << endl << "Frequency is " << freq << endl << endl;
 		reference(sys, ind, sys->SRowId, sys->SColId, sys->Sval);
 		/* End of solving (-omega^2*D_eps+1i*omega*D_sig+S)*xr = -1i*omega*J */
 
@@ -1315,9 +1318,9 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	free(SooRowId1); SooRowId1 = NULL;
 	free(SooColId); SooColId = NULL;
 	free(Sooval); Sooval = NULL;
-	free(LooRowId); LooRowId = NULL;
-	free(LooColId); LooColId = NULL;
-	free(Looval_old); Looval_old = NULL;
+	//free(LooRowId); LooRowId = NULL;
+	//free(LooColId); LooColId = NULL;
+	//free(Looval_old); Looval_old = NULL;
 	/* end of freeing Soo matrix */
 
 	/* free Soi matrix */
