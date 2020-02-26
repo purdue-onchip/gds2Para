@@ -24,7 +24,7 @@ DBG =0 # Off by default
 ifeq ($(DBG), 1)
 	CXXFLAGS =$(CXXFLAGS_DEBUG) -DDEBUG_GDSREADER -DDEBUG_GDSWRITER
 else
-	CXXFLAGS =$(CXXFLAGS_RELEASE) -std=c++17 -O2 -lstdc++fs
+	CXXFLAGS =$(CXXFLAGS_RELEASE) -std=c++17 -lstdc++fs
 endif
 
 ifdef false #ZLIB_DIR # Compression support
@@ -57,27 +57,27 @@ LayoutAnalyzer: $(OBJS)
 
 $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboint.hpp $(SRCDIR)/solnoutclass.hpp
 	@$(MKDIR)
-	mpicxx -std=c++17 -g -lstdc++fs -O0 -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) $(MKL_COMP_FLAGS)
+	mpicxx -std=c++17 -g -gdwarf-3 -lstdc++fs -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) $(MKL_COMP_FLAGS)
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -O1 -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o $(MKL_COMP_FLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o $(MKL_COMP_FLAGS)
 
 $(OBJDIR)/matrixCon.o: $(SRCDIR)/matrixCon.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -O1 -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
 $(OBJDIR)/hypreSolve.o: $(SRCDIR)/hypreSolve.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -O1 -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
 
 $(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -O1 -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o $(MKL_COMP_FLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o $(MKL_COMP_FLAGS)
 
 $(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -O1 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o $(MKL_COMP_FLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o $(MKL_COMP_FLAGS)
 
 
 .PHONY: clean
