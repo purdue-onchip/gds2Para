@@ -75,7 +75,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
     cout << "MKL Status of mat1: values[0] = " << values[0] << endl;*/
 
 
-    /* Generate V0d1 */
+    /* Generate V0d */
     tf::Task taskPG1 = subflow.emplace([=]() {
         cout << "Start generating V0d" << endl;
 #ifdef PRINT_V0D_BLOCKS
@@ -85,10 +85,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
 #endif
 
         sys->merge_v0d1(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, *v0d1num, *leng_v0d1, *v0d1anum, *leng_v0d1a, mapd, sideLen, bdl, bdu);
-#ifdef V0_NEW_SCHEMA
-        // temp = new double[(sys->N_edge - (bdl + bdu) * sys->N_edge_s) * leng_v0d2];    // -sqrt(D_eps)*V0d2
-        // sys->merge_v0d1_v0d2(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, v0d1num, leng_v0d1, v0d1anum, leng_v0d1a, v0d2num, leng_v0d2, v0d2anum, leng_v0d2a,  mapd, sideLen, temp, (bdl + bdu));
-#endif
+
 #ifdef PRINT_VERBOSE_TIMING
         cout << " Time to generate V0d is " << (clock() - t0) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 #endif
@@ -97,9 +94,9 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         cout << "V0d is generated!" << endl;
     });
     taskPG0.precede(taskPG1);
-    taskPG1.name("Generate V_{0d1}");
+    taskPG1.name("Generate V_{0d}");
 
-    /* Generate Ad = V0da1'*D_eps*V0d */
+    /* Generate Ad = V0da^T*D_eps*V0d = D_eps,0 */
     tf::Task taskPG2 = subflow.emplace([=]() {
         clock_t t1 = clock();
         sys->generateAd(mapd, *v0d1num, *v0d1anum, *leng_v0d1, *leng_Ad);
@@ -178,17 +175,6 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
     taskPG4.name("V_{0da}^T to CSR Form");
     taskPG2.precede(taskPG4);
 
-    tf::Task taskPG5 = subflow.emplace([=]() {
-#ifdef V0_NEW_SCHEMA
-        double * drhs = new double[leng_v0d1 * leng_v0d2];
-        mkl_sparse_d_mm(SPARSE_OPERARION_NON_TRANSPOSE, 1, V0dat, SPARSE_MATRIX_TYPE_GENERAL, SPARSE_LAYOUT_COLUMN_MAJOR, temp, leng_v0d2, (sys->N_edge - (bdl + bdu) * sys->N_edge_s), 0, drhs, leng_v0d1);
-        delete[] temp;
-        delete[] drhs;
-#endif
-    });
-    taskPG5.name("drhs");
-    taskPG2.precede(taskPG5);
-
 
     /* Construct V0c with row id, col id and its val */
     myint *leng_v0c = (myint*)calloc(1, sizeof(myint));
@@ -201,7 +187,6 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
     block1_y = 0;// (sys->ylim2 - sys->ylim1) / 3 * sys->lengthUnit;// (sys->yn[sys->ny - 1] - sys->yn[0]) / 10;
     block2_x = 0;// (sys->xlim2 - sys->xlim1) / 5 * sys->lengthUnit;
     block2_y = 0;// (sys->ylim2 - sys->ylim1) / 5 * sys->lengthUnit;
-
 
     /* Generate V0c */
     tf::Task taskPG6 = subflow.emplace([=]() {
@@ -221,7 +206,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
     taskPG6.name("Generate V_{0c}");
     taskPG0.precede(taskPG6);
 
-    /* Generate Ac */
+    /* Generate Ac = V0ca^T*D_sig*V0c = D_sig,0 */
     tf::Task taskPG7 = subflow.emplace([=]() {
         clock_t t1 = clock();
         sys->generateAc(mapc, *v0cnum, *v0canum, *leng_v0c, *leng_Ac);
@@ -344,12 +329,12 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
 #ifdef GENERATE_V0_SOLUTION
         clock_t t1 = clock();
         struct matrix_descr descr;
-        sys->J = (double*)calloc(sys->N_edge, sizeof(double));
+        double *Jport = (double*)calloc(sys->N_edge, sizeof(double));
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
             for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
                 /* Set current density for all edges within sides in port to prepare solver */
                 //cout << " port #" << sourcePort + 1 << ", side #" << sourcePortSide + 1 << ", edge #" << sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge] << ": J = " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << " A/m^2" << endl;
-                sys->J[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+                Jport[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
             }
         }
 
@@ -359,19 +344,19 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         double alpha = 1.0;
         double beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        sparse_status_t s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0dat, descr, sys->J, beta, v0daJ);
+        sparse_status_t s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0dat, descr, Jport, beta, v0daJ); // +V0da^T*J
         if (s != 0) {
-            cerr << "Could not sparse matrix-vector multiply V0daJ (status = " << s << ")" << endl;
+            cerr << "Could not sparse matrix-vector multiply V0da^T*J (status = " << s << ")" << endl;
         }
         for (myint indi = 0; indi < *leng_v0d1; indi++) {
-            v0daJ[indi] *= -1.0;
+            v0daJ[indi] *= -1.0; // -V0da^T*J
         }
 
         /* Solve V0d system */
         double *y0d = (double*)calloc(*leng_v0d1, sizeof(double));
         t1 = clock();
         //cout << " About to call hypreSolve() for y0d on port" << sourcePort + 1 << endl;
-        int status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, *leng_Ad, v0daJ, *leng_v0d1, y0d);
+        int status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, *leng_Ad, v0daJ, *leng_v0d1, y0d); // Numerically find D_eps,0^-1*(-V0da^T*J)
         //cout << " Finished hypreSolve() for y0d on port" << sourcePort + 1 << endl;
 
 #ifndef SKIP_PARDISO
@@ -381,11 +366,12 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
 #endif
 
         for (myint indi = 0; indi < *leng_v0d1; indi++) {
-            y0d[indi] /= (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary
+            y0d[indi] /= (2 * M_PI * sys->freqStart * sys->freqUnit);    // y0d is imaginary; 1/omega * D_eps,0\(-V0da^T*J)
         }
         free(v0daJ); v0daJ = NULL;
         /* End of V0d solving */
 
+        /* Get first vector term with V0d*y0d */
         /* MKL Level 2 (matrix-vector or "mv") operations: y <- alpha * mat_A * vec_x + beta * vec_y
         y = ydt: Using sparse storage, with matrix transposition, on double-precision numbers */
         double *ydt = (double*)calloc(sys->N_edge, sizeof(double));
@@ -393,7 +379,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         alpha = 1.0;
         beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, *V0dt, descr, y0d, beta, ydt);    // -V0d*(D_eps0\(V0da'*rsc))
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, *V0dt, descr, y0d, beta, ydt);    // Scaled first vector term: 1/omega * V0d*(D_eps,0\(-V0da^T*J))
         if (s != 0) {
             cerr << "Could not sparse matrix-vector multiply ydt (status = " << s << ")" << endl;
         }
@@ -413,8 +399,8 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         //    u0a[indi - sys->N_edge_s].real = ydat[indi] / nna;    // u0da
         //}
         for (myint indi = 0; indi < sys->N_edge; indi++) {
-            yd1[indi] = ydt[indi];
-            ydt[indi] *= -1.0 * (2 * M_PI * sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+            yd1[indi] = ydt[indi]; // Save for later; yd1 = 1/omega * V0d*(D_eps,0\(-V0da^T*J))
+            ydt[indi] *= -1.0 * (2 * M_PI * sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0; // yd^T = D_eps*V0d*(D_eps,0\(+V0da^T*J))
         }
         free(y0d); y0d = NULL;
 
@@ -425,12 +411,12 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         alpha = 1.0;
         beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0cat, descr, sys->J, beta, v0caJ);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0cat, descr, Jport, beta, v0caJ); // +V0ca^T*J
         if (s != 0) {
-            cerr << "Could not sparse matrix-vector multiply V0caJ (status = " << s << ")" << endl;
+            cerr << "Could not sparse matrix-vector multiply V0ca^T*J (status = " << s << ")" << endl;
         }
         for (myint indi = 0; indi < *leng_v0c; indi++) {
-            v0caJ[indi] *= -1.0;
+            v0caJ[indi] *= -1.0; // -V0ca^T*J
         }
 
         /* Compute conductor region right hand side */
@@ -438,7 +424,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         alpha = 1.0;
         beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0cat, descr, ydt, beta, crhs);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0cat, descr, ydt, beta, crhs); // crhs is V0ca^T*D_eps*V0d*(D_eps,0\(V0da^T*J))
         if (s != 0) {
             cerr << "Could not sparse matrix-vector multiply crhs (status = " << s << ")" << endl;
         }
@@ -446,9 +432,9 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
 
         double v0caJn = 0.0, crhsn = 0.0;
         for (myint indi = 0; indi < *leng_v0c; indi++) {
-            v0caJ[indi] += crhs[indi];
-            v0caJn += v0caJ[indi] * v0caJ[indi];
-            crhsn += crhs[indi] * crhs[indi];
+            v0caJ[indi] += crhs[indi]; // V0ca^T*D_eps*V0d*(D_eps,0\(-V0da^T*J)) - V0ca^T*J = V0ca^T*[D_eps*V0d*(D_eps,0\(V0da^T*J)) - I]*J
+            v0caJn += v0caJ[indi] * v0caJ[indi]; // Norm for part of third term (resistive component due to conductors)
+            crhsn += crhs[indi] * crhs[indi]; // Norm for conductor right hand side
         }
         v0caJn = sqrt(v0caJn);
         crhsn = sqrt(crhsn);
@@ -490,34 +476,34 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
             //free(y0cs); y0cs = NULL;
 
             //cout << " About to call hypreSolve() for y0c on port" << sourcePort + 1 << endl;
-            status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, *leng_Ac, v0caJ, *leng_v0c, y0c);
+            status = hypreSolve(sys, sys->AcRowId, sys->AcColId, sys->Acval, *leng_Ac, v0caJ, *leng_v0c, y0c); // Numerically find D_sig,0^-1*(V0ca^T*[D_eps*V0d*(D_eps,0\(V0da^T*J)) - I]*J)
             //cout << " Finished hypreSolve() for y0c on port" << sourcePort + 1 << endl;
         }
         free(v0caJ); v0caJ = NULL;
         /* End of V0c solving */
 
 
-        /* V0cy0c */
+        /* Get third vector term with V0c*y0c */
         double *yc = (double*)calloc(sys->N_edge, sizeof(double));
         double *yccp = (double*)malloc(sys->N_edge * sizeof(double));
         alpha = 1.0;
         beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, *V0ct, descr, y0c, beta, yc);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, *V0ct, descr, y0c, beta, yc); // Complete third vector term: V0c*(D_sig,0\(V0ca^T*[D_eps*V0d*(D_eps,0\(V0da^T*J)) - I]*J))
         if (s != 0) {
             cerr << "Could not sparse matrix-vector multiply yc (status = " << s << ")" << endl;
         }
         free(y0c); y0c = NULL;
         for (myint indi = 0; indi < sys->N_edge; indi++) {
-            yccp[indi] = -yc[indi] * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+            yccp[indi] = -yc[indi] * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0; // Modified "copy" of yc includes flipped bracket term: D_eps*V0c*(D_sig,0\(V0ca^T*[I - D_eps*V0d*(D_eps,0\(V0da^T*J))]*J))
         }
 
-        /* dRhs2 */
+        /* Compute second dielectric region right hand side */
         double *dRhs2 = (double*)calloc(*leng_v0d1, sizeof(double));
         alpha = 1.0;
         beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0dat, descr, yccp, beta, dRhs2);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, *V0dat, descr, yccp, beta, dRhs2); // V0da^T*D_eps*V0c*(D_sig,0\(V0ca^T*[I - D_eps*V0d*(D_eps,0\(V0da^T*J))]*J))
         if (s != 0) {
             cerr << "Could not sparse matrix-vector multiply dRhs2 (status = " << s << ")" << endl;
         }
@@ -526,17 +512,17 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         /* Solve y0d2 system */
         double *y0d2 = (double*)calloc(*leng_v0d1, sizeof(double));
         //cout << " About to call hypreSolve() for y0d2 on port" << sourcePort + 1 << endl;
-        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, *leng_Ad, dRhs2, *leng_v0d1, y0d2);
+        status = hypreSolve(sys, sys->AdRowId, sys->AdColId, sys->Adval, *leng_Ad, dRhs2, *leng_v0d1, y0d2); // Numerically find D_eps,0^-1*V0da^T*D_eps*V0c*(D_sig,0\(V0ca^T*[I - D_eps*V0d*(D_eps,0\(V0da^T*J))]*J))
         //cout << " Finished hypreSolve() for y0d2 on port" << sourcePort + 1 << endl;
         free(dRhs2); dRhs2 = NULL;
         /* End of y0d2 solving*/
 
-        /* yd2 */
+        /* Get second vector term with V0d*yd2 */
         double *yd2 = (double*)calloc(sys->N_edge, sizeof(double));
         alpha = 1.0;
         beta = 0.0;
         descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, *V0dt, descr, y0d2, beta, yd2);
+        s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, *V0dt, descr, y0d2, beta, yd2); // Complete second vector term: V0d*(D_eps,0^-1\V0da^T*D_eps*V0c*(D_sig,0\(V0ca^T*[I - D_eps*V0d*(D_eps,0\(V0da^T*J))]*J)))
         if (s != 0) {
             cerr << "Could not sparse matrix-vector multiply yd2 (status = " << s << ")" << endl;
         }
@@ -559,20 +545,18 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
 
 
         /* Final complex vector solution for nullspace layout response of this port */
-        complex<double> *yd = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
-        for (int id = 0; id < sys->N_edge; id++) {
-            yd[id] = yd2[id] - (1i)*(yd1[id]);
+        complex<double> *ynullsol = (complex<double>*)malloc(sys->N_edge * sizeof(complex<double>));
+        for (myint indi = 0; indi < sys->N_edge; indi++) {
+            ynullsol[indi] = yd2[indi] - (1i)*(yd1[indi]); // yd = V0d*(D_eps,0^-1\V0da^T*D_eps*V0c*(D_sig,0\(V0ca^T*[I - D_eps*V0d*(D_eps,0\(V0da^T*J))]*J))) - 1j/omega * V0d*(D_eps,0\(-V0da^T*J)) = 1st term + 2nd term
+            ynullsol[indi] += yc[indi]; // yd = 1st term + 2nd term + 3rd term
         }
+
         free(yd2); yd2 = NULL;
         free(yd1); yd1 = NULL;
-
-        for (myint indi = 0; indi < sys->N_edge; indi++) {
-            yd[indi] += yc[indi];
-        }
         free(yc); yc = NULL;
 
         /* Construct Z-parameters for V0 part */
-        sys->Construct_Z_V0(yd, sourcePort);
+        sys->Construct_Z_V0(ynullsol, sourcePort);
 #endif
 
         /* Calculate the Vh part */
@@ -696,7 +680,7 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
             lapack_complex_double *rhs_h = (lapack_complex_double*)calloc(sys->leng_Vh * 1, sizeof(lapack_complex_double));
             lapack_complex_double *J = (lapack_complex_double*)calloc(sys->N_edge - (bdl + bdu) * sys->N_edge_s, sizeof(lapack_complex_double));
             for (inde = bdl * sys->N_edge_s; inde < sys->N_edge - bdu * sys->N_edge_s; inde++) {
-                J[inde - bdl * sys->N_edge_s].imag = -sys->J[inde] * freq * 2 * M_PI;
+                J[inde - bdl * sys->N_edge_s].imag = -Jport[inde] * freq * 2 * M_PI;
 
             }
             status = matrix_multi('T', Vh, (sys->N_edge - (bdl + bdu) * sys->N_edge_s), sys->leng_Vh, J, (sys->N_edge - (bdl + bdu) * sys->N_edge_s), 1, rhs_h);    // -1i*omega*V_re1'*J
@@ -767,8 +751,8 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
 #endif
 
 #ifdef GENERATE_V0_SOLUTION
-        free(yd); yd = NULL;
-        free(sys->J); sys->J = NULL;
+        free(ynullsol); ynullsol = NULL;
+        free(Jport); Jport = NULL;
 #endif
 
         // Solve system for x in (-omega^2 * D_eps + j * omega * D_sigma + S) * x = -j * omega * J
@@ -819,7 +803,6 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
     PG11End.name("Finalize Parallel HYPRE Solves");
     taskPG3.precede(PG11Start);
     taskPG4.precede(PG11Start);
-    taskPG5.precede(PG11Start);
     taskPG8.precede(PG11Start);
     taskPG9.precede(PG11Start);
     taskPG10.precede(PG11Start);

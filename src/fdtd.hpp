@@ -48,7 +48,7 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (2e-4) // Fraction setting minimum discretization retained in x-direction after node merging in terms of smaller of x-extent
+#define MINDISFRACX (5e-4) // Fraction setting minimum discretization retained in x-direction after node merging in terms of smaller of x-extent
 #define MINDISFRACY (MINDISFRACX) // Fraction setting minimum discretization retained in y-direction after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.02) // Fraction setting largest discretization in x-direction in terms of x-extent
@@ -64,9 +64,8 @@ using namespace std;
 //#define PRINT_PORT_COND // Terminal output has extra information about locating ports in isolated conductors
 #define SKIP_MARK_CELL
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
-#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
+//#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
 //#define PRINT_V0D_BLOCKS
-//#define V0_NEW_SCHEMA
 //#define PRINT_V0_Z_PARAM
 //#define PRINT_V0_Vh_Z_PARAM
 #define SKIP_PARDISO // Remove PARDISO solver code
