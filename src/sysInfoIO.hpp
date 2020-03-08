@@ -16,13 +16,14 @@ inline void WriteVectorIn1Line(ofstream &file_obj, const vector<double> &vec_x) 
 }
 
 void Write2DVectorIn1Line(ofstream &file_obj, const vector<vector<myint>> &vec_2D) {
-	// first two numbers ~ row size & column size
-	file_obj << vec_2D.size() << ' ' << vec_2D[0].size() << ' ';
-
-	for (const auto& v_i : vec_2D) 
-		for (const auto& v_ij : v_i) {
-			file_obj << v_ij << ' ';
-	}
+    file_obj << vec_2D.size() << "  ";
+    for (const auto& v_i : vec_2D) {
+        file_obj << v_i.size() << "  ";     // each vector vec_2D[i] can have different size
+        for (const auto& v_ij : v_i) {
+            file_obj << v_ij << ' ';
+        }
+        file_obj << "     ";
+    }
 	file_obj << endl;
 }
 
@@ -153,19 +154,20 @@ void Read1LineTo2DVector(ifstream &file_obj, vector<vector<myint>> *pVec_2D) {
 	getline(file_obj, line);
 	istringstream myStream(line);
 
-	// first two numbers ~ row size & column size
+	// first number ~ row size ~ size of 2D vector
 	int rowSize, colSize;
-	myStream >> rowSize >> colSize;
+	myStream >> rowSize;
 
-	myint v_ij;
-	for (int i = 0; i < rowSize; i++) {
-		vector<myint> v_i;
-		for (int j = 0; j < colSize; j++) {
-			myStream >> v_ij;
-			v_i.push_back(v_ij);
-		}
-		(*pVec_2D).push_back(v_i);
-	}
+    myint v_ij;
+    for (int i = 0; i < rowSize; i++) {
+        vector<myint> v_i;
+        myStream >> colSize;    // size of each 1D vector
+        for (int j = 0; j < colSize; j++) {
+            myStream >> v_ij;
+            v_i.push_back(v_ij);
+        }
+        (*pVec_2D).push_back(v_i);
+    }
 }
 
 double* Read1LineToDoublePtr(ifstream &file_obj) {

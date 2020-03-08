@@ -17,9 +17,9 @@ The macro `SKIP_LAYERED_FD` in head file `fdtd.hpp` switches between layeredFD s
 Everything else is the same as [V0Vh solver](https://github.com/purdue-onchip/gds2Para/blob/master/purdue_install.md), including commands, final parameters, and storage styles.
 
 ## Windows System
-Currently, only layeredFD solver is supported in Win32 system, and above macro `SKIP_LAYERED_FD` no longer changes anything in Win32 system.
+Currently, only layeredFD solver is supported in Windows system, and above macro `SKIP_LAYERED_FD` no longer changes anything in Windows system.
 ### How to Setup in Visual Studio (tested in Visual Studio 2017):
-1. Create a visual studio project inside the parent directory of folder `gds2Para`, and only include these files in project:
+1. Create a visual studio project next to folder `gds2Para`, and only include these files in project:
 ```bash
 fdtd.hpp
 generateStiff.cpp
@@ -40,5 +40,5 @@ int main(void) {
 }
 ```
 ### How to Run in Visual Studio
-1. Run the layeredFD solver in Linux (could stop ealier with `Ctrl+Z`) to generate a folder `temp_sysInfoIO` inside the parent directory of folder `gds2Para`. This step exports the structure information to a few txt files. This step is necessary because many codes for loading gds files cannot be compiled in Windows system.
-2. Back to Visual Studio, under mode `Debug x64`, run `Local Windows Debugger` in VS to get the parameters.
+1. Run the layeredFD solver in Linux (could stop ealier with `Ctrl+Z`) to generate a folder `temp_sysInfoIO` next to folder `gds2Para`. This step exports the structure information to a few txt files. This step is necessary because many codes for loading gds files cannot be compiled in Windows system.
+2. Back to Visual Studio, under mode `Debug/Release x64/x86`, run `Local Windows Debugger` in VS to get the Z-parameters.
