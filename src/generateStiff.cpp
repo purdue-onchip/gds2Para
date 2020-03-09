@@ -493,11 +493,16 @@ int generateStiff(fdtdMesh *sys){
     SeColIdo = (myint*)malloc(Senum * sizeof(myint));
     SeRowIdn = (myint*)malloc(Senum * sizeof(myint));   // SeRowIdn has the exact memory of the nnz of Se
     Sevaln = (double*)malloc(Senum * sizeof(double));   // Sevaln has the exact memory of the nnz of Se
+	ofstream out;
+	out.open("Se.txt", ofstream::out | ofstream::trunc);
     for (ind = 0; ind < Senum; ind++){
         SeColIdo[ind] = SeColId[ind];
         SeRowIdn[ind] = SeRowId[ind];
         Sevaln[ind] = Seval[ind];
+		out << SeRowId[ind] + 1 << " " << SeColId[ind] + 1 << " ";
+		out << setprecision(15) << Seval[ind] << endl;
     }
+	out.close();
     free(SeRowId); SeRowId = NULL;
     free(Seval); Seval = NULL;
     free(SeColId); SeColId = (myint*)malloc((leng_Se + 1) * sizeof(myint));
@@ -507,11 +512,15 @@ int generateStiff(fdtdMesh *sys){
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));   // ShRowIdn has the exact memory of the nnz of Sh
     Shvaln = (double*)malloc(Shnum * sizeof(double));   // Shvaln has the exact memory of the nnz of Sh
+	out.open("Sh.txt", ofstream::out | ofstream::trunc);
     for (ind = 0; ind < Shnum; ind++){
         ShColIdo[ind] = ShColId[ind];
         ShRowIdn[ind] = ShRowId[ind];
         Shvaln[ind] = Shval[ind];
+		out << ShRowId[ind] + 1 << " " << ShColId[ind] + 1 << " ";
+		out << setprecision(15) << Shval[ind] << endl;
     }
+	out.close();
     free(ShRowId); ShRowId = NULL;
     free(Shval); Shval = NULL;
     free(ShColId); ShColId = (myint*)malloc((leng_Sh + 1) * sizeof(myint));

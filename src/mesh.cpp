@@ -1,6 +1,6 @@
 //#include "stdafx.h"
 #include "fdtd.hpp"
-
+void discretize(vector<double> xOrigOld, myint numxOrigOld, double* xn, myint xnumn, double xc1, double xc2, double xc11, double xc21, double disMinx0, double disMinx1, double disMinx2, double disMaxx0, double disMaxx1, myint& nx, myint& countx, double xlim1, double xlim2);
 
 int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<double, int> &yi, unordered_map<double, int> &zi, unordered_set<double> *portCoorx, unordered_set<double> *portCoory)
 {
@@ -22,8 +22,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	double disMiny = MINDISFRACY * fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1)) * sys->lengthUnit;
 	//double xc1 = -16.5e-3, xc2 = 2e-3, yc1 = -16.5e-3, yc2 = 2e-3, disMinx1 = 30e-6, disMiny1 = 30e-6;
 	//double xc11 = -3.6e-3, xc21 = -3e-3, yc11 = -3.6e-3, yc21 = -0.5e-3, disMinx2 = 5e-6, disMiny2 = 5e-6;
-	double xc1 = -16.5e-3, xc2 = 2e-3, yc1 = -16.5e-3, yc2 = 2e-3, disMinx1 = disMinx, disMiny1 = disMiny;
-	double xc11 = -3.6e-3, xc21 = -3e-3, yc11 = -3.6e-3, yc21 = -0.5e-3, disMinx2 = disMinx, disMiny2 = disMiny;
+	//double xc1 = -5.6e-3, xc2 = -3e-3, yc1 = -14.6e-3, yc2 = -0.3e-3, disMinx1 = disMinx, disMiny1 = disMiny;
+	//double xc11 = -3.6e-3, xc21 = -3e-3, yc11 = -1.5e-3, yc21 = -0.3e-3, disMinx2 = disMinx, disMiny2 = disMiny;
+	double xc1 = 0, xc2 = 0, yc1 = 0, yc2 = 0, disMinx1 = disMinx, disMiny1 = disMiny;   // don't use this
+	double xc11 = 0, xc21 = 0, yc11 = 0, yc21 = 0, disMinx2 = disMinx, disMiny2 = disMiny;    // don't use this
 	double disMinx0 = disMinx, disMiny0 = disMiny;
 
     //for (indi = 0; indi < sys->numCdtRow; indi++) { 
@@ -46,7 +48,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (indi = 0; indi < sys->numPorts; indi++) {
         numPortSides += sys->portCoor[indi].multiplicity;
     }
-    myint numOrigOldXY = numNode + 2 * numPortSides; // Number of coordinates reserved includes each conductor vertex and each pair of points defining area port side
+    myint numOrigOldXY = numNode + 2 * numPortSides + 2; // Number of coordinates reserved includes each conductor vertex and each pair of points defining area port side
     myint numOrigOldZ = 2 * (sys->numStack + numPortSides); // Number of coordinates reserved includes each layer start and stop coordinate and pair of points defining area port side
     xOrigOld.reserve(numOrigOldXY);
     yOrigOld.reserve(numOrigOldXY);
@@ -54,6 +56,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     /* Populate vectors for the old coordinates */
     indj = 0;
+	xOrigOld.push_back(sys->xlim1 * sys->lengthUnit);
+	xOrigOld.push_back(sys->xlim2 * sys->lengthUnit);
+	yOrigOld.push_back(sys->ylim1 * sys->lengthUnit);
+	yOrigOld.push_back(sys->ylim2 * sys->lengthUnit);
     for (indi = 0; indi < sys->numCdtRow; indi++) {
 		if (sys->conductorIn[indi].zmin >= sys->zlim1*sys->lengthUnit && sys->conductorIn[indi].zmin <= sys->zlim2*sys->lengthUnit) {
 			if (sys->conductorIn[indi].zmax >= sys->zlim1*sys->lengthUnit && sys->conductorIn[indi].zmax <= sys->zlim2*sys->lengthUnit) {
@@ -137,88 +143,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->nx = 1;
     xmin = xOrigOld[0];
     xmax = xOrigOld[numOrigOldXY - 1];
+	
     
     double disMaxx = MAXDISFRACX * (sys->xlim2 - sys->xlim1) * sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent
     myint xMaxInd = (myint)((xmax - xmin) / disMaxx); // Cast to myint after floating-point division
 	double disMaxx0 = disMaxx, disMaxx1 = disMaxx0;
+	myint countx = 0;
 
-    
-    //for (indi = 1; indi < numOrigOldXY; indi++) {
-    //    if (abs(xOrigOld[indi] - xOrigOld[indi - 1]) > disMinx) {
-    //        sys->nx++;   // not necessary because later replace this one
-    //    }
-    //}
-    double *xn = (double*)calloc(numNode + 6 * numPortSides + xMaxInd, sizeof(double)); // Initialize saved grid node coordinates for worst case insertions
-    xn[0] = xOrigOld[0];
-    double temp = xn[0];   // in a range of disMin temp is always the first coordinate
-    indj = 0;
-    for (indi = 1; indi < numOrigOldXY; indi++) {
-		if (xOrigOld[indi] >= xc1 && xOrigOld[indi] < xc2) {
-			if (xOrigOld[indi] >= xc11 && xOrigOld[indi] < xc21) {
-				disMinx = disMinx2;
-				disMaxx = disMaxx1;
-			}
-			else {
-				disMinx = disMinx1;
-				disMaxx = disMaxx1;
-			}
-		}
-		else {
-			disMinx = disMinx0;
-			disMaxx = disMaxx0;
-		}
-        if (abs(xOrigOld[indi] - temp) > disMinx && abs(xOrigOld[indi] - temp) <= disMaxx) {
-            indj++;
-            xn[indj] = xOrigOld[indi]; // Save coordinate for nodes to keep if in discretization retention range
-            temp = xn[indj];
-        }
-        else if (abs(xOrigOld[indi] - temp) > disMinx && abs(xOrigOld[indi] - temp) > disMaxx) {
-            while (abs(xOrigOld[indi] - temp) > disMaxx) {
-                indj++;
-                xn[indj] = xn[indj - 1] + disMaxx; // Save coordinates of all nodes past maximum discretization at intervals of the maximum discretization past the previous coordinate
-                temp = xn[indj];
-            }
-            //if (xOrigOld[indi] - temp > disMinx) { // Check original coordinate against new temp coordinate
-            //    temp = xOrigOld[indi];
-            //}
-            indj++;
-            xn[indj] = xOrigOld[indi]; // Include the original coordinate as area node
-			temp = xn[indj];
-        }
-        else {
-            indj++;
-            xn[indj] = xOrigOld[indi]; // Keep original coordinate as area node even if it is smaller than minimum discretization?
-			temp = xn[indj];
-        }
-    }
-    myint countx = indj;
-
-    indj = 0;
-    double first, second;
-    temp = xn[0];
-    for (indi = 1; indi <= countx; indi++) {    // Set the discretization length around port to be equal
-		if (xn[indi] >= xc1 && xn[indi] < xc2) {
-			if (xn[indi] >= xc11 && xn[indi] < xc21) {
-				disMinx = disMinx2;
-			}
-			else {
-				disMinx = disMinx1;
-			}
-		}
-		else {
-			disMinx = disMinx0;
-		}
-
-        if (abs(xn[indi] - temp) > disMinx) {
-            indj++;
-            temp = xn[indi];
-        }
-        else {
-            
-        }
-    }
-    sys->nx = indj + 1;
-
+	double *xn = (double*)calloc(numNode + 6 * numPortSides + xMaxInd, sizeof(double)); // Initialize saved grid node coordinates for worst case insertions
+	discretize(xOrigOld, numOrigOldXY, xn, numNode + 6 * numPortSides + xMaxInd, xc1, xc2, xc11, xc21, disMinx0, disMinx1, disMinx2, disMaxx0, disMaxx1, sys->nx, countx, sys->xlim1 * sys->lengthUnit, sys->xlim2 * sys->lengthUnit);   // discretize the x coordinates based on disMin, disMax
+	sys->xlim1 = xn[0];
+	sys->xlim2 = xn[countx - 1];
+	cout << sys->xlim1 << " " << sys->xlim2 << endl;
 
     /***************************************************************************/
     /* Discretize domain in the y-direction */
@@ -227,91 +163,18 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->ny = 1;
     ymin = yOrigOld[0];
     ymax = yOrigOld[numOrigOldXY - 1];
+	
+
     double disMaxy = MAXDISFRACY * (sys->ylim2 - sys->ylim1) * sys->lengthUnit; // Maximum discretization distance in y-direction is fraction of y-extent
     myint yMaxInd = (myint)((ymax - ymin) / disMaxy); // Cast to myint after floating-point division
 	double disMaxy0 = disMaxy, disMaxy1 = disMaxy * 1;
+	myint county = 0;
 
-    
-    //for (indi = 1; indi < numOrigOldXY; indi++) {
-    //    if (abs(yOrigOld[indi] - yOrigOld[indi - 1]) > disMiny) {
-    //        sys->ny++;
-    //    }
-    //}
-    double *yn = (double*)calloc(numNode + 6 * numPortSides + yMaxInd, sizeof(double));
-    yn[0] = yOrigOld[0];
-    indj = 0;
-    temp = yn[0];
-    for (indi = 1; indi < numOrigOldXY; indi++) {
-		if (yOrigOld[indi] >= yc1 && yOrigOld[indi] < yc2) {
-			if (yOrigOld[indi] >= yc11 && yOrigOld[indi] < yc21) {
-				disMiny = disMiny2;
-				disMaxy = disMaxy1;
-			}
-			else {
-				disMiny = disMiny1;
-				disMaxy = disMaxy1;
-			}
-		}
-		else {
-			disMiny = disMiny0;
-			disMaxy = disMaxy0;
-		}
-
-        if (abs(yOrigOld[indi] - temp) > disMiny && abs(yOrigOld[indi] - temp) <= disMaxy) {
-            indj++;
-            yn[indj] = yOrigOld[indi];
-            temp = yn[indj];
-        }
-        else if (abs(yOrigOld[indi] - temp) > disMiny && abs(yOrigOld[indi] - temp) > disMaxy) {
-            while (abs(yOrigOld[indi] - temp) > disMaxy) {
-                indj++;
-                yn[indj] = yn[indj - 1] + disMaxy;
-                temp = yn[indj];
-            }
-            //if (abs(yOrigOld[indi] - temp) > disMiny) {
-                //temp = yOrigOld[indi];
-            //}
-            indj++;
-            yn[indj] = yOrigOld[indi];
-			temp = yOrigOld[indi];
-        }
-        else {
-            indj++;
-            yn[indj] = yOrigOld[indi];
-			temp = yn[indj];
-        }
-    }
-
-    myint county = indj;
-    //sort(yn, yn + county + 1);
-    //sys->ynu = (double*)calloc(sys->ny, sizeof(double));
-    
-    indj = 0;
-    temp = yn[0];
-    for (indi = 1; indi <= county; indi++) {    // Set the discretization length around port to be equal
-		if (yn[indi] >= yc1 && yn[indi] < yc2) {
-			if (yn[indi] >= yc11 && yn[indi] < yc21) {
-				disMiny = disMiny2;
-			}
-			else {
-				disMiny = disMiny1;
-			}
-		}
-		else {
-			disMiny = disMiny0;
-		}
-        if (abs(yn[indi] - temp) > disMiny) {
-            indj++;
-            temp = yn[indi];
-
-        }
-        else {
-
-        }
-    }
-    
-    sys->ny = indj + 1;
-
+	double *yn = (double*)calloc(numNode + 6 * numPortSides + yMaxInd, sizeof(double));
+	discretize(yOrigOld, numOrigOldXY, yn, numNode + 6 * numPortSides + yMaxInd, yc1, yc2, yc11, yc21, disMiny0, disMiny1, disMiny2, disMaxy0, disMaxy1, sys->ny, county, sys->ylim1 * sys->lengthUnit, sys->ylim2 * sys->lengthUnit);
+	sys->ylim1 = yn[0];
+	sys->ylim2 = yn[county - 1];
+	cout << sys->ylim1 << " " << sys->ylim2 << endl;
 
     /********************************************************************************/
     /* Discretize domain in the z-direction */
@@ -339,7 +202,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     sys->xn = (double*)calloc(sys->nx, sizeof(double));
     indj = 0;
     sys->xn[0] = xn[0];
-    temp = sys->xn[0];
+    double temp = sys->xn[0];
     xi[sys->xn[0]] = indj;
     for (indi = 1; indi <= countx; indi++) {    // Set the discretization length around port to be equal
 		if (xn[indi] >= xc1 && xn[indi] < xc2) {
@@ -466,25 +329,25 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	
 	ofstream out;
 #ifdef PRINT_NODE_COORD
- //   out.open("x.txt", std::ofstream::out | std::ofstream::trunc);
- //   for (indi = 0; indi < sys->nx; indi++) {
- //       out << setprecision(15) << sys->xn[indi] << " ";
- //   }
- //   out<< endl << endl;
- //   out.close();
- //   out.open("y.txt", std::ofstream::out | std::ofstream::trunc);
- //   for (indi = 0; indi < sys->ny; indi++) {
- //       out << sys->yn[indi] << " ";
- //   }
- //   out << endl << endl;
- //   out.close();
- //   out.open("z.txt", std::ofstream::out | std::ofstream::trunc);
- //   for (indi = 0; indi < sys->nz; indi++) {
- //       out << sys->zn[indi] << " ";
- //   }
- //   out << endl << endl;
- //   out.close();
-	//cout << "Coordinates are printed out!\n";
+    out.open("x.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = 0; indi < sys->nx; indi++) {
+        out << setprecision(15) << sys->xn[indi] << " ";
+    }
+    out<< endl << endl;
+    out.close();
+    out.open("y.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = 0; indi < sys->ny; indi++) {
+        out << sys->yn[indi] << " ";
+    }
+    out << endl << endl;
+    out.close();
+    out.open("z.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = 0; indi < sys->nz; indi++) {
+        out << sys->zn[indi] << " ";
+    }
+    out << endl << endl;
+    out.close();
+	cout << "Coordinates are printed out!\n";
 #endif
 
 	/* print the dx min, the dy min, the dz min */
@@ -910,17 +773,17 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     }
 
     /* Start to output markNode */
-    //out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
-    //for (indi = 0; indi < sys->N_node; indi++) {
-    //    if (visited[indi] != 0){
-    //        out << to_string(visited[indi]) << " ";
-    //    }
-    //    else{
-    //        out << "0 ";
-    //    }
-    //}
-    //out << endl;
-    //out.close();
+    out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
+    for (indi = 0; indi < sys->N_node; indi++) {
+        if (visited[indi] != 0){
+            out << to_string(visited[indi]) << " ";
+        }
+        else{
+            out << "0 ";
+        }
+    }
+    out << endl;
+    out.close();
 	/* End of outputting markNode */
 
     /* Construct each isolated conductor */
@@ -2056,4 +1919,99 @@ void fdtdMesh::print()
     cout << "  v0csJ array exists (" << (this->v0csJ != nullptr) << ")" << endl;
     cout << "  Y array exists (" << (this->Y != nullptr) << ")" << endl;
     cout << "------" << endl;
+}
+
+void discretize(vector<double> xOrigOld, myint numxOrigOld, double* xn, myint xnumn, double xc1, double xc2, double xc11, double xc21, double disMinx0, double disMinx1, double disMinx2, double disMaxx0, double disMaxx1, myint& nx, myint& countx, double xlim1, double xlim2) {
+	/* discretize the coordinates based on disMin, disMax along x, y directions
+	xOrigOld : original coordinates from all the points of the polygon
+	numxOrigOld : the number of elements in xOrigOld
+	xn : new generated xn with the resitriction of disMinx, disMaxx
+	xnumn : allocated memory for xn
+	xc1, xc2 : between xc1 and xc2 we use disMinx1, disMaxx1 except for [xc11, xc12]
+	xc11, xc12 : between xc11 and xc12 we use disMinx2, disMaxx1
+	disMinx0 : other places use disMinx0, disMaxx0
+	nx : sys->nx
+	countx : number of elements in xn
+	*/
+	myint indi = 0;
+	double disMinx, disMaxx;
+	while (indi < numxOrigOld && xOrigOld[indi] < xlim1 && abs(xOrigOld[indi] - xlim1) > disMinx0) {
+		indi++;
+	}
+	
+	xn[0] = xOrigOld[indi];
+	
+	double temp = xn[0];   // in a range of disMin temp is always the first coordinate
+	myint indj = 0;
+	
+	for (indi = indi; indi < numxOrigOld; indi++) {
+		if ((xOrigOld[indi] < xlim1 && abs(xOrigOld[indi] - xlim1) > disMinx0) || (xOrigOld[indi] > xlim2 && abs(xOrigOld[indi] - xlim2) > disMinx0)) {
+			continue;
+		}
+		
+		if (xOrigOld[indi] >= xc1 && xOrigOld[indi] < xc2) {
+			if (xOrigOld[indi] >= xc11 && xOrigOld[indi] < xc21) {
+				disMinx = disMinx2;
+				disMaxx = disMaxx1;
+			}
+			else {
+				disMinx = disMinx1;
+				disMaxx = disMaxx1;
+			}
+		}
+		else {
+			disMinx = disMinx0;
+			disMaxx = disMaxx0;
+		}
+		if (abs(xOrigOld[indi] - temp) > disMinx && abs(xOrigOld[indi] - temp) <= disMaxx) {
+			indj++;
+			xn[indj] = xOrigOld[indi]; // Save coordinate for nodes to keep if in discretization retention range
+			temp = xn[indj];
+		}
+		else if (abs(xOrigOld[indi] - temp) > disMinx && abs(xOrigOld[indi] - temp) > disMaxx) {
+			while (abs(xOrigOld[indi] - temp) > disMaxx) {
+				indj++;
+				xn[indj] = xn[indj - 1] + disMaxx; // Save coordinates of all nodes past maximum discretization at intervals of the maximum discretization past the previous coordinate
+				temp = xn[indj];
+			}
+			//if (xOrigOld[indi] - temp > disMinx) { // Check original coordinate against new temp coordinate
+			//    temp = xOrigOld[indi];
+			//}
+			indj++;
+			xn[indj] = xOrigOld[indi]; // Include the original coordinate as area node
+			temp = xn[indj];
+		}
+		else {
+			indj++;
+			xn[indj] = xOrigOld[indi]; // Keep original coordinate as area node even if it is smaller than minimum discretization?
+			temp = xn[indj];
+		}
+	}
+	countx = indj;
+
+	indj = 0;
+	double first, second;
+	temp = xn[0];
+	for (indi = 1; indi <= countx; indi++) {    // Set the discretization length around port to be equal
+		if (xn[indi] >= xc1 && xn[indi] < xc2) {
+			if (xn[indi] >= xc11 && xn[indi] < xc21) {
+				disMinx = disMinx2;
+			}
+			else {
+				disMinx = disMinx1;
+			}
+		}
+		else {
+			disMinx = disMinx0;
+		}
+
+		if (abs(xn[indi] - temp) > disMinx) {
+			indj++;
+			temp = xn[indi];
+		}
+		else {
+
+		}
+	}
+	nx = indj + 1;
 }

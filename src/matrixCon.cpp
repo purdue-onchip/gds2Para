@@ -564,21 +564,21 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 #endif
 
 	/* Print out current */
-	out.open("J.txt", std::ofstream::out | std::ofstream::trunc);
-	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
-		double* cur = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));   // current
-		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
-				/* Set current density for all edges within sides in port to prepare solver */
-				cur[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
-			}
-		}
-		for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
-			out << cur[ind] << endl;
-		}
-		free(cur); cur = NULL;
-	}
-	out.close();
+	//out.open("J.txt", std::ofstream::out | std::ofstream::trunc);
+	//for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
+	//	double* cur = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));   // current
+	//	for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+	//		for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+	//			/* Set current density for all edges within sides in port to prepare solver */
+	//			cur[sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+	//		}
+	//	}
+	//	for (int ind = 0; ind < sys->N_edge - sys->bden; ++ind) {
+	//		out << cur[ind] << endl;
+	//	}
+	//	free(cur); cur = NULL;
+	//}
+	//out.close();
 	cout << "current is generated!\n";
 
 	
@@ -638,11 +638,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 		/* end of solving with inside and outside */
 
 		/* Solve [V0a'*D*V0, V0a'*D;
-				  D*V0,      D+L] with preconditioner which is the L part */
-				  //solveV0L(sys, ind, LrowId, LcolId, Lval, leng, (sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden) * 2, V0dt, V0dat, V0ct, V0cat);
-				  /* End of solving */
+		  D*V0,      D+L] with preconditioner which is the L part */
+		  //solveV0L(sys, ind, LrowId, LcolId, Lval, leng, (sys->leng_v0d1 + sys->leng_v0c + sys->N_edge - sys->bden) * 2, V0dt, V0dat, V0ct, V0cat);
+		  /* End of solving */
 
-				  //free(Looval); Looval = NULL;
+		  //free(Looval); Looval = NULL;
 
 #endif
 

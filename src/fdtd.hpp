@@ -48,8 +48,8 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (0.01) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (0.01) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (0.05) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (0.05) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
@@ -57,8 +57,8 @@ using namespace std;
 #define DT (1.e-12) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-#define UPPER_BOUNDARY_PEC
-#define LOWER_BOUNDARY_PEC
+//#define UPPER_BOUNDARY_PEC
+//#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
@@ -707,6 +707,8 @@ public:
 				//	out2.precision(17);
 				//}
 				for (indk = 0; indk < this->conductorIn[indi].numVert; indk++) {
+					//if (this->conductorIn[indi].x[indk] < this->xlim1 * lengthUnit || this->conductorIn[indi].x[indk] >= this->xlim2 * lengthUnit || this->conductorIn[indi].y[indk] < this->ylim1 * lengthUnit || this->conductorIn[indi].y[indk] >= this->ylim2 * lengthUnit)
+					//	continue;
 					xmin = fmin(xmin, this->conductorIn[indi].x[indk]);
 					xmax = fmax(xmax, this->conductorIn[indi].x[indk]);
 					ymin = fmin(ymin, this->conductorIn[indi].y[indk]);
@@ -1121,6 +1123,7 @@ public:
 				continue;
 			if (!(conductorIn[indi].zmin >= zlim1 * lengthUnit && conductorIn[indi].zmin <= zlim2 * lengthUnit && conductorIn[indi].zmax >= zlim1 * lengthUnit && conductorIn[indi].zmax <= zlim2 * lengthUnit))
 				continue;
+			
 			xrange.clear();
 			xcoor.clear();
 			xcoorv.clear();
@@ -1128,49 +1131,99 @@ public:
 			mark1 = 0;
 			//cout << endl;
 			//cout << endl;
+			//cout << this->conductorIn[indi].numVert << endl;
 			for (indj = 0; indj < this->conductorIn[indi].numVert - 1; indj++) {
-				//cout << this->conductorIn[indi].x[indj] << " " << this->conductorIn[indi].y[indj] << " ";
-				if (this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[indj + 1]) {   // line spanning across x
+				//cout << this->conductorIn[indi].x[indj] << " " << this->conductorIn[indi].y[indj] << endl;
+				if ((this->conductorIn[indi].x[indj] >= xlim1 && this->conductorIn[indi].x[indj] <= xlim2) ||
+					(this->conductorIn[indi].x[indj + 1] >= xlim1 && this->conductorIn[indi].x[indj + 1] <= xlim2)) {
+					// if one of the nodes of the range is inside the total structure
+					if (this->conductorIn[indi].x[indj] < xlim1 || this->conductorIn[indi].x[indj] > xlim2) {
+						if (this->conductorIn[indi].x[indj] < xlim1) {
+							xi[this->conductorIn[indi].x[indj]] = 0;
+						}
+						else if (this->conductorIn[indi].x[indj] > xlim2) {
+							xi[this->conductorIn[indi].x[indj]] = nx - 1;
+						}
+					}
+					else if (this->conductorIn[indi].x[indj + 1] < xlim1 || this->conductorIn[indi].x[indj + 1] > xlim2) {
+						if (this->conductorIn[indi].x[indj + 1] < xlim1) {
+							xi[this->conductorIn[indi].x[indj + 1]] = 0;
+						}
+						else if (this->conductorIn[indi].x[indj + 1] > xlim2) {
+							xi[this->conductorIn[indi].x[indj + 1]] = nx - 1;
+						}
+					}
 
-					if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+
+					
+					if (this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[indj + 1]) {   // line spanning across x
+
+						if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+							x1 = xi[this->conductorIn[indi].x[indj]];   // smaller x
+							x2 = xi[this->conductorIn[indi].x[indj + 1]];    // larger x
+						}
+						else {
+							x1 = xi[this->conductorIn[indi].x[indj + 1]];
+							x2 = xi[this->conductorIn[indi].x[indj]];
+						}
+
+						for (indl = x1; indl <= x2; indl++) {
+							xcoor.insert(indl);
+						}
+					}
+					else {   // line along y direction
+						xcoor.insert(xi[this->conductorIn[indi].x[indj]]);
+					}
+				}
+			}
+			//cout << this->conductorIn[indi].x[indj] << " " << this->conductorIn[indi].y[indj] << endl;
+			if ((this->conductorIn[indi].x[indj] >= xlim1 && this->conductorIn[indi].x[indj] <= xlim2) ||
+				(this->conductorIn[indi].x[0] >= xlim1 && this->conductorIn[indi].x[0] <= xlim2))
+				// if the x range is outside the total size
+			{
+				
+				if (this->conductorIn[indi].x[indj] < xlim1 || this->conductorIn[indi].x[indj] > xlim2) {
+					if (this->conductorIn[indi].x[indj] < xlim1) {
+						xi[this->conductorIn[indi].x[indj]] = 0;
+					}
+					else if (this->conductorIn[indi].x[indj] > xlim2) {
+						xi[this->conductorIn[indi].x[indj]] = nx - 1;
+					}
+				}
+				else if (this->conductorIn[indi].x[0] < xlim1 || this->conductorIn[indi].x[0] > xlim2) {
+					if (this->conductorIn[indi].x[0] < xlim1) {
+						xi[this->conductorIn[indi].x[0]] = 0;
+					}
+					else if (this->conductorIn[indi].x[0] > xlim2) {
+						xi[this->conductorIn[indi].x[0]] = nx - 1;
+					}
+				}
+
+				if (this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[0]) {   // line spanning across x
+					if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
 						x1 = xi[this->conductorIn[indi].x[indj]];   // smaller x
-						x2 = xi[this->conductorIn[indi].x[indj + 1]];    // larger x
+						x2 = xi[this->conductorIn[indi].x[0]];    // larger x
 					}
 					else {
-						x1 = xi[this->conductorIn[indi].x[indj + 1]];
+						x1 = xi[this->conductorIn[indi].x[0]];
 						x2 = xi[this->conductorIn[indi].x[indj]];
 					}
-
 					for (indl = x1; indl <= x2; indl++) {
 						xcoor.insert(indl);
 					}
 				}
-				else {   // line along y direction
+				else {    // line along y direction
 					xcoor.insert(xi[this->conductorIn[indi].x[indj]]);
 				}
 			}
-			if (this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[0]) {   // line spanning across x
-				if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
-					x1 = xi[this->conductorIn[indi].x[indj]];   // smaller x
-					x2 = xi[this->conductorIn[indi].x[0]];    // larger x
-				}
-				else {
-					x1 = xi[this->conductorIn[indi].x[0]];
-					x2 = xi[this->conductorIn[indi].x[indj]];
-				}
-				for (indl = x1; indl <= x2; indl++) {
-					xcoor.insert(indl);
-				}
+			if (xcoor.size() == 0) {
+				continue;
 			}
-			else {    // line along y direction
-				xcoor.insert(xi[this->conductorIn[indi].x[indj]]);
-			}
-
 			for (auto xcoori : xcoor) {
 				xcoorv.push_back(xcoori);
 			}
 			xrange_max = xcoorv.back();   // the maximal x coordinate
-
+			
 			for (indj = 0; indj < xcoorv.size() - 1; indj++) {
 				mark1 = 1;    // the x coordinates are more than 1
 				xrange[xcoorv[indj]] = xcoorv[indj + 1];
@@ -1182,204 +1235,213 @@ public:
 
 			for (indj = 0; indj < this->conductorIn[indi].numVert - 1; indj++) {
 
-				if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[indj + 1]) {   // line along x direction
-					if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+				if ((this->conductorIn[indi].x[indj] >= xlim1 && this->conductorIn[indi].x[indj] <= xlim2) ||
+					(this->conductorIn[indi].x[indj + 1] >= xlim1 && this->conductorIn[indi].x[indj + 1] <= xlim2)) {
+					if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[indj + 1]) {   // line along x direction
+						if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+							ss = xi[this->conductorIn[indi].x[indj]];
+							ee = xi[this->conductorIn[indi].x[indj + 1]];
+							if (ss == ee && mark1 == 1) {
+								continue;
+							}
+
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is the last point
+								xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+								if (mark1 == 0) {   // xrange only has one value, break
+									break;
+								}
+								ss = xrange[ss];
+							}
+						}
+						else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[indj + 1]) {
+							ss = xi[this->conductorIn[indi].x[indj + 1]];
+							ee = xi[this->conductorIn[indi].x[indj]];
+							if (ss == ee && mark1 == 1) {
+								continue;
+							}
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+								xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+								if (mark1 == 0) {    // xrange only has one value, break
+									break;
+								}
+								ss = xrange[ss];
+							}
+						}
+					}
+					else if (this->conductorIn[indi].y[indj] != this->conductorIn[indi].y[indj + 1] && this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[indj + 1]) {   // this edge is with area slope
+						if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+							ss = xi[this->conductorIn[indi].x[indj]];
+							ee = xi[this->conductorIn[indi].x[indj + 1]];
+							if (ss == ee && mark1 == 1) {
+								continue;
+							}
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+								y3 = (this->conductorIn[indi].x[indj + 1] - this->xn[ss]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj + 1];
+								if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
+									y1 = yi[this->conductorIn[indi].y[indj + 1]];
+									y2 = yi[this->conductorIn[indi].y[indj]];
+								}
+								else {
+									y1 = yi[this->conductorIn[indi].y[indj]];
+									y2 = yi[this->conductorIn[indi].y[indj + 1]];
+								}
+								mini = DOUBLEMAX;
+								mini_k = -1;
+								for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+									if (mini > abs(this->yn[indl] - y3)) {    // if there is a yn that is closer to y3
+										mini = abs(this->yn[indl] - y3);
+										mini_k = indl;
+									}
+								}
+								xcoory[ss].push_back(mini_k);
+								if (mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
+
+									break;
+								}
+								ss = xrange[ss];
+							}
+						}
+						else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[indj + 1]) {
+							ss = xi[this->conductorIn[indi].x[indj + 1]];
+							ee = xi[this->conductorIn[indi].x[indj]];
+							if (ss == ee && mark1 == 1) {
+								continue;
+							}
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {
+								y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj + 1] + (this->xn[ss] - this->conductorIn[indi].x[indj + 1]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj];
+								if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
+									y1 = yi[this->conductorIn[indi].y[indj + 1]];
+									y2 = yi[this->conductorIn[indi].y[indj]];
+								}
+								else {
+									y1 = yi[this->conductorIn[indi].y[indj]];
+									y2 = yi[this->conductorIn[indi].y[indj + 1]];
+								}
+								mini = DOUBLEMAX;
+								mini_k = -1;
+								for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+									if (mini > abs(this->yn[indl] - y3)) {
+										mini = abs(this->yn[indl] - y3);
+										mini_k = indl;
+									}
+								}
+								xcoory[ss].push_back(mini_k);
+								if (mark1 == 0) {
+
+									break;
+								}
+								ss = xrange[ss];
+							}
+						}
+					}
+				}
+			}
+			
+
+			if ((this->conductorIn[indi].x[indj] >= xlim1 && this->conductorIn[indi].x[indj] <= xlim2) ||
+				(this->conductorIn[indi].x[0] >= xlim1 && this->conductorIn[indi].x[0] <= xlim2))
+				// if the x range is outside the total size
+			{
+				if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[0]) {
+					if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
 						ss = xi[this->conductorIn[indi].x[indj]];
-						ee = xi[this->conductorIn[indi].x[indj + 1]];
-						if (ss == ee && mark1 == 1) {
-							continue;
-						}
+						ee = xi[this->conductorIn[indi].x[0]];
+						if (!(ss == ee && mark1 == 1)) {
 
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is the last point
-							xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
-							if (mark1 == 0) {   // xrange only has one value, break
-								break;
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+								xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+								if (mark1 == 0) {
+
+									break;
+								}
+								ss = xrange[ss];
 							}
-							ss = xrange[ss];
 						}
 					}
-					else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[indj + 1]) {
-						ss = xi[this->conductorIn[indi].x[indj + 1]];
+					else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[0]) {
+						ss = xi[this->conductorIn[indi].x[0]];
 						ee = xi[this->conductorIn[indi].x[indj]];
-						if (ss == ee && mark1 == 1) {
-							continue;
-						}
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
-							xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
-							if (mark1 == 0) {    // xrange only has one value, break
-								break;
+						if (!(ss == ee && mark1 == 1)) {
+
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+								xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
+								if (mark1 == 0) {
+
+									break;
+								}
+								ss = xrange[ss];
 							}
-							ss = xrange[ss];
 						}
 					}
 				}
-				else if (this->conductorIn[indi].y[indj] != this->conductorIn[indi].y[indj + 1] && this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[indj + 1]) {   // this edge is with area slope
-					if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[indj + 1]) {
+				else if (this->conductorIn[indi].y[indj] != this->conductorIn[indi].y[0] && this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[0]) {   // this edge is with area slope
+					if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
 						ss = xi[this->conductorIn[indi].x[indj]];
-						ee = xi[this->conductorIn[indi].x[indj + 1]];
-						if (ss == ee && mark1 == 1) {
-							continue;
-						}
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
-							y3 = (this->conductorIn[indi].x[indj + 1] - this->xn[ss]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[indj + 1] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj + 1];
-							if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
-								y1 = yi[this->conductorIn[indi].y[indj + 1]];
-								y2 = yi[this->conductorIn[indi].y[indj]];
-							}
-							else {
-								y1 = yi[this->conductorIn[indi].y[indj]];
-								y2 = yi[this->conductorIn[indi].y[indj + 1]];
-							}
-							mini = DOUBLEMAX;
-							mini_k = -1;
-							for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-								if (mini > abs(this->yn[indl] - y3)) {    // if there is a yn that is closer to y3
-									mini = abs(this->yn[indl] - y3);
-									mini_k = indl;
-								}
-							}
-							xcoory[ss].push_back(mini_k);
-							if (mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
+						ee = xi[this->conductorIn[indi].x[0]];
+						if (!(ss == ee && mark1 == 1)) {
 
-								break;
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {   // if ss is not the last point, loop
+								y3 = (this->conductorIn[indi].x[0] - this->xn[ss]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[0];
+								if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
+									y1 = yi[this->conductorIn[indi].y[0]];
+									y2 = yi[this->conductorIn[indi].y[indj]];
+								}
+								else {
+									y1 = yi[this->conductorIn[indi].y[indj]];
+									y2 = yi[this->conductorIn[indi].y[0]];
+								}
+								mini = DOUBLEMAX;
+								mini_k = -1;
+								for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+									if (mini > abs(this->yn[indl] - y3)) {
+										mini = abs(this->yn[indl] - y3);
+										mini_k = indl;
+									}
+								}
+								xcoory[ss].push_back(mini_k);
+								if (mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
+									break;
+								}
+								ss = xrange[ss];
 							}
-							ss = xrange[ss];
 						}
 					}
-					else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[indj + 1]) {
-						ss = xi[this->conductorIn[indi].x[indj + 1]];
+					else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[0]) {
+						ss = xi[this->conductorIn[indi].x[0]];
 						ee = xi[this->conductorIn[indi].x[indj]];
-						if (ss == ee && mark1 == 1) {
-							continue;
-						}
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {
-							y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj + 1] + (this->xn[ss] - this->conductorIn[indi].x[indj + 1]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[indj + 1]) * this->conductorIn[indi].y[indj];
-							if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[indj + 1]) {
-								y1 = yi[this->conductorIn[indi].y[indj + 1]];
-								y2 = yi[this->conductorIn[indi].y[indj]];
-							}
-							else {
-								y1 = yi[this->conductorIn[indi].y[indj]];
-								y2 = yi[this->conductorIn[indi].y[indj + 1]];
-							}
-							mini = DOUBLEMAX;
-							mini_k = -1;
-							for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-								if (mini > abs(this->yn[indl] - y3)) {
-									mini = abs(this->yn[indl] - y3);
-									mini_k = indl;
-								}
-							}
-							xcoory[ss].push_back(mini_k);
-							if (mark1 == 0) {
+						if (!(ss == ee && mark1 == 1)) {
 
-								break;
+							while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
+								y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[0] + (this->xn[ss] - this->conductorIn[indi].x[0]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[indj];
+								if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
+									y1 = yi[this->conductorIn[indi].y[0]];
+									y2 = yi[this->conductorIn[indi].y[indj]];
+								}
+								else {
+									y1 = yi[this->conductorIn[indi].y[indj]];
+									y2 = yi[this->conductorIn[indi].y[0]];
+								}
+								mini = DOUBLEMAX;
+								mini_k = -1;
+								for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
+									if (mini > abs(this->yn[indl] - y3)) {
+										mini = abs(this->yn[indl] - y3);
+										mini_k = indl;
+									}
+								}
+								xcoory[ss].push_back(mini_k);
+								if (mark1 == 0) {
+
+									break;
+								}
+								ss = xrange[ss];
 							}
-							ss = xrange[ss];
 						}
 					}
+
 				}
 			}
-
-			if (this->conductorIn[indi].y[indj] == this->conductorIn[indi].y[0]) {
-				if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
-					ss = xi[this->conductorIn[indi].x[indj]];
-					ee = xi[this->conductorIn[indi].x[0]];
-					if (!(ss == ee && mark1 == 1)) {
-
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
-							xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
-							if (mark1 == 0) {
-
-								break;
-							}
-							ss = xrange[ss];
-						}
-					}
-				}
-				else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[0]) {
-					ss = xi[this->conductorIn[indi].x[0]];
-					ee = xi[this->conductorIn[indi].x[indj]];
-					if (!(ss == ee && mark1 == 1)) {
-
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
-							xcoory[ss].push_back(yi[this->conductorIn[indi].y[indj]]);
-							if (mark1 == 0) {
-
-								break;
-							}
-							ss = xrange[ss];
-						}
-					}
-				}
-			}
-			else if (this->conductorIn[indi].y[indj] != this->conductorIn[indi].y[0] && this->conductorIn[indi].x[indj] != this->conductorIn[indi].x[0]) {   // this edge is with area slope
-				if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
-					ss = xi[this->conductorIn[indi].x[indj]];
-					ee = xi[this->conductorIn[indi].x[0]];
-					if (!(ss == ee && mark1 == 1)) {
-
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {   // if ss is not the last point, loop
-							y3 = (this->conductorIn[indi].x[0] - this->xn[ss]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[indj] + (this->xn[ss] - this->conductorIn[indi].x[indj]) / (this->conductorIn[indi].x[0] - this->conductorIn[indi].x[indj]) * this->conductorIn[indi].y[0];
-							if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
-								y1 = yi[this->conductorIn[indi].y[0]];
-								y2 = yi[this->conductorIn[indi].y[indj]];
-							}
-							else {
-								y1 = yi[this->conductorIn[indi].y[indj]];
-								y2 = yi[this->conductorIn[indi].y[0]];
-							}
-							mini = DOUBLEMAX;
-							mini_k = -1;
-							for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-								if (mini > abs(this->yn[indl] - y3)) {
-									mini = abs(this->yn[indl] - y3);
-									mini_k = indl;
-								}
-							}
-							xcoory[ss].push_back(mini_k);
-							if (mark1 == 0) {   // if this range is the rightmost one, or xrange only has one value, break
-								break;
-							}
-							ss = xrange[ss];
-						}
-					}
-				}
-				else if (this->conductorIn[indi].x[indj] > this->conductorIn[indi].x[0]) {
-					ss = xi[this->conductorIn[indi].x[0]];
-					ee = xi[this->conductorIn[indi].x[indj]];
-					if (!(ss == ee && mark1 == 1)) {
-
-						while (xrange.find(ss) != xrange.end() && xrange[ss] <= ee) {    // if ss is not the last point, loop
-							y3 = (this->conductorIn[indi].x[indj] - this->xn[ss]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[0] + (this->xn[ss] - this->conductorIn[indi].x[0]) / (this->conductorIn[indi].x[indj] - this->conductorIn[indi].x[0]) * this->conductorIn[indi].y[indj];
-							if (this->conductorIn[indi].y[indj] > this->conductorIn[indi].y[0]) {
-								y1 = yi[this->conductorIn[indi].y[0]];
-								y2 = yi[this->conductorIn[indi].y[indj]];
-							}
-							else {
-								y1 = yi[this->conductorIn[indi].y[indj]];
-								y2 = yi[this->conductorIn[indi].y[0]];
-							}
-							mini = DOUBLEMAX;
-							mini_k = -1;
-							for (indl = y1; indl <= y2; indl++) {    // find the closest y to y3
-								if (mini > abs(this->yn[indl] - y3)) {
-									mini = abs(this->yn[indl] - y3);
-									mini_k = indl;
-								}
-							}
-							xcoory[ss].push_back(mini_k);
-							if (mark1 == 0) {
-
-								break;
-							}
-							ss = xrange[ss];
-						}
-					}
-				}
-
-			}
-
+			
 
 			if (mark1 == 0) {    // only has one x
 				for (auto xcooryi : xcoory) {    // only one xcooryi
@@ -1394,6 +1456,12 @@ public:
 						}
 						if (mark % 2 == 0) {
 							y2 = xrangey;
+						}
+
+						if ((y1 == y2 && y1 == 0))   // if y are all on the boundary = 0 we neglect because they may be outside the total structure
+							continue;
+						else if (y1 > y2 && y2 == 0) {
+							y2 = ny - 1;
 						}
 
 						indj = xcooryi.first;
@@ -1436,6 +1504,12 @@ public:
 						y2 = xrangey;
 						//cout << this->yn[y1] << " " << this->yn[y2] << " ";
 						//cout << this->conductorIn[indi].zmax << " " << this->conductorIn[indi].zmin;
+						if (y1 == y2 && y1 == 0)    // if y is on the boundary = 0 this may be they are all outside the total structure
+							continue;
+						else if (y1 > y2 && y2 == 0) {   // if y2 is outside then put y2 as the max position
+							y2 = ny - 1;
+						}
+						
 						for (indj = x1; indj <= x2; indj++) {
 							for (indl = zi[this->conductorIn[indi].zmin]; indl <= zi[this->conductorIn[indi].zmax]; indl++) {
 								for (indk = y1; indk < y2; indk++) {
