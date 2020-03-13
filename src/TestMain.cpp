@@ -234,7 +234,7 @@ int main(int argc, char** argv)
         {
             // Initialize SolverDataBase, mesh, and set variables for performance tracking
             clock_t t1 = clock();
-            tf::Executor executor; // Executor of taskflow
+            tf::Executor executor(1); // Executor of taskflow (optional constructor argument is number of threads, default is thread::hardware_concurrency())
             tf::Taskflow taskflow; // Taskflow graph
             AsciiDataBase adb;
             SolverDataBase sdb;
@@ -398,6 +398,7 @@ int main(int argc, char** argv)
             tf::Task taskJ = taskflow.emplace([&](auto &subflow)
             {
                 status = paraGenerator(&sys, subflow);
+                //sys.x.assign(sys.numPorts * sys.numPorts * sys.nfreq, complex<double>(1., 0.)); // Fake data of resistive network to get overhead when timing
                 if (status == 0)
                 {
                     cout << "paraGenerator dynamic tasking Success!" << endl;

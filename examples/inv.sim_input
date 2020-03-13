@@ -30,5 +30,6 @@ numStack = 17
 163 z = 6.53 h = 1.00 e = 3.9 # Michael added this
 
 PORT
-numPort = 1
-port1 23.0 70.0 4.53 23.0 6.00 4.53 -1
+numPort = 2
+port1 23.0 68.5 4.53 23.0 10.0 4.53 -1
+port2 5.50 54.5 4.53 5.50 10.0 4.53 +1

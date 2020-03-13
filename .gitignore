@@ -32,6 +32,7 @@
 *.app
 
 # Repository-specific files
+*.log
 *_log.txt
 *_out.txt
 *_parrot.gds
