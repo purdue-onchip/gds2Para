@@ -494,15 +494,15 @@ int generateStiff(fdtdMesh *sys){
     SeRowIdn = (myint*)malloc(Senum * sizeof(myint));   // SeRowIdn has the exact memory of the nnz of Se
     Sevaln = (double*)malloc(Senum * sizeof(double));   // Sevaln has the exact memory of the nnz of Se
 	ofstream out;
-	out.open("Se.txt", ofstream::out | ofstream::trunc);
+	//out.open("Se.txt", ofstream::out | ofstream::trunc);
     for (ind = 0; ind < Senum; ind++){
         SeColIdo[ind] = SeColId[ind];
         SeRowIdn[ind] = SeRowId[ind];
         Sevaln[ind] = Seval[ind];
-		out << SeRowId[ind] + 1 << " " << SeColId[ind] + 1 << " ";
-		out << setprecision(15) << Seval[ind] << endl;
+		//out << SeRowId[ind] + 1 << " " << SeColId[ind] + 1 << " ";
+		//out << setprecision(15) << Seval[ind] << endl;
     }
-	out.close();
+	//out.close();
     free(SeRowId); SeRowId = NULL;
     free(Seval); Seval = NULL;
     free(SeColId); SeColId = (myint*)malloc((leng_Se + 1) * sizeof(myint));
@@ -512,15 +512,15 @@ int generateStiff(fdtdMesh *sys){
     ShColIdo = (myint*)malloc(Shnum * sizeof(myint));
     ShRowIdn = (myint*)malloc(Shnum * sizeof(myint));   // ShRowIdn has the exact memory of the nnz of Sh
     Shvaln = (double*)malloc(Shnum * sizeof(double));   // Shvaln has the exact memory of the nnz of Sh
-	out.open("Sh.txt", ofstream::out | ofstream::trunc);
+	//out.open("Sh.txt", ofstream::out | ofstream::trunc);
     for (ind = 0; ind < Shnum; ind++){
         ShColIdo[ind] = ShColId[ind];
         ShRowIdn[ind] = ShRowId[ind];
         Shvaln[ind] = Shval[ind];
-		out << ShRowId[ind] + 1 << " " << ShColId[ind] + 1 << " ";
-		out << setprecision(15) << Shval[ind] << endl;
+		//out << ShRowId[ind] + 1 << " " << ShColId[ind] + 1 << " ";
+		//out << setprecision(15) << Shval[ind] << endl;
     }
-	out.close();
+	//out.close();
     free(ShRowId); ShRowId = NULL;
     free(Shval); Shval = NULL;
     free(ShColId); ShColId = (myint*)malloc((leng_Sh + 1) * sizeof(myint));
@@ -556,7 +556,7 @@ int generateStiff(fdtdMesh *sys){
 }
 
 
-int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val){
+int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val, complex<double>* xsol){
 
     
     double freq = sys->freqNo2freq(freqNo);
@@ -597,11 +597,11 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
                 if (sys->markEdge[sys->mapEdgeR[RowId[indi]]] != 0) {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->getEps(sys->mapEdgeR[RowId[indi]]), SIGMA);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
                 else {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->getEps(sys->mapEdgeR[RowId[indi]]), 0);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
             }
@@ -646,7 +646,7 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     complex<double> *xr;
     complex<double> * ddum;
     xr = (complex<double>*)calloc((sys->N_edge - sys->bden) * sys->numPorts, sizeof(complex<double>));
-
+	
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, valc, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, J, xr, &error);
     if (error != 0){
         printf("\nERROR during numerical factorization: %d", error);
@@ -664,12 +664,13 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     phase = -1;     // Release internal memory
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
 
-    /*cout << "The entire norm of xr is ";
-    double total_norm = 0;
+    cout << "The entire solution error is ";
+    double total_norm = 0, diff_norm = 0;
     for (indi = 0; indi < size; indi++) {
         total_norm += xr[indi].real() * xr[indi].real() + xr[indi].imag() * xr[indi].imag();
+		diff_norm += pow((xr[indi].real() - xsol[indi].real()), 2) + pow((xr[indi].imag() - xsol[indi].imag()), 2);
     }
-    cout << sqrt(total_norm) << endl;*/
+    cout << sqrt(diff_norm) / sqrt(total_norm) << endl;
 
     
 
@@ -886,9 +887,9 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         col_val.push_back(make_pair(AcolId[i], Aval[i]));
     }
     ofstream out;
-    out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
+    //out.open("S.txt", std::ofstream::out | std::ofstream::trunc);
     for (myint i = 0; i < ARows; i++){
-        if (sys->lbde.find(i) != sys->lbde.end() || sys->ubde.find(i) != sys->ubde.end()){   // if this row number is among the upper or lower boundary edges
+        if (sys->mapEdge[i] == -1){   // if this row number is among the removed edges
             continue;
         }
         num = ArowEnd[i] - ArowStart[i];
@@ -896,22 +897,24 @@ int mklMatrixMulti_nt(fdtdMesh *sys, myint &leng_A, myint *aRowId, myint *aColId
         vector<pair<myint, double>> v(col_val.begin() + ArowStart[i], col_val.begin() + ArowEnd[i]);
         sort(v.begin(), v.end());
         while (count < num){
-            if (sys->lbde.find(v[count].first) != sys->lbde.end() || sys->ubde.find(v[count].first) != sys->ubde.end()) {   // if this column number is among the upper or lower boundary edges
+            if (sys->mapEdge[v[count].first] == -1) {   // if this column number is among the removed edges
                 count++;
                 continue;
             }
             sys->SRowId[j] = sys->mapEdge[i];
             sys->SColId[j] = sys->mapEdge[v[count].first];
             sys->Sval[j] = v[count].second / MU;
-            out << sys->SRowId[j] + 1 << " " << sys->SColId[j] + 1 << " ";
-            out << setprecision(15) << sys->Sval[j] << endl;
+			if (sys->SRowId[j] == -1)
+				cout << "Wrong in generating S!\n";
+            //out << sys->SRowId[j] + 1 << " " << sys->SColId[j] + 1 << " ";
+            //out << setprecision(15) << sys->Sval[j] << endl;
 
             j++;
             count++;
         }
         v.clear();
     }
-    out.close();
+    //out.close();
 	cout << "S is generated!\n";
     leng_A = j;
 
@@ -1411,9 +1414,9 @@ int sparse_mv(int index, myint* RowId, myint* ColId, double* val, myint leng, do
 	return 0;
 }
 
-int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double *val) {
+int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double *val, double* xsol) {
 
-
+	ofstream out;
 	double freq = sys->freqNo2freq(freqNo);
 	myint size = sys->outside;
 	//myint *RowId1 = (myint*)malloc((size + 1) * sizeof(myint));
@@ -1523,27 +1526,33 @@ int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double 
 	myint nedge = sys->N_edge - sys->bden;
 	yr = (complex<double>*)calloc(nedge * sys->numPorts, sizeof(complex<double>));
 	int ip;
-	for (ip = 0; ip < sourcePort; ip++) {
+	for (ip = 0; ip < sys->numPorts; ip++) {
 		for (indi = 0; indi < size; ++indi) {
-			yr[sys->mapioR[indi] + ip*nedge] = 1i * xr[indi + ip*size];
+			yr[sys->mapioR[indi] + ip*nedge] = 1i * xr[indi + ip * size];
 		}
 	}
 
-	for (indi = 0; indi < sourcePort; indi++)
+	for (indi = 0; indi < sys->numPorts; indi++)
 		sys->Construct_Z_V0_Vh(&yr[indi * nedge], freqNo, indi);
 
 	phase = -1;     // Release internal memory
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, RowId1, ColId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
 
-	/*cout << "The entire norm of xr is ";
-	double total_norm = 0;
-	for (indi = 0; indi < size; indi++) {
-	total_norm += xr[indi].real() * xr[indi].real() + xr[indi].imag() * xr[indi].imag();
+	double residual = 0, xrnorm = 0;
+	//out.open("xr.txt", ofstream::out | ofstream::trunc);
+	for (indi = 0; indi < size; ++indi) {
+		//out << xr[(sys->numPorts - 1) * size + indi] << endl;//.real() << " " << yr[(sys->numPorts - 1) * nedge + indi].imag() << endl;
+		residual += pow((xr[(sys->numPorts - 1) * size + indi] - xsol[indi]), 2);
+		xrnorm += pow(xr[(sys->numPorts - 1) * size + indi], 2);
 	}
-	cout << sqrt(total_norm) << endl;*/
+	//out.close();
+	cout << "norm(x-xr)/norm(xr) is " << sqrt(residual) / sqrt(xrnorm) << endl;
 
-
-
+	//out.open("yr1.txt", ofstream::out | ofstream::trunc);
+	//for (indi = 0; indi < nedge; ++indi) {
+	//	out << yr[(sourcePort - 1) * nedge + indi].real() << " " << yr[(sourcePort - 1) * nedge + indi].imag() << endl;
+	//}
+	//out.close();
 
 	free(xr); xr = NULL;
 	free(yr); yr = NULL;

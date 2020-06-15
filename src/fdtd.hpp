@@ -33,8 +33,9 @@ typedef long long int myint;
 #else
 typedef int myint;
 #endif
-#include <mkl.h>
 #include <mkl_spblas.h>
+#include <mkl.h>
+
 
 // Manipulate namespace
 using namespace std;
@@ -45,23 +46,24 @@ using namespace std;
 #define EPSILON0 (1./(CSPED*CSPED*MU))
 
 // Solver discretization control macros
-#define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
+#define SIGMA (3.508)  // the load edge sigma //(5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (0.05) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (0.05) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (0.005) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (0.005) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
-#define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
+#define MAXDISLAYERZ (2.)// Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-12) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
 //#define UPPER_BOUNDARY_PEC
 //#define LOWER_BOUNDARY_PEC
+//#define CONDUCTOR_PEC    // all conductor edges are removed
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
-#define SKIP_MARK_CELL
+//#define SKIP_MARK_CELL
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
 //#define PRINT_PORT_SET
 //#define PRINT_V0D_BLOCKS
@@ -333,7 +335,11 @@ public:
 	myint* v0d2aColIdo;
 	double* v0d2aval;
 	double* v0d2avalo;
-	myint leng_v0d1, leng_v0d1a, v0d1num, v0d1anum;
+	myint leng_v0d1, leng_v0d1a, v0d1num, v0d1anum, v0dnum;
+	myint leng_v0d, leng_v0dd;   // leng_v0d is the column number for V0d in V0db, leng_v0dd is the column number for V0d in V0d1
+	myint* v0dbRowId, *v0dbColId, *v0dbColIdo;
+	double* v0dbval, *v0dbaval;
+	myint leng_v0db, v0dbnum, leng_v0db1;
 	myint* mapd;
 
 	double* yd;
@@ -450,6 +456,11 @@ public:
 		this->v0d1aval = NULL;
 		this->v0d1aval1 = NULL;
 		this->v0d1avalo = NULL;
+		this->v0dbRowId = NULL;
+		this->v0dbColId = NULL;
+		this->v0dbColIdo = NULL;
+		this->v0dbval = NULL;
+		this->v0dbaval = NULL;
 		this->v0d2RowId = NULL;
 		this->v0d2ColId = NULL;
 		this->v0d2ColIdo = NULL;
@@ -1840,7 +1851,18 @@ public:
 		this->mapEdge = (myint*)calloc(this->N_edge, sizeof(myint));
 		this->mapEdgeR = (myint*)calloc(this->N_edge - this->bden, sizeof(myint));
 		int ind, count = 0;    // count : how many boundary edges already identified
-
+#ifdef CONDUCTOR_PEC
+		for (int ind = 0; ind < this->N_edge; ++ind) {
+			if (this->markEdge[ind]) {
+				this->mapEdge[ind] = -1;
+				count++;
+			}
+			else {
+				this->mapEdge[ind] = ind - count;
+				this->mapEdgeR[ind - count] = ind;
+			}
+		}
+#else
 		for (ind = 0; ind < this->N_edge; ind++) {
 			if (ind >= 0 && ind < this->N_edge_s && this->lbde.find(ind) != this->lbde.end()) {   // if this edge is on the lower PEC boundary
 				this->mapEdge[ind] = -1;
@@ -1858,6 +1880,7 @@ public:
 		//for (ind = 0; ind < N_edge; ++ind) {
 		//	cout << mapEdge[ind] << " ";
 		//}
+#endif
 	}
 
 	void setMapNode() {
@@ -2254,7 +2277,7 @@ public:
 								node_group.push_back(base);
 								nodegs = node_group.size() - 1;
 								node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
-								mapd[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+								//mapd[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
 								//ind.push_back(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
 								st.push(ix * (this->N_cell_y + 1) + iy);
 								visited[ix * (this->N_cell_y + 1) + iy] = 1;
@@ -2271,7 +2294,7 @@ public:
 												&& ((iz != 0 && iz != this->nz - 1) || (this->lbdn.find(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy) == this->lbdn.end() && this->ubdn.find(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy) == this->ubdn.end()))) {    // this node is in dielectric and this node is not visited, not in the markLayerNode (Projection of the excited conductors), not in the projection side, not among the boundary nodes
 												st.push((indx + 1) * (this->N_cell_y + 1) + indy);
 												visited[(indx + 1) * (this->N_cell_y + 1) + indy] = 1;
-												mapd[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+												//mapd[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
 											}
 										}
@@ -2285,7 +2308,7 @@ public:
 
 												st.push((indx - 1) * (this->N_cell_y + 1) + indy);
 												visited[(indx - 1) * (this->N_cell_y + 1) + indy] = 1;
-												mapd[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
+												//mapd[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy);
 											}
 										}
@@ -2300,7 +2323,7 @@ public:
 
 												st.push((indx) * (this->N_cell_y + 1) + indy + 1);
 												visited[(indx) * (this->N_cell_y + 1) + indy + 1] = 1;
-												mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1] = count;
+												//mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1);
 											}
 										}
@@ -2315,7 +2338,7 @@ public:
 
 												st.push((indx) * (this->N_cell_y + 1) + indy - 1);
 												visited[(indx) * (this->N_cell_y + 1) + indy - 1] = 1;
-												mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1] = count;
+												//mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1);
 											}
 										}
@@ -2333,13 +2356,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2349,13 +2370,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2365,13 +2384,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 
@@ -2382,13 +2399,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2398,13 +2413,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2414,13 +2427,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2434,7 +2445,7 @@ public:
 								startx = this->xn[ix];
 								starty = this->yn[iy];
 
-								mapd[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+								//mapd[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
 								st.push(ix * (this->N_cell_y + 1) + iy);
 								visited[ix * (this->N_cell_y + 1) + iy] = 1;
 								node_group.push_back(base);
@@ -2455,7 +2466,7 @@ public:
 
 												st.push((indx + 1) * (this->N_cell_y + 1) + indy);
 												visited[(indx + 1) * (this->N_cell_y + 1) + indy] = 1;
-												mapd[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+												//mapd[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
 											}
 										}
@@ -2471,7 +2482,7 @@ public:
 
 												st.push((indx - 1) * (this->N_cell_y + 1) + indy);
 												visited[(indx - 1) * (this->N_cell_y + 1) + indy] = 1;
-												mapd[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
+												//mapd[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy);
 											}
 										}
@@ -2486,7 +2497,7 @@ public:
 
 												st.push((indx) * (this->N_cell_y + 1) + indy + 1);
 												visited[(indx) * (this->N_cell_y + 1) + indy + 1] = 1;
-												mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1] = count;
+												//mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1);
 											}
 										}
@@ -2501,7 +2512,7 @@ public:
 
 												st.push((indx) * (this->N_cell_y + 1) + indy - 1);
 												visited[(indx) * (this->N_cell_y + 1) + indy - 1] = 1;
-												mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1] = count;
+												//mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1);
 											}
 										}
@@ -2519,13 +2530,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2535,13 +2544,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2551,13 +2558,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2567,13 +2572,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2583,13 +2586,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2599,13 +2600,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2620,7 +2619,7 @@ public:
 								startx = this->xn[ix];
 								starty = this->yn[iy];
 
-								mapd[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
+								//mapd[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] = count;
 								st.push(ix * (this->N_cell_y + 1) + iy);
 								visited[ix * (this->N_cell_y + 1) + iy] = 1;
 								node_group.push_back(base);
@@ -2641,7 +2640,7 @@ public:
 
 												st.push((indx + 1) * (this->N_cell_y + 1) + indy);
 												visited[(indx + 1) * (this->N_cell_y + 1) + indy] = 1;
-												mapd[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
+												//mapd[iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx + 1) * (this->N_cell_y + 1) + indy);
 											}
 										}
@@ -2655,7 +2654,7 @@ public:
 
 												st.push((indx - 1) * (this->N_cell_y + 1) + indy);
 												visited[(indx - 1) * (this->N_cell_y + 1) + indy] = 1;
-												mapd[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
+												//mapd[iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx - 1) * (this->N_cell_y + 1) + indy);
 											}
 										}
@@ -2669,7 +2668,7 @@ public:
 
 												st.push((indx) * (this->N_cell_y + 1) + indy + 1);
 												visited[(indx) * (this->N_cell_y + 1) + indy + 1] = 1;
-												mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1] = count;
+												//mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy + 1);
 											}
 										}
@@ -2683,7 +2682,7 @@ public:
 
 												st.push((indx) * (this->N_cell_y + 1) + indy - 1);
 												visited[(indx) * (this->N_cell_y + 1) + indy - 1] = 1;
-												mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1] = count;
+												//mapd[iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1] = count;
 												node_group[nodegs].insert(iz * this->N_node_s + (indx) * (this->N_cell_y + 1) + indy - 1);
 											}
 										}
@@ -2700,13 +2699,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2716,13 +2713,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2732,13 +2727,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2748,13 +2741,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2764,13 +2755,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2780,13 +2769,11 @@ public:
 										if (node1 != ndi) {
 											if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 										else if (node2 != ndi) {
 											if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
 												v0d1num++;
-												v0d1anum++;
 											}
 										}
 									}
@@ -2800,97 +2787,187 @@ public:
 			}
 			free(visited); visited = NULL;
 		}
-
+		leng_v0dd = leng_v0d1;
 		/* V0d2 generation */
 		myint indj;
 		myint inz, inx, iny;
 		myint iz, ix, iy;
 		queue<myint> qu;
-		visited = (int*)calloc(this->N_node, sizeof(int));
+		//visited = (int*)calloc(this->N_node, sizeof(int));
 		t2 = clock();
 
 		int markref = 0;   // mark is one reference conductor is excluded in V0d2
+		//for (indi = 0; indi < this->numCdt; indi++) {
+		//	//cout << this->conductor[indi].markPort << " ";
+		//	if (this->conductor[indi].markPort <= -1 && markref == 0) {   // if this conductor is the reference conductor, no V0d2 corresponding to it
+		//		markref = 1;
+		//		continue;
+		//	}
+		//	else {
+		//		mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
+		//		//v.clear();
+		//		//va.clear();
+		//		for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+		//			mapd[this->conductor[indi].node[indj]] = count;
+		//			iz = this->conductor[indi].node[indj] / this->N_node_s;
+		//			ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+		//			iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+		//			avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+		//			if (iz != 0) {    // this node is not on the bottom plane
+		//				eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+		//				if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+		//					v0d1num++;
+		//					v0d1anum++;
+		//					mark = 1;
+		//				}
+		//			}
+		//			if (iz != this->nz - 1) {   // this node is not on the top plane
+		//				eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+		//				if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//					v0d1num++;
+		//					v0d1anum++;
+		//					mark = 1;
+		//				}
+		//			}
+		//			if (ix != 0) {    // this node is not on the left plane
+		//				eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+		//				if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//					v0d1num++;
+		//					v0d1anum++;
+		//					mark = 1;
+		//				}
+		//			}
+		//			if (ix != this->nx - 1) {    // this node is not on the right plane
+		//				eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+		//				if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//					v0d1num++;
+		//					v0d1anum++;
+		//					mark = 1;
+		//				}
+		//			}
+		//			if (iy != 0) {    // this node is not on the front plane
+		//				eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+		//				if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//					v0d1num++;
+		//					v0d1anum++;
+		//					mark = 1;
+		//				}
+		//			}
+		//			if (iy != this->ny - 1) {   // this node is not on the back plane
+		//				eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+		//				if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//					v0d1num++;
+		//					v0d1anum++;
+		//					mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+		//				}
+		//			}
+		//		}
+		//		if (mark == 1) {
+		//			leng_v0d1++;
+		//			count++;
+		//		}
+
+		//	}
+		//}
+
+		/* V0b generation */
+		visited = (int*)calloc(this->N_node, sizeof(int));
 		for (indi = 0; indi < this->numCdt; indi++) {
-			//cout << this->conductor[indi].markPort << " ";
-			if (this->conductor[indi].markPort <= -1 && markref == 0) {   // if this conductor is the reference conductor, no V0d2 corresponding to it
-				markref = 1;
-				continue;
-			}
-			else {
-				mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
-				//v.clear();
-				//va.clear();
-				for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
-					mapd[this->conductor[indi].node[indj]] = count;
-					iz = this->conductor[indi].node[indj] / this->N_node_s;
-					ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
-					iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
-					avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+				iz = this->conductor[indi].node[indj] / this->N_node_s;
+				ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+				iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+				avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+				mark = 0;
+
+				if (iz != 0) {    // this node is not on the bottom plane
+					eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+					if (this->markEdge[eno] == 0) {    // this edge is in the dielectric
+						mark = 1;
+					}
+				}
+				if (iz != this->nz - 1) {   // this node is not on the top plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+					if (this->markEdge[eno] == 0) {
+						mark = 1;
+					}
+				}
+				if (ix != 0) {    // this node is not on the left plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+					if (this->markEdge[eno] == 0) {
+						mark = 1;
+					}
+				}
+				if (ix != this->nx - 1) {    // this node is not on the right plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+					if (this->markEdge[eno] == 0) {
+						mark = 1;
+					}
+				}
+				if (iy != 0) {    // this node is not on the front plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+					if (this->markEdge[eno] == 0) {
+						mark = 1;
+					}
+				}
+				if (iy != this->ny - 1) {   // this node is not on the back plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+					if (this->markEdge[eno] == 0) {
+						mark = 1;
+					}
+				}
+
+				if (mark == 1) {
 					if (iz != 0) {    // this node is not on the bottom plane
 						eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
-						if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+						if (this->markEdge[eno] == 0) {    // this edge is in the dielectric; the other node is outside the conductor
 							v0d1num++;
-							v0d1anum++;
-							mark = 1;
 						}
 					}
 					if (iz != this->nz - 1) {   // this node is not on the top plane
 						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
-						if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+						if (this->markEdge[eno] == 0) {
 							v0d1num++;
-							v0d1anum++;
-							mark = 1;
 						}
 					}
 					if (ix != 0) {    // this node is not on the left plane
 						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
-						if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+						if (this->markEdge[eno] == 0) {
 							v0d1num++;
-							v0d1anum++;
-							mark = 1;
 						}
 					}
 					if (ix != this->nx - 1) {    // this node is not on the right plane
 						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
-						if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+						if (this->markEdge[eno] == 0) {
 							v0d1num++;
-							v0d1anum++;
-							mark = 1;
 						}
 					}
 					if (iy != 0) {    // this node is not on the front plane
 						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
-						if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+						if (this->markEdge[eno] == 0) {
 							v0d1num++;
-							v0d1anum++;
-							mark = 1;
 						}
 					}
 					if (iy != this->ny - 1) {   // this node is not on the back plane
 						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
-						if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+						if (this->markEdge[eno] == 0) {
 							v0d1num++;
-							v0d1anum++;
-							mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
 						}
 					}
-				}
-				if (mark == 1) {
 					leng_v0d1++;
-					count++;
 				}
-
 			}
 		}
+
 
 		/* Sparse matrix construction for V0d1 */
 		this->v0d1RowId = (myint*)malloc(v0d1num * sizeof(myint));
 		this->v0d1ColId = (myint*)malloc(v0d1num * sizeof(myint));
 		this->v0d1val = (double*)malloc(v0d1num * sizeof(double));
-		this->v0d1aval = (double*)malloc(v0d1anum * sizeof(double));
-		this->v0d1aval1 = (double*)malloc(v0d1anum * sizeof(double));
-		this->v0dn = (double*)calloc(leng_v0d1, sizeof(double));
-		this->v0dan = (double*)calloc(leng_v0d1, sizeof(double));
+		this->v0d1aval = (double*)malloc(v0d1num * sizeof(double));
+		this->v0d1aval1 = (double*)malloc(v0d1num * sizeof(double));
+		//this->v0dn = (double*)calloc(leng_v0d1, sizeof(double));
+		//this->v0dan = (double*)calloc(leng_v0d1, sizeof(double));
 
 		double lx_whole_avg = 0;
 		double ly_whole_avg = 0;
@@ -2901,7 +2978,6 @@ public:
 		leng_v0d1 = 0;
 		leng_v0d1a = 0;
 		v0d1num = 0;
-		v0d1anum = 0;
 		for (nodegs = 0; nodegs < node_group.size(); nodegs++) {
 			for (auto ndi : node_group[nodegs]) {
 				iz = ndi / (this->N_node_s);
@@ -2916,12 +2992,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							this->v0d1aval[v0d1num] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = -1 / lz_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = -1 / lz_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
-							v0d1anum++;
 						}
 					}
 					else if (node2 != ndi) {
@@ -2929,12 +3004,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							this->v0d1aval[v0d1num] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = -1 / lz_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = -1 / lz_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
-							v0d1anum++;
 						}
 					}
 				}
@@ -2946,12 +3020,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							this->v0d1aval[v0d1num] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = 1 / lz_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = 1 / lz_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
-							v0d1anum++;
 						}
 					}
 					else if (node2 != ndi) {
@@ -2959,12 +3032,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							this->v0d1aval[v0d1num] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = 1 / lz_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = 1 / lz_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lz_avg, 2);
-							v0d1anum++;
 						}
 					}
 				}
@@ -2976,12 +3048,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
+							this->v0d1aval[v0d1num] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = -1 / lx_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = -1 / lx_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
-							v0d1anum++;
 						}
 					}
 					else if (node2 != ndi) {
@@ -2989,12 +3060,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->xn[indx] - this->xn[indx - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
+							this->v0d1aval[v0d1num] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = -1 / lx_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = -1 / lx_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
-							v0d1anum++;
 						}
 					}
 				}
@@ -3006,12 +3076,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
+							this->v0d1aval[v0d1num] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = 1 / lx_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = 1 / lx_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
-							v0d1anum++;
 						}
 					}
 					else if (node2 != ndi) {
@@ -3019,12 +3088,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = 1 / (this->xn[indx + 1] - this->xn[indx]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
+							this->v0d1aval[v0d1num] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = 1 / lx_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = 1 / lx_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / lx_avg, 2);
-							v0d1anum++;
 						}
 					}
 				}
@@ -3036,12 +3104,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
+							this->v0d1aval[v0d1num] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = -1 / ly_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = -1 / ly_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
-							v0d1anum++;
 						}
 					}
 					else if (node2 != ndi) {
@@ -3049,12 +3116,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = -1 / (this->yn[indy] - this->yn[indy - 1]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
+							this->v0d1aval[v0d1num] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = -1 / ly_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = -1 / ly_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
-							v0d1anum++;
 						}
 					}
 				}
@@ -3066,12 +3132,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
+							this->v0d1aval[v0d1num] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = 1 / ly_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = 1 / ly_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
-							v0d1anum++;
 						}
 					}
 					else if (node2 != ndi) {
@@ -3079,12 +3144,11 @@ public:
 							this->v0d1RowId[v0d1num] = eno;
 							this->v0d1ColId[v0d1num] = leng_v0d1;
 							this->v0d1val[v0d1num] = 1 / (this->yn[indy + 1] - this->yn[indy]);
-							this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
+							//this->v0dn[leng_v0d1] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
+							this->v0d1aval[v0d1num] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0d1aval1[v0d1num] = 1 / ly_avg / MU;
+							//this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
 							v0d1num++;
-							this->v0d1aval[v0d1anum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
-							this->v0d1aval1[v0d1anum] = 1 / ly_avg / MU;
-							this->v0dan[leng_v0d1] += pow(1 / ly_avg, 2);
-							v0d1anum++;
 						}
 					}
 				}
@@ -3096,114 +3160,233 @@ public:
 		markref = 0;
 		double scalar = 1;   // debug use : check with scalar is better
 		/* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
+		//for (indi = 0; indi < this->numCdt; indi++) {
+		//	//cout << "Conductor " << indi << " markPort is " << conductor[indi].markPort << endl;
+		//	if (this->conductor[indi].markPort <= -1 && markref == 0) {
+		//		markref = 1;
+		//		continue;
+		//	}
+		//	start = v0d1num;
+		//	mark = 0;
+		//	myint cnode = this->cdtNumNode[indi];
+		//	for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+		//		
+		//		iz = this->conductor[indi].node[indj] / this->N_node_s;
+		//		ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+		//		iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+		//		avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+		//		if (iz != 0) {    // this node is not on the bottom plane
+		//			eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+		//			if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
+		//				this->v0d1RowId[v0d1num] = eno;
+		//				this->v0d1ColId[v0d1num] = leng_v0d1;
+		//				this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+		//				v0d1num++;
+		//				this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / lz_avg;
+		//				this->v0d1aval1[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / lz_avg / MU;
+		//				v0d1anum++;
+		//				mark = 1;
+		//			}
+		//		}
+		//		if (iz != this->nz - 1) {   // this node is not on the top plane
+		//			eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+		//			if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//				this->v0d1RowId[v0d1num] = eno;
+		//				this->v0d1ColId[v0d1num] = leng_v0d1;
+		//				this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+		//				v0d1num++;
+		//				this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / lz_avg;
+		//				this->v0d1aval1[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / lz_avg / MU;
+		//				v0d1anum++;
+		//				mark = 1;
+		//			}
+		//		}
+		//		if (ix != 0) {    // this node is not on the left plane
+		//			eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+		//			if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//				this->v0d1RowId[v0d1num] = eno;
+		//				this->v0d1ColId[v0d1num] = leng_v0d1;
+		//				this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
+		//				v0d1num++;
+		//				this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / lx_avg;
+		//				this->v0d1aval1[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / lx_avg / MU;
+		//				v0d1anum++;
+		//				mark = 1;
+		//			}
+		//		}
+		//		if (ix != this->nx - 1) {    // this node is not on the right plane
+		//			eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+		//			if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//				this->v0d1RowId[v0d1num] = eno;
+		//				this->v0d1ColId[v0d1num] = leng_v0d1;
+		//				this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
+		//				v0d1num++;
+		//				this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / lx_avg;
+		//				this->v0d1aval1[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / lx_avg / MU;
+		//				v0d1anum++;
+		//				mark = 1;
+		//			}
+		//		}
+		//		if (iy != 0) {    // this node is not on the front plane
+		//			eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+		//			if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//				this->v0d1RowId[v0d1num] = eno;
+		//				this->v0d1ColId[v0d1num] = leng_v0d1;
+		//				this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
+		//				v0d1num++;
+		//				this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / ly_avg;
+		//				this->v0d1aval1[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / ly_avg / MU;
+		//				v0d1anum++;
+		//				mark = 1;
+		//			}
+		//		}
+		//		if (iy != this->ny - 1) {   // this node is not on the back plane
+		//			eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+		//			if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
+		//				this->v0d1RowId[v0d1num] = eno;
+		//				this->v0d1ColId[v0d1num] = leng_v0d1;
+		//				this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
+		//				v0d1num++;
+		//				this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / ly_avg;
+		//				this->v0d1aval1[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / ly_avg / MU;
+		//				v0d1anum++;
+		//				mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+		//			}
+		//		}
+		//	}
+		//	
+		//	if (mark == 1) {
+		//		for (indj = start; indj < v0d1num; indj++) {
+		//			this->v0dn[leng_v0d1] += pow(this->v0d1val[indj], 2);
+		//			this->v0dan[leng_v0d1] += pow(this->v0d1aval[indj], 2);
+		//		}
+		//		leng_v0d1++;
+		//		leng_v0d1a++;
+		//	}
+		//}
+
 		for (indi = 0; indi < this->numCdt; indi++) {
-			//cout << "Conductor " << indi << " markPort is " << conductor[indi].markPort << endl;
-			if (this->conductor[indi].markPort <= -1 && markref == 0) {
-				markref = 1;
-				continue;
-			}
-			start = v0d1num;
-			mark = 0;
-			myint cnode = this->cdtNumNode[indi];
 			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
-				
+				mark = 0;
 				iz = this->conductor[indi].node[indj] / this->N_node_s;
 				ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
 				iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
 				avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+
 				if (iz != 0) {    // this node is not on the bottom plane
 					eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
-					if (this->markEdge[eno] == 0 && this->markNode[(iz - 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {    // this edge is in the dielectric
-						this->v0d1RowId[v0d1num] = eno;
-						this->v0d1ColId[v0d1num] = leng_v0d1;
-						this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
-						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / lz_avg;
-						this->v0d1aval1[v0d1anum] = -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / lz_avg / MU;
-						v0d1anum++;
+					if (this->markEdge[eno] == 0) {    // this edge is in the dielectric
 						mark = 1;
 					}
 				}
 				if (iz != this->nz - 1) {   // this node is not on the top plane
 					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
-					if (this->markEdge[eno] == 0 && this->markNode[(iz + 1) * this->N_node_s + ix * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-						this->v0d1RowId[v0d1num] = eno;
-						this->v0d1ColId[v0d1num] = leng_v0d1;
-						this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
-						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / lz_avg;
-						this->v0d1aval1[v0d1anum] = lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / lz_avg / MU;
-						v0d1anum++;
+					if (this->markEdge[eno] == 0) {
 						mark = 1;
 					}
 				}
 				if (ix != 0) {    // this node is not on the left plane
 					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
-					if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix - 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-						this->v0d1RowId[v0d1num] = eno;
-						this->v0d1ColId[v0d1num] = leng_v0d1;
-						this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
-						v0d1num++;
-						this->v0d1aval[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / lx_avg;
-						this->v0d1aval1[v0d1anum] = -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / lx_avg / MU;
-						v0d1anum++;
+					if (this->markEdge[eno] == 0) {
 						mark = 1;
 					}
 				}
 				if (ix != this->nx - 1) {    // this node is not on the right plane
 					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
-					if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + (ix + 1) * (this->N_cell_y + 1) + iy] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-						this->v0d1RowId[v0d1num] = eno;
-						this->v0d1ColId[v0d1num] = leng_v0d1;
-						this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
-						v0d1num++;
-						this->v0d1aval[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / lx_avg;
-						this->v0d1aval1[v0d1anum] = ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / lx_avg / MU;
-						v0d1anum++;
+					if (this->markEdge[eno] == 0) {
 						mark = 1;
 					}
 				}
 				if (iy != 0) {    // this node is not on the front plane
 					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
-					if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy - 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-						this->v0d1RowId[v0d1num] = eno;
-						this->v0d1ColId[v0d1num] = leng_v0d1;
-						this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
-						v0d1num++;
-						this->v0d1aval[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// -1 / ly_avg;
-						this->v0d1aval1[v0d1anum] = -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// -1 / ly_avg / MU;
-						v0d1anum++;
+					if (this->markEdge[eno] == 0) {
 						mark = 1;
 					}
 				}
 				if (iy != this->ny - 1) {   // this node is not on the back plane
 					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
-					if (this->markEdge[eno] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy + 1] != this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy]) {
-						this->v0d1RowId[v0d1num] = eno;
-						this->v0d1ColId[v0d1num] = leng_v0d1;
-						this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
-						v0d1num++;
-						this->v0d1aval[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / scalar;// 1 / ly_avg;
-						this->v0d1aval1[v0d1anum] = lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg) / MU;// 1 / ly_avg / MU;
-						v0d1anum++;
-						mark = 1;    // mark = 1 means that V0d1 has entries for this conductor, leng_v0d will increase by 1
+					if (this->markEdge[eno] == 0) {
+						mark = 1;
 					}
 				}
-			}
-			
-			if (mark == 1) {
-				for (indj = start; indj < v0d1num; indj++) {
-					this->v0dn[leng_v0d1] += pow(this->v0d1val[indj], 2);
-					this->v0dan[leng_v0d1] += pow(this->v0d1aval[indj], 2);
+
+				if (mark == 1) {
+					if (iz != 0) {    // this node is not on the bottom plane
+						eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+						if (this->markEdge[eno] == 0) {    // this edge is in the dielectric and the other node is outside the conductor
+							this->v0d1RowId[v0d1num] = eno;
+							this->v0d1ColId[v0d1num] = leng_v0d1;
+							this->v0d1val[v0d1num] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+							this->v0d1aval[v0d1num] = -1 / lz_avg;
+							v0d1num++;
+						}
+					}
+					if (iz != this->nz - 1) {   // this node is not on the top plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+						if (this->markEdge[eno] == 0) {
+							this->v0d1RowId[v0d1num] = eno;
+							this->v0d1ColId[v0d1num] = leng_v0d1;
+							this->v0d1val[v0d1num] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+							this->v0d1aval[v0d1num] = 1 / lz_avg;
+
+							v0d1num++;
+						}
+					}
+					if (ix != 0) {    // this node is not on the left plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+						if (this->markEdge[eno] == 0) {
+							this->v0d1RowId[v0d1num] = eno;
+							this->v0d1ColId[v0d1num] = leng_v0d1;
+							this->v0d1val[v0d1num] = -1 / (this->xn[ix] - this->xn[ix - 1]);
+							this->v0d1aval[v0d1num] = -1 / lx_avg;
+
+							v0d1num++;
+						}
+					}
+					if (ix != this->nx - 1) {    // this node is not on the right plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+						if (this->markEdge[eno] == 0) {
+							this->v0d1RowId[v0d1num] = eno;
+							this->v0d1ColId[v0d1num] = leng_v0d1;
+							this->v0d1val[v0d1num] = 1 / (this->xn[ix + 1] - this->xn[ix]);
+							this->v0d1aval[v0d1num] = 1 / lx_avg;
+
+							v0d1num++;
+						}
+					}
+					if (iy != 0) {    // this node is not on the front plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+						if (this->markEdge[eno] == 0) {
+							this->v0d1RowId[v0d1num] = eno;
+							this->v0d1ColId[v0d1num] = leng_v0d1;
+							this->v0d1val[v0d1num] = -1 / (this->yn[iy] - this->yn[iy - 1]);
+							this->v0d1aval[v0d1num] = -1 / ly_avg;
+
+							v0d1num++;
+						}
+					}
+					if (iy != this->ny - 1) {   // this node is not on the back plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+						if (this->markEdge[eno] == 0) {
+							this->v0d1RowId[v0d1num] = eno;
+							this->v0d1ColId[v0d1num] = leng_v0d1;
+							this->v0d1val[v0d1num] = 1 / (this->yn[iy + 1] - this->yn[iy]);
+							this->v0d1aval[v0d1num] = 1 / ly_avg;
+
+							v0d1num++;
+						}
+					}
+					leng_v0d1++;
 				}
-				leng_v0d1++;
-				leng_v0d1a++;
 			}
 		}
-		for (indj = 0; indj < leng_v0d1; ++indj) {   // when using the frequency domain schema should not normalize the vectors
-			this->v0dn[indj] = 1;// sqrt(this->v0dn[indj]);
-			this->v0dan[indj] = 1;// sqrt(this->v0dan[indj]);
-		}
+
+
+		//for (indj = 0; indj < leng_v0d1; ++indj) {   // when using the frequency domain schema should not normalize the vectors
+		//	this->v0dn[indj] = sqrt(this->v0dn[indj]);
+		//	this->v0dan[indj] = sqrt(this->v0dan[indj]);
+		//}
+
 		//ofstream out;
 		//out.open("V0d.txt", std::ofstream::out | std::ofstream::trunc);
 		//for (indi = 0; indi < v0d1num; indi++) {
@@ -3220,6 +3403,1102 @@ public:
 		node_group.clear();
 	}
 
+	void merge_v0d1_outside() {
+		/* generate V0d on the dielectric nodes and the conductor boundary nodes */
+		int* visited;
+		clock_t t1;
+		double t, ta;
+		double ratio;
+		double startx, starty;    // the start coordinates of each block
+
+		int indsize;
+		myint indi = 0;
+		int indx, indy;
+		int mark;
+		int indnum;
+		int* markLayerNode = (int*)calloc(this->N_node_s, sizeof(int));
+
+		leng_v0db = 0;
+		v0dbnum = 0;
+
+		/* V0d1 generation */
+		int count = 1;    /* count which box it is */
+		clock_t t2 = clock();
+		unordered_map<myint, double> va, v;
+		vector<set<myint>> node_group;
+		set<myint> base;
+		myint eno, nno;
+		double lx_avg, ly_avg, lz_avg;
+		t = 0.;
+		ta = 0.;
+		myint node1, node2;
+		int nodegs;   // node group #
+		for (int iz = 0; iz < this->nz; iz++) {    // merge on each layer
+			visited = (int*)calloc(this->nx * this->ny, sizeof(int));
+			for (int ix = 0; ix < this->nx; ix++) {
+				for (int iy = 0; iy < this->ny; iy++) {
+					nno = iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy;
+					if ((iz != 0 && iz != this->nz - 1) || (this->lbdn.find(nno) == this->lbdn.end() && this->ubdn.find(nno) == this->ubdn.end())) {   // if this node is not boundary node
+						if (visited[ix * (this->N_cell_y + 1) + iy] == 0 && this->markNode[iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy] == 0) {   // if this node is not visited and outside the conductor
+							//mapd[nno] = count;
+							startx = this->xn[ix];
+							starty = this->yn[iy];
+							node_group.push_back(base);
+							nodegs = node_group.size() - 1;
+							node_group[nodegs].insert(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+							//ind.push_back(iz * this->N_node_s + ix * (this->N_cell_y + 1) + iy);
+							visited[ix * (this->N_cell_y + 1) + iy] = 1;
+
+
+							for (auto ndi : node_group[nodegs]) {
+								indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+								indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+								avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+								if (iz != 0) {    // this node is not on the bottom plane
+									eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+									compute_edgelink(eno, node1, node2);
+									if (node1 != ndi) {
+										if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+									else if (node2 != ndi) {
+										if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+								}
+								if (iz != this->nz - 1) {   // this node is not on the top plane
+									eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+									compute_edgelink(eno, node1, node2);
+									if (node1 != ndi) {
+										if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+									else if (node2 != ndi) {
+										if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+								}
+								if (indx != 0) {    // this node is not on the left plane
+									eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+									compute_edgelink(eno, node1, node2);
+									if (node1 != ndi) {
+										if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+									else if (node2 != ndi) {
+										if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+
+								}
+								if (indx != this->nx - 1) {    // this node is not on the right plane
+									eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+									compute_edgelink(eno, node1, node2);
+									if (node1 != ndi) {
+										if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+									else if (node2 != ndi) {
+										if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+								}
+								if (indy != 0) {    // this node is not on the front plane
+									eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+									compute_edgelink(eno, node1, node2);
+									if (node1 != ndi) {
+										if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+									else if (node2 != ndi) {
+										if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+								}
+								if (indy != this->ny - 1) {   // this node is not on the back plane
+									eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+									compute_edgelink(eno, node1, node2);
+									if (node1 != ndi) {
+										if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+									else if (node2 != ndi) {
+										if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+											v0dbnum++;
+										}
+									}
+								}
+							}
+							leng_v0db++;
+
+							count++;
+						}
+					}
+				}
+			}
+			free(visited); visited = NULL;
+		}
+		
+		
+
+		/* V0b generation */
+		myint indj;
+		myint inz, inx, iny;
+		myint iz, ix, iy;
+		visited = (int*)calloc(this->N_node, sizeof(int));
+		//t2 = clock();
+		int markfirst = 0;
+		int counts = 0, ed;
+		vector<int> markedge(N_edge, 0);    // mark the shared edges if it is already counted
+		for (indi = 0; indi < this->numCdt; indi++) {
+			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+				iz = this->conductor[indi].node[indj] / this->N_node_s;
+				ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+				iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+				avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+				mark = 0;
+				counts = 0;
+				if (iz != 0) {    // this node is not on the bottom plane
+					eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+					myint nno = this->conductor[indi].node[indj] - this->N_node_s;   // the lower node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {    // this edge is in the dielectric; the other node connects new conductors or the dielectric node
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (iz != this->nz - 1) {   // this node is not on the top plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+					myint nno = this->conductor[indi].node[indj] + this->N_node_s;   // the upper node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (ix != 0) {    // this node is not on the left plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+					myint nno = this->conductor[indi].node[indj] - this->N_cell_y - 1;   // the left node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (ix != this->nx - 1) {    // this node is not on the right plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+					myint nno = this->conductor[indi].node[indj] + this->N_cell_y + 1;   // the right node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (iy != 0) {    // this node is not on the front plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+					myint nno = this->conductor[indi].node[indj] - 1;   // the front node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (iy != this->ny - 1) {   // this node is not on the back plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+					myint nno = this->conductor[indi].node[indj] + 1;   // the back node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;  
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+
+				if (mark == 1 || counts == 1) {   // if this node is not redundant
+					if (markfirst == 0)   // remove the first node because there is one redundant
+					{
+						markfirst = 1;
+						continue;
+					}
+					if (counts == 1) {
+						markedge[ed] = 1;
+					}
+					if (iz != 0) {    // this node is not on the bottom plane
+						eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+						if (this->markEdge[eno] == 0) {    // this edge is in the dielectric; the other node is outside the conductor
+							v0dbnum++;
+						}
+					}
+					if (iz != this->nz - 1) {   // this node is not on the top plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+						}
+					}
+					if (ix != 0) {    // this node is not on the left plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+						}
+					}
+					if (ix != this->nx - 1) {    // this node is not on the right plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+						}
+					}
+					if (iy != 0) {    // this node is not on the front plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+						}
+					}
+					if (iy != this->ny - 1) {   // this node is not on the back plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+						}
+					}
+					leng_v0db++;
+				}
+			}
+		}
+
+		
+
+		/* Sparse matrix construction for V0d1 */
+		this->v0dbRowId = (myint*)malloc(v0dbnum * sizeof(myint));
+		this->v0dbColId = (myint*)malloc(v0dbnum * sizeof(myint));
+		this->v0dbval = (double*)malloc(v0dbnum * sizeof(double));
+		this->v0dbaval = (double*)malloc(v0dbnum * sizeof(double));
+		this->v0dn = (double*)calloc(leng_v0db, sizeof(double));
+		this->v0dan = (double*)calloc(leng_v0db, sizeof(double));
+
+		double lx_whole_avg = 0;
+		double ly_whole_avg = 0;
+		double lz_whole_avg = 0;
+		lx_whole_avg = (this->xn[this->nx - 1] - this->xn[0]) / (this->nx - 1);
+		ly_whole_avg = (this->yn[this->ny - 1] - this->yn[0]) / (this->ny - 1);
+		lz_whole_avg = (this->zn[this->nz - 1] - this->zn[0]) / (this->nz - 1);
+		leng_v0db = 0;
+		v0dbnum = 0;
+		for (nodegs = 0; nodegs < node_group.size(); nodegs++) {
+			for (auto ndi : node_group[nodegs]) {
+				iz = ndi / (this->N_node_s);
+				indx = (ndi % this->N_node_s) / (this->N_cell_y + 1);
+				indy = (ndi % this->N_node_s) % (this->N_cell_y + 1);
+				avg_length(iz, indy, indx, lx_avg, ly_avg, lz_avg);
+				if (iz != 0) {    // this node is not on the bottom plane
+					eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the lower edge
+					compute_edgelink(eno, node1, node2);
+					if (node1 != ndi) {
+						if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+							this->v0dbaval[v0dbnum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+							v0dbnum++;
+						}
+					}
+					else if (node2 != ndi) {
+						if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+							this->v0dbaval[v0dbnum] = -1 / lz_avg; // -lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+				}
+				if (iz != this->nz - 1) {   // this node is not on the top plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + indx * (this->N_cell_y + 1) + indy;    // the upper edge
+					compute_edgelink(eno, node1, node2);
+					if (node1 != ndi) {
+						if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+							this->v0dbaval[v0dbnum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					else if (node2 != ndi) {
+						if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+							this->v0dbaval[v0dbnum] = 1 / lz_avg; // lx_avg * ly_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+				}
+				if (indx != 0) {    // this node is not on the left plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (indx - 1) * (this->N_cell_y + 1) + indy;    // the left edge
+					compute_edgelink(eno, node1, node2);
+					if (node1 != ndi) {
+						if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+							this->v0dbaval[v0dbnum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					else if (node2 != ndi) {
+						if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->xn[indx] - this->xn[indx - 1]);
+							this->v0dbaval[v0dbnum] = -1 / lx_avg; // -ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->xn[indx] - this->xn[indx - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+				}
+				if (indx != this->nx - 1) {    // this node is not on the right plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + indx * (this->N_cell_y + 1) + indy;    // the right edge
+					compute_edgelink(eno, node1, node2);
+					if (node1 != ndi) {
+						if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+							this->v0dbaval[v0dbnum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					else if (node2 != ndi) {
+						if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->xn[indx + 1] - this->xn[indx]);
+							this->v0dbaval[v0dbnum] = 1 / lx_avg; // ly_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->xn[indx + 1] - this->xn[indx]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+				}
+				if (indy != 0) {    // this node is not on the front plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy - 1;    // the front edge
+					compute_edgelink(eno, node1, node2);
+					if (node1 != ndi) {
+						if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+							this->v0dbaval[v0dbnum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					else if (node2 != ndi) {
+						if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->yn[indy] - this->yn[indy - 1]);
+							this->v0dbaval[v0dbnum] = -1 / ly_avg; // -lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->yn[indy] - this->yn[indy - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+				}
+				if (indy != this->ny - 1) {   // this node is not on the back plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + indx * this->N_cell_y + indy;    // the back edge
+					compute_edgelink(eno, node1, node2);
+					if (node1 != ndi) {
+						if (node_group[nodegs].find(node1) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+							this->v0dbaval[v0dbnum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
+							this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					else if (node2 != ndi) {
+						if (node_group[nodegs].find(node2) == node_group[nodegs].end()) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->yn[indy + 1] - this->yn[indy]);
+							this->v0dbaval[v0dbnum] = 1 / ly_avg; // lx_avg * lz_avg / (lx_whole_avg * ly_whole_avg * lz_whole_avg);
+							this->v0dn[leng_v0db] += pow(1 / (this->yn[indy + 1] - this->yn[indy]), 2);
+							this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+				}
+			}
+			leng_v0db++;
+		}
+		int start;
+		double scalar = 1;   // debug use : check with scalar is better
+							 /* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
+		leng_v0db1 = leng_v0db;
+		markfirst = 0;
+		for (indi = 0; indi < N_edge; ++indi) {
+			markedge[indi] = 0;
+		}
+		for (indi = 0; indi < this->numCdt; indi++) {
+			//count = 0;
+			//countp = count;
+			//if (this->conductor[indi].markPort != 0)   // if this conductor is excited not include its V0b
+			//	continue;
+			for (indj = 0; indj < this->cdtNumNode[indi]; indj++) {
+				start = v0dbnum;
+				mark = 0;
+				counts = 0;
+				iz = this->conductor[indi].node[indj] / this->N_node_s;
+				ix = (this->conductor[indi].node[indj] % this->N_node_s) / (this->N_cell_y + 1);
+				iy = (this->conductor[indi].node[indj] % this->N_node_s) % (this->N_cell_y + 1);
+				avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+
+				if (iz != 0) {    // this node is not on the bottom plane
+					eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+					myint nno = this->conductor[indi].node[indj] - this->N_node_s;   // the lower node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {    // this edge is in the dielectric; the other node connects new conductors or the dielectric node
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (iz != this->nz - 1) {   // this node is not on the top plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+					myint nno = this->conductor[indi].node[indj] + this->N_node_s;   // the upper node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (ix != 0) {    // this node is not on the left plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+					myint nno = this->conductor[indi].node[indj] - this->N_cell_y - 1;   // the left node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (ix != this->nx - 1) {    // this node is not on the right plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+					myint nno = this->conductor[indi].node[indj] + this->N_cell_y + 1;   // the right node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (iy != 0) {    // this node is not on the front plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+					myint nno = this->conductor[indi].node[indj] - 1;   // the front node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+				if (iy != this->ny - 1) {   // this node is not on the back plane
+					eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+					myint nno = this->conductor[indi].node[indj] + 1;   // the back node #
+					if (this->markEdge[eno] == 0 && (this->markNode[nno] - 1 > indi || this->markNode[nno] == 0)) {
+						mark = 1;
+					}
+					if (this->markEdge[eno] == 0 && this->markNode[nno] - 1 == indi && markedge[eno] == 0) {
+						counts++;
+						ed = eno;
+					}
+				}
+
+				if (mark == 1 || counts == 1) {
+					if (markfirst == 0) {
+						markfirst = 1;
+						continue;
+					}
+					if (counts == 1) {
+						markedge[ed] = 1;
+					}
+					if (iz != 0) {    // this node is not on the bottom plane
+						eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+						if (this->markEdge[eno] == 0) {    // this edge is in the dielectric and the other node is outside the conductor
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->zn[iz] - this->zn[iz - 1]);
+							this->v0dbaval[v0dbnum] = -1 / lz_avg;
+							this->v0dn[leng_v0db] += pow(1 / (this->zn[iz] - this->zn[iz - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+							v0dbnum++;
+						}
+					}
+					if (iz != this->nz - 1) {   // this node is not on the top plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+						myint nno = this->conductor[indi].node[indj] + this->N_node_s;   // the upper node #
+						if (this->markEdge[eno] == 0) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->zn[iz + 1] - this->zn[iz]);
+							this->v0dbaval[v0dbnum] = 1 / lz_avg;
+							this->v0dn[leng_v0db] += pow(1 / (this->zn[iz + 1] - this->zn[iz]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					if (ix != 0) {    // this node is not on the left plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+						myint nno = this->conductor[indi].node[indj] - this->N_cell_y - 1;    // the left node #
+						if (this->markEdge[eno] == 0) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->xn[ix] - this->xn[ix - 1]);
+							this->v0dbaval[v0dbnum] = -1 / lx_avg;
+							this->v0dn[leng_v0db] += pow(1 / (this->xn[ix] - this->xn[ix - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					if (ix != this->nx - 1) {    // this node is not on the right plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+						myint nno = this->conductor[indi].node[indj] + this->N_cell_y + 1;    // the right node #
+						if (this->markEdge[eno] == 0) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->xn[ix + 1] - this->xn[ix]);
+							this->v0dbaval[v0dbnum] = 1 / lx_avg;
+							this->v0dn[leng_v0db] += pow(1 / (this->xn[ix + 1] - this->xn[ix]), 2);
+							this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					if (iy != 0) {    // this node is not on the front plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+						myint nno = this->conductor[indi].node[indj] - 1;    // the front node #
+						if (this->markEdge[eno] == 0) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = -1 / (this->yn[iy] - this->yn[iy - 1]);
+							this->v0dbaval[v0dbnum] = -1 / ly_avg;
+							this->v0dn[leng_v0db] += pow(1 / (this->yn[iy] - this->yn[iy - 1]), 2);
+							this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					if (iy != this->ny - 1) {   // this node is not on the back plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+						myint nno = this->conductor[indi].node[indj] + 1;   // the back node #
+						if (this->markEdge[eno] == 0) {
+							this->v0dbRowId[v0dbnum] = eno;
+							this->v0dbColId[v0dbnum] = leng_v0db;
+							this->v0dbval[v0dbnum] = 1 / (this->yn[iy + 1] - this->yn[iy]);
+							this->v0dbaval[v0dbnum] = 1 / ly_avg;
+							this->v0dn[leng_v0db] += pow(1 / (this->yn[iy + 1] - this->yn[iy]), 2);
+							this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+							v0dbnum++;
+						}
+					}
+					leng_v0db++;
+				}
+			}
+		}
+		for (int ind = 0; ind < leng_v0db; ++ind) {
+			this->v0dn[ind] = sqrt(this->v0dn[ind]);
+			this->v0dan[ind] = sqrt(this->v0dan[ind]);
+		}
+		//ofstream out;
+		//out.open("V0d.txt", std::ofstream::out | std::ofstream::trunc);
+		//for (indi = 0; indi < v0dbnum; indi++) {
+		//    out << this->v0dbRowId[indi] << " " << this->v0dbColId[indi] << " ";
+		//    out << std::setprecision(15) << this->v0dbval[indi] << endl;
+		//}
+		//out.close();
+		//out.open("V0da.txt", std::ofstream::out | std::ofstream::trunc);
+		//for (indi = 0; indi < v0dbnum; indi++) {
+		//    out << this->v0dbRowId[indi] << " " << this->v0dbColId[indi] << " ";
+		//    out << std::setprecision(15) << this->v0dbaval[indi] << endl;
+		//}
+		//out.close();
+		node_group.clear();
+	}
+
+	void merge_v0db() {   
+		// generate V0db = [V0d, V0b] non-redundant, using tree search to find non-reduendant for each cluster
+		int* visited = (int*)calloc(N_node, sizeof(int));
+		myint node;
+		int iz, ix, iy, mark;
+		myint eno, nno, start, startd;
+		mapd = (myint*)calloc(N_node, sizeof(myint));   // map this node with the column number in V0db
+		leng_v0db = 0;
+		v0dbnum = 0;
+		v0dnum = 0;
+		leng_v0d = 0;
+
+		for (int ind = 0; ind < N_node; ++ind) {
+			if (visited[ind] == 0) {
+				queue<int> q;
+				q.push(ind);
+				visited[ind] = 1;
+				while (!q.empty()) {
+					node = q.front();
+					iz = node / this->N_node_s;
+					ix = (node % this->N_node_s) / (this->N_cell_y + 1);
+					iy = (node % this->N_node_s) % (this->N_cell_y + 1);
+					start = v0dbnum;
+					startd = v0dnum;
+					if (iz != 0) {    // this node is not on the bottom plane
+						eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+						nno = node - this->N_node_s;   // the lower node #
+						if (this->markEdge[eno] == 0) {    // this edge is in the dielectric and the other node is outside the conductor
+							v0dbnum++;
+							if (markNode[node] == 0) {
+								v0dnum++;
+							}
+							if (visited[nno] == 0) {
+								q.push(nno);
+								visited[nno] = 1;
+							}
+						}
+					}
+					if (iz != this->nz - 1) {   // this node is not on the top plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+						nno = node + this->N_node_s;
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+							if (markNode[node] == 0) {
+								v0dnum++;
+							}
+							if (visited[nno] == 0) {
+								q.push(nno);
+								visited[nno] = 1;
+							}
+						}
+					}
+					if (ix != 0) {    // this node is not on the left plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+						nno = node - this->N_cell_y - 1;
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+							if (markNode[node] == 0) {
+								v0dnum++;
+							}
+							if (visited[nno] == 0) {
+								q.push(nno);
+								visited[nno] = 1;
+							}
+						}
+					}
+					if (ix != this->nx - 1) {    // this node is not on the right plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+						nno = node + this->N_cell_y + 1;
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+							if (markNode[node] == 0) {
+								v0dnum++;
+							}
+							if (visited[nno] == 0) {
+								q.push(nno);
+								visited[nno] = 1;
+							}
+						}
+					}
+					if (iy != 0) {    // this node is not on the front plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+						nno = node - 1;
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+							if (markNode[node] == 0) {
+								v0dnum++;
+							}
+							if (visited[nno] == 0) {
+								q.push(nno);
+								visited[nno] = 1;
+							}
+						}
+					}
+					if (iy != this->ny - 1) {   // this node is not on the back plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+						nno = node + 1;
+						if (this->markEdge[eno] == 0) {
+							v0dbnum++;
+							if (markNode[node] == 0) {
+								v0dnum++;
+							}
+							if (visited[nno] == 0) {
+								q.push(nno);
+								visited[nno] = 1;
+							}
+						}
+					}
+					leng_v0db++;
+					if (markNode[node] == 0) {
+						leng_v0d++;
+					}
+					q.pop();
+				}
+				// delete the last node's vector
+				v0dbnum = start;
+				leng_v0db--;
+				if (markNode[node] == 0) {
+					leng_v0d--;
+					v0dnum = startd;
+				}
+			}
+		}
+		
+		this->v0dbRowId = (myint*)malloc(v0dbnum * sizeof(myint));
+		this->v0dbColId = (myint*)malloc(v0dbnum * sizeof(myint));
+		this->v0dbval = (double*)malloc(v0dbnum * sizeof(double));
+		this->v0dbaval = (double*)malloc(v0dbnum * sizeof(double));
+		this->v0dn = (double*)calloc(leng_v0db, sizeof(double));
+		this->v0dan = (double*)calloc(leng_v0db, sizeof(double));
+		myint nnz = v0dbnum, nnzd = v0dnum;
+		v0dbnum = nnzd;    // the starting nnz of V0b
+		v0dnum = 0;
+		leng_v0db = leng_v0d;
+		leng_v0d = 0;
+		double lx_avg, ly_avg, lz_avg;
+		free(visited); visited = (int*)calloc(N_node, sizeof(int));
+
+		for (int ind = 0; ind < N_node; ++ind) {
+			if (visited[ind] == 0) {
+				queue<int> q;
+				q.push(ind);
+				visited[ind] = 1;
+				while (!q.empty()) {
+					node = q.front();
+					iz = node / this->N_node_s;
+					ix = (node % this->N_node_s) / (this->N_cell_y + 1);
+					iy = (node % this->N_node_s) % (this->N_cell_y + 1);
+					avg_length(iz, iy, ix, lx_avg, ly_avg, lz_avg);
+					start = v0dbnum;
+					startd = v0dnum;
+
+					/* first go through its surrounding to see whether this is the last node of the cluster */
+					mark = 0;
+					if (iz != 0) {    // this node is not on the bottom plane
+						eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+						nno = node - this->N_node_s;   // the lower node #
+						if (this->markEdge[eno] == 0) {
+							if (visited[nno] == 0) {
+								mark = 1;   // this is not the last node
+							}
+						}
+					}
+					if (iz != this->nz - 1) {   // this node is not on the top plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+						nno = node + this->N_node_s;
+						if (this->markEdge[eno] == 0) {
+							if (visited[nno] == 0) {
+								mark = 1;
+							}
+						}
+					}
+					if (ix != 0) {    // this node is not on the left plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+						nno = node - this->N_cell_y - 1;
+						if (this->markEdge[eno] == 0) {
+							if (visited[nno] == 0) {
+								mark = 1;
+							}
+						}
+					}
+					if (ix != this->nx - 1) {    // this node is not on the right plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+						nno = node + this->N_cell_y + 1;
+						if (this->markEdge[eno] == 0) {
+							if (visited[nno] == 0) {
+								mark = 1;
+							}
+						}
+					}
+					if (iy != 0) {    // this node is not on the front plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+						nno = node - 1;
+						if (this->markEdge[eno] == 0) {
+							if (visited[nno] == 0) {
+								mark = 1;
+							}
+						}
+					}
+					if (iy != this->ny - 1) {   // this node is not on the back plane
+						eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+						nno = node + 1;
+						if (this->markEdge[eno] == 0) {
+							if (visited[nno] == 0) {
+								mark = 1;
+							}
+						}
+					}
+
+					if (mark == 1 || q.size() > 1) {    // this node is not the last node
+						if (iz != 0) {    // this node is not on the bottom plane
+							eno = (iz - 1) * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the lower edge
+							nno = node - this->N_node_s;   // the lower node #
+							if (this->markEdge[eno] == 0) {    // this edge is in the dielectric and the other node is outside the conductor
+								if (markNode[node] == 0) {   // node on the dieletric
+									this->v0dbRowId[v0dnum] = eno;
+									this->v0dbColId[v0dnum] = leng_v0d;
+									this->v0dbval[v0dnum] = -1 / (zn[iz] - zn[iz - 1]);
+									this->v0dbaval[v0dnum] = -1 / lz_avg;
+									this->v0dn[leng_v0d] += pow(1 / (zn[iz] - zn[iz - 1]), 2);
+									this->v0dan[leng_v0d] += pow(1 / lz_avg, 2);
+									v0dnum++;
+								}
+								else {    // node on the conductor boundary
+									this->v0dbRowId[v0dbnum] = eno;
+									this->v0dbColId[v0dbnum] = leng_v0db;
+									this->v0dbval[v0dbnum] = -1 / (zn[iz] - zn[iz - 1]);
+									this->v0dbaval[v0dbnum] = -1 / lz_avg;
+									this->v0dn[leng_v0db] += pow(1 / (zn[iz] - zn[iz - 1]), 2);
+									this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+									v0dbnum++;
+								}
+
+								if (visited[nno] == 0) {
+									q.push(nno);
+									visited[nno] = 1;
+								}
+							}
+						}
+						if (iz != this->nz - 1) {   // this node is not on the top plane
+							eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_edge_s + ix * (this->N_cell_y + 1) + iy;    // the upper edge
+							nno = node + this->N_node_s;
+							if (this->markEdge[eno] == 0) {
+								if (markNode[node] == 0) {    // node is on the dielectric
+									this->v0dbRowId[v0dnum] = eno;
+									this->v0dbColId[v0dnum] = leng_v0d;
+									this->v0dbval[v0dnum] = 1 / (zn[iz + 1] - zn[iz]);
+									this->v0dbaval[v0dnum] = 1 / lz_avg;
+									this->v0dn[leng_v0d] += pow(1 / (zn[iz + 1] - zn[iz]), 2);
+									this->v0dan[leng_v0d] += pow(1 / lz_avg, 2);
+									v0dnum++;
+								}
+								else {   // node is on the conductor boundary
+									this->v0dbRowId[v0dbnum] = eno;
+									this->v0dbColId[v0dbnum] = leng_v0db;
+									this->v0dbval[v0dbnum] = 1 / (zn[iz + 1] - zn[iz]);
+									this->v0dbaval[v0dbnum] = 1 / lz_avg;
+									this->v0dn[leng_v0db] += pow(1 / (zn[iz + 1] - zn[iz]), 2);
+									this->v0dan[leng_v0db] += pow(1 / lz_avg, 2);
+									v0dbnum++;
+								}
+
+								if (visited[nno] == 0) {
+									q.push(nno);
+									visited[nno] = 1;
+								}
+							}
+						}
+						if (ix != 0) {    // this node is not on the left plane
+							eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + (ix - 1) * (this->N_cell_y + 1) + iy;    // the left edge
+							nno = node - this->N_cell_y - 1;
+							if (this->markEdge[eno] == 0) {
+								if (markNode[node] == 0) {    // node is on the dielectric
+									this->v0dbRowId[v0dnum] = eno;
+									this->v0dbColId[v0dnum] = leng_v0d;
+									this->v0dbval[v0dnum] = -1 / (xn[ix] - xn[ix - 1]);
+									this->v0dbaval[v0dnum] = -1 / lx_avg;
+									this->v0dn[leng_v0d] += pow(1 / (xn[ix] - xn[ix - 1]), 2);
+									this->v0dan[leng_v0d] += pow(1 / lx_avg, 2);
+									v0dnum++;
+								}
+								else {    // node is on the conductor boundary
+									this->v0dbRowId[v0dbnum] = eno;
+									this->v0dbColId[v0dbnum] = leng_v0db;
+									this->v0dbval[v0dbnum] = -1 / (xn[ix] - xn[ix - 1]);
+									this->v0dbaval[v0dbnum] = -1 / lx_avg;
+									this->v0dn[leng_v0db] += pow(1 / (xn[ix] - xn[ix - 1]), 2);
+									this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+									v0dbnum++;
+								}
+
+								if (visited[nno] == 0) {
+									q.push(nno);
+									visited[nno] = 1;
+								}
+							}
+						}
+						if (ix != this->nx - 1) {    // this node is not on the right plane
+							eno = iz * (this->N_edge_s + this->N_edge_v) + this->N_cell_y * (this->N_cell_x + 1) + ix * (this->N_cell_y + 1) + iy;    // the right edge
+							nno = node + this->N_cell_y + 1;
+							if (this->markEdge[eno] == 0) {
+								if (markNode[node] == 0) {    // this node is on the dielectric
+									this->v0dbRowId[v0dnum] = eno;
+									this->v0dbColId[v0dnum] = leng_v0d;
+									this->v0dbval[v0dnum] = 1 / (xn[ix + 1] - xn[ix]);
+									this->v0dbaval[v0dnum] = 1 / lx_avg;
+									this->v0dn[leng_v0d] += pow(1 / (xn[ix + 1] - xn[ix]), 2);
+									this->v0dan[leng_v0d] += pow(1 / lx_avg, 2);
+
+									v0dnum++;
+								}
+								else {
+									this->v0dbRowId[v0dbnum] = eno;
+									this->v0dbColId[v0dbnum] = leng_v0db;
+									this->v0dbval[v0dbnum] = 1 / (xn[ix + 1] - xn[ix]);
+									this->v0dbaval[v0dbnum] = 1 / lx_avg;
+									this->v0dn[leng_v0db] += pow(1 / (xn[ix + 1] - xn[ix]), 2);
+									this->v0dan[leng_v0db] += pow(1 / lx_avg, 2);
+
+									v0dbnum++;
+								}
+								if (visited[nno] == 0) {
+									q.push(nno);
+									visited[nno] = 1;
+								}
+							}
+						}
+						if (iy != 0) {    // this node is not on the front plane
+							eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy - 1;    // the front edge
+							nno = node - 1;
+							if (this->markEdge[eno] == 0) {
+								if (markNode[node] == 0) {
+									this->v0dbRowId[v0dnum] = eno;
+									this->v0dbColId[v0dnum] = leng_v0d;
+									this->v0dbval[v0dnum] = -1 / (yn[iy] - yn[iy - 1]);
+									this->v0dbaval[v0dnum] = -1 / ly_avg;
+									this->v0dn[leng_v0d] += pow(1 / (yn[iy] - yn[iy - 1]), 2);
+									this->v0dan[leng_v0d] += pow(1 / ly_avg, 2);
+
+									v0dnum++;
+								}
+								else {
+									this->v0dbRowId[v0dbnum] = eno;
+									this->v0dbColId[v0dbnum] = leng_v0db;
+									this->v0dbval[v0dbnum] = -1 / (yn[iy] - yn[iy - 1]);
+									this->v0dbaval[v0dbnum] = -1 / ly_avg;
+									this->v0dn[leng_v0db] += pow(1 / (yn[iy] - yn[iy - 1]), 2);
+									this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+									v0dbnum++;
+								}
+
+								if (visited[nno] == 0) {
+									q.push(nno);
+									visited[nno] = 1;
+								}
+							}
+						}
+						if (iy != this->ny - 1) {   // this node is not on the back plane
+							eno = iz * (this->N_edge_s + this->N_edge_v) + ix * this->N_cell_y + iy;    // the back edge
+							nno = node + 1;
+							if (this->markEdge[eno] == 0) {
+								if (markNode[node] == 0) {
+									this->v0dbRowId[v0dnum] = eno;
+									this->v0dbColId[v0dnum] = leng_v0d;
+									this->v0dbval[v0dnum] = 1 / (yn[iy + 1] - yn[iy]);
+									this->v0dbaval[v0dnum] = 1 / ly_avg;
+									this->v0dn[leng_v0d] += pow(1 / (yn[iy + 1] - yn[iy]), 2);
+									this->v0dan[leng_v0d] += pow(1 / ly_avg, 2);
+
+									v0dnum++;
+								}
+								else {
+									this->v0dbRowId[v0dbnum] = eno;
+									this->v0dbColId[v0dbnum] = leng_v0db;
+									this->v0dbval[v0dbnum] = 1 / (yn[iy + 1] - yn[iy]);
+									this->v0dbaval[v0dbnum] = 1 / ly_avg;
+									this->v0dn[leng_v0db] += pow(1 / (yn[iy + 1] - yn[iy]), 2);
+									this->v0dan[leng_v0db] += pow(1 / ly_avg, 2);
+
+									v0dbnum++;
+								}
+
+								if (visited[nno] == 0) {
+									q.push(nno);
+									visited[nno] = 1;
+								}
+							}
+						}
+
+						if (markNode[node] == 0) {
+							leng_v0d++;
+							mapd[node] = leng_v0d;
+						}
+						else {
+							leng_v0db++;
+						}
+					}
+					q.pop();
+				}
+			}
+		}
+		for (int ind = 0; ind < leng_v0db; ++ind) {
+			this->v0dn[ind] = sqrt(this->v0dn[ind]);
+			this->v0dan[ind] = sqrt(this->v0dan[ind]);
+		}
+		//ofstream out;
+		//out.open("map.txt", ofstream::trunc | ofstream::out);
+		//for (int ind = 0; ind < N_node; ++ind) {
+		//	out << mapd[ind] << endl;
+		//}
+		//out.close();
+
+		free(visited); visited = NULL;
+	}
 
 	/* Ad = normalized(V0da)' * D_eps * normalized(V0d)
 	  */
@@ -3228,58 +4507,58 @@ public:
 		myint indi, inz, inx, iny, node1, node2;
 
 		for (indi = 0; indi < v0d1anum; indi++) {
-			if (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
-				inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
-				inx = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) / (this->N_cell_y + 1);
-				iny = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) % (this->N_cell_y + 1);
+			if (this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
+				inz = this->v0dbRowId[indi] / (this->N_edge_s + this->N_edge_v);
+				inx = ((this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) / (this->N_cell_y + 1);
+				iny = ((this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) % (this->N_cell_y + 1);
 				node1 = inz * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
 				node2 = (inz + 1) * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
-				if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[map[node1] - 1]));
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+				if (map[node1] != this->v0dbColId[indi] + 1 && map[node1] != 0) {
+					Ad1[this->v0dbColId[indi]][map[node1] - 1] += this->v0dbaval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[map[node1] - 1]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += this->v0dbaval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]]));
 				}
-				else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[map[node2] - 1]));
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+				else if (map[node2] != this->v0dbColId[indi] + 1 && map[node2] != 0) {
+					Ad1[this->v0dbColId[indi]][map[node2] - 1] += this->v0dbaval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[map[node2] - 1]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += this->v0dbaval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]]));
 				}
 				else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0) / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += abs(this->v0dbaval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0dbRowId[indi]));// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]])));
 				}
 			}
-			else if (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
-				inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
-				inx = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
-				iny = ((this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) % (this->N_cell_y + 1);
+			else if (this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
+				inz = this->v0dbRowId[indi] / (this->N_edge_s + this->N_edge_v);
+				inx = ((this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) / (this->N_cell_y + 1);
+				iny = ((this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v)) - (this->N_cell_y) * (this->N_cell_x + 1)) % (this->N_cell_y + 1);
 				node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
 				node2 = inz * this->N_node_s + (inx + 1) * (this->N_cell_y + 1) + iny;
-				if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[map[node1] - 1]));
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+				if (map[node1] != this->v0dbColId[indi] + 1 && map[node1] != 0) {
+					Ad1[this->v0dbColId[indi]][map[node1] - 1] += this->v0dbaval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[map[node1] - 1]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += this->v0dbaval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]]));
 				}
-				else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[map[node2] - 1]));
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+				else if (map[node2] != this->v0dbColId[indi] + 1 && map[node2] != 0) {
+					Ad1[this->v0dbColId[indi]][map[node2] - 1] += this->v0dbaval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[map[node2] - 1]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += this->v0dbaval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]]));
 				}
 				else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0) / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += abs(this->v0dbaval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->getEps(this->v0dbRowId[indi]));// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]])));
 				}
 			}
 			else {    // this edge is along y axis
-				inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
-				inx = (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) / this->N_cell_y;
-				iny = (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
+				inz = this->v0dbRowId[indi] / (this->N_edge_s + this->N_edge_v);
+				inx = (this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v)) / this->N_cell_y;
+				iny = (this->v0dbRowId[indi] % (this->N_edge_s + this->N_edge_v)) % this->N_cell_y;
 				node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
 				node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
-				if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[map[node1] - 1]));
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+				if (map[node1] != this->v0dbColId[indi] + 1 && map[node1] != 0) {
+					Ad1[this->v0dbColId[indi]][map[node1] - 1] += this->v0dbaval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[map[node1] - 1]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += this->v0dbaval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]]));
 				}
-				else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[map[node2] - 1]));
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+				else if (map[node2] != this->v0dbColId[indi] + 1 && map[node2] != 0) {
+					Ad1[this->v0dbColId[indi]][map[node2] - 1] += this->v0dbaval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[map[node2] - 1]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += this->v0dbaval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->getEps(this->v0dbRowId[indi]);// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]]));
 				}
 				else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0) / ((this->v0dan[this->v0d1ColId[indi]]) * (this->v0dn[this->v0d1ColId[indi]]));
+					Ad1[this->v0dbColId[indi]][this->v0dbColId[indi]] += abs(this->v0dbaval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->getEps(this->v0dbRowId[indi]));// / ((this->v0dan[this->v0dbColId[indi]]) * (this->v0dn[this->v0dbColId[indi]])));
 				}
 			}
 		}
@@ -3293,7 +4572,7 @@ public:
 		this->AdColId = (myint*)calloc(leng_Ad, sizeof(myint));
 		this->Adval = (double*)calloc(leng_Ad, sizeof(double));
 		myint indj = 0;
-		//ofstream out;
+		ofstream out;
 		//out.open("Ad.txt", std::ofstream::trunc | std::ofstream::out);
 		for (indi = 0; indi < leng_v0d1; indi++) {
 			vector<pair<myint, double>> v(Ad1[indi].begin(), Ad1[indi].end());
@@ -3303,7 +4582,8 @@ public:
 					this->AdRowId[indj] = indi;
 					this->AdColId[indj] = adi.first;
 					this->Adval[indj] = adi.second;
-					//out << this->AdRowId[indi] << " " << this->AdColId[indi] << " " << this->Adval[indi] << endl;
+					//out << this->AdRowId[indj] << " " << this->AdColId[indj] << " ";
+					//out << setprecision(15) << this->Adval[indj] << endl;
 					indj++;
 				//}
 			}
@@ -4633,6 +5913,37 @@ public:
 
 	}
 
+	/* Calculate two node's length and the averaged length around one node */
+	void nodeLength(myint node1, myint node2, int no, double& l, double& la) {
+		/* node1 : the first node
+		   node2 : the second node
+		   no : which node is used to calculate the averaged length
+		   l : length between node1 and node 2
+		   la : the averaged length around node1 */
+		int indx1, indy1, indz1, indx2, indy2, indz2;
+		double lxa, lya, lza;
+		compute_node_index(node1, indx1, indy1, indz1);
+		compute_node_index(node2, indx2, indy2, indz2);
+		if (no == 1) {
+			avg_length(indz1, indy1, indx1, lxa, lya, lza);
+		}
+		else if (no == 2) {
+			avg_length(indz2, indy2, indx2, lxa, lya, lza);
+		}
+		if (indx1 != indx2) {   // the edge is along x direction
+			l = xn[indx2] - xn[indx1];
+			la = lxa;
+		}
+		else if (indy1 != indy2) {    // the edge is along y direction
+			l = yn[indy2] - yn[indy1];
+			la = lya;
+		}
+		else if (indz1 != indz2) {    // the edge is along z direction
+			l = zn[indz2] - zn[indz1];
+			la = lza;
+		}
+	}
+
 	/* Calculate the averaged length */
 	void avg_length(int iz, int iy, int ix, double& lx, double& ly, double& lz) {    // given a node, we can know its averaged lengths along x, y, z directions
 		if (iz == 0) {
@@ -4708,7 +6019,7 @@ public:
 
 	/* Construct Z parameters with V0 and Vh */
 	void Construct_Z_V0_Vh(complex<double>* x, int freqNo, int sourcePort) {
-		/* x: field distribution
+		/* x: field distribution, after boundary edges removed
 		freqNo: frequency no.
 		sourcePort: port no.
 		Note: portDirection is the relative position of the port to the ground. E.g., ground is on the top, then portDirection = -1 */
@@ -4744,6 +6055,7 @@ public:
 
 
 			this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] /= sourceCurrent; // Final matrix entry (ohm)
+			cout << "Z is " << this->x[freqNo * (this->numPorts * this->numPorts) + indPort + this->numPorts * sourcePort] << endl;
 		}
 	}
 
@@ -5350,7 +6662,7 @@ int mklMatrixMulti_nt(fdtdMesh* sys, myint& leng_A, myint* aRowId, myint* aColId
 int find_Vh_central(fdtdMesh* sys, int sourcePort);
 int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval, sparse_matrix_t& Ll);   // findVh.cpp
 int matrix_multi(char operation, lapack_complex_double* a, myint arow, myint acol, lapack_complex_double* b, myint brow, myint bcol, lapack_complex_double* tmp3);
-int reference(fdtdMesh* sys, int freqNo, myint* RowId, myint* ColId, double* val);
+int reference(fdtdMesh* sys, int freqNo, myint* RowId, myint* ColId, double* val, complex<double>* xsol);
 int plotTime(fdtdMesh* sys, int sourcePort, double* u0d, double* u0c);
 myint generateLaplacian_count(fdtdMesh* sys);    // count how many nnz in L, and return the number
 int generateLaplacian(fdtdMesh* sys, myint* rowId, myint* colId, double* val);    // generate the Laplacian matrix
@@ -5370,14 +6682,14 @@ void sparseMatrixSum(fdtdMesh* sys, sparse_matrix_t& A, myint* browId1, myint* b
 void sparseMatrixSum1(fdtdMesh* sys, myint* arowId1, myint* acolId, double* aval, myint* browId1, myint* bcolId, double* bval, myint Rows);  // findVh.cpp
 void matrixOutside(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint* AoorowId, myint* AoocolId, double* Aooval, double scale);   // matrixCon.cpp
 void matrixOutside_count(fdtdMesh* sys, myint* ArowStart, myint* ArowEnd, myint* AcolId, double* Aval, myint ARows, myint& leng_Aoo);   // matrixCon.cpp
-void matrixInsideOutside(fdtdMesh* sys, myint* rowId, myint* colId, double* val, myint leng, myint* ooRowId, myint* ooColId, double* ooval, myint* oiRowId, myint* oiColId, double* oival, myint* ioRowId, myint* ioColId, double* ioval);   // matrixCon.cpp
-void matrixInsideOutside_count(fdtdMesh* sys, myint* rowId, myint* colId, myint leng, myint& lengoo, myint& lengoi, myint& lengio);   // matrixCon.cpp
+void matrixInsideOutside(myint* mapio, myint outside, myint inside, myint* rowId, myint* colId, double* val, myint leng, myint* ooRowId, myint* ooColId, double* ooval, myint* oiRowId, myint* oiColId, double* oival, myint* ioRowId, myint* ioColId, double* ioval);   // matrixCon.cpp
+void matrixInsideOutside_count(myint* mapio, myint outside, myint inside, myint* rowId, myint* colId, myint leng, myint& lengoo, myint& lengoi, myint& lengio);   // matrixCon.cpp
 int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N);   // findVh.cpp
-int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* MooRowId, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio, myint* PRowId1, myint* PColId, double* Pval, myint leng_P);   // findVh.cpp
+int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, myint* MooRowId, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio, myint* PRowId1, myint* PColId, double* Pval, myint leng_P);   // findVh.cpp
 void solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* xo);  // findVh.cpp
 void solveOO_pardiso(fdtdMesh* sys, myint* MooRowId1, myint* MooColId, double* Mooval, myint leng, myint N, double* Jo, double* xo, int rhs_s);   // findVh.cpp
 int checkCSRRepeats(myint* RowIdStart, myint* RowIdEnd, myint* ColId, double* val, myint& leng, myint N);   // matrixCon.cpp
-int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double *val); // generateStiff.cpp
+int reference_oo(fdtdMesh *sys, int freqNo, myint *RowId1, myint *ColId, double *val, double* xsol); // generateStiff.cpp
 int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* Aval, myint leng_A, myint N, myint* PRowId1, myint* PColId, double* Pval, myint   leng_P);   // findVh.cpp
 int solveV0L(fdtdMesh* sys, int freqNo, myint* LrowId, myint* LcolId, double* Lval, myint leng, myint N, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat);   // findVh.cpp
 void generateL1(fdtdMesh* sys, double freq, myint* LRowId, myint* LColId, double* Lval, myint leng_L, myint N, myint* L1RowId, myint* L1ColId, double* L1val, myint& leng_L1);   // matrixCon.cpp

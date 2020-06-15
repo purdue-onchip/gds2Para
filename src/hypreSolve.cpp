@@ -50,7 +50,6 @@ int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double 
 
     /* Initialize before setting coefficients matrix values */
     HYPRE_IJMatrixInitialize(A);
-
     vector<double> values;
     vector<HYPRE_Int> cols;
     HYPRE_Int index = 0;
@@ -69,7 +68,7 @@ int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double 
         values.clear();
     }
 
-    /* Assemble after setting the coefficients matrix */
+	/* Assemble after setting the coefficients matrix */
     HYPRE_IJMatrixAssemble(A);
 
     /* Get the parcsr matrix object to use */
@@ -219,7 +218,7 @@ int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double 
         HYPRE_Int    restart = 10;
         bool modify = true;
 
-        /* Create solver */
+		/* Create solver */
         HYPRE_Solver solver, precond;
         HYPRE_ParCSRFlexGMRESCreate(MPI_COMM_WORLD, &solver);
         HYPRE_BoomerAMGCreate(&precond);
@@ -241,13 +240,13 @@ int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double 
         HYPRE_BoomerAMGSetMaxIter(precond, 1); /* do only one iteration! */
         //HYPRE_EuclidCreate(MPI_COMM_WORLD, &precond);
         //HYPRE_EuclidSetMem(precond, 1);
-
+		
         /* Set the AMG preconditioner for the Flexible GMRES solver */
         HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
             (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
         //HYPRE_FlexGMRESSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSolve, (HYPRE_PtrToSolverFcn)HYPRE_EuclidSetup, precond);
 
-        /* Modify AMG parameters at runtime if needed and allowed */
+		/* Modify AMG parameters at runtime if needed and allowed */
         if (modify) {
             /* Optional call: if not called, hypre_FlexGMRESModifyPCDefault is used, which does nothing.
             Otherwise, the custom defined hypre_FlexGMRESModifyPCAMG() is called. */

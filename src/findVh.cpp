@@ -16,7 +16,7 @@ static bool comp(pair<complex<double>, myint> a, pair<complex<double>, myint> b,
     return (pow(a.first.real(), 2) + pow(a.first.imag(), 2)) < (pow(b.first.real(), 2) + pow(b.first.imag(), 2));
 };
 
-int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* MooRowId, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio, myint* PRowId1, myint* PColId, double* Pval, myint leng_P) {
+int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, myint* MooRowId, myint* MooRowId1, myint* MooColId, double* Mooval, myint lengoo, myint* SioRowId, myint* SioColId, double* Sioval, myint lengio, myint* PRowId1, myint* PColId, double* Pval, myint leng_P) {
 	/* solve the problem in frequency domain
 	  [-omega^2*D_epsoo+Soo, Soi
 	   Sio,                  i*omega*D_sigii+Sii]
@@ -38,7 +38,6 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v
 			}
 		}
 	}
-	
 
 	/* solve oo part */
 	double freq = sys->freqNo2freq(freqi);
@@ -47,11 +46,12 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, sparse_matrix_t& v
 	//solveOO(sys, freq, Jo, v0dt, v0dat, xo);   // xo should be imaginary add i later
 	//solveOO_pardiso(sys, MooRowId1, MooColId, Mooval, lengoo, sys->outside, Jo, xo, sys->numPorts);   // use pardiso to solve (-omega^2*D_epsoo+Soo)*xo=Jo
 	for (int ind = 0; ind < sys->numPorts; ++ind) {
-		mkl_gmres_A_P(&Jo[ind * sys->outside], &xo[ind * sys->outside], MooRowId, MooColId, Mooval, lengoo, sys->outside, PRowId1, PColId, Pval, leng_P);
+		/* solve M*x=Jo, with P as the preconditioner */
+		mkl_gmres_A_P(&Jo[ind * sys->outside], &xo[ind * sys->outside], MooRowId, MooColId, Mooval, lengoo, sys->outside, PRowId1, PColId, Pval, leng_P); 
 	}
-	for (int ind = 0; ind < sys->outside * sys->numPorts; ++ind) {
-		xo[ind] *= -freq * 2 * M_PI;   // xo is the solution from (-omega^2*D_epsoo+Soo)\(-omega*Jo)
-	}
+	//for (int ind = 0; ind < sys->outside * sys->numPorts; ++ind) {
+	//	xo[ind] *= -freq * 2 * M_PI;   // xo is the solution from (-omega^2*D_epsoo+Soo)\(-omega*Jo)
+	//}
 	//cout << "Time to solve oo part is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << endl;
 	/* Begin to check the correctness of OO part */
 	//out.open("Jo.txt", std::ofstream::out | std::ofstream::trunc);
@@ -1806,7 +1806,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
 	/*------------------------------------------------------------------------------------*/
 	MKL_INT ipar[size];
-	ipar[14] = 100;
+	ipar[14] = 500;
 	//double b[N];
 	//double expected_solution[N];
 	//double computed_solution[N];
@@ -1828,7 +1828,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	double dvar;
-	int status, maxit = 5000;
+	int status, maxit = 500;
 	ofstream out;
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
@@ -1850,10 +1850,10 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	/*--------------------------------------------------------------------------*/
 	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	if (RCI_request != 0) goto FAILED;
-	ipar[10] = 0;   // no preconditioner
-	ipar[14] = 100;   // restart number
+	ipar[10] = 0;   // preconditioner
+	ipar[14] = 500;   // restart number
 	ipar[7] = 0;
-	dpar[0] = 1.0E-3;
+	dpar[0] = 1.0E-2;
 	/*---------------------------------------------------------------------------
 	/* Check the correctness and consistency of the newly set parameters
 	/*---------------------------------------------------------------------------*/
@@ -1899,12 +1899,18 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
 		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
-		if (dvar < 0.01 || itercount > maxit) goto COMPLETE;
+		if (dvar < dpar[0] || itercount > maxit) goto COMPLETE;
 		else goto ONE;
 	}
 
 	/* apply the preconditioner on the vector tmp[ipar[21]-1] and put the result in vector tmp[ipar[22]-1] */
 	if (RCI_request == 3) {
+		/* diagonal acts as the preconditioner */
+		for (int ind = 0; ind < leng_A; ++ind) {
+			if (ARowId[ind] == AColId[ind]) {   // the diagonal part
+				tmp[ipar[22] - 1 + ARowId[ind]] = tmp[ipar[21] - 1 + ARowId[ind]] / Aval[ind];
+			}
+		}
 		goto ONE;
 	}
 
@@ -1921,7 +1927,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 
 COMPLETE: ipar[12] = 0;
 	dfgmres_get(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp, &itercount);
-	//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+	cout << endl << "      The relative residual is " << dvar << " with iteration number " << itercount << endl << endl;
 	for (i = 0; i < ivar; ++i) {
 		x[i] = computed_solution[i];
 	}
@@ -1932,6 +1938,7 @@ SUCCEDED: free(b); b = NULL;
 	free(expected_solution); expected_solution = NULL;
 	free(computed_solution); computed_solution = NULL;
 	free(residual); residual = NULL;
+	free(tmp); tmp = NULL;
 	return 0;
 }
 
@@ -2360,11 +2367,11 @@ int pardisoSolve(myint* rowId, myint* colId, double* val, double* rsc, double* x
 	pardisoinit(pt, &mtype, iparm);
 	iparm[38] = 1;
 	iparm[34] = 1;    // 0-based indexing
-	iparm[3] = 2;    // number of processors
-					 //iparm[59] = 2;    // out of core version to solve very large problem
-					 //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
+	//iparm[3] = 2;    // number of processors
+	//iparm[59] = 2;    // out of core version to solve very large problem
+	//iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
 
-					 //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
+	//cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
 	double ddum;
 
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, val, rowId, colId, &perm, &nrhs, iparm, &msglvl, rsc, xsol, &error);
@@ -2626,7 +2633,7 @@ int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* A
 	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
 	/*------------------------------------------------------------------------------------*/
 	MKL_INT ipar[size];
-	ipar[14] = 100;
+	ipar[14] = 500;
 	//double b[N];
 	//double expected_solution[N];
 	//double computed_solution[N];
@@ -2670,10 +2677,10 @@ int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* A
 	/*--------------------------------------------------------------------------*/
 	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	if (RCI_request != 0) goto FAILED;
-	ipar[10] = 1;   // preconditioner
-	ipar[14] = 100;   // restart number
+	ipar[10] = 0;   // preconditioner
+	ipar[14] = 500;   // restart number
 	ipar[7] = 0;
-	dpar[0] = 1.0E-3;
+	dpar[0] = 0.01;
 	/*---------------------------------------------------------------------------
 	/* Check the correctness and consistency of the newly set parameters
 	/*---------------------------------------------------------------------------*/
@@ -2718,8 +2725,8 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
-		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
-		if (dvar < 0.001 || itercount > maxit) goto COMPLETE;
+		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		if (dvar < dpar[0] || itercount > maxit) goto COMPLETE;
 		else goto ONE;
 	}
 
@@ -2743,7 +2750,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 
 COMPLETE: ipar[12] = 0;
 	dfgmres_get(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp, &itercount);
-	cout << "Number of iterations: " << itercount << endl;
+	cout << endl << "      The relative residual is " << dvar << " with iteration number " << itercount << endl << endl;
 	for (i = 0; i < ivar; ++i) {
 		x[i] = computed_solution[i];
 	}
