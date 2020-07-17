@@ -265,8 +265,8 @@ int hypreSolve(myint *ARowId, myint *AColId, double *Aval, myint leng_A, double 
 
         if (myid == 0 && info_show == 1)
         {
-            cout << endl << " Iterations = " << num_iterations << endl;
-            cout << " Final Relative Residual Norm = " << final_res_norm << endl;
+            cout << endl << "       Iterations = " << num_iterations << endl;
+            cout << "       Final Relative Residual Norm = " << final_res_norm << endl;
         }
 
         /* Output the final solution */

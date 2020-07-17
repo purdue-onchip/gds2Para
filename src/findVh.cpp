@@ -192,7 +192,6 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 	//pardisoSolve_factorize(SRowId1, SColId, Sval, sys->leng_S, edge);
 	/* End of pardiso solve the backward difference matrix --- factorization */
 
-	outfile.open("xt_nand2_fine_ref.txt", std::ofstream::out | std::ofstream::trunc);
 	for (int ind = 1; ind <= nt; ind++) {    // time marching to find the repeated eigenvectors
 		// Generate the right hand side
 		for (int indi = 0; indi < edge; indi++) {
@@ -1806,7 +1805,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
 	/*------------------------------------------------------------------------------------*/
 	MKL_INT ipar[size];
-	ipar[14] = 500;
+	ipar[14] = 200;
 	//double b[N];
 	//double expected_solution[N];
 	//double computed_solution[N];
@@ -1817,6 +1816,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	double* residual = (double*)malloc(N * sizeof(double));
 	double dpar[size];
 	double* tmp = (double*)calloc(N*(2 * ipar[14] + 1) + (ipar[14] * (ipar[14] + 9)) / 2 + 1, sizeof(double));
+	cout << "    The size of tmp is " << (N*(2 * ipar[14] + 1) + (ipar[14] * (ipar[14] + 9)) / 2 + 1) * 8 << endl;
 	/*---------------------------------------------------------------------------
 	/* Some additional variables to use with the RCI (P)FGMRES solver
 	/*---------------------------------------------------------------------------*/
@@ -1828,8 +1828,9 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	double dvar;
-	int status, maxit = 500;
+	int status, maxit = 200;
 	ofstream out;
+	out.open("iteration_error_S.txt", std::ofstream::out | std::ofstream::trunc);
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
 	/*---------------------------------------------------------------------------*/
@@ -1851,7 +1852,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	if (RCI_request != 0) goto FAILED;
 	ipar[10] = 0;   // preconditioner
-	ipar[14] = 500;   // restart number
+	ipar[14] = 200;   // restart number
 	ipar[7] = 0;
 	dpar[0] = 1.0E-2;
 	/*---------------------------------------------------------------------------
@@ -1898,6 +1899,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
+		out << itercount << " " << dvar << endl;
 		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
 		if (dvar < dpar[0] || itercount > maxit) goto COMPLETE;
 		else goto ONE;
@@ -1939,6 +1941,7 @@ SUCCEDED: free(b); b = NULL;
 	free(computed_solution); computed_solution = NULL;
 	free(residual); residual = NULL;
 	free(tmp); tmp = NULL;
+	out.close();
 	return 0;
 }
 
@@ -2386,6 +2389,59 @@ int pardisoSolve(myint* rowId, myint* colId, double* val, double* rsc, double* x
 	return 0;
 }
 
+int pardisoSolve_c(myint* rowId, myint* colId, complex<double>* val, complex<double>* rsc, complex<double>* xsol, myint size) {
+	/* Use pardiso to solve the complex matrix solution
+	rowId : matrix rowId, csr form, the start index for each row
+	colId : matrix colId
+	val : matrix values
+	rsc : right hand side
+	xsol : solution, output
+	size : dimension size of the problem
+	nnz : non*/
+
+	myint mtype = 13;    /* complex and unsymmetric matrix */
+	myint nrhs = 1;    /* Number of right hand sides */
+	void* pt[64];
+
+	/* Pardiso control parameters */
+	myint iparm[64];
+	myint maxfct, mnum, phase, error, msglvl, solver;
+	double dparm[64];
+	int v0csin;
+	myint perm;
+
+	/* Auxiliary variables */
+	char* var;
+
+	msglvl = 0;    /* print statistical information */
+	solver = 0;    /* use sparse direct solver */
+	error = 0;
+	maxfct = 1;
+	mnum = 1;
+	phase = 13;
+
+	pardisoinit(pt, &mtype, iparm);
+	iparm[38] = 1;
+	iparm[34] = 1;    // 0-based indexing
+					  //iparm[3] = 2;    // number of processors
+					  //iparm[59] = 2;    // out of core version to solve very large problem
+					  //iparm[10] = 0;        /* Use nonsymmetric permutation and scaling MPS */
+
+					  //cout << "Begin to solve (-w^2*D_eps+iwD_sig+S)x=-iwJ\n";
+	double ddum;
+
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, val, rowId, colId, &perm, &nrhs, iparm, &msglvl, rsc, xsol, &error);
+	if (error != 0) {
+		printf("\nERROR during numerical factorization: %d", error);
+		exit(2);
+	}
+
+	phase = -1;     // Release internal memory
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, &ddum, rowId, colId, &perm, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+
+	return 0;
+}
+
 int storeTimeRespValue(fdtdMesh* sys, double** resp, int ind, double* xr) {
 	/* Store the time response voltage
 	   resp : space used to store the voltage
@@ -2514,7 +2570,7 @@ void solveOO(fdtdMesh* sys, double freq, double* Jo, sparse_matrix_t& v0dt, spar
 	}
 	status = mkl_gmres_A(temp2, xh, sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside);   // gmres to solve (dt^2*Loo+D_epsoo), xh is got!
 	//myint* LooRowId1 = (myint*)malloc((sys->outside + 1) * sizeof(myint));
-	//status = COO2CSR_malloc(sys->LooRowId, sys->LooColId, Looval, sys->leng_Loo, sys->outside, LooRowId1);
+	//status = COO2CSR_malloc(sys->LooRowId, sys->LooColId, sys->leng_Loo, sys->outside, LooRowId1);
 	//solveOO_pardiso(sys, LooRowId1, sys->LooColId, Looval, sys->leng_Loo, sys->outside, temp2, xh, 1);
 	/* Begin to output (Loo-omega^2*D_epsoo) */
 	//out.open("Loo.txt", std::ofstream::out | std::ofstream::trunc);
@@ -2628,12 +2684,13 @@ int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* A
 
 
 	myint size = 128;
-
+	ofstream out;
+	out.open("iteration_erroro.txt", ofstream::out | ofstream::trunc);
 	/*------------------------------------------------------------------------------------
 	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
 	/*------------------------------------------------------------------------------------*/
 	MKL_INT ipar[size];
-	ipar[14] = 500;
+	ipar[14] = 1000;
 	//double b[N];
 	//double expected_solution[N];
 	//double computed_solution[N];
@@ -2655,8 +2712,7 @@ int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* A
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	double dvar;
-	int status, maxit = 500;
-	ofstream out;
+	int status, maxit = 1000;
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
 	/*---------------------------------------------------------------------------*/
@@ -2678,7 +2734,7 @@ int mkl_gmres_A_P(double* bm, double* x, myint* ARowId, myint* AColId, double* A
 	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	if (RCI_request != 0) goto FAILED;
 	ipar[10] = 0;   // preconditioner
-	ipar[14] = 500;   // restart number
+	ipar[14] = 1000;   // restart number
 	ipar[7] = 0;
 	dpar[0] = 0.01;
 	/*---------------------------------------------------------------------------
@@ -2725,7 +2781,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
-		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		out << itercount << " " << dvar << endl;
 		if (dvar < dpar[0] || itercount > maxit) goto COMPLETE;
 		else goto ONE;
 	}
