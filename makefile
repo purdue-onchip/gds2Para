@@ -61,23 +61,23 @@ $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboi
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -gdwarf-3 -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o $(MKL_COMP_FLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/mesh.cpp -o $(OBJDIR)/mesh.o $(MKL_COMP_FLAGS) -I $(EIGEN_ROOT_DIR) 
 
 $(OBJDIR)/matrixCon.o: $(SRCDIR)/matrixCon.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -gdwarf-3 -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/matrixCon.cpp -o $(OBJDIR)/matrixCon.o $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS) -I $(EIGEN_ROOT_DIR) 
 
 $(OBJDIR)/hypreSolve.o: $(SRCDIR)/hypreSolve.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/hypreSolver.h
 	@$(MKDIR)
-	mpicxx -g -gdwarf-3 -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/hypreSolve.cpp -o $(OBJDIR)/hypreSolve.o -I $(MKL_COMP_FLAGS) -I $(HYPRE_HEAD_DIR) -L $(HYPRE_LIB_DIR) -lHYPRE -lm $(LFLAGS) -I $(EIGEN_ROOT_DIR) 
 
 $(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -gdwarf-3 -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o $(MKL_COMP_FLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/generateStiff.cpp -o $(OBJDIR)/generateStiff.o $(MKL_COMP_FLAGS) -I $(EIGEN_ROOT_DIR) 
 
 $(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
-	mpicxx -g -gdwarf-3 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o $(MKL_COMP_FLAGS)
+	mpicxx -g -gdwarf-3 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o $(MKL_COMP_FLAGS) -I $(EIGEN_ROOT_DIR) 
 
 
 .PHONY: clean

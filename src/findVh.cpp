@@ -1830,7 +1830,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	double dvar;
 	int status, maxit = 200;
 	ofstream out;
-	out.open("iteration_error_S.txt", std::ofstream::out | std::ofstream::trunc);
+	out.open("iteration_error_L.txt", std::ofstream::out | std::ofstream::trunc);
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
 	/*---------------------------------------------------------------------------*/
