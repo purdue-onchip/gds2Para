@@ -18,15 +18,15 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	cout << "mesh: ylimits! " << sys->ylim1 << " " << sys->ylim2 << endl;//dj
 	cout << "mesh: zlimits! " << sys->zlim1 << " " << sys->zlim2 << " " << sys->lengthUnit << endl;//dj
 
-	/* Generate the mesh nodes based on conductorIn information */
+																								   /* Generate the mesh nodes based on conductorIn information */
 	myint numNode = 0;
 	double disMinx = MINDISFRACX* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent //0.005;
 	double disMiny = MINDISFRACY* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // 0.005;
-	//double xc1 = -16.5e-3, xc2 = 0, yc1 = -16.5e-3, yc2 = 0, disMinx1 = 60e-6, disMiny1 = 60e-6;
-	////double xc11 = -5e-3, xc21 = -3e-3, yc11 = -8e-3, yc21 = -0.3e-3, disMinx2 = 10e-6, disMiny2 = 10e-6;
-	//double xc11 = -5.6e-3, xc21 = -3e-3, yc11 = -14.6e-3, yc21 = -0.3e-3, disMinx2 = 15e-6, disMiny2 = 15e-6;
-	double xc1 = 0, xc2 = 0, yc1 = 0, yc2 = 0, disMinx1 = disMinx, disMiny1 = disMiny;   // don't use this
-	double xc11 = 0, xc21 = 0, yc11 = 0, yc21 = 0, disMinx2 = disMinx, disMiny2 = disMiny;    // don't use this
+	double xc1 = -16.5e-3, xc2 = 0, yc1 = -16.5e-3, yc2 = 0, disMinx1 = 20e-6, disMiny1 = 20e-6;
+	//double xc11 = -5e-3, xc21 = -3e-3, yc11 = -8e-3, yc21 = -0.3e-3, disMinx2 = 10e-6, disMiny2 = 10e-6;
+	double xc11 = -5.6e-3, xc21 = -3e-3, yc11 = -14.6e-3, yc21 = -0.3e-3, disMinx2 = 13e-6, disMiny2 = 13e-6;
+	//double xc1 = 0, xc2 = 0, yc1 = 0, yc2 = 0, disMinx1 = disMinx, disMiny1 = disMiny;   // don't use this
+	//double xc11 = 0, xc21 = 0, yc11 = 0, yc21 = 0, disMinx2 = disMinx, disMiny2 = disMiny;    // don't use this
 	double disMinx0 = disMinx, disMiny0 = disMiny;
 
 	//for (indi = 0; indi < sys->numCdtRow; indi++) { 
@@ -99,28 +99,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 	/* fill in the z coordinates */
 	indj = 0;
-	sys->zlim1 = sys->zlim1 * sys->lengthUnit;
-	sys->zlim2 = sys->zlim2 * sys->lengthUnit;
-	if (sys->stackBegCoor[0] < sys->zlim1) {
-		sys->zlim1 = sys->stackBegCoor[0];
-	}
-	if (sys->stackBegCoor[0] > sys->zlim2) {
-		sys->zlim2 = sys->stackBegCoor[0];
-	}
-	if (sys->stackEndCoor[0] < sys->zlim1) {
-		sys->zlim1 = sys->stackEndCoor[0];
-	}
-	if (sys->stackEndCoor[0] > sys->zlim2) {
-		sys->zlim2 = sys->stackEndCoor[0];
-	}
 	for (indi = 0; indi < sys->numStack; indi++) {//dj 
-		//if (sys->stackEndCoor[indi] >= sys->zlim1 && sys->stackEndCoor[indi] <= sys->zlim2) {
-		//	if (sys->stackBegCoor[indi] >= sys->zlim1 && sys->stackBegCoor[indi] <= sys->zlim2) {
+		if (sys->stackEndCoor[indi] >= sys->zlim1*sys->lengthUnit && sys->stackEndCoor[indi] <= sys->zlim2*sys->lengthUnit) {
+			if (sys->stackBegCoor[indi] >= sys->zlim1*sys->lengthUnit && sys->stackBegCoor[indi] <= sys->zlim2*sys->lengthUnit) {
 				indj += 2; // Increase for each z-coordinate in area pair defining area layer
-		//	}
-		//}
+			}
+		}
 	}
-	cout << endl << endl;
 	for (indi = 0; indi < sys->numPorts; indi++) {
 		vector<double> z1coord = sys->portCoor[indi].z1;
 		vector<double> z2coord = sys->portCoor[indi].z2;
@@ -136,8 +121,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	cout << "Number of stacks is " << sys->numStack << endl;
 	for (indi = 0; indi < sys->numStack; indi++) {//dj 
 		cout << "mesh: stack- " << indi << " " << sys->stackBegCoor[indi] << " " << sys->stackEndCoor[indi] << endl;
-		//if (sys->stackEndCoor[indi] >= sys->zlim1 && sys->stackEndCoor[indi] <= sys->zlim2) {
-		//	if (sys->stackBegCoor[indi] >= sys->zlim1 && sys->stackBegCoor[indi] <= sys->zlim2) {
+		if (sys->stackEndCoor[indi] >= sys->zlim1*sys->lengthUnit && sys->stackEndCoor[indi] <= sys->zlim2*sys->lengthUnit) {
+			if (sys->stackBegCoor[indi] >= sys->zlim1*sys->lengthUnit && sys->stackBegCoor[indi] <= sys->zlim2*sys->lengthUnit) {
 				zOrigOld.push_back(sys->stackBegCoor[indi]);
 				zOrigOld.push_back(sys->stackEndCoor[indi]);
 				//cout << "mesh: stack- " << indi << " " << sys->stackBegCoor[indi] << " " << sys->stackEndCoor[indi] << endl;//dj
@@ -146,8 +131,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 				if (sys->stackEndCoor[indi] - sys->stackBegCoor[indi] > 0) {
 					minLayerDist = fmin(minLayerDist, sys->stackEndCoor[indi] - sys->stackBegCoor[indi]); // Update smallest distance between layers as each layer processed (units included)
 				}
-		//	}
-		//}
+			}
+		}
 	}
 	cout << "mesh: minLayerDist " << minLayerDist << endl;//dj
 	for (indi = 0; indi < sys->numPorts; indi++) {
@@ -162,8 +147,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	}
 	numOrigOldZ = indj;//dj
 
-	/*******************************************************************************************/
-	/* Discretize domain in the x-direction */
+					   /*******************************************************************************************/
+					   /* Discretize domain in the x-direction */
 	sort(xOrigOld.begin(), xOrigOld.end());
 	cout << "old size x " << xOrigOld.size() << endl;
 	sys->nx = 1;
@@ -171,7 +156,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	xmax = xOrigOld[numOrigOldXY - 1];
 
 
-	double disMaxx =  MAXDISFRACX* (sys->xlim2 - sys->xlim1)* sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent//0.01;
+	double disMaxx = MAXDISFRACX* (sys->xlim2 - sys->xlim1)* sys->lengthUnit; // Maximum discretization distance in x-direction is fraction of x-extent//0.01;
 	myint xMaxInd = (myint)((xmax - xmin) / disMaxx); // Cast to myint after floating-point division
 	double disMaxx0 = disMaxx, disMaxx1 = disMaxx0;
 	myint countx = 0;
@@ -212,9 +197,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 	zn[0] = zOrigOld[0];
 	indj = 0;
-	//cout << "zOrigOld is " << zOrigOld[0] << " ";
 	for (indi = 1; indi < numOrigOldZ; indi++) {
-		//cout << zOrigOld[indi] << " ";
 		if (abs(zOrigOld[indi] - zOrigOld[indi - 1]) > disMinz) {
 			sys->nz++;
 		}
@@ -227,7 +210,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	sort(xn, xn + countx + 1);
 	xi.clear();
 
-	sys->xn = (double*)calloc(sys->nx * 2 - 1, sizeof(double));   // put a middle point between coordinates
+	sys->xn = (double*)calloc(sys->nx, sizeof(double));
 	indj = 0;
 	sys->xn[0] = xn[0];
 	double temp = sys->xn[0];
@@ -246,9 +229,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 		}
 
 		if (abs(xn[indi] - temp) > disMinx) {
-			indj++;
-			sys->xn[indj] = (xn[indi] + temp) / 2;   // put a middle point
-			xi[sys->xn[indj]] = indj;
 			indj++;
 			sys->xn[indj] = xn[indi];
 			temp = sys->xn[indj];
@@ -269,7 +249,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 	sort(yn, yn + county + 1);
 	yi.clear();
-	sys->yn = (double*)calloc(sys->ny * 2 - 1, sizeof(double));
+	sys->yn = (double*)calloc(sys->ny, sizeof(double));
 	indj = 0;
 	sys->yn[0] = yn[0];
 	temp = sys->yn[0];
@@ -289,9 +269,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 		if (abs(yn[indi] - temp) > disMiny) {
 			indj++;
-			sys->yn[indj] = (yn[indi] + temp) / 2;   // put a middle point
-			yi[sys->yn[indj]] = indj;
-			indj++;
 			sys->yn[indj] = yn[indi];
 			temp = sys->yn[indj];
 			yi[sys->yn[indj]] = indj;
@@ -306,15 +283,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 	sort(zn, zn + countz + 1);
 	zi.clear();
-	sys->zn = (double*)calloc(sys->nz * 2 - 1, sizeof(double));
+	sys->zn = (double*)calloc(sys->nz, sizeof(double));
 	indj = 0;
 	sys->zn[0] = zn[0];
 	zi[sys->zn[0]] = indj;
 	for (indi = 1; indi <= countz; indi++) {    // Set the discretization length around port to be equal
 		if (abs(zn[indi] - zn[indi - 1]) > disMinz) {
-			indj++;
-			sys->zn[indj] = (zn[indi] + zn[indi - 1]) / 2;
-			zi[sys->zn[indj]] = indj;
 			indj++;
 			sys->zn[indj] = zn[indi];
 			zi[sys->zn[indj]] = indj;
@@ -374,13 +348,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	out.close();
 	out.open("y.txt", std::ofstream::out | std::ofstream::trunc);
 	for (indi = 0; indi < sys->ny; indi++) {
-		out << sys->yn[indi] << " ";
+		out << setprecision(15) << sys->yn[indi] << " ";
 	}
 	out << endl << endl;
 	out.close();
 	out.open("z.txt", std::ofstream::out | std::ofstream::trunc);
 	for (indi = 0; indi < sys->nz; indi++) {
-		out << sys->zn[indi] << " ";
+		out << setprecision(15) << sys->zn[indi] << " ";
 	}
 	out << endl << endl;
 	out.close();
@@ -507,19 +481,19 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	/* do NOT update sys->numCdtRow afterwards */
 	double xOuter[4] = { sys->xlim2, sys->xlim2, sys->xlim1, sys->xlim1 }; // Lower-right around counter-clockwise
 	double yOuter[4] = { sys->ylim1, sys->ylim2, sys->ylim2, sys->ylim1 }; // Lower-right around counter-clockwise
-	//int layerMin = 65536;
-	//int layerMax = -1;
-	//for (size_t indi = 0; indi < sys->conductorIn.size(); indi++)
-	//{
-	//    if (sys->conductorIn[indi].layer < layerMin)
-	//    {
-	//        layerMin = sys->conductorIn[indi].layer;
-	//    }
-	//    else if (sys->conductorIn[indi].layer > layerMax)
-	//    {
-	//        layerMax = sys->conductorIn[indi].layer;
-	//    }
-	//}
+																		   //int layerMin = 65536;
+																		   //int layerMax = -1;
+																		   //for (size_t indi = 0; indi < sys->conductorIn.size(); indi++)
+																		   //{
+																		   //    if (sys->conductorIn[indi].layer < layerMin)
+																		   //    {
+																		   //        layerMin = sys->conductorIn[indi].layer;
+																		   //    }
+																		   //    else if (sys->conductorIn[indi].layer > layerMax)
+																		   //    {
+																		   //        layerMax = sys->conductorIn[indi].layer;
+																		   //    }
+																		   //}
 
 
 #ifdef LOWER_BOUNDARY_PEC
@@ -581,9 +555,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 		}
 	}
 #endif
+	cout << "Boundary edge number is " << sys->bden << endl;
+	sys->setMapEdge();   // map the original edge to the new edge # with upper and lower boundaries
 
 #ifdef CONDUCTOR_PEC
-	/* start of hand code to add the load */
+						 /* start of hand code to add the load */
 	double xL = -2.2e-2, yL = -1.5e-2;   // load position
 	double diff = sys->xlim2 - sys->xlim1;
 	myint xli = 0, yli = 0;
@@ -600,30 +576,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 			diff = abs(sys->yn[ind] - yL);
 		}
 	}
-	vector<myint> loadEdge = { sys->N_edge_s + xli *(sys->N_cell_y + 1) + yli, sys->N_edge_s * 2 + sys->N_edge_v + xli *(sys->N_cell_y + 1) + yli };   // the load edge number
-	myint nnno = sys->N_node_s + xli *(sys->N_cell_y + 1) + yli;
-	sys->markEdge[loadEdge[0]] = 1;    // mark the load edge to be conductor edge
-	sys->markEdge[loadEdge[1]] = 1;
-	sys->markNode[nnno] = 1;
+	myint loadEdge = sys->N_edge_s + xli *(sys->N_cell_y + 1) + yli;   // the load edge number
+	sys->markEdge[loadEdge] = 1;    // mark the load edge to be conductor edge
 									/* end of hand code to add the load */
-	out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
-	for (indi = 0; indi < sys->N_edge; indi++) {
-		if (sys->markEdge[indi] != 0 && indi != loadEdge[0] && indi != loadEdge[1]) {
-			out << std::setprecision(15) << SIGMA << endl;
-			//out << indi + 1 << endl;
-		}
-		else if (sys->markEdge[indi] != 0 && (indi == loadEdge[0] || indi == loadEdge[1])) {
-			out << setprecision(15) << 3.508 << endl;
-		}
-		else {
-			out << 0 << endl;
-		}
-	}
-	sys->bden += 2;
-	out.close();
 #endif
-	cout << "Boundary edge number is " << sys->bden << endl;
-	sys->setMapEdge();   // map the original edge to the new edge # with upper and lower boundaries
 
 	myint eno, nno;
 
@@ -661,7 +617,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	//    sys->nodeEdge[node2].push_back(make_pair(indi, -1 / leng));
 	//}
 	//cout << "nodeEdge is done" << endl;
-	int ix, iy, iz;
+	//int ix, iy, iz;
 	//iz = sys->N_cell_z;
 	//for (ix = 0; ix < sys->nx; ix++) {
 	//    for (iy = 0; iy < sys->ny; iy++) {
@@ -732,8 +688,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 	/* BFS to figure out the disjoint conductors */
 	tt = clock();
-	//setSharedEdge(sys);
-
 	for (indi = 0; indi < sys->N_node; indi++) {
 		if (sys->markNode[indi] == 0) {
 			continue;
@@ -756,8 +710,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 					// how many edges this node connects to
 					if (inz != 0) {    // this node is not on the bottom plane
 						eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-						sys->compute_edgelink(eno, node1, node2);    // compute_edgelink is used to get edge eno's two side's nodes node1, node2
 						if (sys->markEdge[eno] != 0) {
+							sys->compute_edgelink(eno, node1, node2);    // compute_edgelink is used to get edge eno's two side's nodes node1, node2
 							if ((node1 != qu.front() && visited[node1] == 0)) {
 								visited[node1] = count;
 								qu.push(node1);
@@ -765,21 +719,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 							else if ((node2 != qu.front() && visited[node2] == 0)) {
 								visited[node2] = count;
 								qu.push(node2);
-							}
-						}
-						else {
-							if (node1 != qu.front() && visited[node1] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
-							else if (node2 != qu.front() && visited[node2] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
 							}
 						}
 					}
 					if (inz != sys->nz - 1) {    // this node is not on the upper plane
 						eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-						sys->compute_edgelink(eno, node1, node2);
 						if (sys->markEdge[eno] != 0) {
+							sys->compute_edgelink(eno, node1, node2);
 							if ((node1 != qu.front() && visited[node1] == 0)) {
 								visited[node1] = count;
 								qu.push(node1);
@@ -788,20 +734,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 								visited[node2] = count;
 								qu.push(node2);
 							}
-						}
-						else {
-							if (node1 != qu.front() && visited[node1] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
-							else if (node2 != qu.front() && visited[node2] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
+
 						}
 					}
 					if (inx != 0) {    // this node is not on the left plane
 						eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
-						sys->compute_edgelink(eno, node1, node2);
 						if (sys->markEdge[eno] != 0) {
+							sys->compute_edgelink(eno, node1, node2);
 							if ((node1 != qu.front() && visited[node1] == 0)) {
 								visited[node1] = count;
 								qu.push(node1);
@@ -810,20 +749,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 								visited[node2] = count;
 								qu.push(node2);
 							}
-						}
-						else {
-							if (node1 != qu.front() && visited[node1] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
-							else if (node2 != qu.front() && visited[node2] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
+
 						}
 					}
 					if (inx != sys->nx - 1) {    // this node is not on the right plane
 						eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
-						sys->compute_edgelink(eno, node1, node2);
 						if (sys->markEdge[eno] != 0) {
+							sys->compute_edgelink(eno, node1, node2);
 							if ((node1 != qu.front() && visited[node1] == 0)) {
 								visited[node1] = count;
 								qu.push(node1);
@@ -832,20 +764,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 								visited[node2] = count;
 								qu.push(node2);
 							}
-						}
-						else {
-							if (node1 != qu.front() && visited[node1] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
-							else if (node2 != qu.front() && visited[node2] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
+
 						}
 					}
 					if (iny != 0) {    // this node is not on the front plane
 						eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
-						sys->compute_edgelink(eno, node1, node2);
 						if (sys->markEdge[eno] != 0) {
+							sys->compute_edgelink(eno, node1, node2);
 							if ((node1 != qu.front() && visited[node1] == 0)) {
 								visited[node1] = count;
 								qu.push(node1);
@@ -854,20 +779,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 								visited[node2] = count;
 								qu.push(node2);
 							}
-						}
-						else {
-							if (node1 != qu.front() && visited[node1] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
-							else if (node2 != qu.front() && visited[node2] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
+
 						}
 					}
 					if (iny != sys->ny - 1) {    // this node is not on the back plane
 						eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
-						sys->compute_edgelink(eno, node1, node2);
 						if (sys->markEdge[eno] != 0) {
+							sys->compute_edgelink(eno, node1, node2);
 							if ((node1 != qu.front() && visited[node1] == 0)) {
 								visited[node1] = count;
 								qu.push(node1);
@@ -876,14 +794,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 								visited[node2] = count;
 								qu.push(node2);
 							}
-						}
-						else {
-							if (node1 != qu.front() && visited[node1] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
-							else if (node2 != qu.front() && visited[node2] != 0) {   // eliminate shared edges
-								sys->markEdge[eno] = 1;
-							}
+
 						}
 					}
 					qu.pop();
@@ -891,18 +802,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 			}
 		}
 	}
-	
-	
-	for (indi = 0; indi < sys->N_node; indi++) {
-		sys->markNode[indi] = visited[indi];
-	}
+	//setSharedEdge(sys);
 	free(visited);
 	visited = (myint*)calloc(sys->N_node, sizeof(myint));
 	count = (myint)0;
 	std::queue<myint> empty;
 	std::swap(qu, empty);    // clear queue
 
-	/* BFS to figure out the disjoint conductors */
+							 /* BFS to figure out the disjoint conductors */
 	for (indi = 0; indi < sys->N_node; indi++) {
 		if (sys->markNode[indi] == 0) {
 			continue;
@@ -1012,7 +919,6 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 			}
 		}
 	}
-
 #ifdef PRINT_VERBOSE_TIMING
 	//cout << "Time to find isolated conductors is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 	//cout << "Number of isolated conductors counted is " << count << endl;
@@ -1030,6 +936,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	for (indi = 0; indi < sys->N_node; indi++) {
 		sys->markNode[indi] = visited[indi];
 	}
+
 	/* Start to output markNode */
 	out.open("markNode.txt", std::ofstream::out | std::ofstream::trunc);
 	for (indi = 0; indi < sys->N_node; indi++) {
@@ -1185,15 +1092,21 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 
 
-	/* Find the two nodes defining each edge (seems odd not to have this already) */
+				   /* Find the two nodes defining each edge (seems odd not to have this already) */
 	tt = clock();
 	for (indi = 0; indi < sys->N_edge; indi++) {
 		// find edge indi's two nodes
 		sys->compute_edgelink(indi, node1, node2);
 		if (sys->markEdge[indi] != 0 && visited[node1] == visited[node2] && visited[node1] != 0) {
 			sys->markEdge[indi] = visited[node2];    // Mark the edge with each color for different conductors
+
 		}
-		
+		//if (sys->markEdge[indi] != 0) {
+		//    sys->inedge++;
+		//}
+		//else {
+		//    sys->outedge++;
+		//}
 	}
 
 #ifdef PRINT_VERBOSE_TIMING
@@ -1306,12 +1219,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 			}
 		}
 	}
-	//out.open("markCell.txt", ofstream::out | ofstream::trunc);
-	//myint N_cell = sys->N_cell_x * sys->N_cell_y * sys->N_cell_z;
-	//for (indi = 0; indi < N_cell; ++indi) {
-	//	out << sys->markCell[indi] << endl;
-	//}
-	//out.close();
+	out.open("markCell.txt", ofstream::out | ofstream::trunc);
+	myint N_cell = sys->N_cell_x * sys->N_cell_y * sys->N_cell_z;
+	for (indi = 0; indi < N_cell; ++indi) {
+		out << sys->markCell[indi] << endl;
+	}
+	out.close();
 #endif
 
 	return 0;
@@ -1353,32 +1266,30 @@ int matrixConstruction(fdtdMesh *sys) {
 	}*/
 	ofstream out;
 	//out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->N_edge; indi++){
-	//    out << std::setprecision(15) << sys->getEps(indi) << endl;
+	//for (indi = 0; indi < sys->N_edge; indi++) {
+	//	out << std::setprecision(15) << sys->getEps(indi) << endl;
 	//}
 	//out.close();
 
-#ifndef CONDUCTOR_PEC
-	// out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
-	// for (indi = 0; indi < sys->N_edge; indi++){
-	//     if (sys->markEdge[indi] != 0){
-	//         out << std::setprecision(15) << SIGMA << endl;
-	////out << indi + 1 << endl;
-	//     }
-	//     else{
-	//         out << 0 << endl;
-	//     }
-	// }
-	// out.close();
-#endif
-	 checkCondShared(sys);
+	//out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
+	//for (indi = 0; indi < sys->N_edge; indi++) {
+	//	if (sys->markEdge[indi] != 0) {
+	//		out << std::setprecision(15) << SIGMA << endl;
+	//		//out << indi + 1 << endl;
+	//	}
+	//	else {
+	//		out << 0 << endl;
+	//	}
+	//}
+	//out.close();
+
+	//checkCondShared(sys);
 
 	sys->edgeCell.clear();
 	sys->edgeCellArea.clear();
 	//free(sys->markCell); sys->markCell = NULL;
 
 	/*sys->stackEpsn.clear();*/
-
 	return 0;
 }
 
@@ -1765,7 +1676,6 @@ int portSet(fdtdMesh* sys, unordered_map<double, int>& xi, unordered_map<double,
 			}
 		}
 	}
-
 
 #ifdef PRINT_VERBOSE_TIMING
 	cout << "Time of finding side nodes is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
