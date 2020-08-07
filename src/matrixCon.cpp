@@ -43,6 +43,7 @@ void solveA11A22_schur(double* bm, double* x, double freq, double* Doosval, spar
 int gmres_solveA11schur(double* rhs, double* x, double freq, double* Doosval, sparse_matrix_t& V0ddt, sparse_matrix_t& V0ddat, myint N1, double* v0dn, double* v0dan, sparse_matrix_t& V0bt, sparse_matrix_t& V0bat, myint N2, sparse_matrix_t& Soo, myint N3, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22RowId1, myint* A22ColId, double* A22Val, myint leng_A22, void* pt[64], myint iparm[64]);
 void A11schurtimesV(double freq, double* Doosval, sparse_matrix_t& V0ddt, sparse_matrix_t& V0ddat, myint N1, double* v0dn, double* v0dan, sparse_matrix_t& V0bt, sparse_matrix_t& V0bat, myint N2, sparse_matrix_t& Soo, myint N3, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22RowId1, myint* A22ColId, double* A22Val, myint leng_A22, void* pt[64], myint iparm[64], double* v1, double* v2);
 void DTimesV(fdtdMesh* sys, myint nedge, double freq, complex<double>* u1, complex<double>* u2);
+double V2norm(complex<double>* r0, myint n);
 
 static bool comp(pair<double, int> a, pair<double, int> b) {
 	return a.first <= b.first;
@@ -1149,7 +1150,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 			}
 
 			complex<double>* uh = (complex<double>*)calloc(nedge, sizeof(complex<double>));
-			solve_L_schur(u2, uh, freq, Doosval, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, LrowId, LcolId, Lval, leng_L);   // uh = ((D+L)-D*V0*(V0a'*D*V0)^(-1)*V0a'*D)\(-1i*omega*J-D*V0*(V0a'*D*V0)\(V0a'*(-1i*omega*J)))
+			solve_L_schur(u2, uh, nedge, freq, Doosval, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, LrowId, LcolId, Lval, leng_L);   // uh = ((D+L)-D*V0*(V0a'*D*V0)^(-1)*V0a'*D)\(-1i*omega*J-D*V0*(V0a'*D*V0)\(V0a'*(-1i*omega*J)))
 			
 			///* solve [-omega^2*D_eps+L, -omega*D_sig;
 			//omega*D_sig,      -omega^2*D_eps+L]*[xr; xi] = [u2r; u2i] */
@@ -4342,16 +4343,22 @@ void DTimesV(fdtdMesh* sys, myint nedge, double freq, complex<double>* u1, compl
 	}
 }
 
-void solve_L_schur(complex<double>* u2, complex<double>* uh, double freq, double* Doosval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L) {
+void solve_L_schur(complex<double>* u2, complex<double>* uh, myint nedge, double freq, double* Doosval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L) {
+	/* solve {(D+L)-D*V0*(V0a'*D*V0)^(-1)*V0a'*D}*uh = u2 = -1i*omega*J-D*V0*(V0a'*D*V0)^(-1)*(V0a'*(-1i*omega*J)) */
+	int status, maxIterNum = 500;
+	double epsilon = 1e-3;
 
+	status = GMRES(uh, u2, nedge, epsilon, maxIterNum, freq, Doosval, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, LrowId, LcolId, Lval, leng_L, )
 }
 
-int GMRES(complex<double> *x, complex<double> *b, int n, double epsilon, int maxIterNum, double _Complex * P_inv, blkdiag *A0_inv) {
+
+int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int maxIterNum, double freq, double* Doosval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t7 V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L) {
 	// This function implements GMRES 
 	// refer to Iterative Methods Linear System Second Edition Yousef Saad p171 for theory
 	// Also refer to https://rtraba.files.wordpress.com/2015/05/cpp_numerical.pdf for some implementing issue
 	// However, I believe implementation above is not as good as mine regarding the complexity, since it changes matrix size every iteration
 	// And https://en.wikipedia.org/wiki/Generalized_minimal_residual_method, which make easy to refresh the memory.
+	/* x is the solution, b is the rhs */
 
 	int i, j, ii, k;
 
@@ -4364,22 +4371,22 @@ int GMRES(complex<double> *x, complex<double> *b, int n, double epsilon, int max
 	int Hsize = unisize;
 	int Qsize = unisize + 1;
 	int gsize = unisize + 1;
-	double _Complex * V = (double _Complex *) calloc(n * Vsize, sizeof(double _Complex));
-	double _Complex * H = (double _Complex *) calloc((Hsize + 1)*Hsize, sizeof(double _Complex));
-	double _Complex * Q = (double _Complex *) calloc(Qsize*Qsize, sizeof(double _Complex));
-	double _Complex * tempQ = (double _Complex *) calloc(Qsize*Qsize, sizeof(double _Complex));
-	double _Complex * Omega = (double _Complex *) calloc(Qsize*Qsize, sizeof(double _Complex));
-	double _Complex * bg = (double _Complex *) calloc(gsize, sizeof(double _Complex));
-	double _Complex * bgtemp = (double _Complex *) calloc(gsize, sizeof(double _Complex));
-	double _Complex * Htemp = (double _Complex *) calloc(n, sizeof(double _Complex));
-	double _Complex * Htemptemp = (double _Complex *) calloc(n, sizeof(double _Complex));
+	complex<double> * V = (complex<double> *) calloc(n * Vsize, sizeof(complex<double>));
+	complex<double> * H = (complex<double> *) calloc((Hsize + 1)*Hsize, sizeof(complex<double>));
+	complex<double> * Q = (complex<double> *) calloc(Qsize*Qsize, sizeof(complex<double>));
+	complex<double> * tempQ = (complex<double> *) calloc(Qsize*Qsize, sizeof(complex<double>));
+	complex<double> * Omega = (complex<double> *) calloc(Qsize*Qsize, sizeof(complex<double>));
+	complex<double> * bg = (complex<double> *) calloc(gsize, sizeof(complex<double>));
+	complex<double> * bgtemp = (complex<double> *) calloc(gsize, sizeof(complex<double>));
+	complex<double> * Htemp = (complex<double> *) calloc(n, sizeof(complex<double>));
+	complex<double> * Htemptemp = (complex<double> *) calloc(n, sizeof(complex<double>));
 	for (i = 0; i < Qsize; i++) {
 		Q[i + i * Qsize] = 1.0;
 		Omega[i + i * Qsize] = 1.0;
 	}
 	// For every iteration, V is n*Vsize, H is (Hsize+1)*Hsize, Q is Qsize*Qsize, where Qsize=Hsize+1
 	// Omega is Qsize*Qsize, bg is Qsize
-	double _Complex Ht_k_k, Ht_kp1_k, sk, ck;
+	complex<double> Ht_k_k, Ht_kp1_k, sk, ck;
 
 	// for initial guess, we choose x0 = 0, thus, r0 = b
 
@@ -4389,10 +4396,10 @@ int GMRES(complex<double> *x, complex<double> *b, int n, double epsilon, int max
 
 
 	double beta = V2norm(r0, n);    // beta = norm(ro)
-	printf("beta = %.20f \n", beta);
-	bg[0] = beta;
+	//printf("beta = %.20f \n", beta);
+	bg[0] = { beta, 0 };
 	for (i = 1; i < gsize; i++) {
-		bg[i] = 0.0;
+		bg[i] = { 0.0, 0.0 };
 	}
 	double residual = 1.0;
 	for (i = 0; i < n; i++) {
@@ -4434,6 +4441,7 @@ int GMRES(complex<double> *x, complex<double> *b, int n, double epsilon, int max
 
 		// 1, Arnordi process
 		H2MV(psm, pcb, V + k*n, w, n, P_inv, A0_inv, FMMorNew);
+		L_schur_mv()
 		// since we reuse H[0:k-1,k] and V[:,1:k]
 		// only compute H[:,k], and V[:,k+1]
 
@@ -4541,4 +4549,15 @@ int GMRES(complex<double> *x, complex<double> *b, int n, double epsilon, int max
 
 	// return number of iterations
 	return k;
+}
+
+double V2norm(complex<double>* r0, myint n) {
+	/* calculate r0 vector's norm */
+	double res = 0;
+
+	for (int i = 0; i < n; ++i) {
+		res += r0[i].real() * r0[i].real() + r0[i].imag() * r0[i].imag();
+	}
+	res = sqrt(res);
+	return res;
 }
