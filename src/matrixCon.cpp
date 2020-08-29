@@ -11,9 +11,10 @@
 #define SKIP_VH
 //#define INSIDE_OUTSIDE
 void addOmegaEpsilon(fdtdMesh* sys, myint* RowId, myint* ColId, double* val, myint leng, myint N, double freq, double* val1);
-void solveV0(double freq, double* rhs, complex<double>* u0, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint leng_v0d, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, myint leng_v0c, myint nedge, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac, char ri);   // solve (V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0) with real rhs
+void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint leng_v0d, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, myint leng_v0c, myint nedge, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac, char ri);   // solve (V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0) with real rhs
+void solveV0_c(double freq, complex<double>* rhs, complex<double>* u0, double* Depsval, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint leng_v0d, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, myint leng_v0c, myint nedge, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac);   // solve (V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0) with complex rhs
 void V0Multiply(sparse_matrix_t& V0dt, sparse_matrix_t& V0ct, myint lengv0d, myint lengv0c, myint row, complex<double>* u1, complex<double>* u2);
-void V0aMultiply(fdtdMesh* sys, sparse_matrix_t& V0dat, sparse_matrix_t& V0cat, myint lengv0d, myint lengv0c, myint nedge, complex<double>* u2, complex<double>* u1);
+void V0aMultiply(sparse_matrix_t& V0dat, sparse_matrix_t& V0cat, myint lengv0d, myint lengv0c, myint nedge, complex<double>* u2, complex<double>* u1);
 void generateP(fdtdMesh* sys, double freq, myint* LRowId, myint* LColId, double* Lval, myint leng_L, myint N, myint* PRowId, myint* PColId, double* Pval, myint& leng_P);
 void addDiagV0bV0ba(fdtdMesh* sys, myint* LooRowId, myint* LooColId, double* Looval, myint leng_Loo);
 int gmres_V0dLoo(double* Doosval, sparse_matrix_t& V0dt, double* v0dn, sparse_matrix_t& V0dat, double* v0dan, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* A22dbRowId, myint* A22dbColId, double* A22dbval, myint leng_A22db, double* bm, double* res, myint N, myint N1, double freq);
@@ -42,8 +43,20 @@ void A11A22timesV(double* Doosval, double freq, sparse_matrix_t& V0ddt, sparse_m
 void solveA11A22_schur(double* bm, double* x, double freq, double* Doosval, sparse_matrix_t& V0ddt, sparse_matrix_t& V0ddat, myint N1, double* v0dn, double* v0dan, sparse_matrix_t& V0bt, sparse_matrix_t& V0bat, myint N2, sparse_matrix_t& Soo, myint N3, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22RowId1, myint* A22ColId, double* A22Val, myint leng_A22, void* pt[64], myint iparm[64]);
 int gmres_solveA11schur(double* rhs, double* x, double freq, double* Doosval, sparse_matrix_t& V0ddt, sparse_matrix_t& V0ddat, myint N1, double* v0dn, double* v0dan, sparse_matrix_t& V0bt, sparse_matrix_t& V0bat, myint N2, sparse_matrix_t& Soo, myint N3, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22RowId1, myint* A22ColId, double* A22Val, myint leng_A22, void* pt[64], myint iparm[64]);
 void A11schurtimesV(double freq, double* Doosval, sparse_matrix_t& V0ddt, sparse_matrix_t& V0ddat, myint N1, double* v0dn, double* v0dan, sparse_matrix_t& V0bt, sparse_matrix_t& V0bat, myint N2, sparse_matrix_t& Soo, myint N3, myint* A11RowId, myint* A11ColId, double* A11val, myint leng_A11, myint* A22RowId, myint* A22RowId1, myint* A22ColId, double* A22Val, myint leng_A22, void* pt[64], myint iparm[64], double* v1, double* v2);
+
+void solve_L_schur(complex<double>* u2, complex<double>* uh, myint nedge, double freq, complex<double>* Dval, double* Depsval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac);
+int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int maxIterNum, double freq, complex<double>* Dval, double* Depsval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac);
+void L_schur_mv(complex<double>* v1, complex<double>* v2, myint n, double freq, complex<double>* Dval, double* Depsval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac);
 void DTimesV(fdtdMesh* sys, myint nedge, double freq, complex<double>* u1, complex<double>* u2);
+void copyMatrix(complex<double>* a, complex<double>* b, int m, int n);
 double V2norm(complex<double>* r0, myint n);
+complex<double> hermitian_inner_product(complex<double>* w, complex<double>* v, myint n);
+void MatrixMatrix(complex<double>* a, complex<double>* b, complex<double>* c, myint m, myint n, myint k);
+double relaErrorFVV(complex<double>* v1, complex<double>* v2, myint n);
+void resize_matrix_upper_left_zero_based(complex<double> ** pa, int m, int n, int k, int l);
+void resize_matrix_and_fill_with_identity(complex<double> ** pa, int n);
+void ZGMV(complex<double>* M, complex<double>* v1, complex<double>* v2, myint m, myint n);
+
 
 static bool comp(pair<double, int> a, pair<double, int> b) {
 	return a.first <= b.first;
@@ -103,7 +116,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 #endif
 
 	/* Generate A11 = V0ddan'*D_eps*V0ddn */
-	cout << "nnz of V0d is " << sys->v0d1num << endl;
+	cout << "nnz of V0d is " << sys->v0d1num << " and leng_v0d1 is " << sys->leng_v0d1 << endl;
 	sys->generateAdeps_v0d1(sys->mapd, sys->v0d1num, sys->v0d1num, sys->leng_v0d1);   // Ad = V0d1a'*D_eps*V0d1
 	//sys->generateAdeps_v0db(sys->mapd, sys->v0dnum, sys->v0dnum, sys->leng_v0d);   // Ad = V0da'*D_eps*V0d
 	//sys->generateMd(sys->mapd, sys->v0d1num, sys->v0d1num, sys->leng_v0d1);   // Md = V0d1a'*V0d1
@@ -120,14 +133,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	ofstream outfile;
 	//outfile.open("V0d1.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0d1num; ++indi) {
-	//	outfile << sys->mapio[sys->mapEdge[sys->v0d1RowId[indi]]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
+	//	outfile << sys->mapEdge[sys->v0d1RowId[indi]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
 	//	outfile << setprecision(15) << sys->v0d1val[indi] << endl;
 	//}
 	//outfile.close();
 
 	//outfile.open("V0d1a.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0d1num; ++indi) {
-	//	outfile << sys->mapio[sys->mapEdge[sys->v0d1RowId[indi]]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
+	//	outfile << sys->mapEdge[sys->v0d1RowId[indi]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
 	//	outfile << setprecision(15) << sys->v0d1aval[indi] << endl;
 	//}
 	//outfile.close();
@@ -429,32 +442,17 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 
 	//outfile.open("V0c.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0cnum; ++indi) {
-	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " " << sys->v0cvalo[indi] << endl;
+	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " ";
+	//	outfile << setprecision(15) << sys->v0cvalo[indi] << endl;
 	//}
 	//outfile.close();
 
 	//outfile.open("V0ca.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0cnum; ++indi) {
-	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " " << sys->v0cavalo[indi] << endl;
+	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " ";
+	//	outfile << setprecision(15) << sys->v0cavalo[indi] << endl;
 	//}
 	//outfile.close();
-
-	//outfile.open("inside.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->N_edge; ++indi) {
-	//	if (sys->markEdge[indi]) {
-	//		outfile << indi << endl;
-	//	}
-	//}
-	//outfile.close();
-	/*for (indi = 0; indi < sys->numCdt + 1; indi++) {
-	cout << sys->acu_cnno[indi] << " ";
-	}
-	cout << endl;
-	for (indi = 0; indi < sys->numCdt + 1; indi++) {
-	cout << sys->cindex[indi] << " ";
-	}
-	cout << endl;*/
-
 
 	double *a;
 	int *ia, *ja;
@@ -803,7 +801,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	}
 	outfile.close();
 	cout << "current is generated!\n";
-
+	
 	/* Frequency domain to solve inside outside part */
 	for (int ind = 0; ind < sys->nfreq; ++ind) {
 #ifdef FREQ
@@ -1090,6 +1088,18 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 		/* End of generating matrix [-omega^2*D_eps+S, -omega*D_sig;
 		omega*D_sig,      -omega^2*D_eps+S] */
 
+		/* generate (-omega^2*D_eps+j*omega*D_sig) */
+		complex<double>* Dval = (complex<double>*)calloc(nedge, sizeof(complex<double>));
+		double* Depsval = (double*)calloc(nedge, sizeof(double));
+		for (int indi = 0; indi < nedge; ++indi) {
+			if (sys->markEdge[sys->mapEdgeR[indi]])
+				Dval[indi] = { -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[indi]), freq * 2 * M_PI * SIGMA };
+			else 
+				Dval[indi] = { -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[indi]), 0.0 };
+			Depsval[indi] = sys->getEps(sys->mapEdgeR[indi]);
+		}
+		/* end of (-omega^2*D_eps+j*omega*D_sig) */
+
 		for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
 			double* J = (double*)calloc(nedge, sizeof(double));
 			sys->setCurrent(sourcePort, J);
@@ -1136,22 +1146,27 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 			//	V0aJ[sys->leng_v0d1 + ind] /= sys->v0can[ind];   // v0aJ= = V0a'*(-omega*J)
 			//}
 			complex<double>* u1 = (complex<double>*)calloc(sys->leng_v0d1 + sys->leng_v0c, sizeof(complex<double>));
-			solveV0(freq, V0aJ, u1, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, nedge, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, 'i');   // u1 = (V0a'*D*V0)\(V0a'*(-1i*omega*J))
+			solveV0(freq, V0aJ, u1, Depsval, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, nedge, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, 'i');   // u1 = (V0a'*D*V0)\(V0a'*(-1i*omega*J))
 			
 			complex<double>* u2 = (complex<double>*)calloc(nedge, sizeof(complex<double>));
 			V0Multiply(V0dt, V0ct, sys->leng_v0d1, sys->leng_v0c, nedge, u1, u2);   // u2 = V0*(V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0)\(V0a'*1i*v0aJ)
 			DTimesV(sys, nedge, freq, u2, u2);   // u2 = D*u2
 			//double* u2ri = (double*)calloc(nedge * 2, sizeof(double));
-			for (int ind = 0; ind < nedge; ++ind) {
-				complex<double> temp(0, J[ind]);
-				u2[ind] = temp - u2[ind];   // u2 = -1i*omega*J-(-omega^2*D_eps+1i*omega*D_sig)*V0*(V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0)\(V0a'*(-1i*omega*J))
-				//u2ri[ind] = u2[ind].real();   // u2.real()
-				//u2ri[nedge + ind] = u2[ind].imag();   // u2.imag()
+			for (int indi = 0; indi < nedge; ++indi) {
+				complex<double> temp(0, J[indi]);
+				u2[indi] = temp - u2[indi];   // u2 = -1i*omega*J-(-omega^2*D_eps+1i*omega*D_sig)*V0*(V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0)\(V0a'*(-1i*omega*J))
+				//u2ri[indi] = u2[indi].real();   // u2.real()
+				//u2ri[nedge + indi] = u2[indi].imag();   // u2.imag()
 			}
 
 			complex<double>* uh = (complex<double>*)calloc(nedge, sizeof(complex<double>));
-			solve_L_schur(u2, uh, nedge, freq, Doosval, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, LrowId, LcolId, Lval, leng_L);   // uh = ((D+L)-D*V0*(V0a'*D*V0)^(-1)*V0a'*D)\(-1i*omega*J-D*V0*(V0a'*D*V0)\(V0a'*(-1i*omega*J)))
-			
+			solve_L_schur(u2, uh, nedge, freq, Dval, Depsval, V0dt, V0dat, sys->leng_v0d1, V0ct, V0cat, sys->leng_v0c, LrowId, LcolId, Lval, leng_L, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac);   // uh = ((D+L)-D*V0*(V0a'*D*V0)^(-1)*V0a'*D)\(-1i*omega*J-D*V0*(V0a'*D*V0)\(V0a'*(-1i*omega*J)))
+			//outfile.open("uh.txt", ofstream::out | ofstream::trunc);
+			//for (int indi = 0; indi < nedge; ++indi) {
+			//	outfile << setprecision(15) << uh[indi].real() << " " << setprecision(15) << uh[indi].imag() << endl;
+			//}
+			//outfile.close();
+
 			///* solve [-omega^2*D_eps+L, -omega*D_sig;
 			//omega*D_sig,      -omega^2*D_eps+L]*[xr; xi] = [u2r; u2i] */
 			//double* xhri = (double*)calloc(nedge * 2, sizeof(double));
@@ -1218,9 +1233,10 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 			/* End of calculating the error norm */
 
 			free(J); J = NULL;
-			//free(V0aJ); V0aJ = NULL;
-			//free(u1); u1 = NULL;
-			//free(u2); u2 = NULL;
+			free(V0aJ); V0aJ = NULL;
+			free(u1); u1 = NULL;
+			free(u2); u2 = NULL;
+			free(uh); uh = NULL;
 			//free(u2ri); u2ri = NULL;
 			//free(xhri); xhri = NULL;
 			//free(xh); xh = NULL;
@@ -1234,6 +1250,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 			/* End of solving [V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0, V0a'*(-omega^2*D_eps+1i*omega*D_sig);
 			(-omega^2*D_eps+1i*omega*D_sig)*V0,      -omega^2*D_eps+1i*omega*D_sig+L] */
 		}
+		free(Dval); Dval = NULL;
 		//free(L1RowId); L1RowId = NULL;
 		//free(L1ColId); L1ColId = NULL;
 		//free(L1val); L1val = NULL;
@@ -2206,7 +2223,7 @@ void addOmegaEpsilon(fdtdMesh* sys, myint* RowId, myint* ColId, double* val, myi
 	}
 }
 
-void solveV0(double freq, double* rhs, complex<double>* u0, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint leng_v0d, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, myint leng_v0c, myint nedge, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac, char ri) {
+void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint leng_v0d, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, myint leng_v0c, myint nedge, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac, char ri) {
 	/* solve (V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0) with real right hand side
 	sys : provide V0d, V0da, V0c, V0ca
 	freq : frequency
@@ -2229,6 +2246,10 @@ void solveV0(double freq, double* rhs, complex<double>* u0, sparse_matrix_t& v0d
 		rhs1[indi] = rhs[indi]; // sys->v0dan[indi] *
 	}
 	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, rhs1, leng_v0d, temp, 1, 3);   // temp = (V0da'*D_eps*V0d)\bd
+	for (int ind = 0; ind < leng_v0d; ++ind) {
+		u0dr[ind] = temp[ind];
+		u0dr[ind] /= ((-pow(freq * 2 * M_PI, 2)));// / sys->v0dn[ind]);   // u0dr = (V0da'*(-omega^2*D_eps)*V0d)\(bd), real
+	}
 	//for (int ind = 0; ind < leng_v0d; ++ind) {
 	//	temp[ind] *= sys->v0dn[ind];
 	//}
@@ -2238,7 +2259,7 @@ void solveV0(double freq, double* rhs, complex<double>* u0, sparse_matrix_t& v0d
 	//}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0dt, descr, temp, beta, temp1);   // temp1 = V0d*(V0da'*D_eps*V0d)\bd
 	for (int ind = 0; ind < nedge; ++ind) {
-		temp1[ind] *= Doosval[ind];   // temp1 = D_eps*V0d*(V0da'*D_eps*V0d)\bd
+		temp1[ind] *= Depsval[ind];   // temp1 = D_eps*V0d*(V0da'*D_eps*V0d)\bd
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0cat, descr, temp1, beta, temp2);   // temp2 = V0ca'*D_eps*V0d*(V0da'*D_eps*V0d)\bd
 	for (int ind = 0; ind < leng_v0c; ++ind) {
@@ -2260,20 +2281,17 @@ void solveV0(double freq, double* rhs, complex<double>* u0, sparse_matrix_t& v0d
 	//}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_TRANSPOSE, alpha, v0ct, descr, temp2, beta, temp1);   // temp1 = V0c*u0c, imaginary
 	for (int ind = 0; ind < nedge; ++ind) {
-		temp1[ind] *= Doosval[ind];   // temp1 = D_eps*V0c*u0c
+		temp1[ind] *= Depsval[ind];   // temp1 = D_eps*V0c*u0c
 	}
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp1, beta, temp);
 	//for (int ind = 0; ind < leng_v0d; ++ind) {
 	//	temp[ind] /= sys->v0dan[ind];
 	//}
-	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, temp, leng_v0d, u0di, 1, 3);   // u0di = (V0da'*D_eps*V0d)\(V0da'*D_eps*V0c*u0c), imaginary
+	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, temp, leng_v0d, u0di, 0, 3);   // u0di = (V0da'*D_eps*V0d)\(V0da'*D_eps*V0c*u0c), imaginary
 	for (int ind = 0; ind < leng_v0d; ++ind) {
 		u0di[ind] *= -1;// *sys->v0dn[ind];   // u0di = -(V0da'*D_eps*V0d)\(V0da'*D_eps*V0c*u0c), imaginary
 	}
-	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, rhs1, leng_v0d, u0dr, 1, 3);   // u0dr = (V0da'*D_eps*V0d)\(bd), real
-	for (int ind = 0; ind < leng_v0d; ++ind) {
-		u0dr[ind] /= ((-pow(freq * 2 * M_PI, 2)));// / sys->v0dn[ind]);   // u0dr = (V0da'*(-omega^2*D_eps)*V0d)\(bd), real
-	}
+	
 
 	/* Assign to the final solution */
 	if (ri == 'r') {
@@ -2301,6 +2319,37 @@ void solveV0(double freq, double* rhs, complex<double>* u0, sparse_matrix_t& v0d
 	free(u0dr); u0dr = NULL;
 	free(rhs1); rhs1 = NULL;
 }
+
+void solveV0_c(double freq, complex<double>* rhs, complex<double>* u0, double* Depsval, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint leng_v0d, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, myint leng_v0c, myint nedge, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac) {
+	/* solve (V0a'*(-omega^2*D_eps+1i*omega*D_sig)*V0) with complex right hand side
+	 */
+	double* rhsr = (double*)calloc(leng_v0d + leng_v0c, sizeof(double));
+	double* rhsi = (double*)calloc(leng_v0d + leng_v0c, sizeof(double));
+	for (int ind = 0; ind < leng_v0d + leng_v0c; ++ind) {
+		rhsr[ind] = rhs[ind].real();
+		rhsi[ind] = rhs[ind].imag();
+	}
+	complex<double>* u0r = (complex<double>*)calloc(leng_v0d + leng_v0c, sizeof(complex<double>));
+	complex<double>* u0i = (complex<double>*)calloc(leng_v0d + leng_v0c, sizeof(complex<double>));
+	ofstream out;
+	
+	solveV0(freq, rhsr, u0r, Depsval, v0dt, v0dat, leng_v0d, v0ct, v0cat, leng_v0c, nedge, AdRowId, AdColId, Adval, leng_Ad, AcRowId, AcColId, Acval, leng_Ac, 'r');
+	/*out.open("v1.txt", ofstream::out | ofstream::trunc);
+	for (int ind = 0; ind < leng_v0d + leng_v0c; ++ind) {
+		out << setprecision(15) << rhsi[ind] << endl;
+	}
+	out.close();*/
+	solveV0(freq, rhsi, u0i, Depsval, v0dt, v0dat, leng_v0d, v0ct, v0cat, leng_v0c, nedge, AdRowId, AdColId, Adval, leng_Ad, AcRowId, AcColId, Acval, leng_Ac, 'i');
+	/*out.open("v2.txt", ofstream::out | ofstream::trunc);
+	for (int ind = 0; ind < leng_v0d + leng_v0c; ++ind) {
+		out << setprecision(15) << u0i[ind].real() << " " << setprecision(15) << u0i[ind].imag() << endl;
+	}
+	out.close();*/
+	for (int ind = 0; ind < leng_v0d + leng_v0c; ++ind) {
+		u0[ind] = u0r[ind] + u0i[ind];
+	}
+}
+
 
 void V0Multiply(sparse_matrix_t& V0dt, sparse_matrix_t& V0ct, myint lengv0d, myint lengv0c, myint row, complex<double>* u1, complex<double>* u2) {
 	/* Do V0*u1 and put the result in u2 */
@@ -2388,7 +2437,8 @@ void generateL1(fdtdMesh* sys, double freq, myint* LRowId, myint* LColId, double
 	leng_L1 = ind;
 }
 
-void V0aMultiply(fdtdMesh* sys, sparse_matrix_t& V0dat, sparse_matrix_t& V0cat, myint lengv0d, myint lengv0c, myint nedge, complex<double>* u2, complex<double>* u1) {
+void V0aMultiply(sparse_matrix_t& V0dat, sparse_matrix_t& V0cat, myint lengv0d, myint lengv0c, myint nedge, complex<double>* u2, complex<double>* u1) {
+	/* Do u1 = V0a'*u2, put the result in u1 */
 	double alpha = 1;
 	double beta = 0;
 	struct matrix_descr descr;
@@ -2409,13 +2459,9 @@ void V0aMultiply(fdtdMesh* sys, sparse_matrix_t& V0dat, sparse_matrix_t& V0cat, 
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, tempr, beta, tempcr);
 	s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, V0cat, descr, tempi, beta, tempci);
 	for (int ind = 0; ind < lengv0d; ++ind) {
-		tempdr[ind] /= sys->v0dan[ind];
-		tempdi[ind] /= sys->v0dan[ind];
 		u1[ind] = tempdr[ind] + 1i * tempdi[ind];
 	}
 	for (int ind = 0; ind < lengv0c; ++ind) {
-		tempcr[ind] /= sys->v0can[ind];
-		tempci[ind] /= sys->v0can[ind];
 		u1[ind + lengv0d] = tempcr[ind] + 1i * tempci[ind];
 	}
 	free(tempr); tempr = NULL;
@@ -4343,16 +4389,16 @@ void DTimesV(fdtdMesh* sys, myint nedge, double freq, complex<double>* u1, compl
 	}
 }
 
-void solve_L_schur(complex<double>* u2, complex<double>* uh, myint nedge, double freq, double* Doosval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L) {
+void solve_L_schur(complex<double>* u2, complex<double>* uh, myint nedge, double freq, complex<double>* Dval, double* Depsval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac) {
 	/* solve {(D+L)-D*V0*(V0a'*D*V0)^(-1)*V0a'*D}*uh = u2 = -1i*omega*J-D*V0*(V0a'*D*V0)^(-1)*(V0a'*(-1i*omega*J)) */
 	int status, maxIterNum = 500;
-	double epsilon = 1e-3;
+	double epsilon = 1e-2;
 
-	status = GMRES(uh, u2, nedge, epsilon, maxIterNum, freq, Doosval, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, LrowId, LcolId, Lval, leng_L, )
+	status = GMRES(uh, u2, nedge, epsilon, maxIterNum, freq, Dval, Depsval, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, LrowId, LcolId, Lval, leng_L, AdRowId, AdColId, Adval, leng_Ad, AcRowId, AcColId, Acval, leng_Ac);
 }
 
 
-int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int maxIterNum, double freq, double* Doosval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t7 V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L) {
+int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int maxIterNum, double freq, complex<double>* Dval, double* Depsval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac) {
 	// This function implements GMRES 
 	// refer to Iterative Methods Linear System Second Edition Yousef Saad p171 for theory
 	// Also refer to https://rtraba.files.wordpress.com/2015/05/cpp_numerical.pdf for some implementing issue
@@ -4381,8 +4427,8 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 	complex<double> * Htemp = (complex<double> *) calloc(n, sizeof(complex<double>));
 	complex<double> * Htemptemp = (complex<double> *) calloc(n, sizeof(complex<double>));
 	for (i = 0; i < Qsize; i++) {
-		Q[i + i * Qsize] = 1.0;
-		Omega[i + i * Qsize] = 1.0;
+		Q[i + i * Qsize] = 1;
+		Omega[i + i * Qsize] = 1;
 	}
 	// For every iteration, V is n*Vsize, H is (Hsize+1)*Hsize, Q is Qsize*Qsize, where Qsize=Hsize+1
 	// Omega is Qsize*Qsize, bg is Qsize
@@ -4399,7 +4445,7 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 	//printf("beta = %.20f \n", beta);
 	bg[0] = { beta, 0 };
 	for (i = 1; i < gsize; i++) {
-		bg[i] = { 0.0, 0.0 };
+		bg[i] = 0;
 	}
 	double residual = 1.0;
 	for (i = 0; i < n; i++) {
@@ -4418,7 +4464,7 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 			unisize = 2 * k;
 			// 0.1 resize V
 			Vsize = unisize + 1;
-			V = (double _Complex *) realloc(V, n*Vsize * sizeof(double _Complex));
+			V = (complex<double> *) realloc(V, n*Vsize * sizeof(complex<double>));
 			// 0.2 resize H
 			Hsize = unisize;
 			resize_matrix_upper_left_zero_based(&H, k + 1, k, Hsize + 1, Hsize);
@@ -4426,22 +4472,32 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 			Qsize = Hsize + 1;
 			resize_matrix_upper_left_zero_based(&Q, k + 1, k + 1, Qsize, Qsize);
 			for (ii = k + 1; ii < Qsize; ii++) {
-				Q[ii + ii * Qsize] = 1.0;
+				Q[ii + ii * Qsize] = 1;
 			}
-			tempQ = (double _Complex *) realloc(tempQ, Qsize*Qsize * sizeof(double _Complex));
+			tempQ = (complex<double> *) realloc(tempQ, Qsize*Qsize * sizeof(complex<double>));
 			resize_matrix_and_fill_with_identity(&Omega, Qsize);
 			// 0.4 resize bar{g}
 			gsize = Qsize;
-			bg = (double _Complex *) realloc(bg, Qsize * sizeof(double _Complex));
+			bg = (complex<double> *) realloc(bg, Qsize * sizeof(complex<double>));
 			for (ii = k + 1; ii < Qsize; ii++) {
-				bg[ii] = 0.0;
+				bg[ii] = 0;
 			}
-			bgtemp = (double _Complex *) realloc(bgtemp, Qsize * sizeof(double _Complex));
+			bgtemp = (complex<double> *) realloc(bgtemp, Qsize * sizeof(complex<double>));
 		}
 
 		// 1, Arnordi process
-		H2MV(psm, pcb, V + k*n, w, n, P_inv, A0_inv, FMMorNew);
-		L_schur_mv()
+		ofstream out;
+		//out.open("v1.txt", ofstream::out | ofstream::trunc);
+		//for (int ind = 0; ind < n; ++ind) {
+		//	out << setprecision(15) << V[k * n + ind].real() << " " << setprecision(15) << V[k * n + ind].imag() << endl;
+		//}
+		//out.close();
+		L_schur_mv(V + k * n, w, n, freq, Dval, Depsval, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, LrowId, LcolId, Lval, leng_L, AdRowId, AdColId, Adval, leng_Ad, AcRowId, AcColId, Acval, leng_Ac);
+		//out.open("v2.txt", ofstream::out | ofstream::trunc);
+		//for (int ind = 0; ind < n; ++ind) {
+		//	out << setprecision(15) << w[ind].real() << " " << setprecision(15) << w[ind].imag() << endl;
+		//}
+		//out.close();
 		// since we reuse H[0:k-1,k] and V[:,1:k]
 		// only compute H[:,k], and V[:,k+1]
 
@@ -4453,7 +4509,7 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 			}
 		}
 
-		H[k + 1 + k * (Hsize + 1)] = V2norm(w, n);
+		H[k + 1 + k * (Hsize + 1)] = complex<double>(V2norm(w, n), 0.0);
 
 		for (ii = 0; ii < n; ii++) {
 			V[ii + (k + 1)*n] = w[ii] / H[k + 1 + k * (Hsize + 1)];
@@ -4467,11 +4523,11 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 		// 2.2 compute the new plane rotation
 		Ht_k_k = Htemp[k];
 		Ht_kp1_k = Htemp[k + 1];
-		sk = Ht_kp1_k / csqrt(cpow(Ht_k_k, 2) + cpow(Ht_kp1_k, 2));
-		ck = Ht_k_k / csqrt(cpow(Ht_k_k, 2) + cpow(Ht_kp1_k, 2));
+		sk = Ht_kp1_k / sqrt(pow(Ht_k_k, 2) + pow(Ht_kp1_k, 2));
+		ck = Ht_k_k / sqrt(pow(Ht_k_k, 2) + pow(Ht_kp1_k, 2));
 		Omega[k + k * Qsize] = ck;
 		Omega[k + (k + 1) * Qsize] = sk;
-		Omega[k + 1 + k * Qsize] = -1 * sk;
+		Omega[k + 1 + k * Qsize] = -1.0 * sk;
 		Omega[k + 1 + (k + 1) * Qsize] = ck;
 
 		// 2.3 multiply this new plane rotation to previous computed plane rotation, denoted as Q. 
@@ -4483,7 +4539,7 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 		MatrixMatrix(Omega, tempQ, Q, Qsize, Qsize, Qsize);
 
 		// 2.4 compute residual
-		residual = cabs(bg[k + 1]) / beta;
+		residual = abs(bg[k + 1]) / beta;
 		printf("k = %d, residual = %.20f \n", k, residual);
 
 		// 2.5 make Omega (plane rotation) identity again for next iteration.
@@ -4497,10 +4553,10 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 
 	// 3, After converge, compute result: xm = x0 + V_my_m, where y_m = min(\bar{g} - \bar{Rm}y)
 	// 3.0 get Rm:
-	double _Complex * Rm = (double _Complex *) calloc(Qsize * Hsize, sizeof(double _Complex));
+	complex<double> * Rm = (complex<double> *) calloc(Qsize * Hsize, sizeof(complex<double>));
 	MatrixMatrix(Q, H, Rm, Qsize, Qsize, Hsize);
 	// 3.1 compute y_m = min(\bar{g} - \bar{Rm}y). \bar{Rm} is upper triangle version of Hm
-	double _Complex * y = (double _Complex *) calloc(k, sizeof(double _Complex));
+	complex<double> * y = (complex<double> *) calloc(k, sizeof(complex<double>));
 	// This is equivalent to solving an upper triangle linear system
 	// Right now \bar{Rm} is of size (k+1) * k.
 	// also consider use MKL's pztrtrs function
@@ -4515,21 +4571,21 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 	ZGMV(V, y, x, n, k);
 
 	// test ||bg - Rmy||
-	double _Complex * Ry = (double _Complex *) calloc(Qsize, sizeof(double _Complex));
+	complex<double> * Ry = (complex<double> *) calloc(Qsize, sizeof(complex<double>));
 	ZGMV(Rm, y, Ry, Qsize, k);
 	printf("||bg - Rmy|| is %.20f \n", relaErrorFVV(bg, Ry, Hsize + 1));
 
 	// test ||beta e1 - \bar{Hm}y||
-	double _Complex * Hy = (double _Complex *) calloc(Hsize + 1, sizeof(double _Complex));
+	complex<double> * Hy = (complex<double> *) calloc(Hsize + 1, sizeof(complex<double>));
 	ZGMV(H, y, Hy, Hsize + 1, k);
-	double _Complex * be = (double _Complex *) calloc(Hsize + 1, sizeof(double _Complex));
+	complex<double> * be = (complex<double> *) calloc(Hsize + 1, sizeof(complex<double>));
 	be[0] = beta;
 	printf("||beta e1 - bar{Hm}y|| is %.20f \n", relaErrorFVV(be, Hy, Hsize + 1));
 
 	// test ||b - Zx||
-	double _Complex * Zx = (double _Complex *) calloc(n, sizeof(double _Complex));
-	H2MV(psm, pcb, x, Zx, n, P_inv, A0_inv, FMMorNew);
-	printf("||b - Zx|| is %.20f \n", relaErrorFVV(b, Zx, n));
+	complex<double> * Zx = (complex<double> *) calloc(n, sizeof(complex<double>));
+	L_schur_mv(x, Zx, n, freq, Dval, Depsval, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, LrowId, LcolId, Lval, leng_L, AdRowId, AdColId, Adval, leng_Ad, AcRowId, AcColId, Acval, leng_Ac);
+	printf("||b - Zx|| is %.20f \n \n", relaErrorFVV(b, Zx, n));
 
 	// 4, free memory:
 	free(r0); r0 = NULL;
@@ -4546,6 +4602,9 @@ int GMRES(complex<double> *x, complex<double> *b, myint n, double epsilon, int m
 	free(Htemptemp); Htemptemp = NULL;
 	free(Rm); Rm = NULL;
 	free(y); y = NULL;
+	free(Ry); Ry = NULL;
+	free(Hy); Hy = NULL;
+	free(Zx); Zx = NULL;
 
 	// return number of iterations
 	return k;
@@ -4559,5 +4618,135 @@ double V2norm(complex<double>* r0, myint n) {
 		res += r0[i].real() * r0[i].real() + r0[i].imag() * r0[i].imag();
 	}
 	res = sqrt(res);
+	return res;
+}
+
+void copyMatrix(complex<double>* a, complex<double>* b, int m, int n) {
+	/* cpoy a to b with size m*n (columnwise) */
+	int i;
+	int t = m * n;
+	for (i = 0; i < t; ++i) {
+		b[i] = a[i];
+	}
+}
+
+void resize_matrix_upper_left_zero_based(complex<double> ** pa, int m, int n, int k, int l) {
+	// this matrix resize a m*n matrix stored in a to a k * l matrix, original matrix is put at 
+	// upper left of the new matrix. Here k > m, l > n
+	// in the resultant matrix, except the filled region, all the other elements are 0.
+	complex<double> * temp = (complex<double> *) calloc(m*n, sizeof(complex<double>));
+	copyMatrix((*pa), temp, m, n);
+	free((*pa));
+	(*pa) = NULL;
+	(*pa) = (complex<double> *) calloc(k*l, sizeof(complex<double>));
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < n; j++) {
+			(*pa)[i + j * k] = temp[i + j * m];
+		}
+	}
+	free(temp);
+	temp = NULL;
+}
+
+void resize_matrix_and_fill_with_identity(complex<double> ** pa, int n) {
+	// this matrix resize a matrix a to a n * n matrix, and matrix a as an identity matrix.
+	free((*pa));
+	(*pa) = NULL;
+	(*pa) = (complex<double> *) calloc(n*n, sizeof(complex<double>));
+	for (int i = 0; i < n; i++) {
+		(*pa)[i + n*i] = { 1.0, 0.0 };
+	}
+}
+
+void L_schur_mv(complex<double>* v1, complex<double>* v2, myint n, double freq, complex<double>* Dval, double* Depsval, sparse_matrix_t& V0dt, sparse_matrix_t& V0dat, myint leng_v0d, sparse_matrix_t& V0ct, sparse_matrix_t& V0cat, myint leng_v0c, myint* LrowId, myint* LcolId, double* Lval, myint leng_L, myint* AdRowId, myint* AdColId, double* Adval, myint leng_Ad, myint* AcRowId, myint* AcColId, double* Acval, myint leng_Ac) {
+	ofstream outfile;
+	/* multiply (D+L-D*V0*(V0a'*D*V0)\(V0a'*D))*v1 with a vector */
+	complex<double>* Lv1 = (complex<double>*)calloc(n, sizeof(complex<double>));
+	sparseMatrixVecMul_c(LrowId, LcolId, Lval, leng_L, v1, Lv1);   // Lv1=L*v1
+
+	complex<double>* Dv1 = (complex<double>*)calloc(n, sizeof(complex<double>));
+	for (int ind = 0; ind < n; ++ind) {
+		Dv1[ind] = Dval[ind] * v1[ind];   // Dv1 = (-omega^2*D_eps+1i*omega*D_sig)*v1
+	}
+
+	double alpha = 1, beta = 0;
+	struct matrix_descr descr;
+	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+	sparse_status_t s;
+	complex<double>* V0atDv1 = (complex<double>*)calloc(leng_v0d + leng_v0c, sizeof(complex<double>));
+	V0aMultiply(V0dat, V0cat, leng_v0d, leng_v0c, n, Dv1, V0atDv1);   //V0atDv1 = V0a'*D*v1
+
+	complex<double>* A0iV0atDv1 = (complex<double>*)calloc(leng_v0d + leng_v0c, sizeof(complex<double>));
+	
+	solveV0_c(freq, V0atDv1, A0iV0atDv1, Depsval, V0dt, V0dat, leng_v0d, V0ct, V0cat, leng_v0c, n, AdRowId, AdColId, Adval, leng_Ad, AcRowId, AcColId, Acval, leng_Ac);   // A0iV0atDv1 = (V0a'*D*V0)\(V0a'*D*v1)
+
+	complex<double>* V0A0iV0atDv1 = (complex<double>*)calloc(n, sizeof(complex<double>));
+
+	V0Multiply(V0dt, V0ct, leng_v0d, leng_v0c, n, A0iV0atDv1, V0A0iV0atDv1);   // V0A0iV0atDv1 = V0*(V0a'*D*V0)\(V0a'*D*v1)
+
+	complex<double>* DV0A0iV0atDv1 = (complex<double>*)calloc(n, sizeof(complex<double>));    // DV0A0iV0atDv1=D*V0*(V0a'*D*V0)\(V0a'*D*v1)
+	for (int ind = 0; ind < n; ++ind) {
+		DV0A0iV0atDv1[ind] = Dval[ind] * V0A0iV0atDv1[ind];    // DV0A0iV0atDv1=D*V0*(V0a'*D*V0)\(V0a'*D*v1)
+	}
+
+	for (int ind = 0; ind < n; ++ind) {
+		v2[ind] = Lv1[ind] + Dv1[ind] + DV0A0iV0atDv1[ind];
+	}
+
+	free(Lv1); Lv1 = NULL;
+	free(Dv1); Dv1 = NULL;
+	free(V0atDv1); V0atDv1 = NULL;
+	free(A0iV0atDv1); A0iV0atDv1 = NULL;
+	free(V0A0iV0atDv1); V0A0iV0atDv1 = NULL;
+	free(DV0A0iV0atDv1); DV0A0iV0atDv1 = NULL;
+
+}
+
+complex<double> hermitian_inner_product(complex<double>* w, complex<double>* v, myint n) {
+	/* hermitian inner product of w and v, sum{wi * vi^H} */
+	complex<double> res = 0;
+
+	for (int ind = 0; ind < n; ++ind) {
+		res += w[ind] * conj(v[ind]);
+	}
+	return res;
+}
+
+void ZGMV(complex<double>* M, complex<double>* v1, complex<double>* v2, myint m, myint n) {
+	/* Multiply a dense matrix with a vector M * v1 = v2
+	m and n are the size of the matrix M */
+	for (int ind = 0; ind < m; ++ind) {
+		v2[ind] = 0;
+		for (int indi = 0; indi < n; ++indi) {
+			v2[ind] += M[ind + indi * m] * v1[indi];
+		}
+	}
+}
+
+void MatrixMatrix(complex<double>* a, complex<double>* b, complex<double>* c, myint m, myint n, myint k) {
+	/* Do matrix-matrix multiplication a * b = c 
+	a size : m * n
+	b size : n * k
+	c size : m * k */
+	for (int ind = 0; ind < m; ++ind) {
+		for (int indi = 0; indi < k; ++indi) {
+			c[ind + indi * m] = 0;
+			for (int indj = 0; indj < n; ++indj) {
+				c[ind + indi * m] += a[ind + indj * m] * b[indi * n + indj];
+			}
+		}
+	}
+}
+
+double relaErrorFVV(complex<double>* v1, complex<double>* v2, myint n) {
+	/* calculate ||v1 - v2|| / ||v1|| and return
+	n is the size of v1 or v2 vector*/
+	double res = 0, v1norm = 0;
+
+	for (int ind = 0; ind < n; ++ind) {
+		res += norm(v1[ind] - v2[ind]);
+		v1norm += norm(v1[ind]);
+	}
+	res = sqrt(res) / sqrt(v1norm);
 	return res;
 }

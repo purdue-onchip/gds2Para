@@ -8528,6 +8528,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22);    // findVh.cpp
 int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* sol);    // findVh.cpp
 int sparseMatrixVecMul(myint* rowId, myint* colId, double* val, myint leng, double* v1, double* v2);   // findVh.cpp
+int sparseMatrixVecMul_c(myint* rowId, myint* colId, double* val, myint leng, complex<double>* v1, complex<double>* v2);   // findVh.cpp
 int pardisoSolve(myint* rowId, myint* colId, double* val, double* rsc, double* xsol, myint size);   // findVh.cpp
 int storeTimeRespValue(fdtdMesh* sys, double** resp, int ind, double* xr);   // findVh.cpp
 int mklFFT(fdtdMesh* sys, double* time, complex<double>* freq, int N);   // findVh.cpp

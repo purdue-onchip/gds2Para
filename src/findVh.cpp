@@ -2336,6 +2336,22 @@ int sparseMatrixVecMul(myint* rowId, myint* colId, double* val, myint leng, doub
 	return 0;
 }
 
+int sparseMatrixVecMul_c(myint* rowId, myint* colId, double* val, myint leng, complex<double>* v1, complex<double>* v2) {
+	/* sparse matrix multiply a dense complex vector
+	rowId : rowId of this sparse matrix
+	colId : colId of this sparse matrix
+	val : value of this sparse matrix
+	leng : nnz in the matrix
+	v1 : vector
+	v2 : result vector,
+	Note: v2 need to initialize to be 0 first */
+	for (myint i = 0; i < leng; ++i) {
+
+		v2[rowId[i]] += complex<double>(val[i], 0.0) * v1[colId[i]];
+	}
+	return 0;
+}
+
 int pardisoSolve(myint* rowId, myint* colId, double* val, double* rsc, double* xsol, myint size) {
 	/* Use pardiso to solve the matrix solution
 	   rowId : matrix rowId, csr form, the start index for each row
