@@ -78,7 +78,9 @@ int layeredFdtd(void) {
 		return status;
 	}
 
-    solveE_Zpara_layered(&sys);
+    //cout << endl << endl << "Results from Layered Finite-Difference Solver: " << endl;
+    //solveE_Zpara_layered(&sys);
+    cout << endl << endl << "Results from Reference (direct backslash with PARDISO): " << endl;
     solveE_Zpara_reference(&sys);
 
 	return 0;

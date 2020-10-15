@@ -24,7 +24,7 @@
 #include <algorithm>
 #include <utility>
 
-#define SKIP_LAYERED_FD   // Comment out if you want to run layered FD code in Linux, doesn't matter for Windows system
+//#define SKIP_LAYERED_FD   // Comment out if you want to run layered FD code in Linux, doesn't matter for Windows system
 
 // HYPRE and MKL data type control
 #define LARGE_SYSTEM (1) // Must leave defined with the current makefile
@@ -59,8 +59,8 @@ using namespace std;
 #define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-#define UPPER_BOUNDARY_PEC
-#define LOWER_BOUNDARY_PEC
+//#define UPPER_BOUNDARY_PEC
+//#define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL

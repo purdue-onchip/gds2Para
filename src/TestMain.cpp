@@ -358,10 +358,15 @@ int main(int argc, char** argv)
             // Parameter generation
             clock_t t6 = clock();
 #ifndef SKIP_LAYERED_FD     // Run layered Finite-Difference solver
-            cout << endl << endl << "Results from Layered Finite-Difference Solver: " << endl;
-            status = solveE_Zpara_layered(&sys);
-            //cout << endl << endl << "Results from Reference (direct backslash with PARDISO): " << endl;
-            //solveE_Zpara_reference(&sys);
+            //cout << endl << endl << "Results from Layered Finite-Difference Solver: " << endl;
+            //status = solveE_Zpara_layered(&sys);
+            //cout << "layeredFD solver time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+
+            clock_t t_ref = clock();
+            cout << endl << endl << "Results from Reference (direct backslash with PARDISO): " << endl;
+            solveE_Zpara_reference(&sys);
+            cout << "direct backslash solver time is " << (clock() - t_ref) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+
 #else                       // Run VoVh solver
             cout << endl << endl << "Results from V0Vh Solver: " << endl;
             status = paraGenerator(&sys, xi, yi, zi);

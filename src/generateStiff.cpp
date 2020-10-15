@@ -580,6 +580,59 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     int indz, indy, temp;
     int sourcePort;
 
+    // output port index and direction
+    ofstream out;
+    out.open("port_index.txt", std::ofstream::out | std::ofstream::trunc);
+    out << "num of ports: \n" << sys->numPorts << endl;
+    out << "port index, direction, sourceCurrent I, and edgeLength * (-direc) at port. \n(Note: portDirection is the relative position of the port to the ground. E.g., ground is on the top, then portDirection = -1):";
+    for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
+        // port index
+        out << endl;
+        for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+            for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++) {
+                out << sys->mapEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][inde]] << "  ";
+            }
+        }
+
+        // port direction
+        out << endl;
+        for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+            for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++) {
+                out << sys->portCoor[sourcePort].portDirection[sourcePortSide] << "  ";
+            }
+        }
+
+        // port area or source current /* Only divide matrix entry by current at end of response port calculation */
+        out << endl;
+        double sourceCurrent = 0.; // In-phase current from unit source port edge current densities into supply point (A)
+        for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++)
+        {
+            sourceCurrent += sys->portCoor[sourcePort].portArea[sourcePortSide];
+        }
+        out << sourceCurrent << endl;
+        // edge length * (-direc) at port
+        int inz, inx, iny;
+        double leng;
+        int indPortSide = 0; // Only deal with first port side to get response edge line integral
+        for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[indPortSide].size(); indEdge++) {
+            myint thisEdge = sys->portCoor[sourcePort].portEdge[indPortSide][indEdge];
+            if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= sys->N_edge_s) {    // This edge is along the z-axis
+                inz = thisEdge / (sys->N_edge_s + sys->N_edge_v);
+                leng = sys->zn[inz + 1] - sys->zn[inz];
+            }
+            else if (thisEdge % (sys->N_edge_s + sys->N_edge_v) >= (sys->N_cell_y) * (sys->N_cell_x + 1)) {    // This edge is along the x-axis
+                inx = ((thisEdge % (sys->N_edge_s + sys->N_edge_v)) - (sys->N_cell_y) * (sys->N_cell_x + 1)) / (sys->N_cell_y + 1);
+                leng = sys->xn[inx + 1] - sys->xn[inx];
+            }
+            else {    // This edge is along the y-axis
+                iny = (thisEdge % (sys->N_edge_s + sys->N_edge_v)) % sys->N_cell_y;
+                leng = sys->yn[iny + 1] - sys->yn[iny];
+            }
+            out << leng * (sys->portCoor[sourcePort].portDirection[indPortSide] * -1.0) << "  ";    // Volt line integral coefficient
+        }
+    }
+    out.close();
+
     for (sourcePort = 0; sourcePort < sys->numPorts; sourcePort++) {
         for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
             for (int inde = 0; inde < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); inde++){
@@ -591,6 +644,12 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
             }
         }
     }
+
+    /*out.open("J.txt", std::ofstream::out | std::ofstream::trunc);
+    for (int i = 0; i < sys->N_edge - sys->bden; i++) {
+        out << J[i].real() << "  " << J[i].imag() << endl;
+    }
+    out.close();*/
     
     /* Used in plasma2D for upper and lower excitation */
     /*myint current_edge = sys->portEdge[sourcePort][indi - 1] + (sys->N_edge_s + sys->N_edge_v);
@@ -688,7 +747,11 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
     }
     cout << sqrt(total_norm) << endl;*/
 
-    
+    //out.open("eSolu.txt", std::ofstream::out | std::ofstream::trunc);
+    //for (int i = 0; i < sys->N_edge - sys->bden; i++) {
+    //    out << xr[i].real() << "  " << xr[i].imag() << endl;
+    //}
+    //out.close();
 
 
     free(xr); xr = NULL;    

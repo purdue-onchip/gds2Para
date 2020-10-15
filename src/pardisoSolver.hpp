@@ -649,6 +649,7 @@ int solveE_Zpara_layered(fdtdMesh *psys) {
     for (int indFreq = 0; indFreq < vFreqHz.size(); indFreq++) {    // for each computed freq point
         double omegaHz = 2.0 * M_PI * vFreqHz[indFreq];
 
+        cout << indFreq << "-th frequency" << endl;
         // Cascaded system matrix (-w^2*D_eps+iw*D_sig+ShSe/mu)
         denseFormatOfMatrix cascadedS = cascadeMatrixS(psys, omegaHz, indexMap);
 

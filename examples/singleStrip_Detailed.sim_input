@@ -6,7 +6,7 @@ FREQUENCY
 freqUnit = 1.0e+6
 freqStart = 45
 freqEnd = 50000
-nfreq = 50
+nfreq = 1
 freqScale = 1
 
 DIELECTRIC STACK
