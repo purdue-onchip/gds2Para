@@ -45,6 +45,7 @@ using namespace std;
 #define MU (4*M_PI*1.e-7)
 #define CSPED (299792458.)
 #define EPSILON0 (1./(CSPED*CSPED*MU))
+#define MAXC (256*6)
 
 // Solver control macros
 #define SIGMA (5.8e+7)  // the load edge sigma //(3.508) // Default conductivity for conductors is copper (S/m)
@@ -56,10 +57,10 @@ using namespace std;
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.)// Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-12) // Time step for finding high-frequency modes (s)
+#define DT (1.e-10) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-//#define UPPER_BOUNDARY_PEC
+#define UPPER_BOUNDARY_PEC
 //#define LOWER_BOUNDARY_PEC
 //#define CONDUCTOR_PEC    // all conductor edges are removed
 #define PRINT_NODE_COORD

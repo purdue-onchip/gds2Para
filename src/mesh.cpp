@@ -20,8 +20,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 																								   /* Generate the mesh nodes based on conductorIn information */
 	myint numNode = 0;
-	double disMinx = MINDISFRACX* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent //0.005;
-	double disMiny = MINDISFRACY* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // 0.005;
+	double disMinx = 1e-8;// MINDISFRACX* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent //0.005; 
+	double disMiny = 1e-8;// MINDISFRACY* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // 0.005; 
 	//double xc1 = -16.5e-3, xc2 = 0, yc1 = -16.5e-3, yc2 = 0, disMinx1 = 20e-6, disMiny1 = 20e-6;
 	//double xc11 = -5.6e-3, xc21 = -3e-3, yc11 = -14.6e-3, yc21 = -0.3e-3, disMinx2 = 13e-6, disMiny2 = 13e-6;
 	double xc1 = 0, xc2 = 0, yc1 = 0, yc2 = 0, disMinx1 = disMinx, disMiny1 = disMiny;   // don't use this
@@ -31,7 +31,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	//for (indi = 0; indi < sys->numCdtRow; indi++) { 
 	//    numNode += sys->conductorIn[indi].numVert;
 	//}
-
+	
 	for (indi = 0; indi < sys->numCdtRow; indi++) {
 		if (sys->conductorIn[indi].zmin >= sys->zlim1*sys->lengthUnit && sys->conductorIn[indi].zmin <= sys->zlim2*sys->lengthUnit) {
 			if (sys->conductorIn[indi].zmax >= sys->zlim1*sys->lengthUnit && sys->conductorIn[indi].zmax <= sys->zlim2*sys->lengthUnit) {
@@ -62,6 +62,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	yOrigOld.push_back(sys->ylim1 * sys->lengthUnit);
 	yOrigOld.push_back(sys->ylim2 * sys->lengthUnit);
 	//double condzmax = 0, condzmin = sys->zlim2 * sys->lengthUnit;
+	
 	for (indi = 0; indi < sys->numCdtRow; indi++) {
 		//if (sys->conductorIn[indi].zmax > condzmax)
 		//	condzmax = sys->conductorIn[indi].zmax;
@@ -146,7 +147,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 	}
 	numOrigOldZ = indj;//dj
 
-					   /*******************************************************************************************/
+	/*******************************************************************************************/
 					   /* Discretize domain in the x-direction */
 	sort(xOrigOld.begin(), xOrigOld.end());
 	cout << "old size x " << xOrigOld.size() << endl;
@@ -802,122 +803,122 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 		}
 	}
 	//setSharedEdge(sys);
-	free(visited);
-	visited = (myint*)calloc(sys->N_node, sizeof(myint));
-	count = (myint)0;
-	std::queue<myint> empty;
-	std::swap(qu, empty);    // clear queue
+	//free(visited);
+	//visited = (myint*)calloc(sys->N_node, sizeof(myint));
+	//count = (myint)0;
+	//std::queue<myint> empty;
+	//std::swap(qu, empty);    // clear queue
 
-							 /* BFS to figure out the disjoint conductors */
-	for (indi = 0; indi < sys->N_node; indi++) {
-		if (sys->markNode[indi] == 0) {
-			continue;
-		}
-		else {
-			if (visited[indi] != 0) {
-				continue;
-			}
-			else {
-				qu.push(indi);
-				count++;
-				visited[indi] = count;
-				//sys->cond2condIn.push_back(base);
-				while (!qu.empty()) {
-					mark = 0;
-					inz = qu.front() / (sys->N_node_s);
-					inx = (qu.front() % sys->N_node_s) / (sys->N_cell_y + 1);
-					iny = (qu.front() % sys->N_node_s) % (sys->N_cell_y + 1);
+	///* BFS to figure out the disjoint conductors */
+	//for (indi = 0; indi < sys->N_node; indi++) {
+	//	if (sys->markNode[indi] == 0) {
+	//		continue;
+	//	}
+	//	else {
+	//		if (visited[indi] != 0) {
+	//			continue;
+	//		}
+	//		else {
+	//			qu.push(indi);
+	//			count++;
+	//			visited[indi] = count;
+	//			//sys->cond2condIn.push_back(base);
+	//			while (!qu.empty()) {
+	//				mark = 0;
+	//				inz = qu.front() / (sys->N_node_s);
+	//				inx = (qu.front() % sys->N_node_s) / (sys->N_cell_y + 1);
+	//				iny = (qu.front() % sys->N_node_s) % (sys->N_cell_y + 1);
 
-					// how many edges this node connects to
-					if (inz != 0) {    // this node is not on the bottom plane
-						eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-						sys->compute_edgelink(eno, node1, node2);    // compute_edgelink is used to get edge eno's two side's nodes node1, node2
-						if (sys->markEdge[eno] != 0) {
-							if ((node1 != qu.front() && visited[node1] == 0)) {
-								visited[node1] = count;
-								qu.push(node1);
-							}
-							else if ((node2 != qu.front() && visited[node2] == 0)) {
-								visited[node2] = count;
-								qu.push(node2);
-							}
-						}
-					}
-					if (inz != sys->nz - 1) {    // this node is not on the upper plane
-						eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
-						if (sys->markEdge[eno] != 0) {
-							sys->compute_edgelink(eno, node1, node2);
-							if ((node1 != qu.front() && visited[node1] == 0)) {
-								visited[node1] = count;
-								qu.push(node1);
-							}
-							else if ((node2 != qu.front() && visited[node2] == 0)) {
-								visited[node2] = count;
-								qu.push(node2);
-							}
-						}
-					}
-					if (inx != 0) {    // this node is not on the left plane
-						eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
-						if (sys->markEdge[eno] != 0) {
-							sys->compute_edgelink(eno, node1, node2);
-							if ((node1 != qu.front() && visited[node1] == 0)) {
-								visited[node1] = count;
-								qu.push(node1);
-							}
-							else if ((node2 != qu.front() && visited[node2] == 0)) {
-								visited[node2] = count;
-								qu.push(node2);
-							}
-						}
-					}
-					if (inx != sys->nx - 1) {    // this node is not on the right plane
-						eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
-						if (sys->markEdge[eno] != 0) {
-							sys->compute_edgelink(eno, node1, node2);
-							if ((node1 != qu.front() && visited[node1] == 0)) {
-								visited[node1] = count;
-								qu.push(node1);
-							}
-							else if ((node2 != qu.front() && visited[node2] == 0)) {
-								visited[node2] = count;
-								qu.push(node2);
-							}
-						}
-					}
-					if (iny != 0) {    // this node is not on the front plane
-						eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
-						if (sys->markEdge[eno] != 0) {
-							sys->compute_edgelink(eno, node1, node2);
-							if ((node1 != qu.front() && visited[node1] == 0)) {
-								visited[node1] = count;
-								qu.push(node1);
-							}
-							else if ((node2 != qu.front() && visited[node2] == 0)) {
-								visited[node2] = count;
-								qu.push(node2);
-							}
-						}
-					}
-					if (iny != sys->ny - 1) {    // this node is not on the back plane
-						eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
-						if (sys->markEdge[eno] != 0) {
-							sys->compute_edgelink(eno, node1, node2);
-							if ((node1 != qu.front() && visited[node1] == 0)) {
-								visited[node1] = count;
-								qu.push(node1);
-							}
-							else if ((node2 != qu.front() && visited[node2] == 0)) {
-								visited[node2] = count;
-								qu.push(node2);
-							}
-						}
-					}
-					qu.pop();
-				}
-			}
-		}
-	}
+	//				// how many edges this node connects to
+	//				if (inz != 0) {    // this node is not on the bottom plane
+	//					eno = (inz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
+	//					sys->compute_edgelink(eno, node1, node2);    // compute_edgelink is used to get edge eno's two side's nodes node1, node2
+	//					if (sys->markEdge[eno] != 0) {
+	//						if ((node1 != qu.front() && visited[node1] == 0)) {
+	//							visited[node1] = count;
+	//							qu.push(node1);
+	//						}
+	//						else if ((node2 != qu.front() && visited[node2] == 0)) {
+	//							visited[node2] = count;
+	//							qu.push(node2);
+	//						}
+	//					}
+	//				}
+	//				if (inz != sys->nz - 1) {    // this node is not on the upper plane
+	//					eno = inz * (sys->N_edge_s + sys->N_edge_v) + sys->N_edge_s + inx * (sys->N_cell_y + 1) + iny;    // the node's lower edge
+	//					if (sys->markEdge[eno] != 0) {
+	//						sys->compute_edgelink(eno, node1, node2);
+	//						if ((node1 != qu.front() && visited[node1] == 0)) {
+	//							visited[node1] = count;
+	//							qu.push(node1);
+	//						}
+	//						else if ((node2 != qu.front() && visited[node2] == 0)) {
+	//							visited[node2] = count;
+	//							qu.push(node2);
+	//						}
+	//					}
+	//				}
+	//				if (inx != 0) {    // this node is not on the left plane
+	//					eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (inx - 1) * (sys->N_cell_y + 1) + iny;
+	//					if (sys->markEdge[eno] != 0) {
+	//						sys->compute_edgelink(eno, node1, node2);
+	//						if ((node1 != qu.front() && visited[node1] == 0)) {
+	//							visited[node1] = count;
+	//							qu.push(node1);
+	//						}
+	//						else if ((node2 != qu.front() && visited[node2] == 0)) {
+	//							visited[node2] = count;
+	//							qu.push(node2);
+	//						}
+	//					}
+	//				}
+	//				if (inx != sys->nx - 1) {    // this node is not on the right plane
+	//					eno = inz *(sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + inx * (sys->N_cell_y + 1) + iny;
+	//					if (sys->markEdge[eno] != 0) {
+	//						sys->compute_edgelink(eno, node1, node2);
+	//						if ((node1 != qu.front() && visited[node1] == 0)) {
+	//							visited[node1] = count;
+	//							qu.push(node1);
+	//						}
+	//						else if ((node2 != qu.front() && visited[node2] == 0)) {
+	//							visited[node2] = count;
+	//							qu.push(node2);
+	//						}
+	//					}
+	//				}
+	//				if (iny != 0) {    // this node is not on the front plane
+	//					eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny - 1;
+	//					if (sys->markEdge[eno] != 0) {
+	//						sys->compute_edgelink(eno, node1, node2);
+	//						if ((node1 != qu.front() && visited[node1] == 0)) {
+	//							visited[node1] = count;
+	//							qu.push(node1);
+	//						}
+	//						else if ((node2 != qu.front() && visited[node2] == 0)) {
+	//							visited[node2] = count;
+	//							qu.push(node2);
+	//						}
+	//					}
+	//				}
+	//				if (iny != sys->ny - 1) {    // this node is not on the back plane
+	//					eno = inz *(sys->N_edge_s + sys->N_edge_v) + inx * sys->N_cell_y + iny;
+	//					if (sys->markEdge[eno] != 0) {
+	//						sys->compute_edgelink(eno, node1, node2);
+	//						if ((node1 != qu.front() && visited[node1] == 0)) {
+	//							visited[node1] = count;
+	//							qu.push(node1);
+	//						}
+	//						else if ((node2 != qu.front() && visited[node2] == 0)) {
+	//							visited[node2] = count;
+	//							qu.push(node2);
+	//						}
+	//					}
+	//				}
+	//				qu.pop();
+	//			}
+	//		}
+	//	}
+	//}
 #ifdef PRINT_VERBOSE_TIMING
 	//cout << "Time to find isolated conductors is " << (clock() - tt) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 	//cout << "Number of isolated conductors counted is " << count << endl;
@@ -1218,12 +1219,12 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 			}
 		}
 	}
-	out.open("markCell.txt", ofstream::out | ofstream::trunc);
-	myint N_cell = sys->N_cell_x * sys->N_cell_y * sys->N_cell_z;
-	for (indi = 0; indi < N_cell; ++indi) {
-		out << sys->markCell[indi] << endl;
-	}
-	out.close();
+	//out.open("markCell.txt", ofstream::out | ofstream::trunc);
+	//myint N_cell = sys->N_cell_x * sys->N_cell_y * sys->N_cell_z;
+	//for (indi = 0; indi < N_cell; ++indi) {
+	//	out << sys->markCell[indi] << endl;
+	//}
+	//out.close();
 #endif
 
 	return 0;
@@ -1264,23 +1265,23 @@ int matrixConstruction(fdtdMesh *sys) {
 	}
 	}*/
 	ofstream out;
-	out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
-	for (indi = 0; indi < sys->N_edge; indi++) {
-		out << std::setprecision(15) << sys->getEps(indi) << endl;
-	}
-	out.close();
+	//out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
+	//for (indi = 0; indi < sys->N_edge; indi++) {
+	//	out << std::setprecision(15) << sys->getEps(indi) << endl;
+	//}
+	//out.close();
 
-	out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
-	for (indi = 0; indi < sys->N_edge; indi++) {
-		if (sys->markEdge[indi] != 0) {
-			out << std::setprecision(15) << SIGMA << endl;
-			//out << indi + 1 << endl;
-		}
-		else {
-			out << 0 << endl;
-		}
-	}
-	out.close();
+	//out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
+	//for (indi = 0; indi < sys->N_edge; indi++) {
+	//	if (sys->markEdge[indi] != 0) {
+	//		out << std::setprecision(15) << SIGMA << endl;
+	//		//out << indi + 1 << endl;
+	//	}
+	//	else {
+	//		out << 0 << endl;
+	//	}
+	//}
+	//out.close();
 
 	//checkCondShared(sys);
 

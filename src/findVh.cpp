@@ -104,7 +104,7 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, myint* MooRowId, m
 int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval, sparse_matrix_t& Ll) {
 	int t0n = 3;
 	double dt = DT;
-	double tau = 1.e-11;
+	double tau = 1.e-9;
 	double t0 = t0n * tau;
 	myint nt = 2 * t0 / dt;
 	myint SG = 10;
@@ -191,7 +191,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 	/* pardiso solve the backward difference matrix --- factorization */
 	//pardisoSolve_factorize(SRowId1, SColId, Sval, sys->leng_S, edge);
 	/* End of pardiso solve the backward difference matrix --- factorization */
-
+	outfile.open("x.txt", ofstream::out | ofstream::trunc);
 	for (int ind = 1; ind <= nt; ind++) {    // time marching to find the repeated eigenvectors
 		// Generate the right hand side
 		for (int indi = 0; indi < edge; indi++) {
@@ -218,7 +218,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 		/* End of backward difference, use HYPRE solve */
 
 		/* Use pardiso to solve backward difference */
-		status = pardisoSolve(SRowId1, SColId, Sval, rsc, &xr[edge * 2], edge);
+		//status = pardisoSolve(SRowId1, SColId, Sval, rsc, &xr[edge * 2], edge);
 		//outfile.open("xr.txt", std::ofstream::trunc | std::ofstream::out);
 		//for (int indi = 0; indi < edge; ++indi) {
 		//	outfile << xr[edge * 2 + indi] << endl;
@@ -230,41 +230,41 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 		          (D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
 				  for backward difference*/
 		/* Generate [v0a' * b; b] */
-		//bm = (double*)calloc(noden + edge, sizeof(double));
-		//sys->generateLaplacianRight(bm, rsc);
-		////outfile.open("bm.txt", std::ofstream::trunc | std::ofstream::out);
-		////for (int ind = 0; ind < sys->N_edge - sys->bden + sys->leng_v0d1 + sys->leng_v0c; ++ind) {
-		////	outfile << bm[ind] << endl;
-		////}
-		////outfile.close();
+		bm = (double*)calloc(noden + edge, sizeof(double));
+		sys->generateLaplacianRight(bm, rsc);
+		//outfile.open("bm.txt", std::ofstream::trunc | std::ofstream::out);
+		//for (int ind = 0; ind < sys->N_edge - sys->bden + sys->leng_v0d1 + sys->leng_v0c; ++ind) {
+		//	outfile << bm[ind] << endl;
+		//}
+		//outfile.close();
 
-		///* Use MKL fgmres to solve the matrix solution */
-		///* solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
-		//        (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] with diagonal as the preconditioner */
-		////x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
-		////status = mkl_gmres(sys, bm, x, Ll, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
-		///* End of using MKL fgmres to solve the matrix solution */
+		/* Use MKL fgmres to solve the matrix solution */
+		/* solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
+		        (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] with diagonal as the preconditioner */
+		x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
+		status = mkl_gmres(sys, bm, x, Ll, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
+		/* End of using MKL fgmres to solve the matrix solution */
 
-		///* Use direct solver to solve the matrix solution */
-		///* When dt^2*Loo is much larger than dt*D_sig+D_eps, this way is accurate
-		// solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
-  //              (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
+		/* Use direct solver to solve the matrix solution */
+		/* When dt^2*Loo is much larger than dt*D_sig+D_eps, this way is accurate
+		 solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
+                (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] */
 		//x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
 		//status = solveBackMatrix(sys, bm, x, v0ct, v0cat, v0dt, v0dat, A12RowId, A12ColId, A12val, leng_A12, A21RowId, A21ColId, A21val, leng_A21, A22RowId, A22ColId, A22val, leng_A22);
-		// /* End of using direct solver to solve the matrix solution */
+		 /* End of using direct solver to solve the matrix solution */
 
-		///* Use pardiso to solve the matrix solution */
-		////x = (double*)calloc((noden + sys->N_edge - sys->bden), sizeof(double));
-		////status = pardisoSolve(sys->LlRowId, sys->LlColId, sys->Llval, bm, x, edge + noden);
-		///* End of using pardiso to solve the matrix solution */
-		//
-		///* Compute V0 * y0 + xh */
-		//status = combine_x(x, sys, &xr[edge * 2]);
-		////outfile.open("x.txt", std::ofstream::trunc | std::ofstream::out);
-		////for (int indi = 0; indi < edge; ++indi) {
-		////	outfile << xr[edge * 2 + indi] << endl;
-		////}
-		////outfile.close();
+		/* Use pardiso to solve the matrix solution */
+		//x = (double*)calloc((noden + sys->N_edge - sys->bden), sizeof(double));
+		//status = pardisoSolve(sys->LlRowId, sys->LlColId, sys->Llval, bm, x, edge + noden);
+		/* End of using pardiso to solve the matrix solution */
+		
+		/* Compute V0 * y0 + xh */
+		status = combine_x(x, sys, &xr[edge * 2]);
+		//outfile.open("x.txt", std::ofstream::trunc | std::ofstream::out);
+		//for (int indi = 0; indi < edge; ++indi) {
+		//	outfile << xr[edge * 2 + indi] << endl;
+		//}
+		//outfile.close();
 
 		/* End of solving [V0a'*(D_eps+dt*D_sig)*V0, V0a'*(D_eps+dt*D_sig)
 		(D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
@@ -281,6 +281,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 		
 
 		nn = 0;
+		nn = sys->getVoltage(&xr[(edge) * 2], sourcePort);   // get the voltage
 		for (int indi = 0; indi < edge; indi++) {
 			//nn += pow(xr[2 * edge + indi], 2);
 			xr[indi] = xr[edge + indi];
@@ -289,7 +290,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 		}
 		//nn = sqrt(nn);
 
-		nn = sys->getVoltage(xr, sourcePort);   // get the voltage
+		
 
 		outfile << nn << endl;
 		free(bm); bm = NULL;
@@ -1652,7 +1653,7 @@ int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A
 	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
 	/*------------------------------------------------------------------------------------*/
 	MKL_INT ipar[size];
-	ipar[14] = 100;
+	ipar[14] = 200;
 	//double b[N];
 	//double expected_solution[N];
 	//double computed_solution[N];
@@ -1697,7 +1698,7 @@ int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A
 	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	if (RCI_request != 0) goto FAILED;
 	ipar[10] = 1;   // the Preconditioned FGMRES iterations will be performed
-	ipar[14] = 100;   // restart number
+	ipar[14] = 200;   // restart number
 	ipar[7] = 0;
 	dpar[0] = 1.0E-3;
 	/*---------------------------------------------------------------------------
@@ -1754,7 +1755,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		//cout << "The solution is " << bmn << endl;
 
 		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
-		if (dvar < 0.0001) goto COMPLETE;
+		if (dvar < dpar[0] || itercount > ipar[14]) goto COMPLETE;
 		else goto ONE;
 	}
 
@@ -1973,6 +1974,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		/* Preconditioner : [v0da'*D_eps*v0d,v0da'*D_eps*v0c,   0;
 							 0,              v0ca'*dt*D_sig*v0c,0;
 							 0,              0,                ,D_eps+dt*D_sig+dt^2*L] */
+		
 		int status;
 		double alpha = 1, beta = 0;
 		struct matrix_descr descr;
@@ -2007,9 +2009,12 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp, beta, temp1); // temp1 = V0da'*D_eps*normalized(V0c)*yc
 		for (myint indi = 0; indi < sys->leng_v0d1; ++indi) {
 			temp1[indi] = b1[indi] - temp1[indi] / sys->v0dan[indi];   // temp1 = b1 - normalized(V0da)'*D_eps*normalized(V0c)*yc
+			temp1[indi] *= sys->v0dan[indi];
 		}
 		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp1, sys->leng_v0d1, b2, 0, 3);
-
+		for (myint indi = 0; indi, sys->leng_v0d1; ++indi) {
+			b2[indi] *= sys->v0dn[indi];
+		}
 		//out.open("b1.txt", std::ofstream::trunc | std::ofstream::out);
 		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
 		//	out << b1[indi] << endl;
@@ -2099,9 +2104,12 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
 			temp2[ind] += temp3[ind];   // temp2 = v0da'*D_eps*v0c*y2+v0da'*D_eps*y3
 			temp2[ind] = b1[ind] - temp2[ind];   // temp2 = b1-v0da1'*D_eps*v0c*y2-v0da'*D_eps*y3
+			temp2[ind] *= sys->v0dan[ind];
 		}
 		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp2, sys->leng_v0d1, b2, 0, 3);   // solve y1
-
+		for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+			b2[ind] *= sys->v0dn[ind];
+		}
 
 		free(temp);
 		free(temp1);
@@ -2146,10 +2154,12 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, v0dat, descr, temp3, beta, temp);   // temp = V0da'*D_eps*V0c*(V0ca'*D_sig*V0c)\(bc)
 		for (int indi = 0; indi < sys->leng_v0d1; ++indi) {
 			temp[indi] = b1[indi] - temp[indi] / sys->v0dan[indi];   // temp = bd-V0da'*D_eps*V0c*(V0ca'*D_sig*V0c)\(bc)
+			temp[indi] *= sys->v0dan[indi];
 		}
 		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, xd, 0, 3);   // xd=(V0da'*D_eps*V0d)\(bd-V0da'*D_eps*V0c*((V0ca'*D_sig*dt*V0c)\bc))
 
 		for (int indi = 0; indi < sys->leng_v0d1; ++indi) {
+			xd[indi] *= sys->v0dn[indi];
 			b2[indi] = xd[indi];
 			temp[indi] = xd[indi] / sys->v0dn[indi];
 		}
@@ -2243,7 +2253,9 @@ int solveBackMatrix(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t& v0ct,
 int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, double* sol) {
 	/* Solve [V0a'*(D_eps+dt*D_sig)*V0]^(-1)
 	The matrix is [V0da'*D_eps*V0d, V0da'*D_eps*V0c;
-	               V0ca'*D_eps*V0d, V0ca'*(D_eps+dt*D_sig)*V0c] */
+	               V0ca'*D_eps*V0d, V0ca'*(D_eps+dt*D_sig)*V0c] 
+				sys->Ad is normalized 
+				sys->Ac is not normalized */
 	int status;
 	double alpha = 1, beta = 0;
 	struct matrix_descr descr;
@@ -2256,7 +2268,14 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	double* temp = (double*)malloc(edge * sizeof(double));
 	double* temp1 = (double*)malloc(sys->leng_v0c * sizeof(double));
 	double* xc = (double*)malloc(sys->leng_v0c * sizeof(double));
-	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, rhs, sys->leng_v0d1, bd1, 1, 3);   // bd1 = (v0da'*D_eps*v0d)^(-1)*(bd)
+	double* rhs1 = (double*)malloc(sys->leng_v0d1 * sizeof(double));
+	for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+		rhs1[ind] = rhs[ind] * sys->v0dan[ind];
+	}
+	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, rhs1, sys->leng_v0d1, bd1, 1, 3);   // bd1 = (v0da'*D_eps*v0d)^(-1)*(bd)
+	for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
+		bd1[ind] *= sys->v0dn[ind];
+	}
 	//out.open("bd1.txt", std::ofstream::out | std::ofstream::trunc);
 	//for (int ind = 0; ind < sys->leng_v0d1; ind++) {
 	//	out << bd1[ind] << endl;
@@ -2304,10 +2323,12 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	}
 	for (myint i = 0; i < sys->leng_v0d1; ++i) {
 		bd1[i] = rhs[i] - bd1[i];  // bd1 = bd-v0da'*D_eps*v0c*xc
+		bd1[i] *= sys->v0dan[i];
 	}
 	status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, bd1, sys->leng_v0d1, bd1, 1, 3);   // bd1 (xd) = (v0da'*D_eps*v0d)^(-1)*(bd-v0da'*D_eps*v0c*xc)
 
 	for (myint i = 0; i < sys->leng_v0d1; ++i) {
+		bd1[i] *= sys->v0dn[i];
 		sol[i] = bd1[i];
 	}
 	for (myint i = 0; i < sys->leng_v0c; ++i) {
@@ -2317,6 +2338,7 @@ int solveA11Matrix(fdtdMesh* sys, double* rhs, sparse_matrix_t& v0ct, sparse_mat
 	free(temp); temp = NULL;
 	free(temp1); temp1 = NULL;
 	free(xc); xc = NULL;
+	free(rhs1); rhs1 = NULL;
 	return 0;
 }
 

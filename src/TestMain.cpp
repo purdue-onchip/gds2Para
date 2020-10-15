@@ -28,6 +28,10 @@ using std::cerr;
 using std::cout;
 using std::endl;
 
+int readTXT(fdtdMesh* sys, string file);
+double fdtdGetValue(char *str);
+int fdtdStringWord(char *s, char *word[]);
+
 /// @brief main function 
 /// @param argc number of arguments 
 /// @param argv values of arguments 
@@ -234,6 +238,100 @@ int main(int argc, char** argv)
             }
             cout << "Created PSLG file for each layer" << endl;
         }
+//		else if ((strcmp(argv[1], "-rt") == 0) || (strcmp(argv[1], "--readtxt") == 0))
+//		{   // read the txt file for all the inputs and output citi file
+//			// Initialize SolverDataBase, mesh, and set variables for performance tracking
+//			clock_t t1 = clock();
+//			fdtdMesh sys;
+//			int status = 0; // Initialize as able to return successfully
+//			
+//			readTXT(&sys, argv[2]);
+//
+//			// Mesh the domain and mark conductors
+//			unordered_map<double, int> xi, yi, zi;
+//			unordered_set<double> portCoorx, portCoory;
+//
+//			clock_t t2 = clock();
+//			status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+//			if (status == 0)
+//			{
+//				cout << "meshAndMark Success!" << endl;
+//				cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+//			}
+//			else
+//			{
+//				cerr << "meshAndMark Fail!" << endl;
+//				return status;
+//			}
+//			//sys.print();
+//
+//			// Set D_eps and D_sig
+//			clock_t t3 = clock();
+//			status = matrixConstruction(&sys);
+//			if (status == 0)
+//			{
+//				cout << "matrixConstruction Success!" << endl;
+//				cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+//			}
+//			else {
+//				cerr << "matrixConstruction Fail!" << endl;
+//				return status;
+//			}
+//			//sys.print();
+//
+//			// Set port
+//			clock_t t4 = clock();
+//			status = portSet(&sys, xi, yi, zi);
+//			if (status == 0)
+//			{
+//				cout << "portSet Success!" << endl;
+//				cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+//			}
+//			else
+//			{
+//				cerr << "portSet Fail!" << endl;
+//				return status;
+//			}
+//			//sys.print();
+//
+//			// Generate Stiffness Matrix
+//#ifndef SKIP_GENERATE_STIFF
+//			clock_t t5 = clock();
+//			status = generateStiff(&sys);
+//			if (status == 0)
+//			{
+//				cout << "generateStiff Success!" << endl;
+//				cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+//			}
+//			else
+//			{
+//				cerr << "generateStiff Fail!" << endl;
+//				return status;
+//			}
+//#endif
+//
+//			// Write object sys to files
+//#ifndef SKIP_WRITE_SYS_TO_FILE
+//			WriteSysToFile(sys);
+//#endif
+//
+//			// Parameter generation
+//			clock_t t6 = clock();
+//			status = paraGenerator(&sys, xi, yi, zi);
+//			if (status == 0)
+//			{
+//				cout << "paraGenerator Success!" << endl;
+//				cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+//			}
+//			else
+//			{
+//				cerr << "paraGenerator Fail!" << endl;
+//				return status;
+//			}
+//			cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+//			cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+//
+//		}
         else
         {
             cerr << "Must pass a .imp file to read and blank GDSII file to write after \"-i\" flag, rerun with \"--help\" flag for details" << endl;
@@ -447,4 +545,160 @@ int main(int argc, char** argv)
     }
 
     return 0;
+}
+
+int readTXT(fdtdMesh* sys, string file) {
+	/* read the txt file */
+	FILE *fp, *cfp;
+	char fbase[MAXC];
+	char s[MAXC];
+	char *word[MAXC];
+	
+	fp = fopen(&file[0], "r");
+	if (fp == NULL) {
+		perror("Failed: ");
+		return -2;
+	}
+	
+	cout << "Begin reading the txt file!" << endl;
+	
+	// read the conductorIn information
+	fgets(s, MAXC, fp);
+	fdtdStringWord(s, word);
+	sys->lengthUnit = 1;
+	sys->xlim1 = fdtdGetValue(word[0]);
+	sys->xlim2 = fdtdGetValue(word[1]);
+	sys->ylim1 = fdtdGetValue(word[2]);
+	sys->ylim2 = fdtdGetValue(word[3]);
+	sys->zlim1 = fdtdGetValue(word[4]);
+	sys->zlim2 = fdtdGetValue(word[5]);
+	while (strncmp(word[0], "FREQUENCY:", 10)) {
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+	}
+	if (!strncmp(word[0], "FREQUENCY:", 10)) {
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+		sys->freqUnit = fdtdGetValue(word[2]);
+
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+		sys->freqStart = fdtdGetValue(word[2]);
+
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+		sys->freqEnd = fdtdGetValue(word[2]);
+
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+		sys->nfreq = fdtdGetValue(word[2]);
+
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+		sys->freqScale = fdtdGetValue(word[2]);
+	}
+	while (strncmp(word[0], "CONDUCTORIN:", 12)) {
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+	}
+	if (!strncmp(word[0], "CONDUCTORIN:", 12)) {
+		while (fgets(s, MAXC, fp) != NULL) {
+			fdtdStringWord(s, word);
+			if (!strncmp(word[0], "STACK", 5)) {
+				break;
+			}
+			fdtdOneCondct base;
+			sys->conductorIn.push_back(base);
+			int i = sys->conductorIn.size() - 1;
+			sys->conductorIn[i].numVert = (int)fdtdGetValue(word[0]);
+			sys->conductorIn[i].zmin = fdtdGetValue(word[1]);
+			sys->conductorIn[i].zmax = fdtdGetValue(word[2]);
+			sys->conductorIn[i].x = (double*)calloc(sys->conductorIn[i].numVert, sizeof(double));
+			sys->conductorIn[i].y = (double*)calloc(sys->conductorIn[i].numVert, sizeof(double));
+			for (int j = 0; j < sys->conductorIn[i].numVert; ++j) {
+				sys->conductorIn[i].x[j] = fdtdGetValue(word[j * 2 + 3]);
+				sys->conductorIn[i].y[j] = fdtdGetValue(word[j * 2 + 4]);
+			}
+		}
+	}
+	sys->numCdtRow = sys->conductorIn.size();
+
+	// read the stack information
+	while (strncmp(word[0], "STACK", 5)) {
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+	}
+	if (fgets(s, MAXC, fp) != NULL) {
+		fdtdStringWord(s, word);
+		sys->numStack = (int)fdtdGetValue(word[0]);
+		//cout << "NumStack is " << word[0] << endl;
+		for (int i = 0; i < sys->numStack; ++i) {
+			fgets(s, MAXC, fp);
+			fdtdStringWord(s, word);
+			sys->stackBegCoor.push_back(fdtdGetValue(word[0]));
+			sys->stackEndCoor.push_back(fdtdGetValue(word[1]));
+			sys->stackEps.push_back(fdtdGetValue(word[2]));
+			sys->stackSig.push_back(fdtdGetValue(word[3]));
+		}
+	}
+	
+
+	// read the port information
+	while (strncmp(word[0], "PORT", 4)) {
+		fgets(s, MAXC, fp);
+		fdtdStringWord(s, word);
+	}
+	if (fgets(s, MAXC, fp) != NULL) {
+		fdtdStringWord(s, word);
+		sys->numPorts = (int)fdtdGetValue(word[0]);
+		cout << "Numports is " << word[0] << endl;
+		for (int i = 0; i < sys->numPorts; ++i) {
+			fgets(s, MAXC, fp);
+			fdtdStringWord(s, word);
+			fdtdPort base;
+			sys->portCoor.push_back(base);
+			sys->portCoor[i].multiplicity = (int)fdtdGetValue(word[0]);
+			cout << "port " << i << " multiplicity is " << word[0] << endl;
+			for (int j = 0; j < sys->portCoor[i].multiplicity; ++j) {
+				sys->portCoor[i].x1.push_back(fdtdGetValue(word[j * 6 + 1]));
+				sys->portCoor[i].y1.push_back(fdtdGetValue(word[j * 6 + 2]));
+				sys->portCoor[i].z1.push_back(fdtdGetValue(word[j * 6 + 3]));
+				sys->portCoor[i].x2.push_back(fdtdGetValue(word[j * 6 + 4]));
+				sys->portCoor[i].y2.push_back(fdtdGetValue(word[j * 6 + 5]));
+				sys->portCoor[i].z2.push_back(fdtdGetValue(word[j * 6 + 6]));
+				sys->portCoor[i].portDirection.push_back(fdtdGetValue(word[j * 6 + 7]));
+			}
+			
+		}
+	}
+	return 0;
+}
+
+double fdtdGetValue(char *str)
+{
+	double value;                            /* converted true value      */
+	sscanf(str, "%lf", &value);
+	return value;
+}
+
+int fdtdStringWord(char *s, char *word[]) {
+	int wno;                      /* word char counter */
+	int ctr;                       /* char flag         */
+
+	ctr = 1;
+	wno = 0;
+	for (; *s != '\0'; s++)
+		if (*s == ' ' || *s == '\t' || *s == ',' || *s == '(' ||
+			*s == ')' || *s == '\n') {
+			*s = '\0';
+			ctr = 1;
+		}
+		else {
+			*s = (char)toupper(*s);
+			if (ctr == 1) {
+				word[wno++] = s;
+				ctr = 0;
+			}
+		}
+		return(wno);
 }
