@@ -238,100 +238,100 @@ int main(int argc, char** argv)
             }
             cout << "Created PSLG file for each layer" << endl;
         }
-//		else if ((strcmp(argv[1], "-rt") == 0) || (strcmp(argv[1], "--readtxt") == 0))
-//		{   // read the txt file for all the inputs and output citi file
-//			// Initialize SolverDataBase, mesh, and set variables for performance tracking
-//			clock_t t1 = clock();
-//			fdtdMesh sys;
-//			int status = 0; // Initialize as able to return successfully
-//			
-//			readTXT(&sys, argv[2]);
-//
-//			// Mesh the domain and mark conductors
-//			unordered_map<double, int> xi, yi, zi;
-//			unordered_set<double> portCoorx, portCoory;
-//
-//			clock_t t2 = clock();
-//			status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
-//			if (status == 0)
-//			{
-//				cout << "meshAndMark Success!" << endl;
-//				cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-//			}
-//			else
-//			{
-//				cerr << "meshAndMark Fail!" << endl;
-//				return status;
-//			}
-//			//sys.print();
-//
-//			// Set D_eps and D_sig
-//			clock_t t3 = clock();
-//			status = matrixConstruction(&sys);
-//			if (status == 0)
-//			{
-//				cout << "matrixConstruction Success!" << endl;
-//				cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-//			}
-//			else {
-//				cerr << "matrixConstruction Fail!" << endl;
-//				return status;
-//			}
-//			//sys.print();
-//
-//			// Set port
-//			clock_t t4 = clock();
-//			status = portSet(&sys, xi, yi, zi);
-//			if (status == 0)
-//			{
-//				cout << "portSet Success!" << endl;
-//				cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-//			}
-//			else
-//			{
-//				cerr << "portSet Fail!" << endl;
-//				return status;
-//			}
-//			//sys.print();
-//
-//			// Generate Stiffness Matrix
-//#ifndef SKIP_GENERATE_STIFF
-//			clock_t t5 = clock();
-//			status = generateStiff(&sys);
-//			if (status == 0)
-//			{
-//				cout << "generateStiff Success!" << endl;
-//				cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-//			}
-//			else
-//			{
-//				cerr << "generateStiff Fail!" << endl;
-//				return status;
-//			}
-//#endif
-//
-//			// Write object sys to files
-//#ifndef SKIP_WRITE_SYS_TO_FILE
-//			WriteSysToFile(sys);
-//#endif
-//
-//			// Parameter generation
-//			clock_t t6 = clock();
-//			status = paraGenerator(&sys, xi, yi, zi);
-//			if (status == 0)
-//			{
-//				cout << "paraGenerator Success!" << endl;
-//				cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-//			}
-//			else
-//			{
-//				cerr << "paraGenerator Fail!" << endl;
-//				return status;
-//			}
-//			cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-//			cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
-//
-//		}
+		else if ((strcmp(argv[1], "-rt") == 0) || (strcmp(argv[1], "--readtxt") == 0))
+		{   // read the txt file for all the inputs and output citi file
+			// Initialize SolverDataBase, mesh, and set variables for performance tracking
+			clock_t t1 = clock();
+			fdtdMesh sys;
+			int status = 0; // Initialize as able to return successfully
+			
+			readTXT(&sys, argv[2]);
+
+			// Mesh the domain and mark conductors
+			unordered_map<double, int> xi, yi, zi;
+			unordered_set<double> portCoorx, portCoory;
+
+			clock_t t2 = clock();
+			status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+			if (status == 0)
+			{
+				cout << "meshAndMark Success!" << endl;
+				cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+			}
+			else
+			{
+				cerr << "meshAndMark Fail!" << endl;
+				return status;
+			}
+			//sys.print();
+
+			// Set D_eps and D_sig
+			clock_t t3 = clock();
+			status = matrixConstruction(&sys);
+			if (status == 0)
+			{
+				cout << "matrixConstruction Success!" << endl;
+				cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+			}
+			else {
+				cerr << "matrixConstruction Fail!" << endl;
+				return status;
+			}
+			//sys.print();
+
+			// Set port
+			clock_t t4 = clock();
+			status = portSet(&sys, xi, yi, zi);
+			if (status == 0)
+			{
+				cout << "portSet Success!" << endl;
+				cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+			}
+			else
+			{
+				cerr << "portSet Fail!" << endl;
+				return status;
+			}
+			//sys.print();
+
+			// Generate Stiffness Matrix
+#ifndef SKIP_GENERATE_STIFF
+			clock_t t5 = clock();
+			status = generateStiff(&sys);
+			if (status == 0)
+			{
+				cout << "generateStiff Success!" << endl;
+				cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+			}
+			else
+			{
+				cerr << "generateStiff Fail!" << endl;
+				return status;
+			}
+#endif
+
+			// Write object sys to files
+#ifndef SKIP_WRITE_SYS_TO_FILE
+			WriteSysToFile(sys);
+#endif
+
+			// Parameter generation
+			clock_t t6 = clock();
+			status = paraGenerator(&sys, xi, yi, zi);
+			if (status == 0)
+			{
+				cout << "paraGenerator Success!" << endl;
+				cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+			}
+			else
+			{
+				cerr << "paraGenerator Fail!" << endl;
+				return status;
+			}
+			cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+			cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+
+		}
         else
         {
             cerr << "Must pass a .imp file to read and blank GDSII file to write after \"-i\" flag, rerun with \"--help\" flag for details" << endl;

@@ -20,8 +20,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
 																								   /* Generate the mesh nodes based on conductorIn information */
 	myint numNode = 0;
-	double disMinx = 1e-8;// MINDISFRACX* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent //0.005; 
-	double disMiny = 1e-8;// MINDISFRACY* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // 0.005; 
+	double disMinx = MINDISFRACX* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // Minimum discretization retained in x- or y-directions after node merging is fraction of smaller of x-extent or y-extent //0.005; 
+	double disMiny = MINDISFRACY* fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1))* sys->lengthUnit; // 0.005; 
 	//double xc1 = -16.5e-3, xc2 = 0, yc1 = -16.5e-3, yc2 = 0, disMinx1 = 20e-6, disMiny1 = 20e-6;
 	//double xc11 = -5.6e-3, xc21 = -3e-3, yc11 = -14.6e-3, yc21 = -0.3e-3, disMinx2 = 13e-6, disMiny2 = 13e-6;
 	double xc1 = 0, xc2 = 0, yc1 = 0, yc2 = 0, disMinx1 = disMinx, disMiny1 = disMiny;   // don't use this
@@ -1265,23 +1265,23 @@ int matrixConstruction(fdtdMesh *sys) {
 	}
 	}*/
 	ofstream out;
-	//out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->N_edge; indi++) {
-	//	out << std::setprecision(15) << sys->getEps(indi) << endl;
-	//}
-	//out.close();
+	out.open("eps.txt", std::ofstream::trunc | std::ofstream::out);
+	for (indi = 0; indi < sys->N_edge; indi++) {
+		out << std::setprecision(15) << sys->getEps(indi) << endl;
+	}
+	out.close();
 
-	//out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->N_edge; indi++) {
-	//	if (sys->markEdge[indi] != 0) {
-	//		out << std::setprecision(15) << SIGMA << endl;
-	//		//out << indi + 1 << endl;
-	//	}
-	//	else {
-	//		out << 0 << endl;
-	//	}
-	//}
-	//out.close();
+	out.open("sig.txt", std::ofstream::trunc | std::ofstream::out);
+	for (indi = 0; indi < sys->N_edge; indi++) {
+		if (sys->markEdge[indi] != 0) {
+			out << std::setprecision(15) << SIGMA << endl;
+			//out << indi + 1 << endl;
+		}
+		else {
+			out << 0 << endl;
+		}
+	}
+	out.close();
 
 	//checkCondShared(sys);
 

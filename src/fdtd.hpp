@@ -51,13 +51,13 @@ using namespace std;
 #define SIGMA (5.8e+7)  // the load edge sigma //(3.508) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (0.01) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (0.01) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (0.001) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (0.001) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
-#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
+#define MAXDISFRACX (0.005) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACY (0.005) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.)// Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-#define DT (1.e-10) // Time step for finding high-frequency modes (s)
+#define DT (1.e-11) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
 #define UPPER_BOUNDARY_PEC
@@ -4309,7 +4309,7 @@ public:
 
 						if (markNode[node] == 0) {
 							leng_v0d++;
-							mapd[node] = leng_v0d;
+							//mapd[node] = leng_v0d;
 						}
 						else if (markCdt[markNode[node] - 1] == 1 || (markCdt[markNode[node] - 1] == 0 && node != cond_remnode[markNode[node] - 1])) {
 							leng_v0db++;
@@ -4333,7 +4333,7 @@ public:
 		cout << "leng_v0dd is " << leng_v0d << endl;
 		/* v0g generation */
 		double scalar = 1;   // debug use : check with scalar is better
-							 /* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
+		/* Note: should make the mesh around the conductor with the same size in order to make sure V0da for each conductor is generated correctly */
 		for (int indi = 0; indi < this->numCdt; indi++) {
 			if (markCdt[indi] == 0) {   // V0g from V0b
 				mark = 0;    // if mark = 0 it means that no V0d2 for this conductor, leng_v0d doesn't increase by 1
@@ -6427,7 +6427,7 @@ public:
 		this->Adval = (double*)calloc(leng_Ad, sizeof(double));
 		myint indj = 0;
 		ofstream out;
-		out.open("Ad.txt", std::ofstream::trunc | std::ofstream::out);
+		//out.open("Ad.txt", std::ofstream::trunc | std::ofstream::out);
 		for (indi = 0; indi < leng_v0d1; indi++) {
 			vector<pair<myint, double>> v(Ad1[indi].begin(), Ad1[indi].end());
 			sort(v.begin(), v.end());
@@ -6436,15 +6436,15 @@ public:
 				this->AdRowId[indj] = indi;
 				this->AdColId[indj] = adi.first;
 				this->Adval[indj] = adi.second;
-				out << this->AdRowId[indj] + 1 << " " << this->AdColId[indj] + 1 << " ";
-				out << setprecision(15) << this->Adval[indj] << endl;
+				//out << this->AdRowId[indj] + 1 << " " << this->AdColId[indj] + 1 << " ";
+				//out << setprecision(15) << this->Adval[indj] << endl;
 				indj++;
 				//}
 			}
 			v.clear();
 		}
 		Ad1.clear();
-		out.close();
+		//out.close();
 
 	}
 
@@ -8049,7 +8049,7 @@ public:
 		myint indi, inz, inx, iny, node1, node2;
 
 		/* Compute [V0da' * D_eps * V0d, V0da' * D_eps * V0c, V0da' * D_eps] */
-		for (indi = 0; indi < v0d1anum; indi++) {
+		for (indi = 0; indi < v0d1num; indi++) {
 			if (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
 																								  //cout << "z\n";
 				inz = this->v0d1RowId[indi] / (this->N_edge_s + this->N_edge_v);
@@ -8063,9 +8063,9 @@ public:
 					//cout << this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] << endl;
 					//cout << (this->v0dan[this->v0d1ColIdo[indi]]) << " " << (this->v0dn[mapd[node1] - 1]) << endl;
 					Ll[this->v0d1ColIdo[indi]][mapd[node1] - 1] += this->v0d1avalo[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0d1RowId[indi]) / ((this->v0dan[this->v0d1ColIdo[indi]]) * (this->v0dn[mapd[node1] - 1]));   // do the normalization
-																																																													  //cout << this->v0d1avalo[indi] << endl;
-																																																													  //cout << this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] << endl;
-																																																													  //cout << (this->v0dan[this->v0d1ColIdo[indi]]) << " " << (this->v0dn[this->v0d1ColIdo[indi]]) << endl;
+					//cout << this->v0d1avalo[indi] << endl;
+					//cout << this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] << endl;
+					//cout << (this->v0dan[this->v0d1ColIdo[indi]]) << " " << (this->v0dn[this->v0d1ColIdo[indi]]) << endl;
 					Ll[this->v0d1ColIdo[indi]][this->v0d1ColIdo[indi]] += this->v0d1avalo[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->getEps(this->v0d1RowId[indi]) / ((this->v0dan[this->v0d1ColIdo[indi]]) * (this->v0dn[this->v0d1ColIdo[indi]]));
 				}
 				else if (mapd[node2] != this->v0d1ColIdo[indi] + 1 && mapd[node2] != 0) {

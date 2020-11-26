@@ -99,6 +99,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	sys->merge_v0d1(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, sideLen);
 	
 #ifdef INSIDE_OUTSIDE
+	sys->mapd = (myint*)calloc(sys->N_node, (sizeof(myint)));
 	sys->merge_v0db(block1_x, block1_y, block2_x, block2_y, block3_x, block3_y, sideLen);
 	myint* v0bRowId = (myint*)malloc((sys->v0dbnum - sys->v0dnum) * sizeof(myint));
 	myint* v0bColId = (myint*)malloc((sys->v0dbnum - sys->v0dnum) * sizeof(myint));
@@ -119,7 +120,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	/* Generate A11 = V0ddan'*D_eps*V0ddn */
 	cout << "nnz of V0d is " << sys->v0d1num << " and leng_v0d1 is " << sys->leng_v0d1 << endl;
 	sys->generateAdeps_v0d1(sys->mapd, sys->v0d1num, sys->v0d1num, sys->leng_v0d1);   // Ad = V0d1a'*D_eps*V0d1
-	//sys->generateAdeps_v0db(sys->mapd, sys->v0dnum, sys->v0dnum, sys->leng_v0d);   // Ad = V0da'*D_eps*V0d
+	//sys->generateAdeps_v0db(sys->mapd, sys->v0dnum, sys->v0dnum, sys->leng_v0d);   // Ad = V0da'*D_eps*V0d only nodes outside the conductors
 	//sys->generateMd(sys->mapd, sys->v0d1num, sys->v0d1num, sys->leng_v0d1);   // Md = V0d1a'*V0d1
 
 	//double* test = (double*)calloc(sys->leng_v0d, sizeof(double));
@@ -132,19 +133,19 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 
 	/* Print out V0d, V0da, V0c, V0ca */
 	ofstream outfile;
-	//outfile.open("V0d1.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->v0d1num; ++indi) {
-	//	outfile << sys->mapEdge[sys->v0d1RowId[indi]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
-	//	outfile << setprecision(15) << sys->v0d1val[indi] << endl;
-	//}
-	//outfile.close();
+	outfile.open("V0d1.txt", std::ofstream::trunc | std::ofstream::out);
+	for (indi = 0; indi < sys->v0d1num; ++indi) {
+		outfile << sys->mapEdge[sys->v0d1RowId[indi]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
+		outfile << setprecision(15) << sys->v0d1val[indi] << endl;
+	}
+	outfile.close();
 
-	//outfile.open("V0d1a.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->v0d1num; ++indi) {
-	//	outfile << sys->mapEdge[sys->v0d1RowId[indi]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
-	//	outfile << setprecision(15) << sys->v0d1aval[indi] << endl;
-	//}
-	//outfile.close();
+	outfile.open("V0d1a.txt", std::ofstream::trunc | std::ofstream::out);
+	for (indi = 0; indi < sys->v0d1num; ++indi) {
+		outfile << sys->mapEdge[sys->v0d1RowId[indi]] + 1 << " " << sys->v0d1ColId[indi] + 1 << " ";
+		outfile << setprecision(15) << sys->v0d1aval[indi] << endl;
+	}
+	outfile.close();
 
 	//outfile.open("V0db.txt", std::ofstream::trunc | std::ofstream::out);
 	//for (indi = 0; indi < sys->v0dnum; ++indi) {
@@ -441,18 +442,18 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	//}
 	//outfile.close();
 
-	//outfile.open("V0c.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->v0cnum; ++indi) {
-	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " ";
-	//	outfile << setprecision(15) << sys->v0cvalo[indi] << endl;
-	//}
-	//outfile.close();
+	outfile.open("V0c.txt", std::ofstream::trunc | std::ofstream::out);
+	for (indi = 0; indi < sys->v0cnum; ++indi) {
+		outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " ";
+		outfile << setprecision(15) << sys->v0cvalo[indi] << endl;
+	}
+	outfile.close();
 
-	//outfile.open("V0ca.txt", std::ofstream::trunc | std::ofstream::out);
-	//for (indi = 0; indi < sys->v0cnum; ++indi) {
-	//	outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " ";
-	//	outfile << setprecision(15) << sys->v0cavalo[indi] << endl;
-	//}
+	outfile.open("V0ca.txt", std::ofstream::trunc | std::ofstream::out);
+	for (indi = 0; indi < sys->v0cnum; ++indi) {
+		outfile << sys->v0cRowId[indi] + 1 << " " << sys->v0cColIdo[indi] + 1 << " ";
+		outfile << setprecision(15) << sys->v0cavalo[indi] << endl;
+	}
 	outfile.close();
 
 	double *a;
@@ -695,6 +696,30 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	//free(Lx); Lx = NULL;
 	/* end of debugging to test L to be solved with HYPRE */
 
+	/* Print out current for Matlab debug */
+	outfile.open("J.txt", std::ofstream::out | std::ofstream::trunc);
+	for (int sourcePort = sys->numPorts - 1; sourcePort < sys->numPorts; ++sourcePort) {
+		double* cur = (double*)calloc((sys->N_edge), sizeof(double));   // current
+		for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
+			for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+				/* Set current density for all edges within sides in port to prepare solver */
+				cur[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+				//cout << "current left markEdge is " << sys->markEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge] - sys->N_cell_y] << endl;
+				//myint node1, node2;
+				//int indx, indy, indz;
+				//sys->compute_edgelink(sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge], node1, node2);
+				//sys->compute_node_index(node1, indx, indy, indz);
+				//cout << sys->markEdge[(indz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy] << endl;
+				//cout << sys->markEdge[(indz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1] << endl;
+			}
+		}
+		for (int ind = 0; ind < sys->N_edge; ++ind) {
+			outfile << cur[ind] << endl;
+		}
+		free(cur); cur = NULL;
+	}
+	outfile.close();
+	cout << "current is generated!\n";
 
 #ifdef TIME
 	/* Time domain method to simulate */
@@ -711,12 +736,12 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	//cout << "Begin to generate Ll matrix!\n";
 	sys->generateLaplacianLeft(LrowId, LcolId, Lval, leng, DT);    // Compute the matrix [V0a'*D*V0, V0a'*D; D*V0, D+L] and put in sys->LlrowId, sys->LlcolId, sys->Llval
 	//cout << "Already generate L matrix!\n";
-	//outfile.open("Ll.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int ind = 0; ind < sys->leng_Ll; ++ind) {
-	//   	outfile << sys->LlRowId[ind] + 1 << " " << sys->LlColId[ind] + 1 << " " << std::setprecision(15) << sys->Llval[ind] << endl;
-	//}
-	//outfile.close();
-	//cout << "Ll is generated!\n";
+	outfile.open("Ll.txt", std::ofstream::out | std::ofstream::trunc);
+	for (int ind = 0; ind < sys->leng_Ll; ++ind) {
+	   	outfile << sys->LlRowId[ind] + 1 << " " << sys->LlColId[ind] + 1 << " " << std::setprecision(15) << sys->Llval[ind] << endl;
+	}
+	outfile.close();
+	cout << "Ll is generated!\n";
 
 	/* transfer Ll's rowId to csr format */
 	sys->LlRowIdo = (myint*)malloc(sys->leng_Ll * sizeof(myint));
@@ -753,7 +778,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	//	outfile << A22RowId[ind] + 1 << " " << A22ColId[ind] + 1 << " " << A22val[ind] << endl;
 	//}
 	//outfile.close();
-
+	
 	for (int sourcePort = 0; sourcePort < sys->numPorts; ++sourcePort) {
 
 		/* backward difference */
@@ -778,30 +803,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 	/* End of time domain method to simulate */
 #endif
 
-	/* Print out current for Matlab debug */
-	//outfile.open("J.txt", std::ofstream::out | std::ofstream::trunc);
-	//for (int sourcePort = sys->numPorts - 1; sourcePort < sys->numPorts; ++sourcePort) {
-	//	double* cur = (double*)calloc((sys->N_edge), sizeof(double));   // current
-	//	for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-	//		for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
-	//			/* Set current density for all edges within sides in port to prepare solver */
-	//			cur[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
-	//			//cout << "current left markEdge is " << sys->markEdge[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge] - sys->N_cell_y] << endl;
-	//			//myint node1, node2;
-	//			//int indx, indy, indz;
-	//			//sys->compute_edgelink(sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge], node1, node2);
-	//			//sys->compute_node_index(node1, indx, indy, indz);
-	//			//cout << sys->markEdge[(indz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy] << endl;
-	//			//cout << sys->markEdge[(indz - 1) * (sys->N_edge_s + sys->N_edge_v) + sys->N_cell_y * (sys->N_cell_x + 1) + (indx - 1) * (sys->N_cell_y + 1) + indy + 1] << endl;
-	//		}
-	//	}
-	//	for (int ind = 0; ind < sys->N_edge; ++ind) {
-	//		outfile << cur[ind] << endl;
-	//	}
-	//	free(cur); cur = NULL;
-	//}
-	//outfile.close();
-	//cout << "current is generated!\n";
+
 	
 	/* Frequency domain to solve inside outside part */
 	for (int ind = 0; ind < sys->nfreq; ++ind) {
@@ -955,19 +957,16 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 			double* res = (double*)calloc(sys->outside + sys->leng_v0d + leng_v0b, sizeof(double));
 			//solveAooMatrix(Jo, freq, Doosval, V0ddt, V0ddat, sys->leng_v0d, sys->v0dn, sys->v0dan, V0bt, V0bat, leng_v0b, Soo, sys->outside, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, A22RowId, A22RowId1, A22ColId, A22Val, leng_A22, LooRowId, LooColId, Looval, leng_Loo, res, pt, iparm);
 			solveAooMatrix_schur(Jo, freq, Doosval, V0ddt, V0ddat, sys->leng_v0d, sys->v0dn, sys->v0dan, V0bt, V0bat, leng_v0b, Soo, sys->outside, sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, A22RowId, A22RowId1, A22ColId, A22Val, leng_A22, LooRowId, LooColId, Looval, leng_Loo, res, pt, iparm);
-			//complex<double>* x = (complex<double>*)calloc(nedge, sizeof(complex<double>));
-			////	status = combine_x_v0d_uh(res, sys, x);
-			//status = combine_x_v0d_v0b_uh(V0ddt, V0bt, sys->leng_v0d, leng_v0b, sys->outside, res, xsol);
-			////out.open("plasma_pkg_time_47.5GHz.txt", ofstream::out | ofstream::app);
-			////out << freq << " " << sourcePort << " " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
-			////out.close();
+			complex<double>* x = (complex<double>*)calloc(nedge, sizeof(complex<double>));
+			//	status = combine_x_v0d_uh(res, sys, x);
+			status = combine_x_v0d_v0b_uh(V0ddt, V0bt, sys->leng_v0d, leng_v0b, sys->outside, res, xsol);
 
-			//for (int indi = 0; indi < sys->outside; ++indi) {
-			//	x[sys->mapioR[indi]] = 0 + 1i * xsol[indi];
-			//}
-			//sys->Construct_Z_V0_Vh(x, ind, sourcePort);
+			for (int indi = 0; indi < sys->outside; ++indi) {
+				x[sys->mapioR[indi]] = { 0, xsol[indi] };
+			}
+			sys->Construct_Z_V0_Vh(x, ind, sourcePort);
 			//cout << "Port " << sourcePort << " and frequency is " << freq << endl;
-			//free(x); x = NULL;
+			free(x); x = NULL;
 			free(res); res = NULL;
 			free(Jo); Jo = NULL;
 
@@ -978,7 +977,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 
 
 		/* Only solve oo part with pardiso */
-		reference_oo(sys, ind, SooRowId1, SooColId, Sooval, xsol);
+		//reference_oo(sys, ind, SooRowId1, SooColId, Sooval, xsol);
 		/* End of only solving oo part with pardiso */
 
 		//t1 = clock();
@@ -1044,9 +1043,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 		//free(S1val); S1val = NULL;
 		/* End of solving -omega^2*D_eps+1i*omega*D_sig+S by gmres */
 
-
 		free(Looval); Looval = NULL;
-		free(Sooval); Sooval = NULL;
 		//free(Loodbval); Loodbval = NULL;
 		mkl_sparse_destroy(Soo);
 		mkl_sparse_destroy(sol);
@@ -2341,7 +2338,7 @@ void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, spa
 			u0[ind] = u0dr[ind] + 1i * u0di[ind];
 		}
 		for (int ind = 0; ind < leng_v0c; ++ind) {
-			u0[leng_v0d + ind] = 0 + 1i * u0c[ind];
+			u0[leng_v0d + ind] = { 0, u0c[ind] };
 		}
 	}
 	else if (ri == 'i') {
@@ -4106,7 +4103,7 @@ void A11A22Precond(double freq, double* Doosval, sparse_matrix_t& V0ddat, myint 
 	}
 	//t = clock();
 	//mkl_gmres_A(v0datx2x3, x, A11RowId, A11ColId, A11val, leng_A11, N1);
-	status = hypreSolve(A11RowId, A11ColId, A11val, leng_A11, v0datx2, N1, v2, 0, 3);
+	status = hypreSolve(A11RowId, A11ColId, A11val, leng_A11, v0datx2, N1, v2, 1, 3);
 	
 	/* pardiso sanity check */
 	//myint* A11RowId1 = (myint*)calloc((N1 + 1), sizeof(myint));
@@ -4407,7 +4404,7 @@ void solveMatrix(double* Jo, double freq, double* Doosval, sparse_matrix_t& V0dd
 			xt[ind] = xo[mapio[ind]];
 		}
 		else {
-			xt[ind] = xi[mapio[ind] - outside] + 1i * 0;
+			xt[ind] = { xi[mapio[ind] - outside], 0 };
 		}
 	}
 
@@ -4424,9 +4421,9 @@ void DTimesV(fdtdMesh* sys, myint nedge, double freq, complex<double>* u1, compl
 	for (int ind = 0; ind < nedge; ++ind) {
 		complex<double> epsig;
 		if (sys->markEdge[sys->mapEdgeR[ind]])
-			epsig = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]) + 1i * freq * 2 * M_PI * SIGMA;
+			epsig = { -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]), freq * 2 * M_PI * SIGMA };
 		else
-			epsig = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]) + 1i * 0;
+			epsig = { -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]), 0 };
 		u2[ind] = epsig * u1[ind];   // u2 = (-omega^2*D_eps+1i*omega*D_sig)*
 	}
 }

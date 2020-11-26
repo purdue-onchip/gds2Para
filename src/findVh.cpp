@@ -82,7 +82,7 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, myint* MooRowId, m
 				//y[sourcePort * nedge + indi] = xi[sourcePort * inside + sys->mapio[indi] - sys->outside] + 1i * 0;
 			}
 			else {
-				y[sourcePort * nedge + indi] = 0 + 1i * xo[sourcePort * sys->outside + sys->mapio[indi]];
+				y[sourcePort * nedge + indi] = { 0, xo[sourcePort * sys->outside + sys->mapio[indi]] };
 			}
 		}
 	}
@@ -104,7 +104,7 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, myint* MooRowId, m
 int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_matrix_t& v0cat, sparse_matrix_t& v0dt, sparse_matrix_t& v0dat, myint* A12RowId, myint* A12ColId, double* A12val, myint leng_A12, myint* A21RowId, myint* A21ColId, double* A21val, myint leng_A21, myint* A22RowId, myint* A22ColId, double* A22val, myint leng_A22, myint* SRowId1, myint* SColId, double* Sval, sparse_matrix_t& Ll) {
 	int t0n = 3;
 	double dt = DT;
-	double tau = 1.e-9;
+	double tau = 1.e-10;
 	double t0 = t0n * tau;
 	myint nt = 2 * t0 / dt;
 	myint SG = 10;
@@ -191,7 +191,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 	/* pardiso solve the backward difference matrix --- factorization */
 	//pardisoSolve_factorize(SRowId1, SColId, Sval, sys->leng_S, edge);
 	/* End of pardiso solve the backward difference matrix --- factorization */
-	outfile.open("x.txt", ofstream::out | ofstream::trunc);
+	outfile.open("v_our_tau1e-10.txt", ofstream::out | ofstream::trunc);
 	for (int ind = 1; ind <= nt; ind++) {    // time marching to find the repeated eigenvectors
 		// Generate the right hand side
 		for (int indi = 0; indi < edge; indi++) {
@@ -218,13 +218,21 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 		/* End of backward difference, use HYPRE solve */
 
 		/* Use pardiso to solve backward difference */
+		//clock_t t1 = clock();
 		//status = pardisoSolve(SRowId1, SColId, Sval, rsc, &xr[edge * 2], edge);
+		//cout << "Time for pardiso for one step is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 		//outfile.open("xr.txt", std::ofstream::trunc | std::ofstream::out);
 		//for (int indi = 0; indi < edge; ++indi) {
 		//	outfile << xr[edge * 2 + indi] << endl;
 		//}
 		//outfile.close();
 		/* End of using pardiso to solve backward difference */
+
+		/* Use gmres to solve backward difference */
+		//clock_t t1 = clock();
+		//mkl_gmres_A(rsc, &xr[edge * 2], sys->SRowId, SColId, Sval, sys->leng_S, edge);
+		//cout << "Time for mkl_gmres for one step is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+		/* End of using gmres to solve backward difference */
 
 		/* Start to solve [V0a'*(D_eps+dt*D_sig)*V0, V0a'*(D_eps+dt*D_sig)
 		          (D_eps+dt*D_sig)*V0,      D_eps+dt*D_sig+dt^2*L]
@@ -242,7 +250,9 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 		/* solve [v0a'*(D_eps+dt*D_sig)*v0, v0a'*(D_eps+dt*D_sig);
 		        (D_eps+dt*D_sig)*v0,      D_eps+dt*D_sig+dt^2*L] with diagonal as the preconditioner */
 		x = (double*)malloc((noden + sys->N_edge - sys->bden) * sizeof(double));
+		//clock_t t1 = clock();
 		status = mkl_gmres(sys, bm, x, Ll, A22RowId, A22ColId, A22val, leng_A22, v0ct, v0cat, v0dt, v0dat);
+		//cout << "Time for mkl_gmres for one step is " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
 		/* End of using MKL fgmres to solve the matrix solution */
 
 		/* Use direct solver to solve the matrix solution */
@@ -326,6 +336,7 @@ int find_Vh_back(fdtdMesh* sys, int sourcePort, sparse_matrix_t& v0ct, sparse_ma
 	}
 	free(resp); resp = NULL;
     free(xr); xr = NULL;
+	return 0;
 }
 
 int find_Vh_central(fdtdMesh *sys, int sourcePort){
@@ -1700,7 +1711,7 @@ int mkl_gmres(fdtdMesh* sys, double* bm, double* x, sparse_matrix_t Ll, myint* A
 	ipar[10] = 1;   // the Preconditioned FGMRES iterations will be performed
 	ipar[14] = 200;   // restart number
 	ipar[7] = 0;
-	dpar[0] = 1.0E-3;
+	dpar[0] = 0.001;
 	/*---------------------------------------------------------------------------
 	/* Check the correctness and consistency of the newly set parameters
 	/*---------------------------------------------------------------------------*/
@@ -1722,17 +1733,17 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	/*---------------------------------------------------------------------------*/
 	if (RCI_request == 1) {
 		s = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, Ll, descr, &tmp[ipar[21] - 1], beta, &tmp[ipar[22] - 1]);
-		//out.open("x1.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
-		//	out << tmp[ipar[21] - 1 + indi] << endl;
-		//}
-		//out.close();
+		/*out.open("x1.txt", std::ofstream::trunc | std::ofstream::out);
+		for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
+			out << setprecision(15) << tmp[ipar[21] - 1 + indi] << endl;
+		}
+		out.close();
 
-		//out.open("b1.txt", std::ofstream::trunc | std::ofstream::out);
-		//for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
-		//	out << tmp[ipar[22] - 1 + indi] << endl;
-		//}
-		//out.close();
+		out.open("b1.txt", std::ofstream::trunc | std::ofstream::out);
+		for (int indi = 0; indi < sys->leng_v0d1 + sys->leng_v0c + sys->N_edge; ++indi) {
+			out << setprecision(15) << tmp[ipar[22] - 1 + indi] << endl;
+		}
+		out.close();*/
 
 		goto ONE;
 	}
@@ -1806,7 +1817,7 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	/* Allocate storage for the ?par parameters and the solution/rhs/residual vectors
 	/*------------------------------------------------------------------------------------*/
 	MKL_INT ipar[size];
-	ipar[14] = 200;
+	ipar[14] = 300;
 	//double b[N];
 	//double expected_solution[N];
 	//double computed_solution[N];
@@ -1829,9 +1840,9 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 	sparse_status_t s;
 	double dvar;
-	int status, maxit = 200;
+	int status, maxit = 300;
 	ofstream out;
-	out.open("iteration_error_L.txt", std::ofstream::out | std::ofstream::trunc);
+
 	/*---------------------------------------------------------------------------
 	/* Save the right-hand side in vector b for future use
 	/*---------------------------------------------------------------------------*/
@@ -1853,9 +1864,9 @@ int mkl_gmres_A(double* bm, double* x, myint* ARowId, myint* AColId, double* Ava
 	dfgmres_init(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 	if (RCI_request != 0) goto FAILED;
 	ipar[10] = 0;   // preconditioner
-	ipar[14] = 200;   // restart number
+	ipar[14] = 300;   // restart number
 	ipar[7] = 0;
-	dpar[0] = 1.0E-2;
+	dpar[0] = 1.0E-3;
 	/*---------------------------------------------------------------------------
 	/* Check the correctness and consistency of the newly set parameters
 	/*---------------------------------------------------------------------------*/
@@ -1900,8 +1911,7 @@ ONE: dfgmres(&ivar, computed_solution, bm, &RCI_request, ipar, dpar, tmp);
 		i = 1;
 		daxpy(&ivar, &dvar, bm, &i, residual, &i);
 		dvar = cblas_dnrm2(ivar, residual, i) / cblas_dnrm2(ivar, bm, i);    // relative residual
-		out << itercount << " " << dvar << endl;
-		//cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
+		cout << "The relative residual is " << dvar << " with iteration number " << itercount << endl;
 		if (dvar < dpar[0] || itercount > maxit) goto COMPLETE;
 		else goto ONE;
 	}
@@ -1942,7 +1952,7 @@ SUCCEDED: free(b); b = NULL;
 	free(computed_solution); computed_solution = NULL;
 	free(residual); residual = NULL;
 	free(tmp); tmp = NULL;
-	out.close();
+
 	return 0;
 }
 
@@ -1970,6 +1980,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 	/* b1 : right hand side
 	   b2 : solution */
 	ofstream out;
+	//cout << "choice is " << choice << endl;
 	if (choice == 1) {
 		/* Preconditioner : [v0da'*D_eps*v0d,v0da'*D_eps*v0c,   0;
 							 0,              v0ca'*dt*D_sig*v0c,0;
@@ -1986,7 +1997,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		double* temp = (double*)calloc((sys->N_edge - sys->bden), sizeof(double));
 		double* temp1 = (double*)calloc(sys->leng_v0d1, sizeof(double));
 		double* temp2 = (double*)calloc(sys->leng_v0c, sizeof(double));
-		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);
+		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 1, 3);
 
 		/* (V0ca'*(D_sig*dt)*V0c)*y0c=b2 */
 		for (myint indi = 0; indi < sys->leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
@@ -2047,7 +2058,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		descr.type = SPARSE_MATRIX_TYPE_GENERAL;
 		sparse_status_t s;
 
-		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);  // solve y3
+		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 1, 3);  // solve y3
 
 		/* v0ca' line */
 		double* temp = (double*)malloc((sys->N_edge - sys->bden) * sizeof(double));
@@ -2073,7 +2084,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		}
 
 		// solve (v0ca'*dt*D_sig*v0c)
-		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, &b2[sys->leng_v0d1], 0, 3);
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, &b2[sys->leng_v0d1], 1, 3);
 		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
 			b2[sys->leng_v0d1 + indi] /= (DT / sys->v0cn[indi]);
 		}
@@ -2106,7 +2117,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 			temp2[ind] = b1[ind] - temp2[ind];   // temp2 = b1-v0da1'*D_eps*v0c*y2-v0da'*D_eps*y3
 			temp2[ind] *= sys->v0dan[ind];
 		}
-		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp2, sys->leng_v0d1, b2, 0, 3);   // solve y1
+		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp2, sys->leng_v0d1, b2, 1, 3);   // solve y1
 		for (int ind = 0; ind < sys->leng_v0d1; ++ind) {
 			b2[ind] *= sys->v0dn[ind];
 		}
@@ -2128,7 +2139,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		sparse_status_t s;
 		myint edge = sys->N_edge - sys->bden;
 
-		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 0, 3);  // solve y3
+		status = hypreSolve(A22RowId, A22ColId, A22val, leng_A22, &b1[sys->leng_v0d1 + sys->leng_v0c], sys->N_edge - sys->bden, &b2[sys->leng_v0d1 + sys->leng_v0c], 1, 3);  // solve y3
 
 		double* temp = (double*)calloc(sys->leng_v0d1, sizeof(double));
 		double* temp1 = (double*)calloc(sys->leng_v0c, sizeof(double));
@@ -2139,7 +2150,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		for (int i = 0; i < sys->leng_v0c; ++i) {
 			temp1[i] = b1[sys->leng_v0d1 + i] * sys->v0can[i];
 		}
-		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, temp2, 0, 3);
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp1, sys->leng_v0c, temp2, 1, 3);
 		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
 			temp2[indi] /= (DT / sys->v0cn[indi]);   // temp2 = (V0ca'*D_sig*dt*V0c)\(bc)
 		}
@@ -2156,7 +2167,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 			temp[indi] = b1[indi] - temp[indi] / sys->v0dan[indi];   // temp = bd-V0da'*D_eps*V0c*(V0ca'*D_sig*V0c)\(bc)
 			temp[indi] *= sys->v0dan[indi];
 		}
-		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, xd, 0, 3);   // xd=(V0da'*D_eps*V0d)\(bd-V0da'*D_eps*V0c*((V0ca'*D_sig*dt*V0c)\bc))
+		status = hypreSolve(sys->AdRowId, sys->AdColId, sys->Adval, sys->leng_Ad, temp, sys->leng_v0d1, xd, 1, 3);   // xd=(V0da'*D_eps*V0d)\(bd-V0da'*D_eps*V0c*((V0ca'*D_sig*dt*V0c)\bc))
 
 		for (int indi = 0; indi < sys->leng_v0d1; ++indi) {
 			xd[indi] *= sys->v0dn[indi];
@@ -2174,7 +2185,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
 			temp2[indi] *= sys->v0can[indi];
 		}
-		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp2, sys->leng_v0c, xc, 0, 3);
+		status = hypreSolve(sys->AcRowId, sys->AcColId, sys->Acval, sys->leng_Ac, temp2, sys->leng_v0c, xc, 1, 3);
 		for (int indi = 0; indi < sys->leng_v0c; ++indi) {
 			b2[sys->leng_v0d1 + indi] = xc[indi] / (DT / sys->v0cn[indi]);   // xc = (V0ca'*D_sig*dt*V0c)\(bc-V0ca'*D_eps*V0d*xd)
 		}
@@ -2185,7 +2196,7 @@ int applyPrecond(fdtdMesh* sys, double* b1, double* b2, myint* A22RowId, myint* 
 		free(xd); xd = NULL;
 		free(xc); xc = NULL;
 	}
-	
+	return 1;
 }
 
 void applyPrecond_P(myint* PRowId1, myint* PColId, double* Pval, myint leng_P, myint N, double* x1, double* x2) {
