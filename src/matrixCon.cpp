@@ -2287,7 +2287,7 @@ void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, spa
 	for (int indi = 0; indi < leng_v0d; ++indi) {   // Ad is not normalized with V0da and V0d
 		rhs1[indi] = rhs[indi]; // sys->v0dan[indi] *
 	}
-	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, rhs1, leng_v0d, temp, 1, 3);   // temp = (V0da'*D_eps*V0d)\bd
+	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, rhs1, leng_v0d, temp, 0, 3);   // temp = (V0da'*D_eps*V0d)\bd
 	for (int ind = 0; ind < leng_v0d; ++ind) {
 		u0dr[ind] = temp[ind];
 		u0dr[ind] /= ((-pow(freq * 2 * M_PI, 2)));// / sys->v0dn[ind]);   // u0dr = (V0da'*(-omega^2*D_eps)*V0d)\(bd), real
@@ -2312,7 +2312,7 @@ void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, spa
 	//for (int indi = 0; indi < leng_v0c; ++indi) {   // Ac is not normalized with V0ca and V0c
 	//	temp2[indi] *= sys->v0can[indi];
 	//}
-	status = hypreSolve(AcRowId, AcColId, Acval, leng_Ac, temp2, leng_v0c, u0c, 1, 3);
+	status = hypreSolve(AcRowId, AcColId, Acval, leng_Ac, temp2, leng_v0c, u0c, 0, 3);
 	for (int indi = 0; indi < leng_v0c; ++indi) {
 		u0c[indi] /= -((freq * 2 * M_PI));// / sys->v0cn[indi]);    // u0c = (V0ca'*(omega*D_sig)*V0c)(bc-V0ca'*D_eps*V0d*(V0da'*D_eps*V0d)\bd), imaginary
 		temp2[indi] = u0c[indi];
@@ -2329,7 +2329,7 @@ void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, spa
 	//for (int ind = 0; ind < leng_v0d; ++ind) {
 	//	temp[ind] /= sys->v0dan[ind];
 	//}
-	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, temp, leng_v0d, u0di, 1, 3);   // u0di = (V0da'*D_eps*V0d)\(V0da'*D_eps*V0c*u0c), imaginary
+	status = hypreSolve(AdRowId, AdColId, Adval, leng_Ad, temp, leng_v0d, u0di, 0, 3);   // u0di = (V0da'*D_eps*V0d)\(V0da'*D_eps*V0c*u0c), imaginary
 	for (int ind = 0; ind < leng_v0d; ++ind) {
 		u0di[ind] *= -1;// *sys->v0dn[ind];   // u0di = -(V0da'*D_eps*V0d)\(V0da'*D_eps*V0c*u0c), imaginary
 	}
