@@ -82,7 +82,7 @@ int solveFreqIO(fdtdMesh* sys, int freqi, complex<double>* y, myint* MooRowId, m
 				//y[sourcePort * nedge + indi] = xi[sourcePort * inside + sys->mapio[indi] - sys->outside] + 1i * 0;
 			}
 			else {
-				y[sourcePort * nedge + indi] = 0 + 1i * xo[sourcePort * sys->outside + sys->mapio[indi]];
+				y[sourcePort * nedge + indi] = { 0, xo[sourcePort * sys->outside + sys->mapio[indi]] };
 			}
 		}
 	}

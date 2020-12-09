@@ -4,9 +4,9 @@
 #include "hypreSolver.h"
 #include <mkl_service.h>
 #include <mkl_dfti.h>
-#define TIME (1)   // TIME = 1 run time domain
+//#define TIME (1)   // TIME = 1 run time domain
 //#define FREQ (1)   // define FREQ run frequency domain
-//#define SOLVECHIP (1)   // define SOLVECHIP in the frequency domain
+#define SOLVECHIP (1)   // define SOLVECHIP in the frequency domain
 //#define GENERATE_V0_SOLUTION
 #define SKIP_VH
 //#define INSIDE_OUTSIDE
@@ -1196,11 +1196,11 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int>& xi, unordered_map<d
 				x[indi] = u0[indi] + uh[indi];   // x = V0*y0+uh
 			}
 			sys->Construct_Z_V0_Vh(x, ind, sourcePort);
-			outfile.open("xsol.txt", ofstream::out | ofstream::trunc);
-			for (int indi = 0; indi < nedge; ++indi) {
-				outfile << setprecision(15) << x[indi].real() << " " << setprecision(15) << x[indi].imag() << endl;
-			}
-			outfile.close();
+			//outfile.open("xsol.txt", ofstream::out | ofstream::trunc);
+			//for (int indi = 0; indi < nedge; ++indi) {
+			//	outfile << setprecision(15) << x[indi].real() << " " << setprecision(15) << x[indi].imag() << endl;
+			//}
+			//outfile.close();
 
 
 
@@ -2338,15 +2338,15 @@ void solveV0(double freq, double* rhs, complex<double>* u0, double* Depsval, spa
 	/* Assign to the final solution */
 	if (ri == 'r') {
 		for (int ind = 0; ind < leng_v0d; ++ind) {
-			u0[ind] = u0dr[ind] + 1i * u0di[ind];
+			u0[ind] = { u0dr[ind], u0di[ind] };
 		}
 		for (int ind = 0; ind < leng_v0c; ++ind) {
-			u0[leng_v0d + ind] = 0 + 1i * u0c[ind];
+			u0[leng_v0d + ind] = { 0, u0c[ind] };
 		}
 	}
 	else if (ri == 'i') {
 		for (int ind = 0; ind < leng_v0d; ++ind) {
-			u0[ind] = 1i * u0dr[ind] - u0di[ind];
+			u0[ind] = { -u0di[ind], u0dr[ind] };
 		}
 		for (int ind = 0; ind < leng_v0c; ++ind) {
 			u0[leng_v0d + ind] = -u0c[ind];
@@ -4407,7 +4407,7 @@ void solveMatrix(double* Jo, double freq, double* Doosval, sparse_matrix_t& V0dd
 			xt[ind] = xo[mapio[ind]];
 		}
 		else {
-			xt[ind] = xi[mapio[ind] - outside] + 1i * 0;
+			xt[ind] = { xi[mapio[ind] - outside], 0 };
 		}
 	}
 
@@ -4424,9 +4424,9 @@ void DTimesV(fdtdMesh* sys, myint nedge, double freq, complex<double>* u1, compl
 	for (int ind = 0; ind < nedge; ++ind) {
 		complex<double> epsig;
 		if (sys->markEdge[sys->mapEdgeR[ind]])
-			epsig = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]) + 1i * freq * 2 * M_PI * SIGMA;
+			epsig = { -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]), freq * 2 * M_PI * SIGMA };
 		else
-			epsig = -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]) + 1i * 0;
+			epsig = { -pow(freq * 2 * M_PI, 2) * sys->getEps(sys->mapEdgeR[ind]), 0 };
 		u2[ind] = epsig * u1[ind];   // u2 = (-omega^2*D_eps+1i*omega*D_sig)*
 	}
 }
