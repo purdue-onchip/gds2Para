@@ -50,12 +50,20 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (5e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+//#define MINDISFRACX (5e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+//#define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+//#define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
+//#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
+//#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
+//#define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
+// Set for large 4004_29M edges: MINDISFRACX & Y (1e-3);  4004_7M edges: MINDISFRACX & Y (2e-3); 
+#define MINDISFRACX (2e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (2e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
+
 #define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)

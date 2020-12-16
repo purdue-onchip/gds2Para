@@ -45,3 +45,5 @@ Thumbs.db
 examples/WEDGE100_REV01.gds
 examples/WEDGE100_REV02.gds
 confidential/
+examples/plasma_pkg.gds
+examples/plasma_windowed4.gds
