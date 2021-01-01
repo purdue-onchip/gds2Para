@@ -56,13 +56,28 @@ using namespace std;
 //#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
 //#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
 //#define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-// Set for large 4004_29M edges: MINDISFRACX & Y (1e-3);  4004_7M edges: MINDISFRACX & Y (2e-3); 
-#define MINDISFRACX (2e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (2e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+//// Set for large 4004_29M edges: MINDISFRACX & Y (1e-3);  4004_7M edges: MINDISFRACX & Y (2e-3); 
+//#define MINDISFRACX (2e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+//#define MINDISFRACY (2e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+//#define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
+//#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
+//#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
+//#define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
+// Li Xue's latest setup for IBM plasma_windowed4. 0.7M unknowns for plasma_windowed4.
+//#define MINDISFRACX (0.01) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+//#define MINDISFRACY (0.01) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+//#define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
+//#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
+//#define MAXDISFRACY (0.05) // Fraction setting largest discretization in y-direction in terms of y-extent
+//#define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
+// For IBM plasma package, 8.6M unknowns
+#define MINDISFRACX (0.0010) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (0.0015) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
-#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
+#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACY (0.05) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
+
 
 #define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
