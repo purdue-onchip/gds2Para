@@ -70,9 +70,9 @@ using namespace std;
 //#define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
 //#define MAXDISFRACY (0.05) // Fraction setting largest discretization in y-direction in terms of y-extent
 //#define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
-// For IBM plasma package, 8.6M unknowns
-#define MINDISFRACX (0.0010) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (0.0015) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+// For IBM plasma package. 8.6M unknowns: MINDISFRACX (0.0010) & Y (0.0015); 22.4M unknowns: MINDISFRACX & Y (7.5e-4); 16.9M unknowns: MINDISFRACX (0.00075) & Y (0.0010)
+#define MINDISFRACX (0.00075) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (0.0010) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
 #define MAXDISFRACX (0.05) // Fraction setting largest discretization in x-direction in terms of x-extent
 #define MAXDISFRACY (0.05) // Fraction setting largest discretization in y-direction in terms of y-extent
