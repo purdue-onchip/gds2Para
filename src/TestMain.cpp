@@ -234,7 +234,7 @@ int main(int argc, char** argv)
         {
             // Initialize SolverDataBase, mesh, and set variables for performance tracking
             clock_t t1 = clock();
-            tf::Executor executor(1); // Executor of taskflow (optional constructor argument is number of threads, default is thread::hardware_concurrency())
+            tf::Executor executor; // Executor of taskflow (optional constructor argument is number of threads, default is thread::hardware_concurrency())
             tf::Taskflow taskflow; // Taskflow graph
             AsciiDataBase adb;
             SolverDataBase sdb;
@@ -397,8 +397,25 @@ int main(int argc, char** argv)
             clock_t t6 = clock();
             tf::Task taskJ = taskflow.emplace([&](auto &subflow)
             {
+                // Calculate Z-parameters
                 status = paraGenerator(&sys, subflow);
-                //sys.x.assign(sys.numPorts * sys.numPorts * sys.nfreq, complex<double>(1., 0.)); // Fake data of resistive network to get overhead when timing
+
+                // Fake Z-parameters
+                /*sys.x.assign(sys.numPorts * sys.numPorts * sys.nfreq, complex<double>(-1., 0.)); // Fake data of resistive network to get overhead when timing
+                for (size_t indi = 0; indi < sys.nfreq; indi++)
+                {
+                    for (size_t indj = 0; indj < sys.numPorts; indj++)
+                    {
+                        for (size_t indk = 0; indk < sys.numPorts; indk++)
+                        {
+                            if (indi == indj)
+                            {
+                                sys.x[indi * (sys.numPorts * sys.numPorts) + indj * sys.numPorts + indk] = sys.numPorts; // Correct diagonal entry
+                            }
+                        }
+                    }
+                }*/
+
                 if (status == 0)
                 {
                     cout << "paraGenerator dynamic tasking Success!" << endl;

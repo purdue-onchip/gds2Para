@@ -330,11 +330,11 @@ int paraGenerator(fdtdMesh *sys, tf::Subflow subflow) {
         clock_t t1 = clock();
         struct matrix_descr descr;
         double *Jport = (double*)calloc(sys->N_edge, sizeof(double));
-        for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[sourcePort].multiplicity; sourcePortSide++) {
-            for (int indEdge = 0; indEdge < sys->portCoor[sourcePort].portEdge[sourcePortSide].size(); indEdge++) {
+        for (int sourcePortSide = 0; sourcePortSide < sys->portCoor[0].multiplicity; sourcePortSide++) {
+            for (int indEdge = 0; indEdge < sys->portCoor[0].portEdge[sourcePortSide].size(); indEdge++) {
                 /* Set current density for all edges within sides in port to prepare solver */
                 //cout << " port #" << sourcePort + 1 << ", side #" << sourcePortSide + 1 << ", edge #" << sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge] << ": J = " << sys->portCoor[sourcePort].portDirection[sourcePortSide] << " A/m^2" << endl;
-                Jport[sys->portCoor[sourcePort].portEdge[sourcePortSide][indEdge]] = sys->portCoor[sourcePort].portDirection[sourcePortSide];
+                Jport[sys->portCoor[1].portEdge[sourcePortSide][indEdge]] = sys->portCoor[1].portDirection[sourcePortSide];
             }
         }
 
