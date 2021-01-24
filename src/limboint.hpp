@@ -515,6 +515,8 @@ private:
     int datatype;                  // Datatype (standards-compliant means identically equal to 0)
     vector<std::string> props;     // Properties of path
     int type;                      // Endcap type of path
+    double bexten;                 // Custom end cap for beginning of path (m)
+    double eexten;                 // Custom end cap for end of path (m)
     double width;                  // Width of path (m)
 public:
     // Default constructor
@@ -525,25 +527,40 @@ public:
         this->datatype = 0;
         this->props = {};
         this->type = 2;
+        this->bexten = 0.;
+        this->eexten = 0.;
         this->width = 0.;
     }
 
-    // Parametrized constructor
+    // Parametrized constructor (standard path types)
     path(vector<double> paths, int layer, vector<std::string> props, int type, double width)
     {
         this->paths = paths;
         this->layer = layer;
         this->datatype = 0;
         this->props = props;
-        if ((type >= 0) || (type <= 2))
+        if ((type == 0) || (type == 1) || (type == 2))
         {
             this->type = type;
         }
         else
         {
-            cerr << "Path type must be 0, 1, or 2. Defaulting to type 2." << endl;
+            cerr << "Path type must be 0, 1, 2, or 4. Defaulting to type 2. (Different syntax for type 4.)" << endl;
             this->type = 2; // Default to type 2 if invalid
         }
+        this->width = width;
+    }
+    
+   // Parametrized constructor (custom path types)
+    path(vector<double> paths, int layer, vector<std::string> props, double bexten, double eexten, double width)
+    {
+        this->paths = paths;
+        this->layer = layer;
+        this->datatype = 0;
+        this->props = props;
+        this->type = 4; // Custom extensions only
+        this->bexten = bexten;
+        this->eexten = eexten;
         this->width = width;
     }
 
@@ -572,10 +589,22 @@ public:
     }
 
     // Get path type
-    // 0 = square ends flush at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+    // 0 = square ends flush at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
     int getType() const
     {
         return this->type;
+    }
+    
+    // Get path type 4 custom beginning extension
+    double getBExten() const
+    {
+        return this->bexten;
+    }
+    
+    // Get path type 4 custom end extension
+    double getEExten() const
+    {
+        return this->eexten;
     }
 
     // Get path width
@@ -610,18 +639,30 @@ public:
     }
 
     // Set path type
-    // 0 = square ends flushat vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+    // 0 = square ends flushat vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
     void setType(int type)
     {
-        if ((type == 0) || (type == 1) || (type == 2))
+        if ((type == 0) || (type == 1) || (type == 2) || (type == 4))
         {
             this->type = type;
         }
         else
         {
-            cerr << "Path type must be 0, 1, or 2. Defaulting to type 2." << endl;
+            cerr << "Path type must be 0, 1, 2, or 4. Defaulting to type 2." << endl;
             this->type = 2; // Default to type 2 if invalid
         }
+    }
+    
+    // Set path type 4 custom beginning extension
+    void setBExten(double bexten)
+    {
+        this->bexten = bexten;
+    }
+    
+    // Set path type 4 custom end extension
+    void setEExten(double eexten)
+    {
+        this->eexten = eexten;
     }
 
     // Set path width
@@ -664,6 +705,8 @@ public:
         //this->layer = 0;
         //this->datatype = 0;
         //this->type = 2;
+        //this->bexten = 0.;
+        //this->eexten = 0.;
         //this->width = 0.;
     }
 };
@@ -2399,9 +2442,17 @@ public:
                     {
                         overshoot1 = 0.0; // Path actually has square ends at terminal vertices
                     }
+                    else if ((type == 4) && (indj == 0))
+                    {
+                        overshoot1 = 2. / width * (cell.paths[indi]).getBExten(); // Path has custom beginning extension
+                    }
                     if ((type == 0) && (indj == numPathPt - 1))
                     {
                         overshoot2 = 0.0; // Path actually has square ends at terminal vertices
+                    }
+                    else if ((type == 4) && (indj == numPathPt - 1))
+                    {
+                        overshoot2 = 2. / width * (cell.paths[indi]).getEExten(); // Path has custom end extension
                     }
                     if (pathCoord[2 * indj] == pathCoord[2 * indj + 2]) // Path segment along y-axis
                     {
@@ -2889,9 +2940,17 @@ public:
                 {
                     overshoot1 = 0.0; // Path actually has square ends at terminal vertices
                 }
+                else if ((type == 4) && (indj == 0))
+                {
+                        overshoot1 = 2. / width * (cell.paths[indi]).getBExten(); // Path has custom beginning extension
+                }
                 if ((type == 0) && (indj == pathCoord.size() - 4))
                 {
                     overshoot2 = 0.0; // Path actually has square ends at terminal vertices
+                }
+                else if ((type == 4) && (indj == pathCoord.size() - 4))
+                {
+                    overshoot2 = 2. / width * (cell.paths[indi]).getEExten(); // Path has custom end extension
                 }
 
                 // Initialize the conductorIn information
@@ -3176,6 +3235,7 @@ public:
                 gw.gds_write_layer((((this->cells)[indCell]).paths)[indPath].getLayer());
                 gw.gds_write_datatype((((this->cells)[indCell]).paths)[indPath].getLayer());
                 gw.gds_write_pathtype((((this->cells)[indCell]).paths)[indPath].getType());
+                // Limbo does not support BGNEXTN or ENDEXTN writing
                 gw.gds_write_width(width);
                 gw.gds_write_xy(xcoord, ycoord, numPt);
                 gw.gds_write_endel();
@@ -3572,6 +3632,28 @@ public:
             if (this->getElement() == 't')
             {
                 ((this->cells)[this->numCell]).textboxes.back().setType(data[0]);
+            }
+        }
+        else if (ascii_record_type == "BGNEXTN")
+        {
+            // Scaling for end cap extensions
+            double unitFactor = this->getdbUnits();
+            
+            // Store beginning extension
+            if (this->getElement() == 'p')
+            {
+                ((this->cells)[this->numCell]).paths.back().setBExten(unitFactor * data[0]);
+            }
+        }
+        else if (ascii_record_type == "ENDEXTN")
+        {
+            // Scaling for end cap extensions
+            double unitFactor = this->getdbUnits();
+            
+            // Store end extension
+            if (this->getElement() == 'p')
+            {
+                ((this->cells)[this->numCell]).paths.back().setEExten(unitFactor * data[0]);
             }
         }
         else if (ascii_record_type == "WIDTH")

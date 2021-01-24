@@ -2783,7 +2783,7 @@ struct SolverDataBase
                         case 01:
                         {
                             // Interpolate operation
-                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
                             if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
                             {
                                 pathType = 1;
@@ -2888,7 +2888,7 @@ struct SolverDataBase
                         case 01:
                         {
                             // Interpolate operation
-                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
                             if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
                             {
                                 pathType = 1;
@@ -3066,7 +3066,7 @@ struct SolverDataBase
                         case 01:
                         {
                             // Interpolate operation
-                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                            int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
                             if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
                             {
                                 pathType = 1;
@@ -3264,7 +3264,7 @@ struct SolverDataBase
                     case 01:
                     {
                         // Interpolate operation
-                        int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                        int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
                         if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
                         {
                             pathType = 1;
@@ -3477,7 +3477,7 @@ struct SolverDataBase
                     case 01:
                     {
                         // Interpolate operation
-                        int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width
+                        int pathType; // pathType: 0 = square ends at vertices, 1 = round ends, 2 = square ends overshoot vertices by half width, 4 = custom
                         if ((currentAper.getStanTemp() == 'C') || (currentAper.getStanTemp() == 'O'))
                         {
                             pathType = 1;
