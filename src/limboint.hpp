@@ -3645,7 +3645,7 @@ public:
                 ((this->cells)[this->numCell]).paths.back().setBExten(unitFactor * data[0]);
             }
         }
-        else if (ascii_record_type == "ENDEXTN")
+        else if (ascii_record_type == "ENDTEXTN")
         {
             // Scaling for end cap extensions
             double unitFactor = this->getdbUnits();
