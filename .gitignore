@@ -30,6 +30,7 @@
 *.exe
 *.out
 *.app
+LayoutAnalyzer
 
 # Repository-specific files
 *_log.txt
@@ -41,7 +42,20 @@
 *.ts
 *.lis
 *.st[0-9]*
+
+# Confidential files
 Thumbs.db
 examples/WEDGE100_REV01.gds
 examples/WEDGE100_REV02.gds
 confidential/
+examples/plasma_pkg.gds
+examples/plasma_windowed4.gds
+
+# Temorary txt output for development purpose
+eps.txt
+sig.txt
+x.txt
+y.txt
+z.txt
+cond.txt
+markEdge.txt
