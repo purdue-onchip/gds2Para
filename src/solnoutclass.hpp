@@ -1679,6 +1679,7 @@ class Parasitics
     // Compute nodal admittance matrices from network parameters at a certain frequency
     void computeYBusFromParam(size_t indFreq)
     {
+		int indi, indj;
         // Need to get Y-parameters temporarily
         const int nPorts = (const int)this->getNPort();
         cdMat matY;
@@ -1687,13 +1688,13 @@ class Parasitics
         case ('Y'):
         {
             cout << "Directly using Y-parameters to place circuit elements." << endl;
-            matY = this->matParam[indFreq];
+            matY = this->matParam[indFreq].inverse();
             break;
         }
         case ('Z'):
         {
             cout << "Notice: Finding Y-parameters by inverting Z-parameters matrix. Placing circuit elements afterwards." << endl;
-            matY = this->matParam[indFreq].inverse();
+            matY = this->matParam[indFreq];
             break;
         }
         case ('S'):
@@ -1751,7 +1752,12 @@ class Parasitics
         dMat matG(nPorts, nPorts); // Initialize Eigen nodal conductance matrix for this frequency (S)
         dMat matC(nPorts, nPorts); // Initialize Eigen nodal capacitance matrix for this frequency (F)
         matG = matY.real(); // G = Re{Y} (S)
-        matC = matY.imag() / (2. * M_PI * this->freqs[indFreq]); // C = B / omega = Im{Y} / (2*pi*f) (F)
+        matC = (matY.imag() * (2. * M_PI * this->freqs[indFreq])); // C = B / omega = Im{Y} / (2*pi*f) (F)
+		for (indi = 0; indi < nPorts; indi++) {
+			for (indj = 0; indj < nPorts; indj++) {
+				matC(indi, indj) = -1 / matC(indi, indj);
+			}
+		}
 #endif
         this->setGMatrix(matG); // Update the objects in this class
         this->setCMatrix(matC);
@@ -1921,7 +1927,7 @@ class Parasitics
         {
             (this->ports)[indi].print();
         }
-        cout << "  Conductance Matrix (S):" << endl;
+        cout << "  Resistance Matrix (Ohms):" << endl;
         for (size_t indi = 0; indi < this->matG.outerSize(); indi++)
         {
 #ifdef EIGEN_SPARSE
