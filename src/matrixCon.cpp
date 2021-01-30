@@ -67,14 +67,14 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->v0d1valo[indi] = sys->v0d1val[indi];
     }
     for (indi = 0; indi < v0d1num; indi++) {    // compute sqrt(D_eps)*V0d1
-        sys->v0d1val[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
+        sys->v0d1val[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi]) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
     }
     sys->v0d1avalo = (double*)malloc(v0d1anum * sizeof(double));
     for (indi = 0; indi < v0d1anum; indi++) {
         sys->v0d1avalo[indi] = sys->v0d1aval[indi];
     }
     for (indi = 0; indi < v0d1anum; indi++) {
-        sys->v0d1aval[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
+        sys->v0d1aval[indi] *= sqrt(sys->stackEpsn[(sys->v0d1RowId[indi]) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0);
     }
 
 
@@ -197,7 +197,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->v0cvalo[indi] = sys->v0cval[indi];    // v0cvalo is the v0c values without D_sig
     for (indi = 0; indi < v0cnum; indi++) {
         if (sys->markEdge[sys->v0cRowId[indi]] != 0) {
-            sys->v0cval[indi] *= sqrt(SIGMA);       // Compute the sparse form of D_sig*V0c
+            sys->v0cval[indi] *= sqrt(sys->stackSign[sys->v0cRowId[indi] / (sys->N_edge_s + sys->N_edge_v)]);       // Compute the sparse form of D_sig*V0c SIGMA
         }
     }
     sys->v0cavalo = (double*)malloc(v0canum * sizeof(double));
@@ -205,7 +205,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         sys->v0cavalo[indi] = sys->v0caval[indi];
     for (indi = 0; indi < v0canum; indi++) {
         if (sys->markEdge[sys->v0cRowId[indi]] != 0) {
-            sys->v0caval[indi] *= sqrt(SIGMA);
+            sys->v0caval[indi] *= sqrt(sys->stackSign[sys->v0cRowId[indi] / (sys->N_edge_s + sys->N_edge_v)]);//SIGMA
         }
     }
 
@@ -442,7 +442,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         crhs = (double*)calloc(leng_v0c, sizeof(double));
         for (indi = 0; indi < sys->N_edge; indi++) {
             yd1[indi] = ydt[indi];
-            ydt[indi] *= -1.0 * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+            ydt[indi] *= -1.0 * (2 * M_PI*sys->freqStart * sys->freqUnit) * sys->stackEpsn[(indi) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
         
         alpha = 1;
@@ -531,7 +531,7 @@ int paraGenerator(fdtdMesh *sys, unordered_map<double, int> xi, unordered_map<do
         free(y0c); y0c = NULL;
 
         for (indi = 0; indi < sys->N_edge; indi++) {
-            yccp[indi] = -yc[indi] * sys->stackEpsn[(indi + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
+            yccp[indi] = -yc[indi] * sys->stackEpsn[(indi) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0;
         }
         
         alpha = 1;

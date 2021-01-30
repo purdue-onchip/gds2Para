@@ -10,7 +10,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     int status;
     double xmin, xmax, ymin, ymax, xwid, ywid;
     clock_t tt = clock();
-
+	cout << " lim x" << sys->xlim1 << " " << sys->xlim2 << endl;
+	cout << " lim y" << sys->ylim1 << " " << sys->ylim2 << endl;
     /* Generate the mesh nodes based on conductorIn information */
     myint numNode = 0;
     double disMinx = MINDISFRACX * fmin((sys->ylim2 - sys->ylim1), (sys->xlim2 - sys->xlim1)); // Minimum discretization (m) retained in x-direction after node merging is fraction of smaller of x-extent or y-extent
@@ -27,13 +28,17 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     for (indi = 0; indi < sys->numPorts; indi++) {
         numPortSides += sys->portCoor[indi].multiplicity;
     }
-    myint numOrigOldXY = numNode + 2 * numPortSides; // Number of coordinates reserved includes each conductor vertex and each pair of points defining area port side
+    myint numOrigOldXY = numNode + 2 * numPortSides; //+2 dj with lim; // Number of coordinates reserved includes each conductor vertex and each pair of points defining area port side
     myint numOrigOldZ = 2 * (sys->numStack + numPortSides); // Number of coordinates reserved includes each layer start and stop coordinate and pair of points defining area port side
     xOrigOld.reserve(numOrigOldXY);
     yOrigOld.reserve(numOrigOldXY);
     zOrigOld.reserve(numOrigOldZ);
 
     /* Populate vectors for the old coordinates */
+	/*xOrigOld.push_back(sys->xlim1);
+	xOrigOld.push_back(sys->xlim2);
+	yOrigOld.push_back(sys->ylim1);
+	yOrigOld.push_back(sys->ylim2);*/
     indj = 0;
     for (indi = 0; indi < sys->numCdtRow; indi++) {
         for (indk = 0; indk < sys->conductorIn[indi].numVert; indk++) {
@@ -51,9 +56,11 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         for (indk = 0; indk < sys->portCoor[indi].multiplicity; indk++) {
             xOrigOld.push_back(x1coord[indk]);
             yOrigOld.push_back(y1coord[indk]);
+			cout << "port x " << x1coord[indk] << " port y " << y1coord[indk] << endl;
             indj++;
             xOrigOld.push_back(x2coord[indk]);
             yOrigOld.push_back(y2coord[indk]);
+			cout << "port x " << x1coord[indk] << " port y " << y1coord[indk] << endl;
             indj++; // Increase for each point in area pair defining area port side
         }
     }
@@ -303,10 +310,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
     
     /* Putting the layer relative permittivities and conductivities in order of increasing z-coordinate */
     indi = 0;
-    if (sys->stackBegCoor[0] == sys->zn[0]) {
+    if (sys->stackBegCoor[0] == sys->zn[0]) {// first stack is the bottomost stack
         indj = 0;
-        sys->stackEpsn.push_back(sys->stackEps[indj]);    // the stack eps with indi < sys->N_edge_s
-        sys->stackSign.push_back(sys->stackSig[indj]);    // the stack sig with indi < sys->N_edge_s
+        //sys->stackEpsn.push_back(sys->stackEps[indj]);    // the stack eps with indi < sys->N_edge_s
+        //sys->stackSign.push_back(sys->stackSig[indj]);    // the stack sig with indi < sys->N_edge_s
         while (indi < sys->nz - 1) {
             if ((sys->zn[indi] + sys->zn[indi + 1]) / 2 >= sys->stackBegCoor[indj] && (sys->zn[indi] + sys->zn[indi + 1]) / 2 <= sys->stackEndCoor[indj]) {
                 sys->stackEpsn.push_back(sys->stackEps[indj]);
@@ -317,11 +324,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 indj++;
             }
         }
+		sys->stackEpsn.push_back(sys->stackEps[indj]);    // top surface
+		sys->stackSign.push_back(sys->stackSig[indj]);    // top surface
     }
     else {
         indj = sys->numStack - 1;
-        sys->stackEpsn.push_back(sys->stackEps[indj]);
-        sys->stackSign.push_back(sys->stackSig[indj]);
+        //sys->stackEpsn.push_back(sys->stackEps[indj]);
+        //sys->stackSign.push_back(sys->stackSig[indj]);
         while (indi < sys->nz - 1) {
             if ((sys->zn[indi] + sys->zn[indi + 1]) / 2 >= sys->stackBegCoor[indj] && (sys->zn[indi] + sys->zn[indi + 1]) / 2 <= sys->stackEndCoor[indj]) {
                 sys->stackEpsn.push_back(sys->stackEps[indj]);
@@ -332,7 +341,17 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
                 indj--;
             }
         }
+		sys->stackEpsn.push_back(sys->stackEps[indj]);    // top surface
+		sys->stackSign.push_back(sys->stackSig[indj]);    // top surface
     }
+
+	cout << "z0 " << sys->zn[0] << endl;
+	for (indi = 0; indi < sys->nz; indi++) {
+		cout << " layer " << indi << " eps " << sys->stackEpsn[indi] << " sig " << sys->stackSign[indi] << endl;
+		if (indi < sys->nz - 1) {
+			cout << " beg " << sys->stackBegCoor[indi] << " end " << sys->stackEndCoor[indi] << endl;
+		}
+	}
 
     /* Reduce memory usage from storing the original coordinates */
     vector<double>().swap(xOrigOld);
@@ -438,7 +457,7 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 
     //cout << "Start to find nodes inside polygons!\n";
     //sys->findInsideCond_xrangey(xi, yi, zi);
-
+	cout << "here" << endl;
 
     /*double px = -3225.6e-6, py = 806.4e-6, pz = 716e-6;
     sys->checkPoint(px, py, pz, xi, yi, zi);*/
@@ -480,13 +499,14 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
     }
 
-    /*ofstream out;
+    ofstream out;
     out.open("markEdge.txt", std::ofstream::out | std::ofstream::trunc);
     for (indi = 0; indi < sys->N_edge; indi++){
         out << sys->markEdge[indi] << endl;
     }
     out.close();
-    cout << "markEdge is generated!\n";
+    /*cout << "markEdge is generated!\n";
+	
 #ifdef LOWER_BOUNDARY_PEC
     sys->conductorIn.push_back(fdtdOneCondct()); // the lower PEC plane
     sys->conductorIn.back().numVert = 4;
@@ -846,13 +866,29 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         }
     }
 
+	int izt, ixt, iyt;
+	//ofstream out;
+	cout << "Num condcutors"<<sys->numCdt << endl;
+	out.open("cond.txt", std::ofstream::out | std::ofstream::trunc);
+	for (indi = 0; indi < sys->numCdt; indi++) {
+		out << "conductor "<< indi << endl;
+		for (indj = 0; indj < sys->conductor[indi].cdtNodeind; indj++) {
+			izt = sys->conductor[indi].node[indj] / (sys->N_node_s);
+			ixt = (sys->conductor[indi].node[indj] - izt * sys->N_node_s) / (sys->N_cell_y + 1);
+			iyt = sys->conductor[indi].node[indj] % (sys->N_cell_y + 1);
+			out << sys->conductor[indi].node[indj] << " " << sys->xn[ixt] << " " << sys->yn[iyt] << " " << sys->zn[izt] << endl;
+		}
+	}
+	out.close();
+
+
     /* Establish relationship between isolated conductors and ports */
     bool isSetEmpty = false;
     if (sys->cond2condIn.empty()) {
         isSetEmpty = true; // Change value to prevent checks against sys->cond2condIn.end()
     }
     myint indPortNode1, indPortNode2;
-    int step = 10;   // further to go 5 steps to find the port node
+    int step = 50;   // further to go 5 steps to find the port node
     set<int> cond;    // the port conductors
     for (indi = 0; indi < sys->numPorts; indi++) {
 #ifdef PRINT_PORT_COND
@@ -869,9 +905,13 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
         for (indk = 0; indk < mult; indk++)   // Check whether all the port nodes are inside conductors, if not return
         {
             indPortNode1 = sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]];
+			/*for (indj = 0; indj > -50; indj--) {
+				cout << sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]+indj] << endl;
+				cout << "y coord " << sys->yn[yi[y1coord[indk]]+indj] << endl;
+			}*/
             indPortNode2 = sys->markNode[zi[z2coord[indk]] * sys->N_node_s + xi[x2coord[indk]] * (sys->N_cell_y + 1) + yi[y2coord[indk]]];
 
-            
+			cout << "  first = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
 #ifdef PRINT_PORT_COND
             cout << zi[z1coord[indk]] << " " << sys->xn[xi[x1coord[indk]]] << " " << sys->yn[yi[y1coord[indk]]] << endl;
             cout << zi[z2coord[indk]] << " " << sys->xn[xi[x2coord[indk]]] << " " << sys->yn[yi[y2coord[indk]]] << endl;
@@ -881,6 +921,10 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
             indPortNode1 = sys->markNode[zi[sys->portCoor[indi].z1[indk]] * sys->N_node_s + xi[sys->portCoor[indi].x1[indk]] * (sys->N_cell_y + 1) + yi[sys->portCoor[indi].y1[indk]]];
             indPortNode2 = sys->markNode[zi[sys->portCoor[indi].z2[indk]] * sys->N_node_s + xi[sys->portCoor[indi].x2[indk]] * (sys->N_cell_y + 1) + yi[sys->portCoor[indi].y2[indk]]];   // Update indPortNode1 and indPortNode2
             cout << "  mult = " << mult << ", indPortNode1 = " << indPortNode1 << ", indPortNode2 = " << indPortNode2 << endl;
+			cout << zi[z1coord[indk]] << " " << sys->xn[xi[x1coord[indk]]] << " " << sys->yn[yi[y1coord[indk]]] << endl;
+			cout << zi[z2coord[indk]] << " " << sys->xn[xi[x2coord[indk]]] << " " << sys->yn[yi[y2coord[indk]]] << endl;
+			cout << sys->zn[zi[sys->portCoor[indi].z1[indk]]] << " " << sys->xn[xi[sys->portCoor[indi].x1[indk]]] << " " << sys->yn[yi[sys->portCoor[indi].y1[indk]]] << endl;
+			cout << sys->zn[zi[sys->portCoor[indi].z2[indk]]] << " " << sys->xn[xi[sys->portCoor[indi].x2[indk]]] << " " << sys->yn[yi[sys->portCoor[indi].y2[indk]]] << endl;
             if (mark == 0){
                 cerr << "Port node could not be located within a conductor. Exiting now." << endl;
                 return 1;
@@ -942,6 +986,8 @@ int meshAndMark(fdtdMesh *sys, unordered_map<double, int> &xi, unordered_map<dou
 #endif
     sys->bden = sys->lbde.size() + sys->ubde.size();    // the boundary edge number
     sys->setMapEdge();   // map the original edge to the new edge # with upper and lower boundaries
+
+	
     /*outc.open("mapEdge.txt", std::ofstream::out | std::ofstream::trunc);
     for (int i = 0; i < sys->N_edge; i++) {
         outc << sys->mapEdge[i] << endl;
@@ -1121,15 +1167,17 @@ int matrixConstruction(fdtdMesh *sys) {
     }*/
     ofstream out;
     out.open("eps.txt", std::ofstream::out | std::ofstream::trunc);
+	cout << " N " << sys->N_edge << " bd " << sys->bden << endl;
     for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
-        out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->stackEpsn[(sys->mapEdgeR[indi] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
+        out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->stackEpsn[(sys->mapEdgeR[indi]) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0 << endl;
     }
     out.close();
 
     out.open("sig.txt", std::ofstream::out | std::ofstream::trunc);
+	cout << "bd edge number " << sys->bden << " s edge number " << sys->N_edge_s << " v_edge_number " << sys->N_edge_v << endl;
     for (indi = 0; indi < sys->N_edge - sys->bden; indi++){
         if (sys->markEdge[sys->mapEdgeR[indi]] != 0){
-            out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << SIGMA << endl;
+            out << std::setprecision(std::numeric_limits<double>::digits10 + 1) << sys->stackSign[(sys->mapEdgeR[indi]) / (sys->N_edge_s + sys->N_edge_v)] << endl;//SIGMA
         }
         else{
             out << 0 << endl;
@@ -1174,7 +1222,8 @@ int portSet(fdtdMesh* sys, unordered_map<double, int> xi, unordered_map<double, 
             /* Extract the node markers*/
             myint indMarkNode1 = sys->markNode[zi[z1coord[indk]] * sys->N_node_s + xi[x1coord[indk]] * (sys->N_cell_y + 1) + yi[y1coord[indk]]];
             myint indMarkNode2 = sys->markNode[zi[z2coord[indk]] * sys->N_node_s + xi[x2coord[indk]] * (sys->N_cell_y + 1) + yi[y2coord[indk]]];
-
+			cout << "indMarkNode1 " << indMarkNode1 << " indMarkNode2 " << indMarkNode2 << endl;
+			cout << sys->conductor[indMarkNode1 - 1].markPort << " " << sys->conductor[indMarkNode2 - 1].markPort << endl; 
             /* Track conductor index each port side touches and mark each conductor with the port number */
             if ((indMarkNode1 != 0) && (sys->conductor[indMarkNode1 - 1].markPort > -1)) { // Only supply end of port not on PEC
                 sys->portCoor[indi].portCnd.push_back(indMarkNode1);

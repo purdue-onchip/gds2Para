@@ -96,13 +96,13 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                 xr[2 * (sys->N_edge - sys->bden) + sys->SRowId[index]] += sys->Sval[index] * xr[1 * (sys->N_edge - sys->bden) + sys->SColId[index]] * (-2) * pow(dt, 2);
                 index++;
             }
-            if (sys->markEdge[sys->mapEdgeR[start]] != 0){
-                xr[2 * (sys->N_edge - sys->bden) + start] += -rsc[start] * 2 * pow(dt, 2) + dt * SIGMA * xr[start] - 2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[1 * (sys->N_edge - sys->bden) + start];
-                xr[2 * (sys->N_edge - sys->bden) + start] /= (2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 + dt * SIGMA);
+            if (sys->markEdge[sys->mapEdgeR[start]] != 0){//SIGMA next line
+                xr[2 * (sys->N_edge - sys->bden) + start] += -rsc[start] * 2 * pow(dt, 2) + dt * sys->stackSign[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * xr[start] - 2 * sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[1 * (sys->N_edge - sys->bden) + start];
+                xr[2 * (sys->N_edge - sys->bden) + start] /= (2 * sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 + dt * sys->stackSign[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)]);
             }
             else {
-                xr[2 * (sys->N_edge - sys->bden) + start] += -rsc[start] * 2 * pow(dt, 2) - 2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[1 * (sys->N_edge - sys->bden) + start];
-                xr[2 * (sys->N_edge - sys->bden) + start] /= (2 * sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0);
+                xr[2 * (sys->N_edge - sys->bden) + start] += -rsc[start] * 2 * pow(dt, 2) - 2 * sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[start] + 4 * sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0 * xr[1 * (sys->N_edge - sys->bden) + start];
+                xr[2 * (sys->N_edge - sys->bden) + start] /= (2 * sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0);
             }
             nn += xr[1 * (sys->N_edge - sys->bden) + start] * xr[1 * (sys->N_edge - sys->bden) + start];
         }
@@ -133,12 +133,12 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                     index++;
                 }
                 if (sys->markEdge[sys->mapEdgeR[start]] != 0) {
-                    temp1[0][start] = sqrt(SIGMA) * U0[U0_i - 1][start];
-                    temp2[0][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                    temp1[0][start] = sqrt(sys->stackSign[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)]) * U0[U0_i - 1][start];//SIGMA
+                    temp2[0][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
                 }
                 else {
                     temp1[0][start] = 0;
-                    temp2[0][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                    temp2[0][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
                 }
             }
             for (myint inde = 0; inde < l; inde++){
@@ -351,12 +351,12 @@ int find_Vh(fdtdMesh *sys, lapack_complex_double *u0, lapack_complex_double *u0a
                     index++;
                 }
                 if (sys->markEdge[sys->mapEdgeR[start]] != 0) {
-                    temp1[(U0_i - 1)][start] = sqrt(SIGMA) * U0[U0_i - 1][start];
-                    temp2[(U0_i - 1)][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                    temp1[(U0_i - 1)][start] = sqrt(sys->stackSign[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)]) * U0[U0_i - 1][start];//SIGMA
+                    temp2[(U0_i - 1)][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
                 }
                 else {
                     temp1[(U0_i - 1)][start] = 0;
-                    temp2[(U0_i - 1)][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start] + sys->N_edge_v) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
+                    temp2[(U0_i - 1)][start] = sqrt(sys->stackEpsn[(sys->mapEdgeR[start]) / (sys->N_edge_v + sys->N_edge_s)] * EPSILON0) * U0[U0_i - 1][start];
                 }
             }
             index = U0_i - 1;

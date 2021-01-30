@@ -50,22 +50,23 @@ using namespace std;
 #define SIGMA (5.8e+7) // Default conductivity for conductors is copper (S/m)
 #define DOUBLEMAX (1.e+30)
 #define DOUBLEMIN (-1.e+30)
-#define MINDISFRACX (5e-3) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
-#define MINDISFRACY (5e-3) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
+#define MINDISFRACX (1e-4) // Fraction setting minimum discretization retained in x-directions after node merging in terms of smaller of x-extent
+#define MINDISFRACY (1e-4) // Fraction setting minimum discretization retained in y-directions after node merging in terms of smaller of y-extent
 #define MINDISFRACZ (0.05) // Fraction setting minimum discretization retained in z-direction after node merging in terms of distance between closest layers
-#define MAXDISFRACX (0.1) // Fraction setting largest discretization in x-direction in terms of x-extent
-#define MAXDISFRACY (0.1) // Fraction setting largest discretization in y-direction in terms of y-extent
+#define MAXDISFRACX (0.001) // Fraction setting largest discretization in x-direction in terms of x-extent
+#define MAXDISFRACY (0.001) // Fraction setting largest discretization in y-direction in terms of y-extent
 #define MAXDISLAYERZ (2.) // Largest discretization in z-direction represented as fewest nodes placed between closest layers (1. = distance between closest layers, 2. = half distance between closest layers)
 #define DT (1.e-15) // Time step for finding high-frequency modes (s)
 
 // Debug testing macros (comment out if not necessary)
-#define UPPER_BOUNDARY_PEC
+//#define UPPER_BOUNDARY_PEC
 #define LOWER_BOUNDARY_PEC
 #define PRINT_NODE_COORD
 #define PRINT_DIS_COUNT (1)
 #define SKIP_MARK_CELL
 #define PRINT_VERBOSE_TIMING // Terminal output has extra runtime clock information
-//#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
+#define PRINT_PORT_SET // Terminal output shows logical tests in portSet()
+#define PRINT_PORT_COND 
 //#define PRINT_V0D_BLOCKS
 //#define V0_NEW_SCHEMA
 #define PRINT_V0_Z_PARAM
@@ -475,10 +476,10 @@ public:
 
 		cout << "Print conductorIn information: " << endl;
 		for (indi = 0; indi < this->numCdtRow; indi++) {
-			for (indj = 0; indj < this->conductorIn[indi].numVert - 1; indj++) {
-				if (this->conductorIn[indi].layer == 5) {
-					cout << this->conductorIn[indi].x[indj] << " " << this->conductorIn[indi].y[indj] << " " << this->conductorIn[indi].zmin << " " << this->conductorIn[indi].zmax << endl;
-				}
+			for (indj = 0; indj < this->conductorIn[indi].numVert; indj++) {
+				//if (this->conductorIn[indi].layer == 5) {
+				cout << " indi " << indi << " x " << this->conductorIn[indi].x[indj] << " y " << this->conductorIn[indi].y[indj] << " " << this->conductorIn[indi].zmin << " " << this->conductorIn[indi].zmax << endl;
+				//}
 			}
 		}
 	}
@@ -548,7 +549,10 @@ public:
 		myint node1, node2;
 
 
-
+		/*for (indi = 0; indi < this->numCdtRow; indi++) {
+			cout << "conductor no " << indi << " layer " << this->conductorIn[indi].layer << " zmin " << this->conductorIn[indi].zmin << " zmax " << this->conductorIn[indi].zmax << endl;
+			cout << "conductor no " << indi << " zi(zmin) " << zi[this->conductorIn[indi].zmin] << " zi(zmax) " << zi[this->conductorIn[indi].zmax] << endl;
+		}*/
 		for (indi = 0; indi < this->numCdtRow; indi++) {
 			if (this->conductorIn[indi].zmax == this->conductorIn[indi].zmin)
 				continue;
@@ -582,6 +586,7 @@ public:
 				}
 
 			}
+			//cout << "here 1" << endl;
 			if (max(yi[this->conductorIn[indi].y[indj]], yi[this->conductorIn[indi].y[0]]) > ymax) {
 				ymax = max(yi[this->conductorIn[indi].y[indj]], yi[this->conductorIn[indi].y[0]]);
 			}
@@ -668,6 +673,8 @@ public:
 					}
 				}
 			}
+
+			//cout << "here 2" << endl;
 			if (this->conductorIn[indi].x[indj] < this->conductorIn[indi].x[0]) {
 				ss = xi[this->conductorIn[indi].x[indj]];
 				ee = xi[this->conductorIn[indi].x[0]];
@@ -1199,6 +1206,7 @@ public:
 		return 0 means not find the port point
 		indi : the port #
 		indk : this port's multiplicity*/
+		int flag = 0;
 		if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n] == 0) {   // the first port node is not inside the conductor
 			int i = 0;
 			if (x1n < x2n) {   // x1n goes further left
@@ -1266,16 +1274,35 @@ public:
 					return 0;
 				}
 			}
-			else if (z1n > z2n) {   // z1n goes further up
-				while (i < step && z1n < this->nz - 1) {
-					z1n += 1;
+			else if (z1n > z2n) {   // z1n goes further up //dj y goes down and up
+				//while (i < step && z1n < this->nz - 1) {
+				flag = 0;
+				while (i < step && y1n > 0) {
+					y1n -= 1;
 					if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
-						this->portCoor[indi].z1[indk] = this->zn[z1n];
+						//this->portCoor[indi].z1[indk] = this->zn[z1n];
+						this->portCoor[indi].y1[indk] = this->yn[y1n];
+						flag = 1;
 						break;
 					}
 					i++;
 				}
-				if (i == step || z1n == this->nz - 1) {   // doesn't find a point that is inside the conductor
+				if (flag == 0) {// go up
+					flag = 0;
+					while (i < step && y1n < this->ny - 1) {
+						y1n += 1;
+						if (this->markNode[z1n * this->N_node_s + x1n * (this->N_cell_y + 1) + y1n]) {
+							//this->portCoor[indi].z1[indk] = this->zn[z1n];
+							this->portCoor[indi].y1[indk] = this->yn[y1n];
+							flag = 1;
+							break;
+						}
+						i++;
+					}
+				}
+				//if (i == step || z1n == this->nz - 1) {   // doesn't find a point that is inside the conductor
+				//if (i == step || y1n == 0 || y1n == this->ny - 1) {
+				if (flag == 0) {
 					return 0;
 				}
 			}
@@ -1360,6 +1387,10 @@ public:
 					return 0;
 				}
 			}
+		}
+		if (z1n > z2n || z1n < z2n) {
+			this->portCoor[indi].y2[indk] = this->portCoor[indi].y1[indk];
+			this->portCoor[indi].x2[indk] = this->portCoor[indi].x1[indk];
 		}
 		return 1;
 	}
@@ -2756,15 +2787,15 @@ public:
 				node1 = inz * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
 				node2 = (inz + 1) * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
 				if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[inz] * EPSILON0;//dj shifted (old: (this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[inz] * EPSILON0;
 				}
 				else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[inz] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[inz] * EPSILON0;
 				}
 				else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackEpsn[inz] * EPSILON0);
 				}
 			}
 			else if (this->v0d1RowId[indi] % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
@@ -2774,15 +2805,15 @@ public:
 				node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
 				node2 = inz * this->N_node_s + (inx + 1) * (this->N_cell_y + 1) + iny;
 				if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[inz] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[inz] * EPSILON0;
 				}
 				else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[inz] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[inz] * EPSILON0;
 				}
 				else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackEpsn[inz] * EPSILON0);
 				}
 			}
 			else {    // this edge is along y axis
@@ -2792,15 +2823,15 @@ public:
 				node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
 				node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
 				if (map[node1] != this->v0d1ColId[indi] + 1 && map[node1] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][map[node1] - 1] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[inz] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[inz] * EPSILON0;
 				}
 				else if (map[node2] != this->v0d1ColId[indi] + 1 && map[node2] != 0) {
-					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][map[node2] - 1] += this->v0d1aval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[inz] * EPSILON0;
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[inz] * EPSILON0;
 				}
 				else {//if (map[this->edgelink[this->v0d1aRowId[indi] * 2]] == 0 || map[this->edgelink[this->v0d1aRowId[indi] * 2] + 1] == 0) {
-					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[(this->v0d1RowId[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0);
+					Ad1[this->v0d1ColId[indi]][this->v0d1ColId[indi]] += abs(this->v0d1aval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackEpsn[inz] * EPSILON0);
 				}
 			}
 		}
@@ -2863,8 +2894,14 @@ public:
 		set<myint> base;
 		int nodegs;
 
+		cout << " num cdt " << this->numCdt << endl;
+		for (ic = 0; ic < this->numCdt; ic++) {
+			cout << " ic " << ic << " node number " << this->cdtNumNode[ic] << endl;
+		}
 		for (ic = 0; ic < this->numCdt; ic++) {
 			if (this->conductor[ic].markPort <= 0) {    // not excited conductors
+				cout << " ic neg " << ic << " node number " << this->cdtNumNode[ic] << " "<< this->conductor[ic].markPort<<endl;
+				
 				markcond = ic + 1;
 				//visited = (int*)calloc(this->N_node, sizeof(int));
 				n = this->cdtNumNode[ic] - 1;
@@ -2874,7 +2911,7 @@ public:
 
 					if (visited[this->conductor[ic].node[jc]] == 0 && this->ubdn.find(this->conductor[ic].node[jc]) == this->ubdn.end() && this->lbdn.find(this->conductor[ic].node[jc]) == this->lbdn.end()) {   // this node is not visited and it is not in the boundary
 																																																				  //if (!ind.empty())
-																																																				  //    ind.clear();
+						//cout << "wrong" << endl;																																				  //    ind.clear();
 						iz = this->conductor[ic].node[jc] / (this->N_node_s);
 						ix = (this->conductor[ic].node[jc] - iz * this->N_node_s) / (this->N_cell_y + 1);
 						iy = this->conductor[ic].node[jc] % (this->N_cell_y + 1);
@@ -3061,6 +3098,7 @@ public:
 					this->acu_cnno.push_back(leng_v0c);
 				}
 				//free(visited); visited = NULL;
+				cout << " v0cnum " << v0cnum <<endl;
 			}
 
 			else {   // markPort > 0 then the conductor is not reference conductor, no need to judge the boundary nodes
@@ -3444,8 +3482,12 @@ public:
 		int indi, indj, inx, iny, inz;
 		myint node1, node2;
 		unordered_map<myint, unordered_map<myint, double>> Ac;
-
-		for (indi = 0; indi < v0canum; indi++) {    // the upper and lower planes are PEC
+		/*for (indi = 0; indi < this->nz; indi++) {
+			cout << " indi " << indi << " sigma " << this->stackSign[indi] << endl;
+		}*/
+		for (indi = 0; indi < v0canum; indi++) {    // the upper and lower planes are PEC 
+			//inz = this->v0cRowId[indi] / (this->N_edge_s + this->N_edge_v);
+			//cout << " indi " << indi << " inz " << inz << " sigma " << SIGMA << endl;
 			if (this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v) >= this->N_edge_s) {    // this edge is along z axis
 				inz = this->v0cRowId[indi] / (this->N_edge_s + this->N_edge_v);
 				inx = ((this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v)) - this->N_edge_s) / (this->N_cell_y + 1);
@@ -3453,15 +3495,15 @@ public:
 				node1 = inz * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
 				node2 = (inz + 1) * this->N_node_s + (this->N_cell_y + 1) * inx + iny;
 				if (map[node1] != this->v0cColId[indi] + 1 && map[node1] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
+					Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackSign[inz];
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) *this->stackSign[inz];
 				}
 				else if (map[node2] != this->v0cColId[indi] + 1 && map[node2] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * SIGMA;
+					Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->zn[inz + 1] - this->zn[inz]) *  this->stackSign[inz];
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackSign[inz];
 				}
 				else if (this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * SIGMA);
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->zn[inz + 1] - this->zn[inz]) * this->stackSign[inz]); //SIGMA);
 				}
 			}
 			else if (this->v0cRowId[indi] % (this->N_edge_s + this->N_edge_v) >= (this->N_cell_y) * (this->N_cell_x + 1)) {    // this edge is along x axis
@@ -3471,15 +3513,15 @@ public:
 				node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
 				node2 = inz * this->N_node_s + (inx + 1) * (this->N_cell_y + 1) + iny;
 				if (map[node1] != this->v0cColId[indi] + 1 && map[node1] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
+					Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackSign[inz]; //SIGMA;
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackSign[inz]; //SIGMA;
 				}
 				else if (map[node2] != this->v0cColId[indi] + 1 && map[node2] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * SIGMA;
+					Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->xn[inx + 1] - this->xn[inx]) * this->stackSign[inz]; //SIGMA;
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * this->stackSign[inz]; //SIGMA;
 				}
 				else if (this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) * SIGMA);
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->xn[inx + 1] - this->xn[inx]) *this->stackSign[inz]);// SIGMA);
 				}
 			}
 			else {    // this edge is along y axis
@@ -3489,15 +3531,15 @@ public:
 				node1 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny;
 				node2 = inz * this->N_node_s + inx * (this->N_cell_y + 1) + iny + 1;
 				if (map[node1] != this->v0cColId[indi] + 1 && map[node1] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
+					Ac[this->v0cColId[indi]][map[node1] - 1] += this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackSign[inz]; //SIGMA;
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackSign[inz]; //SIGMA;
 				}
 				else if (map[node2] != this->v0cColId[indi] + 1 && map[node2] != 0 && this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * SIGMA;
+					Ac[this->v0cColId[indi]][map[node2] - 1] += this->v0caval[indi] * (-1) / (this->yn[iny + 1] - this->yn[iny]) * this->stackSign[inz]; //SIGMA;
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackSign[inz]; //SIGMA;
 				}
 				else if (this->markEdge[this->v0cRowId[indi]] != 0) {
-					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * SIGMA);
+					Ac[this->v0cColId[indi]][this->v0cColId[indi]] += abs(this->v0caval[indi] * 1 / (this->yn[iny + 1] - this->yn[iny]) * this->stackSign[inz]);// SIGMA);
 				}
 			}
 		}
@@ -3514,7 +3556,7 @@ public:
 			vector<pair<myint, double>> v(Ac[indi].begin(), Ac[indi].end());
 			sort(v.begin(), v.end());
 			for (auto aci : v) {
-				if (abs(aci.second) > 1e5) {
+				if (1){//abs(aci.second) > 1e5) {
 					this->AcRowId[indj] = indi;
 					this->AcColId[indj] = aci.first;
 					this->Acval[indj] = aci.second;
@@ -3556,11 +3598,11 @@ public:
 				w[this->N_edge - this->bden + start] = 0;
 				w[start] = V[(j - 1) * 2 * (this->N_edge - this->bden) + (this->N_edge - this->bden) + start];
 				while (indi < this->leng_S && this->SRowId[indi] == start) {
-					w[this->N_edge - this->bden + start] += -this->Sval[indi] * V[(j - 1) * 2 * (this->N_edge - this->bden) + this->SColId[indi]] / (this->stackEpsn[(this->mapEdgeR[start] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 * pow(scale, 2));
+					w[this->N_edge - this->bden + start] += -this->Sval[indi] * V[(j - 1) * 2 * (this->N_edge - this->bden) + this->SColId[indi]] / (this->stackEpsn[(this->mapEdgeR[start]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 * pow(scale, 2));//+ this->N_edge_v removed dj
 					indi++;
 				}
-				if (this->markEdge[this->mapEdgeR[start]] != 0)
-					w[this->N_edge - this->bden + start] += -V[(j - 1) * 2 * (this->N_edge - this->bden) + (this->N_edge - this->bden) + start] * SIGMA / (this->stackEpsn[(this->mapEdgeR[start] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 * scale);
+				if (this->markEdge[this->mapEdgeR[start]] != 0)//SIGMA next line
+					w[this->N_edge - this->bden + start] += -V[(j - 1) * 2 * (this->N_edge - this->bden) + (this->N_edge - this->bden) + start] * this->stackSign[(this->mapEdgeR[start]) / (this->N_edge_s + this->N_edge_v)] / (this->stackEpsn[(this->mapEdgeR[start]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0 * scale);
 			}
 			for (i = 0; i <= j - 1; i++) {
 				for (int in = 0; in < (this->N_edge - this->bden) * 2; in++) {
@@ -3832,7 +3874,7 @@ public:
 		}
 		indi = 0;
 		while (indi < (this->N_edge - this->bden)) {
-			A[(this->N_edge - this->bden + indi) * (this->N_edge - this->bden) * 2 + this->N_edge - this->bden + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+			A[(this->N_edge - this->bden + indi) * (this->N_edge - this->bden) * 2 + this->N_edge - this->bden + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
 			indi++;
 		}
 
@@ -3840,10 +3882,10 @@ public:
 		indi = 0;
 		while (indi < (this->N_edge - this->bden)) {
 			if (this->markEdge[this->mapEdgeR[indi]] != 0) {
-				B[indi * (this->N_edge - this->bden) * 2 + indi] = scale * SIGMA;
+				B[indi * (this->N_edge - this->bden) * 2 + indi] = scale * this->stackSign[(this->mapEdgeR[indi]) / (this->N_edge_s + this->N_edge_v)];// SIGMA;
 			}
-			B[(this->N_edge - this->bden + indi) * (this->N_edge - this->bden) * 2 + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
-			B[indi * (this->N_edge - this->bden) * 2 + this->N_edge - this->bden + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+			B[(this->N_edge - this->bden + indi) * (this->N_edge - this->bden) * 2 + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
+			B[indi * (this->N_edge - this->bden) * 2 + this->N_edge - this->bden + indi] = pow(scale, 2) * this->stackEpsn[(this->mapEdgeR[indi]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0;
 			indi++;
 		}
 
@@ -3965,11 +4007,11 @@ public:
 				valc[indi] += this->Sval[indi]; // val[indi] is real
 				if (this->SRowId[indi] == this->SColId[indi]) {
 					if (this->markEdge[this->mapEdgeR[this->SRowId[indi]]] != 0) {
-						complex<double> addedPart(-(2. * M_PI * freq) * this->stackEpsn[(this->mapEdgeR[this->SRowId[indi]] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0, SIGMA);
+						complex<double> addedPart(-(2. * M_PI * freq) * this->stackEpsn[(this->mapEdgeR[this->SRowId[indi]]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0, this->stackSign[(this->mapEdgeR[this->SRowId[indi]]) / (this->N_edge_s + this->N_edge_v)]);// SIGMA);
 						valc[indi] += (2. * M_PI * freq) * addedPart;
 					}
 					else {
-						complex<double> addedPart(-(2. * M_PI * freq) * this->stackEpsn[(this->mapEdgeR[this->SRowId[indi]] + this->N_edge_v) / (this->N_edge_s + this->N_edge_v)] * EPSILON0, 0);
+						complex<double> addedPart(-(2. * M_PI * freq) * this->stackEpsn[(this->mapEdgeR[this->SRowId[indi]]) / (this->N_edge_s + this->N_edge_v)] * EPSILON0, 0);
 						valc[indi] += (2. * M_PI * freq) * addedPart;
 					}
 				}
@@ -4266,7 +4308,7 @@ public:
 				for (indj = 0; indj < this->numPorts; indj++) {
 					Zresult = this->x[indj + indi*this->numPorts];
 					cout << Zresult << " ";
-					//cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " "; // Alternative for copying and pasting into MATLAB
+					cout << Zresult.real() << "+ 1i* " << Zresult.imag() << " "; // Alternative for copying and pasting into MATLAB
 				}
 				cout << endl;
 			}

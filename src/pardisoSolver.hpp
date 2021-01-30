@@ -348,11 +348,11 @@ denseFormatOfMatrix cascadeMatrixS(fdtdMesh *psys, double omegaHz, const mapInde
         // For diagonal nnz, add "-w^2*eps+iw*sig" to psys->Sval (ShSe/mu)
         if (nnzS_rowId == nnzS_colId) {     // if at diagonal
             myint nnzS_rowId_growZ = psys->mapEdgeR[nnzS_rowId_rmPECz];
-            myint layerInd_alongZ = (nnzS_rowId_growZ + psys->N_edge_v) / (psys->N_edge_s + psys->N_edge_v);
+            myint layerInd_alongZ = (nnzS_rowId_growZ) / (psys->N_edge_s + psys->N_edge_v);//+ psys->N_edge_v removed dj
             double epsi_thisnnz = psys->stackEpsn[layerInd_alongZ] * EPSILON0;
             double sigma_thisnnz = 0;
             if (psys->markEdge[nnzS_rowId_growZ] != 0) {
-                sigma_thisnnz = SIGMA;
+                sigma_thisnnz = psys->stackSign[layerInd_alongZ];//SIGMA
             }   // if inside a conductor 
 
             complex<double> epsi_sigma = { -omegaHz*omegaHz*epsi_thisnnz, omegaHz*sigma_thisnnz };

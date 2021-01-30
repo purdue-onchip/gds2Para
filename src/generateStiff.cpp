@@ -618,11 +618,11 @@ int reference(fdtdMesh *sys, int freqNo, myint *RowId, myint *ColId, double *val
             valc[indi] += val[indi]; // val[indi] is real
             if (RowId[indi] == ColId[indi]){
                 if (sys->markEdge[sys->mapEdgeR[RowId[indi]]] != 0) {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, SIGMA);
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]]) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, sys->stackSign[(sys->mapEdgeR[RowId[indi]]) / (sys->N_edge_s + sys->N_edge_v)]);//SIGMA
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
                 else {
-                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]] + sys->N_edge_v) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
+                    complex<double> addedPart(-(2. * M_PI * freq) * sys->stackEpsn[(sys->mapEdgeR[RowId[indi]]) / (sys->N_edge_s + sys->N_edge_v)] * EPSILON0, 0);
                     valc[indi] += (2. * M_PI * freq) * addedPart;
                 }
             }
