@@ -16,6 +16,7 @@
 #include <parser-spef/parser-spef.hpp>
 #include <Eigen/Sparse>
 #include "limboint.hpp"
+#include "autoPortFromDefLef.hpp"
 #include "solnoutclass.hpp"
 #include "layeredFdtd.hpp"
 

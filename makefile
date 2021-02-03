@@ -33,9 +33,12 @@ ifdef BOOST_DIR # Boost library support
 endif
 endif
 
+# Flags -I -L for Limbo DEF and LEF parsers
+LIMBO_DEF_LEF_FLAGS = -L $(LIMBO_LIB_DIR) -ldefparseradapt -llefparseradapt -I $(LIMBO_ROOT_DIR)
+
 # Special Libraries to Include
 INCLUDE =-I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) -I $(HYPRE_HEAD_DIR) $(MKL_COMP_FLAGS)
-LIB =-L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -L $(HYPRE_LIB_DIR) -lHYPRE -lm
+LIB =-L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -ldefparseradapt -L $(HYPRE_LIB_DIR) -lHYPRE -lm
 
 ifdef false #ZLIB_DIR
 ifdef BOOST_DIR
@@ -57,7 +60,7 @@ LayoutAnalyzer: $(OBJS)
 
 $(OBJDIR)/TestMain.o: $(SRCDIR)/TestMain.cpp $(SRCDIR)/fdtd.hpp $(SRCDIR)/limboint.hpp $(SRCDIR)/solnoutclass.hpp
 	@$(MKDIR)
-	mpicxx -w -std=c++17 -g -lstdc++fs -O0 -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) $(MKL_COMP_FLAGS)
+	mpicxx -w -std=c++17 -g -lstdc++fs -O0 -c $(SRCDIR)/TestMain.cpp -o $(OBJDIR)/TestMain.o -L $(LIMBO_LIB_DIR) -l$(LIB_PREFIX)parser -ldefparseradapt -I $(LIMBO_ROOT_DIR) -I $(PARSER_SPEF_ROOT_DIR) -I $(EIGEN_ROOT_DIR) $(MKL_COMP_FLAGS)
 
 $(OBJDIR)/mesh.o: $(SRCDIR)/mesh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
@@ -78,6 +81,10 @@ $(OBJDIR)/generateStiff.o: $(SRCDIR)/generateStiff.cpp $(SRCDIR)/fdtd.hpp
 $(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
 	@$(MKDIR)
 	mpicxx -w -g -O1 -c $(SRCDIR)/findVh.cpp -o $(OBJDIR)/findVh.o $(MKL_COMP_FLAGS)
+
+$(OBJDIR)/autoPortFromDefLef.o: $(SRCDIR)/autoPortFromDefLef.cpp $(SRCDIR)/autoPortFromDefLef.hpp
+	@$(MKDIR)
+	mpicxx -w -g -O1 -c $(SRCDIR)/autoPortFromDefLef.cpp -o $(OBJDIR)/autoPortFromDefLef.o $(LIMBO_DEF_LEF_FLAGS)
 
 
 .PHONY: clean
