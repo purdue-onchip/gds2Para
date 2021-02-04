@@ -68,10 +68,7 @@ public:
     int defUnit = 1;        // int coordinate in DEF divided by this->defUnit will be true physical coordinate in unit um. 
     double dieAreaInUm[4];  // {xmin, ymin, xmax, ymax} in um of this design 
 
-    DefDataBase()
-    {
-        //cout << "DefDataBase::" << __func__ << endl;
-    }
+    DefDataBase() {}
 
     //////////////////// Custom member functions defined here ///////////////////
 
@@ -152,16 +149,16 @@ protected:
     unordered_map<string, LefPinInfo> tempPinsInCell;
 
 
-
 public:
+    //////////////////// Custom member functions defined here ///////////////////
+
+    void appendCellMap(const unordered_map<string, LefCellInfo>& newCells);
+    void print_allCells();
+
     /// base type 
     typedef LefParser::LefDataBase base_type;
-
     /// @brief constructor 
-    LefDataBase() : base_type()
-    {
-        //cout << "constructing LefDataBase" << endl;
-    }
+    LefDataBase() : base_type() {}
     //////////////////// required callbacks from abstract LefParser::LefDataBase ///////////////////
     /// @brief set LEF version 
     /// @param v string of LEF version 
@@ -215,5 +212,11 @@ public:
     /// @param v an object for pin 
     virtual void lef_pin_cbk(lefiPin const& v);
 };
+
+// check if the cellName and LefPinName used as net node are correctly defined in LEF files
+bool areAllComponentsInNetsValidCell(
+    const unordered_map<string, ComponentInfo>& allComponentsDEF,
+    const vector<NetInfo>& allNetsDEF,
+    const unordered_map<string, LefCellInfo>& allCellsLEF);
 
 #endif

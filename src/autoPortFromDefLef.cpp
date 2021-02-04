@@ -54,6 +54,41 @@ bool DefDataBase::areAllNetNodesValidComponentOrValidPin() {
     return isValidCom;
 }
 
+// check if the cellName and LefPinName used as net node are correctly defined in LEF files
+bool areAllComponentsInNetsValidCell(
+    const unordered_map<string, ComponentInfo>& allComponentsDEF,
+    const vector<NetInfo>& allNetsDEF,
+    const unordered_map<string, LefCellInfo>& allCellsLEF) 
+{
+    bool isValid = true;
+
+    for (const auto& net : allNetsDEF) {
+        for (const auto& NodenamePin : net.vNodenamePin) {
+            const string& nodeName = NodenamePin.first;
+            const string& pinName = NodenamePin.second;
+
+            // Node type 1: defined as component
+            if (nodeName != "PIN") {
+                // check cellName
+                string cellName = allComponentsDEF.at(nodeName).cellName;
+                if (allCellsLEF.find(cellName) == allCellsLEF.end()) {
+                    isValid = false;
+                    cout << "Node \"" << nodeName << "\" of net \"" << net.netName << "\" has invalid cell \"" << cellName << "\"\n";
+                }
+
+                // check pinName
+                unordered_map<string, LefPinInfo> allPinsInCell = allCellsLEF.at(cellName).allPinsInCell;
+                if (allPinsInCell.find(pinName) == allPinsInCell.end()) {
+                    isValid = false;
+                    cout << "Node \"" << nodeName << "\" of net \"" << net.netName << "\" has invalid pin \"" << pinName << "\"\n";
+                }
+            }
+        }
+    }
+
+    return isValid;
+}
+
 //////////////////// required callbacks from abstract DefParser::DefDataBase ///////////////////
 /// @param token divider characters 
 void DefDataBase::set_def_dividerchar(string const& token)
@@ -164,6 +199,29 @@ void DefDataBase::end_def_design()
     //cout << __func__ << endl;
 }
 
+
+void LefDataBase::appendCellMap(const unordered_map<string, LefCellInfo>& newCells) {
+    this->allCells.insert(newCells.begin(), newCells.end());
+};
+
+
+void LefDataBase::print_allCells() {
+    cout << "Total " << this->allCells.size() << " cells in all LEF files. (Cells & pins printed below are unordered)\n";
+    for (const auto& [cellName, cellInfo] : this->allCells) {
+        cout << "\nCell \"" << cellName << "\": origin " << cellInfo.originXInUm << "  " << cellInfo.originYInUm << " um, size "
+            << cellInfo.sizeXInUm << "  " << cellInfo.sizeYInUm << " um \n";
+        for (const auto& [pinName, pinInfo] : cellInfo.allPinsInCell) {
+            cout << "PIN " << pinName << ", " << pinInfo.direct << ", Layer ";
+            for (const auto& layer : pinInfo.vLayer) {
+                cout << layer << "  ";
+            }
+            cout << endl;
+            for (const auto& rect : pinInfo.vRectsInUm) {
+                cout << "    RECT " << rect[0] << "  " << rect[1] << "  " << rect[2] << "  " << rect[3] << endl;
+            }
+        }
+    }
+}
 
 //////////////////// required callbacks from abstract LefParser::LefDataBase ///////////////////
 /// @brief set LEF version 
