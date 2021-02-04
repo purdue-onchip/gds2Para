@@ -9,6 +9,7 @@
 #include <fstream>
 
 #include <limbo/parsers/def/adapt/DefDriver.h>
+#include <limbo/parsers/lef/adapt/LefDriver.h>
 
 using namespace std;
 
@@ -119,5 +120,70 @@ public:
     virtual void end_def_design();
 };
 
+/// @brief test LefParser
+class LefDataBase : public LefParser::LefDataBase
+{
+public:
+    /// base type 
+    typedef LefParser::LefDataBase base_type;
+
+    /// @brief constructor 
+    LefDataBase() : base_type()
+    {
+        //cout << "constructing LefDataBase" << endl;
+    }
+    //////////////////// required callbacks from abstract LefParser::LefDataBase ///////////////////
+    /// @brief set LEF version 
+    /// @param v string of LEF version 
+    virtual void lef_version_cbk(string const& v);
+    /// @brief set LEF version 
+    /// @param v floating point number of LEF version 
+    virtual void lef_version_cbk(double v);
+    /// @brief set divider characters 
+    /// @param v divider characters
+    virtual void lef_dividerchar_cbk(string const& v);
+    /// @brief set unit 
+    /// @param v an object for unit 
+    virtual void lef_units_cbk(LefParser::lefiUnits const& v);
+    /// @brief set manufacturing entry 
+    /// @param v manufacturing entry 
+    virtual void lef_manufacturing_cbk(double v);
+    /// @brief set bus bit characters 
+    /// @param v but bit characters 
+    virtual void lef_busbitchars_cbk(string const& v);
+    /// @brief add layer 
+    /// @param v an object for layer 
+    virtual void lef_layer_cbk(LefParser::lefiLayer const& v);
+    /// @brief add via 
+    /// @param v an object for via 
+    virtual void lef_via_cbk(LefParser::lefiVia const& v);
+    /// @brief add via rule 
+    /// @param v an object for via rule 
+    virtual void lef_viarule_cbk(LefParser::lefiViaRule const& v);
+    /// @brief spacing callback 
+    /// @param v an object for spacing 
+    virtual void lef_spacing_cbk(LefParser::lefiSpacing const& v);
+    /// @brief site callback 
+    /// @param v an object for site 
+    virtual void lef_site_cbk(LefParser::lefiSite const& v);
+    /// @brief macro begin callback, describe standard cell type 
+    /// @param v name of macro 
+    virtual void lef_macrobegin_cbk(std::string const& v);
+    /// @brief macro callback, describe standard cell type 
+    /// @param v an object for macro 
+    virtual void lef_macro_cbk(LefParser::lefiMacro const& v);
+    /// @brief property callback 
+    /// @param v an object for property 
+    virtual void lef_prop_cbk(LefParser::lefiProp const& v);
+    /// @brief noise margin callback 
+    /// @param v an object for noise margin 
+    virtual void lef_maxstackvia_cbk(LefParser::lefiMaxStackVia const& v);
+    /// @brief obstruction callback 
+    /// @param v an object for obstruction 
+    virtual void lef_obstruction_cbk(LefParser::lefiObstruction const& v);
+    /// @brief pin callback, describe pins in a standard cell 
+    /// @param v an object for pin 
+    virtual void lef_pin_cbk(lefiPin const& v);
+};
 
 #endif
