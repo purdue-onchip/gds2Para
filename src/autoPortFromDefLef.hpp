@@ -25,24 +25,28 @@ enum OrientType {
 };
 
 struct ComponentInfo {
-    double xInUm = 0;   // x, y of origin, converted to unit um, as default DEF unit.
+    double xInUm = 0;   // x, y of origin, converted to default DEF unit in um.
     double yInUm = 0;
-    string orient = "";
+    string orient = "N";
     string cellName = "";
 };
 
-struct PinInfo {    // external pin defined in DEF, copied from DefParser::Pin
-    double xInUm = 0;   // x, y of this Pin, converted to unit um, as default DEF unit.
+struct PinInfo {
+    string direct = "INPUT";    // direction, {INPUT, OUTPUT, INOUT, FEEDTHRU}
+    vector<string> vLayer;      // layers  
+
+    PinInfo() {}
+    PinInfo(string dir, vector<string> vLay)
+        : direct{ dir }, vLayer{ vLay } {}
+};
+
+struct DefPinInfo : public PinInfo {
+    double xInUm = 0;   // x, y placement of this Pin, converted to default DEF unit in um.
     double yInUm = 0;
-    //string pin_name; ///< pin name 
-    //string net_name; ///< net name 
-    string direct; //< direction, {INPUT, OUTPUT, INOUT, FEEDTHRU}
-    //string status; ///< placement status , {COVER, FIXED, PLACED}
-    //int32_t origin[2]; ///< offset to node origin 
-    //string orient; ///< orientation 
-    vector<string> vLayer; ///< layers  
-    //vector<vector<int32_t> > vBbox; ///< bounding box on each layer, pin geometry
-    //string use; ///< "use" token in DEF file, {SIGNAL, POWER, GROUND, CLOCK, etc.}
+
+    DefPinInfo() {}
+    DefPinInfo(string dir, vector<string> vLay, double x, double y)
+        : PinInfo{ dir, vLay }, xInUm{ x }, yInUm{ y } {}
 };
 
 struct NetInfo {        // same as DefParser::Net, redefine here for easier reference.
@@ -58,7 +62,7 @@ class DefDataBase : public DefParser::DefDataBase
 public:
     vector<NetInfo> allNets;    // need to track the order of nets in DEF file, so use vector.
     unordered_map<string, ComponentInfo> allComponents; // map[componentName] = struct{cellName, x, y, orient}
-    unordered_map<string, PinInfo> allPins;             // map[pinName] = struct{x, y, direction, layer}
+    unordered_map<string, DefPinInfo> allDefPins;       // map[pinName] = struct{x, y, direction, layer}
     string defVersion = "";
     string defDesign = "";
     int defUnit = 1;        // int coordinate in DEF divided by this->defUnit will be true physical coordinate in unit um. 
@@ -72,7 +76,7 @@ public:
     //////////////////// Custom member functions defined here ///////////////////
 
     void print_allNets();
-    void print_allPins();
+    void print_allDefPins();
     void print_allComponents();
 
     // check if all nodeNames defined in nets are valid component or valid external pin
@@ -120,9 +124,35 @@ public:
     virtual void end_def_design();
 };
 
+struct LefPinInfo : public PinInfo {
+    vector<vector<double>> vRectsInUm;      // rectangles. vRects[i] = {x0,y0,x1,y1} are two opposite corners of the rect
+
+    LefPinInfo() {}
+    LefPinInfo(string dir, vector<string> vLay, vector<vector<double>> vRect)
+        : PinInfo{ dir, vLay }, vRectsInUm{ vRect } {}
+};
+
+struct LefCellInfo {
+    double originXInUm = 0; // origin of this cell to align with a DEF COMPONENT placement point, in unit um.
+    double originYInUm = 0;
+    double sizeXInUm = 0;   // width BY height of the placement bounding rectangle, in um.
+    double sizeYInUm = 0;
+    unordered_map<string, LefPinInfo> allPinsInCell;    // map[pinName] = struct LefPinInfo.
+};
+
 /// @brief test LefParser
 class LefDataBase : public LefParser::LefDataBase
 {
+public:
+    unordered_map<string, LefCellInfo> allCells;        // map[cellName] = struct LefCellInfo.
+    string lefVersion = "";
+
+protected:
+    string tempCellName = "";       // temp data to store info of current cell
+    unordered_map<string, LefPinInfo> tempPinsInCell;
+
+
+
 public:
     /// base type 
     typedef LefParser::LefDataBase base_type;

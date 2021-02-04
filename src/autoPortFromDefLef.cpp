@@ -1,7 +1,6 @@
 #include "autoPortFromDefLef.hpp"
 
 
-
 void DefDataBase::print_allNets() {
     cout << "Total " << this->allNets.size() << " nets. netName: (nodeName, pin) \n";
     for (const auto& net : this->allNets) {
@@ -12,9 +11,9 @@ void DefDataBase::print_allNets() {
     }
 }
 
-void DefDataBase::print_allPins() {
-    cout << "Total " << this->allPins.size() << " external pins. pinName (unordered): x(um), y(um), direction, layers\n";
-    for (const auto& pin : this->allPins) {
+void DefDataBase::print_allDefPins() {
+    cout << "Total " << this->allDefPins.size() << " external pins. pinName (unordered): x(um), y(um), direction, layers\n";
+    for (const auto& pin : this->allDefPins) {
         cout << pin.first << ": " << pin.second.xInUm << ", " << pin.second.yInUm << ", "
             << pin.second.direct << ", ";
         for (const auto& layer : pin.second.vLayer) cout << layer << "  ";
@@ -45,7 +44,7 @@ bool DefDataBase::areAllNetNodesValidComponentOrValidPin() {
             }
 
             // Node type 2: defined as external pin
-            if ((nodeName == "PIN") && (this->allPins.find(pinName) == this->allPins.end())) {
+            if ((nodeName == "PIN") && (this->allDefPins.find(pinName) == this->allDefPins.end())) {
                 isValidCom = false;
                 cout << "Net \"" << net.netName << "\" has invalid node name at pin \"" << nodeName << "\"\n";
             }
@@ -119,7 +118,8 @@ void DefDataBase::add_def_pin(DefParser::Pin const& p)
     //cout << __func__ << ": " << p.pin_name << endl;
     double xInUm = p.origin[0] * 1.0 / this->defUnit;
     double yInUm = p.origin[1] * 1.0 / this->defUnit;
-    this->allPins[p.pin_name] = { xInUm, yInUm, p.direct, p.vLayer };
+    DefPinInfo tempDefPinInfo(p.direct, p.vLayer, xInUm, yInUm);
+    this->allDefPins[p.pin_name] = tempDefPinInfo;
 }
 /// @brief set number of pins 
 /// @param token number of pins 
@@ -171,12 +171,14 @@ void DefDataBase::end_def_design()
 void LefDataBase::lef_version_cbk(string const& v)
 {
     //cout << "lef version = " << v << endl;
+    this->lefVersion = v;
 }
 /// @brief set LEF version 
 /// @param v floating point number of LEF version 
 void LefDataBase::lef_version_cbk(double v)
 {
     //cout << "lef version = " << v << endl;
+    this->lefVersion = to_string(v);
 }
 /// @brief set divider characters 
 /// @param v divider characters
@@ -188,7 +190,7 @@ void LefDataBase::lef_dividerchar_cbk(string const& v)
 /// @param v an object for unit 
 void LefDataBase::lef_units_cbk(LefParser::lefiUnits const& v)
 {
-    //v.print(stdout);
+    //v.print(stdout);      // typically defined in tech LEF, not in cell LEF
 }
 /// @brief set manufacturing entry 
 /// @param v manufacturing entry 
@@ -237,12 +239,25 @@ void LefDataBase::lef_site_cbk(LefParser::lefiSite const& v)
 void LefDataBase::lef_macrobegin_cbk(std::string const& v)
 {
     //cout << __func__ << " => " << v << endl;
+
+    // start reading a new cell
+    this->tempCellName = v;
+    this->tempPinsInCell.clear();   // clear stored pin info in prev cell
 }
 /// @brief macro callback, describe standard cell type 
 /// @param v an object for macro 
 void LefDataBase::lef_macro_cbk(LefParser::lefiMacro const& v)
 {
     //v.print(stdout);
+
+    // refer to "/limbo/thirdparty/lefdef/5.8/lef/lef/lefiMacro.hpp" for detailed lefiMacro
+    double originX = v.originX();
+    double originY = v.originY();
+    double sizeX = v.sizeX();
+    double sizeY = v.sizeY();
+    this->allCells[this->tempCellName] = { originX, originY, sizeX, sizeY, this->tempPinsInCell };
+
+    // here, end reading current cell 
 }
 /// @brief property callback 
 /// @param v an object for property 
@@ -267,4 +282,57 @@ void LefDataBase::lef_obstruction_cbk(LefParser::lefiObstruction const& v)
 void LefDataBase::lef_pin_cbk(lefiPin const& v)
 {
     //v.print(stdout);
+
+    // refer to "/limbo/thirdparty/lefdef/5.8/lef/lef/lefiMacro.hpp" for detailed lefiPin
+    string pinName = v.name();
+    string pinDirect(v.direction());
+
+#define IGNORE_DEBUG_PRINT_lefiPin_
+#ifndef IGNORE_DEBUG_PRINT_lefiPin_
+    cout << "MACRO " << this->tempCellName << ": Pin " << pinName << "  ";
+#endif
+
+    // find geometries "Layer" and "Rect" of this pin, details in "5.8/lef/lef/lefiMisc.hpp"
+    vector<string> vLayer = {};
+    vector<vector<double>> vRect;
+
+    lefiGeometries  *geo = v.port(0);       // only consider the first port of each pin, ignore other ports of this pin
+    int numItems = geo->numItems();         // num of items like Layer, Rect, etc.
+    lefiGeomRect *rect;
+    for (int i = 0; i < numItems; i++) {
+        switch (geo->itemType(i)) {
+
+        case lefiGeomLayerE:
+            vLayer.push_back((string)geo->getLayer(i));
+#ifndef IGNORE_DEBUG_PRINT_lefiPin_
+            fprintf(stdout, "Layer %s\n", geo->getLayer(i));
+#endif
+            break;
+        case lefiGeomRectE:
+            rect = geo->getRect(i);
+            vRect.push_back({ rect->xl, rect->yl, rect->xh, rect->yh });
+#ifndef IGNORE_DEBUG_PRINT_lefiPin_
+            if (rect->colorMask) {
+                fprintf(stdout, "Rect MASK %d, %g,%g  %g,%g\n", rect->colorMask,
+                    rect->xl, rect->yl,
+                    rect->xh, rect->yh);
+            }
+            else {
+                fprintf(stdout, "Rect %g,%g  %g,%g\n", rect->xl, rect->yl,
+                    rect->xh, rect->yh);
+            }
+#endif
+            break;
+        default:
+#ifndef IGNORE_DEBUG_PRINT_lefiPin_
+            lefiError(0, 1375, "ERROR (LEFPARS-1375): unknown geometry type");
+            fprintf(stdout, "Unknown geometry type %d\n",
+                (int)(geo->itemType(i)));
+#endif
+            break;
+        }
+    }
+
+    LefPinInfo tempLefPinInfo(pinDirect, vLayer, vRect);
+    this->tempPinsInCell[pinName] = tempLefPinInfo;
 }
