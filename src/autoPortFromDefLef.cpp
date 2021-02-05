@@ -394,3 +394,47 @@ void LefDataBase::lef_pin_cbk(lefiPin const& v)
     LefPinInfo tempLefPinInfo(pinDirect, vLayer, vRect);
     this->tempPinsInCell[pinName] = tempLefPinInfo;
 }
+
+unordered_map<string, LayerMapInfo> readLayerMap(string inFileName) {
+    /*  return map[layerName] = struct LayerMapInfo */
+    ifstream inFile(inFileName);
+    if (!inFile.is_open()) {
+        cerr << "ERROR in opening file " << inFileName << endl;
+        exit(-1);
+    }
+
+    unordered_map<string, LayerMapInfo> layerMap;
+    
+    string curLine;
+    string firstWord;
+    int layerNameInNum = -1;
+    double zmin = 0, zmax = 0;
+    double lengthUnit = 1.0;
+
+    bool notFoundLayerMapYet = true;
+    while (notFoundLayerMapYet && getline(inFile, curLine)) {
+        stringstream curLineStream(curLine);
+        curLineStream >> firstWord;
+
+        if (firstWord == "lengthUnit") {
+            string temp;
+            curLineStream >> temp;
+            curLineStream >> lengthUnit;
+        }
+        if (firstWord == "BEGIN_LAYER_MAP") {
+            notFoundLayerMapYet = false;
+            while (getline(inFile, curLine)) {  // read the layer map section
+                stringstream ls(curLine);
+                ls >> firstWord;
+                if (firstWord == "END_LAYER_MAP") break;
+
+                ls >> layerNameInNum >> zmin >> zmax;
+                
+                double zminInUm = zmin * lengthUnit * 1.0e6;
+                double zmaxInUm = zmax * lengthUnit * 1.0e6;
+                layerMap[firstWord] = { layerNameInNum, zminInUm, zmaxInUm };
+            }
+        }
+    }
+    return layerMap;
+}

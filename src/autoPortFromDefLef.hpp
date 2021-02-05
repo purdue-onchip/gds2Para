@@ -219,4 +219,12 @@ bool areAllComponentsInNetsValidCell(
     const vector<NetInfo>& allNetsDEF,
     const unordered_map<string, LefCellInfo>& allCellsLEF);
 
+
+struct LayerMapInfo {
+    int layerNameInNum = -1;    // used in GDSII
+    double zminInUm = 0.0;
+    double zmaxInUm = 0.0;
+};
+unordered_map<string, LayerMapInfo> readLayerMap(string inFileName);
+
 #endif
