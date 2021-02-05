@@ -67,7 +67,7 @@ struct compareObj {
             }
         }
     }
-} convexCompare;
+}; // convexCompare;    // Instantiating a struct as an object at HEAD FILE is not a good practice, SS
 
 // Structure for planar straight-line graphs
 struct pslg
@@ -2648,6 +2648,7 @@ public:
         iter_swap(allPt.begin(), allPt.begin() + indPtMin); // Bottommost point moved to front
 
         // Sort points relative to first point using custom structure
+        compareObj convexCompare;
         convexCompare.p0 = allPt[0];
         sort(allPt.begin() + 1, allPt.end(), convexCompare);
 

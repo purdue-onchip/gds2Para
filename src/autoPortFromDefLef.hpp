@@ -8,8 +8,10 @@
 #include <unordered_map>
 #include <fstream>
 
-#include <limbo/parsers/def/adapt/DefDriver.h>
-#include <limbo/parsers/lef/adapt/LefDriver.h>
+#include <limbo/parsers/def/adapt/DefDriver.h>  // Limbo DEF parser
+#include <limbo/parsers/lef/adapt/LefDriver.h>  // Limbo LEF parser
+//#include "solnoutclass.hpp"                     // class Port
+#include "limboint.hpp"                         // class strans
 
 using namespace std;
 
@@ -226,5 +228,34 @@ struct LayerMapInfo {
     double zmaxInUm = 0.0;
 };
 unordered_map<string, LayerMapInfo> readLayerMap(string inFileName);
+void print_layerMap(const unordered_map<string, LayerMapInfo>& layerMap);
 
+/* Directly reusing class "Port" in "solnoutclass.hpp" needs inporting 
+the entire big "solnoutclass.hpp" and extra packages. So, define a 
+simple struct NetPortCoor here, which can be easily converted to class Port when needed.*/
+struct NetPortCoor : public PinInfo {
+    string portName;    // netName + NodeName + pinName
+    double xInUm = 0;   // x, y placement of this Pin, converted to default DEF unit in um.
+    double yInUm = 0;
+    double zInUm = 0;
+    int gdsiiNum = -1;  // Layer number in GDSII file on which port exists
+};
+
+class AutoPorts {
+public:
+    unordered_map<string, LayerMapInfo> layerMap;
+    unordered_map<string, vector<NetPortCoor>> netName_to_vPortCoor;
+
+
+    AutoPorts();
+
+    void readLayerMap_cbk(string inFileName);
+    void print_layerMap_cbk();
+    void getPortCoordinate(
+        const unordered_map<string, ComponentInfo>& allComponentsDEF,
+        const unordered_map<string, DefPinInfo>& allDefPinsDEF,
+        const vector<NetInfo>& allNetsDEF,
+        const unordered_map<string, LefCellInfo>& allCellsLEF);
+    void print_netName_to_vPortCoor();
+};
 #endif

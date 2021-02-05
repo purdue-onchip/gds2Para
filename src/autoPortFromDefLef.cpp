@@ -438,3 +438,75 @@ unordered_map<string, LayerMapInfo> readLayerMap(string inFileName) {
     }
     return layerMap;
 }
+
+void print_layerMap(const unordered_map<string, LayerMapInfo>& layerMap) {
+    cout << "Layer Map: (layerName layerNameInNumUsedInGDS zminInUm zmaxInUm) \n";
+    for (auto&[layerName, layerInfo] : layerMap) {
+        cout << layerName << "  " << layerInfo.layerNameInNum << "  "
+            << layerInfo.zminInUm << "  " << layerInfo.zmaxInUm << endl;
+    }
+}
+
+
+AutoPorts::AutoPorts() {
+}
+
+void AutoPorts::readLayerMap_cbk(string inFileName) {
+    this->layerMap = readLayerMap(inFileName);
+}
+
+void AutoPorts::print_layerMap_cbk() {
+    print_layerMap(this->layerMap);
+}
+
+void AutoPorts::getPortCoordinate(
+    const unordered_map<string, ComponentInfo>& allComponentsDEF,
+    const unordered_map<string, DefPinInfo>& allDefPinsDEF,
+    const vector<NetInfo>& allNetsDEF,
+    const unordered_map<string, LefCellInfo>& allCellsLEF)
+{
+
+    for (const auto& net : allNetsDEF) {                        // loop over all nets
+        const string& netName = net.netName;
+        vector<NetPortCoor> vPortCoor;
+        for (const auto& NodenamePin : net.vNodenamePin) {      // loop over all nodes in cur net
+            const string& nodeName = NodenamePin.first;
+            const string& pinName = NodenamePin.second;
+
+            // Node type 1: defined as component
+            if (nodeName != "PIN") {
+
+            }
+
+            // Node type 2: defined as external pin
+            if (nodeName == "PIN") {
+                const DefPinInfo& defPin = allDefPinsDEF.at(pinName);
+                NetPortCoor portCoor;
+                portCoor.direct = defPin.direct;
+                portCoor.vLayer = defPin.vLayer;
+                portCoor.portName = netName + "PIN" + pinName;
+                portCoor.xInUm = defPin.xInUm;
+                portCoor.yInUm = defPin.yInUm;
+                string layerName = defPin.vLayer[0];                    // use the first found layerName as the port layer
+                portCoor.zInUm = this->layerMap[layerName].zminInUm;    // put port at layer bottom
+                portCoor.gdsiiNum = this->layerMap[layerName].layerNameInNum;
+
+                vPortCoor.push_back(portCoor);
+            }
+        }
+        this->netName_to_vPortCoor[netName] = vPortCoor;
+    }
+
+}
+
+void AutoPorts::print_netName_to_vPortCoor() {
+    cout << "Port Coordinate in um: (portName layerName, layerNameInNum, x, y, z) \n";
+    for (auto&[netName, vPortCoor] : this->netName_to_vPortCoor) {
+        cout << "\nNet \"" << netName << "\": \n"; 
+        for (auto & portCoor : vPortCoor) {
+            cout << portCoor.portName << "  " << portCoor.vLayer[0] << "  " << portCoor.gdsiiNum << "  "
+                << portCoor.xInUm << "  " << portCoor.yInUm << "  " << portCoor.zInUm << endl;
+        }
+    }
+}
+

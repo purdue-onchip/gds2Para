@@ -84,7 +84,7 @@ $(OBJDIR)/findVh.o: $(SRCDIR)/findVh.cpp $(SRCDIR)/fdtd.hpp
 
 $(OBJDIR)/autoPortFromDefLef.o: $(SRCDIR)/autoPortFromDefLef.cpp $(SRCDIR)/autoPortFromDefLef.hpp
 	@$(MKDIR)
-	mpicxx -w -g -O1 -c $(SRCDIR)/autoPortFromDefLef.cpp -o $(OBJDIR)/autoPortFromDefLef.o $(LIMBO_DEF_LEF_FLAGS)
+	mpicxx -w -g -O1 -c $(SRCDIR)/autoPortFromDefLef.cpp -o $(OBJDIR)/autoPortFromDefLef.o $(LIMBO_DEF_LEF_FLAGS) $(MKL_COMP_FLAGS)
 
 
 .PHONY: clean
