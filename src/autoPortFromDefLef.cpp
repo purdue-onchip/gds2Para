@@ -459,13 +459,81 @@ void AutoPorts::print_layerMap_cbk() {
     print_layerMap(this->layerMap);
 }
 
+// Transform local coordinate within a LEF cell to global coordinate at entire DEF design structure
+vector<double> localLefCoorToGlobalDefCoor(
+    double localLefCoor[2],     // local LEF coordinate
+    double sizeBB[2],           // size of bounding box of the cell
+    double origin[2],           // origin of the cell to align with a DEF COMPONENT placement point
+    double placementDef[2],     // the DEF COMPONENT placement point
+    string orient)              // orientation of the cell defined in DEF COMPONENTS
+{
+    // step 1: find local coordinate {xc, yc} relative to cell center
+    double xc = localLefCoor[0] - sizeBB[0] / 2;
+    double yc = localLefCoor[1] - sizeBB[1] / 2;
+
+    // step 2: mirror & rotation with respect to cell center. => {xmr, ymr}
+    double xmr, ymr;
+    double xll = -sizeBB[0] / 2;// new lower left corner w.r.t. cell center
+    double yll = -sizeBB[1] / 2;
+    if (orient == "N") {        // R0
+        xmr = xc; 
+        ymr = yc;
+    }
+    else if (orient == "S") {   // R180
+        xmr = -xc;
+        ymr = -yc;
+    }
+    else if (orient == "FN") {  // MY
+        xmr = -xc;
+        ymr = yc;
+    }
+    else if (orient == "FS") {  // MX
+        xmr = xc;
+        ymr = -yc;
+    }
+    else {
+        // new lower left corner w.r.t. cell center when orient = W, E, FW, FE
+        xll = -sizeBB[1] / 2;
+        yll = -sizeBB[0] / 2;
+
+        if (orient == "W") {        // R90
+            xmr = -yc;
+            ymr = xc;
+        }
+        else if (orient == "E") {   // R270
+            xmr = yc;
+            ymr = -xc;
+        }
+        else if (orient == "FW") {  // MX90
+            xmr = yc;
+            ymr = xc;
+        }
+        else if (orient == "FE") {  // MY90
+            xmr = -yc;
+            ymr = -xc;
+        }
+        else {
+            cerr << "ERROR! Invalid orientation type: " << orient
+                << ". Reset to default orient \"N\"." << endl;
+            xmr = xc;
+            ymr = yc;
+            double xll = -sizeBB[0] / 2;
+            double yll = -sizeBB[1] / 2;
+        }
+    }
+
+    // step 3: find global DEF coordinate {xg, yg}
+    double xg = (xmr - xll) - origin[0] + placementDef[0];
+    double yg = (ymr - yll) - origin[1] + placementDef[1];
+    return {xg, yg};
+}
+
 void AutoPorts::getPortCoordinate(
     const unordered_map<string, ComponentInfo>& allComponentsDEF,
     const unordered_map<string, DefPinInfo>& allDefPinsDEF,
     const vector<NetInfo>& allNetsDEF,
     const unordered_map<string, LefCellInfo>& allCellsLEF)
 {
-
     for (const auto& net : allNetsDEF) {                        // loop over all nets
         const string& netName = net.netName;
         vector<NetPortCoor> vPortCoor;
@@ -475,7 +543,44 @@ void AutoPorts::getPortCoordinate(
 
             // Node type 1: defined as component
             if (nodeName != "PIN") {
+                // corresponding cell of cur component
+                const ComponentInfo& defComp = allComponentsDEF.at(nodeName);
+                string cellName = defComp.cellName;
+                const LefCellInfo& lefCell = allCellsLEF.at(cellName);
 
+                // cur cell info: size of bounding box, origin, placement, and orient
+                double sizeBBInUm[2] = { lefCell.sizeXInUm, lefCell.sizeYInUm };
+                double originInUm[2] = { lefCell.originXInUm, lefCell.originYInUm };
+                double placementDefInUm[2] = { defComp.xInUm, defComp.yInUm };
+                string cellOrient = defComp.orient;
+
+                // pin of cur cell and its local coordinate within the cell
+                const LefPinInfo& lefPin = lefCell.allPinsInCell.at(pinName);
+                const vector<double>& rect = lefPin.vRectsInUm[0];      // use the first Rect of cur pin
+                double localCoor_xInUm = (rect[0] + rect[2]) / 2.0;     // use the center point of 1st rect as cur pin location
+                double localCoor_yInUm = (rect[1] + rect[3]) / 2.0;
+
+                // apply transformation from local cell coordinate to global port coordinate
+                double localLefCoorInUm[2] = { localCoor_xInUm, localCoor_yInUm };
+                vector<double> globalCoorInUm = localLefCoorToGlobalDefCoor(
+                    localLefCoorInUm,   // local LEF coordinate
+                    sizeBBInUm,         // size of bounding box of the cell
+                    originInUm,         // origin of the cell to align with a DEF COMPONENT placement point
+                    placementDefInUm,   // the DEF COMPONENT placement point
+                    cellOrient);        // orientation of the cell defined in DEF COMPONENTS
+
+                // organize port coordinate together in struct NetPortCoor
+                NetPortCoor portCoor;
+                portCoor.direct = lefPin.direct;
+                portCoor.vLayer = lefPin.vLayer;
+                portCoor.portName = "port_" + netName + "_" + nodeName + "_" + pinName;
+                portCoor.xInUm = globalCoorInUm[0];
+                portCoor.yInUm = globalCoorInUm[1];
+                string layerName = lefPin.vLayer[0];                    // use the first found layerName as the port layer
+                portCoor.zInUm = this->layerMap[layerName].zminInUm;    // put port at layer bottom
+                portCoor.gdsiiNum = this->layerMap[layerName].layerNameInNum;
+
+                vPortCoor.push_back(portCoor);
             }
 
             // Node type 2: defined as external pin
@@ -484,7 +589,7 @@ void AutoPorts::getPortCoordinate(
                 NetPortCoor portCoor;
                 portCoor.direct = defPin.direct;
                 portCoor.vLayer = defPin.vLayer;
-                portCoor.portName = netName + "PIN" + pinName;
+                portCoor.portName = "port_" + netName + "_PIN_" + pinName;
                 portCoor.xInUm = defPin.xInUm;
                 portCoor.yInUm = defPin.yInUm;
                 string layerName = defPin.vLayer[0];                    // use the first found layerName as the port layer

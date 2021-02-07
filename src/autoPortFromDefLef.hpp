@@ -11,7 +11,7 @@
 #include <limbo/parsers/def/adapt/DefDriver.h>  // Limbo DEF parser
 #include <limbo/parsers/lef/adapt/LefDriver.h>  // Limbo LEF parser
 //#include "solnoutclass.hpp"                     // class Port
-#include "limboint.hpp"                         // class strans
+//#include "limboint.hpp"                         // class strans
 
 using namespace std;
 
@@ -258,4 +258,8 @@ public:
         const unordered_map<string, LefCellInfo>& allCellsLEF);
     void print_netName_to_vPortCoor();
 };
+
+vector<double> localLefCoorToGlobalDefCoor(double localLefCoor[2], 
+    double sizeBB[2], double origin[2], double placementDef[2], string orient);
+
 #endif
