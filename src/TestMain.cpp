@@ -50,6 +50,7 @@ int main(int argc, char** argv)
             cout << "  -sp, --spef           Read GDSII and sim input files into memory, simulate, and write solution to SPEF file." << endl;
             cout << "  -sc, --citi           Read GDSII and sim input files into memory, simulate, and write solution to CITIfile." << endl;
             cout << "  -st, --touchstone     Read GDSII and sim input files into memory, simulate, and write solution to Touchstone file." << endl;
+            cout << "  -ldp, --lefdefspef    Read GDSII, sim input, and LEF/DEF files into memory, simulate, and write solution to SPEF file." << endl;
             cout << endl << "Comments:" << endl;
             cout << " The file passed after -r, --read, -p, or --parrot must be a Calma GDSII stream file." << endl;
             cout << " The file passed after -w or --write must be a blank SPEF file." << endl;
@@ -58,7 +59,8 @@ int main(int argc, char** argv)
             cout << " The first file passed after -s or --simulate (or -sx or --xyce) must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Xyce file." << endl;
             cout << " The first file passed after -sp or --spef must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank SPEF file." << endl;
             cout << " The first file passed after -sc or --citi must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank CITIfile." << endl;
-            cout << " The first file passed after -sc or --citi must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Touchstone file." << endl;
+            cout << " The first file passed after -st or --touchstone must be a Calma GDSII stream file, the second must be a sim_input file, and the third must be a blank Touchstone file." << endl;
+            cout << " The first file passed after -ldp or --lefdefspef must be a Calma GDSII stream file, the second must be a sim_input file, the third must be a blank SPEF file, and all subsequent files must be LEF/DEF files." << endl;
             cout << endl << "Bug reporting:" << endl;
             cout << "Visit <https://github.com/purdue-onchip/gds2Para>" << endl;
         }
@@ -445,6 +447,278 @@ int main(int argc, char** argv)
             cerr << "Must pass a GDSII file, sim_input file, and blank Touchstone file to write after \"-st\" flag" << endl;
             cerr << "Rerun with \"--help\" flag for details" << endl;
         }
+    }
+    else if (argc > 5)
+    {
+    	if ((strcmp(argv[1], "-ld") == 0) || (strcmp(argv[1], "--lefdef") == 0) || (strcmp(argv[1], "-ldx") == 0) || (strcmp(argv[1], "--lefdefxyce") == 0) || (strcmp(argv[1], "-ldp") == 0) || (strcmp(argv[1], "--lefdefspef") == 0)) // || (strcmp(argv[1], "-ldc") == 0) || (strcmp(argv[1], "--lefdefciti") == 0) || (strcmp(argv[1], "-ldt") == 0) || (strcmp(argv[1], "--lefdeftouchstone") == 0))
+    	{
+            // Initialize SolverDataBase, mesh, and set variables for performance tracking
+            clock_t t1 = clock();
+            SolverDataBase sdb;
+            fdtdMesh sys;
+            int status = 0; // Initialize as able to return successfully
+            bool adbIsGood, sdbIsGood, sdbCouldDump;
+
+            // Get file names
+            string inGDSIIFile = argv[2];
+            string inSimFile = argv[3];
+            string outFile = argv[4];
+            string inDefFile = "";
+            vector<string> inLefFiles = {};
+            for (size_t indi = 5; indi < argc; indi++) {
+                string curFile = argv[indi];
+                size_t indExten = curFile.find_last_of(".");
+                if (curFile.compare(indExten, indExten + 3, ".def") == 0
+                    || curFile.compare(indExten, indExten + 3, ".DEF") == 0) {
+                    inDefFile = curFile;
+                }
+                if (curFile.compare(indExten, indExten + 3, ".lef") == 0
+                    || curFile.compare(indExten, indExten + 3, ".LEF") == 0) {
+                    inLefFiles.push_back(curFile);
+                }
+            }
+            if (inDefFile.size() == 0 || inLefFiles.size() == 0) {
+                cerr << "ERROR! Both DEF and LEF files must be provided. \n";
+                return 1;
+            }
+
+            // Read GDSII file
+            AsciiDataBase adb;
+            adb.setFileName(inGDSIIFile);
+            GdsParser::GdsReader adbReader(adb);
+            adbIsGood = adbReader(inGDSIIFile.c_str());
+            if (adbIsGood)
+            {
+                vector<size_t> indCellPrint = {}; // { adb.getNumCell() - 1 };
+                adb.print(indCellPrint);
+                cout << "GDSII file read" << endl;
+            }
+            else
+            {
+                cerr << "Unable to read in GDSII file" << endl;
+                status = 1;
+                return status;
+            }
+
+            // Read simulation input file
+            sdbIsGood = sdb.readSimInput(inSimFile);
+            if (sdbIsGood)
+            {
+                cout << "Simulation input file read" << endl;
+            }
+            else
+            {
+                cerr << "Unable to read in simulation input file" << endl;
+                status = 1;
+                return status;
+            }
+
+            // Read LEF/DEF files
+            LefDataBase dbLef;      // LEF
+            bool lefStatus = LefParser::read(dbLef, inLefFiles[0]);
+            if (lefStatus) {
+                cout << "Successfully read in LEF file " << inLefFiles[0] << endl;
+            }
+            else {
+                cerr << "Unable to read in LEF file " << inLefFiles[0] << endl;
+                return 1;
+            }
+            for (int i = 1; i < inLefFiles.size(); i++) {   // append cells from other LEF files to dbLef
+                LefDataBase tempLef;
+                lefStatus = LefParser::read(tempLef, inLefFiles[i]);
+                if (lefStatus) {
+                    cout << "Successfully read in LEF file " << inLefFiles[i] << endl;
+                }
+                else {
+                    cerr << "Unable to read in LEF file " << inLefFiles[i] << endl;
+                    return 1;
+                }
+                dbLef.appendCellMap(tempLef.allCells);
+            }
+            DefDataBase dbDef;      // DEF
+            bool defStatus = DefParser::read(dbDef, inDefFile);
+            if (defStatus) {
+                cout << "Successfully read in DEF file " << inDefFile << endl;
+            }
+            else {
+                cerr << "Unable to read in DEF file " << inDefFile << endl;
+                return 1;
+            }
+            /* Verify LEF/DEF
+            dbLef.print_allCells();
+            dbDef.print_allComponents();
+            dbDef.print_allDefPins();
+            dbDef.print_allNets();
+            dbDef.areAllNetNodesValidComponentOrValidPin();
+            areAllComponentsInNetsValidCell(dbDef.allComponents, dbDef.allNets, dbLef.allCells);
+            */
+
+            // Set auto ports from LEF/DEF
+            AutoPorts autoPorts;
+            autoPorts.readLayerMap_cbk(inSimFile);
+            //autoPorts.print_layerMap_cbk();
+            autoPorts.getPortCoordinate(dbDef.allComponents, dbDef.allDefPins, dbDef.allNets, dbLef.allCells);
+            //autoPorts.print_netName_to_vPortCoor();
+
+            // Append information so far to fdtdMesh
+            unordered_set<double> portCoorx, portCoory;
+            string topCellName = adb.getCell(adb.getNumCell() - 1).getCellName();
+            adb.saveToMesh(topCellName, { 0., 0. }, strans(), &sys, sdb.findLayerIgnore()); // Recursively save GDSII conductor information to sys
+            sdb.convertToFDTDMesh(&sys, adb.getNumCdtIn(), &portCoorx, &portCoory); // Save simulation input information to sys
+
+            // Mesh the domain and mark conductors
+            unordered_map<double, int> xi, yi, zi;
+            clock_t t2 = clock();
+            status = meshAndMark(&sys, xi, yi, zi, &portCoorx, &portCoory);
+            if (status == 0)
+            {
+                cout << "meshAndMark Success!" << endl;
+                cout << "meshAndMark time is " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+            }
+            else
+            {
+                cerr << "meshAndMark Fail!" << endl;
+                return status;
+            }
+            //sys.print();
+
+            // Set D_eps and D_sig
+            clock_t t3 = clock();
+            status = matrixConstruction(&sys);
+            if (status == 0)
+            {
+                cout << "matrixConstruction Success!" << endl;
+                cout << "matrixConstruction time is " << (clock() - t3) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+            }
+            else {
+                cerr << "matrixConstruction Fail!" << endl;
+                return status;
+            }
+            //sys.print();
+
+            // Set port
+            clock_t t4 = clock();
+            status = portSet(&sys, xi, yi, zi);
+            if (status == 0)
+            {
+                cout << "portSet Success!" << endl;
+                cout << "portSet time is " << (clock() - t4) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+            }
+            else
+            {
+                cerr << "portSet Fail!" << endl;
+                return status;
+            }
+            //sys.print();
+
+            // Generate Stiffness Matrix
+#ifndef SKIP_GENERATE_STIFF
+            clock_t t5 = clock();
+            status = generateStiff(&sys);
+            if (status == 0)
+            {
+                cout << "generateStiff Success!" << endl;
+                cout << "generateStiff time is " << (clock() - t5) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+            }
+            else
+            {
+                cerr << "generateStiff Fail!" << endl;
+                return status;
+            }
+#endif
+
+            // Write object sys to files
+#ifndef SKIP_LAYERED_FD
+            WriteSysToFile(sys);
+#endif
+
+            // Parameter generation
+            clock_t t6 = clock();
+#ifndef SKIP_LAYERED_FD     // Run layered Finite-Difference solver
+            cout << endl << endl << "Results from Layered Finite-Difference Solver: " << endl;
+            status = solveE_Zpara_layered(&sys);
+            //cout << endl << endl << "Results from Reference (direct backslash with PARDISO): " << endl;
+            //solveE_Zpara_reference(&sys);
+#else                       // Run VoVh solver
+            cout << endl << endl << "Results from V0Vh Solver: " << endl;
+            status = paraGenerator(&sys, xi, yi, zi);
+#endif
+            if (status == 0)
+            {
+                cout << "paraGenerator Success!" << endl;
+                cout << "paraGenerator time is " << (clock() - t6) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+            }
+            else
+            {
+                cerr << "paraGenerator Fail!" << endl;
+                return status;
+            }
+            cout << "Engine time to this point: " << (clock() - t2) * 1.0 / CLOCKS_PER_SEC << " s" << endl;
+            cout << "Total time to this point: " << (clock() - t1) * 1.0 / CLOCKS_PER_SEC << " s" << endl << endl;
+
+            // Network parameter storage
+            Parasitics newPara = sdb.getParasitics(); // Start with outdated parastics to update
+            newPara.saveNetworkParam('Z', sdb.getSimSettings().getFreqsHertz(), sys.x); // Save the Z-parameters in fdtdMesh to Parasitics class
+            sdb.setParasitics(newPara);
+
+            // Select Output File Based on Control Mode
+            cout << endl;
+            if ((strcmp(argv[1], "-ldp") == 0) || (strcmp(argv[1], "--lefdefspef") == 0))
+            {
+                // Output SPEF file
+                string outSPEFFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutSPEF(outSPEFFile);
+                sdb.print(indLayerPrint);
+                bool sdbCouldDump = sdb.dumpSPEF();
+                cout << "File ready at " << outSPEFFile << endl;
+            }
+            /*else if ((strcmp(argv[1], "-ldc") == 0) || (strcmp(argv[1], "--lefdefciti") == 0))
+            {
+                // Convert to S-parameters
+                Parasitics newPara = sdb.getParasitics(); // Start with copy of parastics to reinterpret
+                newPara.convertParam('S');
+                sdb.setParasitics(newPara);
+
+                // Output Common Instrumentation Transfer and Interchange file (CITIfile)
+                string outCITIFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutCITI(outCITIFile);
+                sdb.print(indLayerPrint);
+                bool sdbCouldDump = sdb.dumpCITI();
+                cout << "File ready at " << outCITIFile << endl;
+            }
+            else if ((strcmp(argv[1], "-ldt") == 0) || (strcmp(argv[1], "--lefdeftouchstone") == 0))
+            {
+                // Output Touchstone file
+                string outTstoneFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, 1 * sdb.getNumLayer() / 3, 2 * sdb.getNumLayer() / 3, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutTouchstone(outTstoneFile);
+                sdb.print(indLayerPrint);
+                bool sdbCouldDump = sdb.dumpTouchstone();
+                cout << "File ready at " << outTstoneFile << endl;
+            }*/
+            else
+            {
+                // Output Xyce subcircuit file
+                string outXyceFile = argv[4];
+                vector<size_t> indLayerPrint = { 0, sdb.getNumLayer() / 2, sdb.getNumLayer() - 1 }; // {}; // Can use integer division
+                sdb.setDesignName(adb.findNames().back());
+                sdb.setOutXyce(outXyceFile);
+                sdb.print(indLayerPrint);
+                sdbCouldDump = sdb.dumpXyce();
+                cout << "File ready at " << outXyceFile << endl;
+            }
+    	}
+    	else
+    	{
+    		cerr << "Must pass a GDSII file, sim_input file, a blank Xyce file to write, and LEF/DEF files after \"-ld\" or \"-ldx\" flag" << endl;
+    		cerr << "Must pass a GDSII file, sim_input file, a blank SPEF file to write, and LEF/DEF files after \"-ldp\" flag" << endl;
+    		cerr << "Rerun with \"--help\" flag for details" << endl;
+    	}
     }
     else
     {
