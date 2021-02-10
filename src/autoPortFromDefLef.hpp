@@ -7,6 +7,7 @@
 #include <vector>
 #include <unordered_map>
 #include <fstream>
+#include <sstream>
 
 #include <limbo/parsers/def/adapt/DefDriver.h>  // Limbo DEF parser
 #include <limbo/parsers/lef/adapt/LefDriver.h>  // Limbo LEF parser
@@ -51,6 +52,12 @@ struct DefPinInfo : public PinInfo {
         : PinInfo{ dir, vLay }, xInUm{ x }, yInUm{ y } {}
 };
 
+struct ViaInfo {
+    string viaName = "";
+    double xInUm;
+    double yInUm;
+};
+
 struct NetInfo {        // same as DefParser::Net, redefine here for easier reference.
     string netName = "";
     int netWeight = 1;  // net weight, used in automatic layout tools, not used in gds2Para.
@@ -65,6 +72,7 @@ public:
     vector<NetInfo> allNets;    // need to track the order of nets in DEF file, so use vector.
     unordered_map<string, ComponentInfo> allComponents; // map[componentName] = struct{cellName, x, y, orient}
     unordered_map<string, DefPinInfo> allDefPins;       // map[pinName] = struct{x, y, direction, layer}
+    unordered_map<string, vector<ViaInfo>> netName_to_vVias;
     string defVersion = "";
     string defDesign = "";
     int defUnit = 1;        // int coordinate in DEF divided by this->defUnit will be true physical coordinate in unit um. 
@@ -122,6 +130,16 @@ public:
     /// @brief end of design 
     virtual void end_def_design();
 };
+
+namespace CustomDefParser {
+    class CustomDefDriver : public DefParser::Driver {
+    public:
+        CustomDefDriver(DefDataBase& dbDef);
+        bool custom_parse_file(const string& filename);
+    };
+
+    bool customDefRead(DefDataBase& dbDef, const string& defFile);
+}   // end of namespace CustomDefParser
 
 struct LefPinInfo : public PinInfo {
     vector<vector<double>> vRectsInUm;      // rectangles. vRects[i] = {x0,y0,x1,y1} are two opposite corners of the rect

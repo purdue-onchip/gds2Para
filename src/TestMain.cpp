@@ -537,6 +537,7 @@ int main(int argc, char** argv)
             }
             DefDataBase dbDef;      // DEF
             bool defStatus = DefParser::read(dbDef, inDefFile);
+            CustomDefParser::customDefRead(dbDef, inDefFile);
             if (defStatus) {
                 cout << "Successfully read in DEF file " << inDefFile << endl;
             }

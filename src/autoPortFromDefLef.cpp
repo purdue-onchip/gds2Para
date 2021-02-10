@@ -1,5 +1,152 @@
 #include "autoPortFromDefLef.hpp"
 
+namespace CustomDefParser {
+    CustomDefDriver::CustomDefDriver(DefDataBase& dbDef)
+        : Driver(dbDef) {
+    }
+
+    // define as global to access retrieved data inside customized callback function
+    DefDataBase* defDB = NULL;
+
+    int custom_netf(defrCallbackType_e c, defiNet* net, defiUserData ud) {
+#define IGNORE_DEBUG_PRINT_defiNet_
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+        cout << endl << endl;
+        net->print(stdout);
+        cout << "numWires = " << net->numWires() << endl;
+#endif
+        
+        string netName = net->name();
+        vector<ViaInfo> vVias;
+
+        // Via information from Regular Wiring Statement in DEF-NETS
+        /*      refer to Limbo\limbo\thirdparty\lefdef\5.8\def\def\defiNet.hpp  */
+        int x, y;       // current point
+        ViaInfo curVia;
+        for (int i = 0; i < net->numWires(); i++) {
+            int newLayer = 0;
+            const defiWire* w = net->wire(i);
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+            fprintf(stdout, "+ %s ", w->wireType());
+#endif
+            for (int j = 0; j < w->numPaths(); j++) {
+                const defiPath* p = w->path(j);
+                p->initTraverse();
+                int path;
+                while ((path = (int)(p->next())) != DEFIPATH_DONE) {
+                    switch (path) {
+                    case DEFIPATH_LAYER:
+                        if (newLayer == 0) {
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                            fprintf(stdout, "%s ", p->getLayer());
+#endif
+                            newLayer = 1;
+                        }
+                        else {
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                            fprintf(stdout, "\n  NEW %s ", p->getLayer());
+#endif
+                        }
+                        break;
+                    case DEFIPATH_VIA:
+                        curVia.viaName = p->getVia();
+                        curVia.xInUm = x * 1.0 / defDB->defUnit;
+                        curVia.yInUm = y * 1.0 / defDB->defUnit;
+                        vVias.push_back(curVia);
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                        fprintf(stdout, "%s ", p->getVia());
+#endif
+                        break;
+                    case DEFIPATH_VIAROTATION:
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                        fprintf(stdout, "%d\n", p->getViaRotation());
+#endif
+                        break;
+                    case DEFIPATH_VIADATA:
+                        int numX, numY, stepX, stepY;
+                        p->getViaData(&numX, &numY, &stepX, &stepY);
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                        fprintf(stdout, "%d %d %d %d\n", numX, numY, stepX, stepY);
+#endif
+                        break;
+                    case DEFIPATH_WIDTH:
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                        fprintf(stdout, "%d\n", p->getWidth());
+#endif
+                        break;
+                    case DEFIPATH_POINT:
+                        p->getPoint(&x, &y);
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                        fprintf(stdout, "( %d %d ) ", x, y);
+#endif
+                        break;
+                    case DEFIPATH_TAPER:
+#ifndef IGNORE_DEBUG_PRINT_defiNet_
+                        fprintf(stdout, "TAPER\n");
+#endif
+                        break;
+                    }
+                }
+            }
+        }
+
+        defDB->netName_to_vVias[netName] = vVias;
+        
+        return 0;
+    }
+
+    bool CustomDefDriver::custom_parse_file(const string& filename) {
+        // Setup DEF reader API. Doc in Limbo/limbo/thirdparty/lefdef/5.8/def/doc/defapi.pdf
+        defrInitSession(1);
+        defrSetUserData((void*)3);  // Set user data
+        defrSetAddPathToNet();      // Add path data to the appropriate net data
+        
+        // Set customized callback function to retrieve info from thirdparty DEF reader
+        /* Available function cbk and function input type are defined in 
+                Limbo\limbo\thirdparty\lefdef\5.8\def\def\defrReader.hpp
+           The usage example in Limbo is in
+                Limbo\limbo\parsers\def\adapt\DefDriver.cc
+        */
+        defrSetNetCbk(custom_netf);
+
+        FILE* f = fopen(filename.c_str(), "r");
+        if (!f) {
+            std::cerr << "Could not open input file " << filename << "\n";
+            return false;
+        }
+
+        // Set case sensitive to 0 to start with, in History & PropertyDefinition
+        // reset it to 1.
+        void* userData = NULL;
+        int res = defrRead(f, filename.c_str(), userData, 1);
+
+        (void)defrPrintUnusedCallbacks(stdout);
+        (void)defrReleaseNResetMemory();
+        (void)defrUnsetNonDefaultCbk();
+        (void)defrUnsetNonDefaultStartCbk();
+        (void)defrUnsetNonDefaultEndCbk();
+
+        // Unset all the callbacks
+        defrUnsetNetCbk();
+
+        // Release allocated singleton data.
+        defrClear();
+        fclose(f);
+
+        return true;
+    }
+
+    bool customDefRead(DefDataBase& dbDef, const string& defFile) {
+        defDB = &dbDef;      // set dbDef as global defDB 
+
+        CustomDefDriver driver(dbDef);
+        bool res = driver.custom_parse_file(defFile);
+
+        defDB = NULL;       // reset to NULL
+        return res;
+    }
+}   // end of namespace CustomDefParser
+
 
 void DefDataBase::print_allNets() {
     cout << "Total " << this->allNets.size() << " nets. netName: (nodeName, pin) \n";
