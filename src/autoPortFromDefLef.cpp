@@ -149,12 +149,21 @@ namespace CustomDefParser {
 
 
 void DefDataBase::print_allNets() {
-    cout << "Total " << this->allNets.size() << " nets. netName: (nodeName, pin) \n";
+    cout << "Total " << this->allNets.size() << " nets. netName: (nodeName, pin), viaName, viaCoor in um \n";
     for (const auto& net : this->allNets) {
-        cout << net.netName << ": ";
+        string netName = net.netName;
+        cout << "Net \"" << netName << "\": \n";
         for (const auto& NodenamePin : net.vNodenamePin)
-            cout << "(" << NodenamePin.first << ", " << NodenamePin.second << ") ";
+            cout << "  (" << NodenamePin.first << ", " << NodenamePin.second << ") ";
         cout << endl;
+        if (this->netName_to_vVias.find(netName) == this->netName_to_vVias.end()) {
+            cout << "  No via found in net " << netName << endl;
+        }
+        else {
+            for (const ViaInfo& via : this->netName_to_vVias[netName]) {
+                cout << "  " << via.viaName << "  ( " << via.xInUm << ", " << via.yInUm << " ) \n";
+            }
+        }
     }
 }
 
