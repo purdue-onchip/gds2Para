@@ -27,13 +27,6 @@ enum OrientType {
     FE = 7
 };
 
-struct ComponentInfo {
-    double xInUm = 0;   // x, y of origin, converted to default DEF unit in um.
-    double yInUm = 0;
-    string orient = "N";
-    string cellName = "";
-};
-
 struct PinInfo {
     string direct = "INPUT";    // direction, {INPUT, OUTPUT, INOUT, FEEDTHRU}
     vector<string> vLayer;      // layers  
@@ -41,6 +34,19 @@ struct PinInfo {
     PinInfo() {}
     PinInfo(string dir, vector<string> vLay)
         : direct{ dir }, vLayer{ vLay } {}
+};
+
+struct CompPinInfo : public PinInfo {
+    // rectangles of each pin in the component, converted to global coordinate in um.
+    vector<vector<double>> vRectsInUm_globCoor; // vRects[i] = {x0,y0,x1,y1} are two opposite corners of the rect
+};
+
+struct ComponentInfo {
+    double xInUm = 0;   // x, y of origin, converted to default DEF unit in um.
+    double yInUm = 0;
+    string orient = "N";
+    string cellName = "";
+    unordered_map<string, CompPinInfo> allPinsInComp;   // map[pinName] = struct CompPinInfo.
 };
 
 struct DefPinInfo : public PinInfo {
@@ -211,5 +217,8 @@ public:
 
 vector<double> localLefCoorToGlobalDefCoor(double localLefCoor[2], 
     double sizeBB[2], double origin[2], double placementDef[2], string orient);
+void localCellPinRect_to_globalCompPinRect(
+    const unordered_map<string, LefCellInfo>& allCellsLEF,
+    unordered_map<string, ComponentInfo>& allComponentsDEF);
 
 #endif

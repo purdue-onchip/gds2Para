@@ -178,10 +178,20 @@ void DefDataBase::print_allDefPins() {
 }
 
 void DefDataBase::print_allComponents() {
-    cout << "Total " << this->allComponents.size() << " components. compName (unordered): cellName, x(um), y(um), orient \n";
-    for (const auto& comp : this->allComponents) {
-        cout << comp.first << ": " << comp.second.cellName << ", " << comp.second.xInUm << ", "
-            << comp.second.yInUm << ", " << comp.second.orient << endl;
+    cout << "Total " << this->allComponents.size() << " components. compName (unordered): cellName, x(um), y(um), orient, and global pin rect \n";
+    for (const auto& [compName, compInfo] : this->allComponents) {
+        cout << "\n" << compName << ": " << compInfo.cellName << ", " << compInfo.xInUm << ", "
+            << compInfo.yInUm << ", " << compInfo.orient << endl;
+        for (const auto&[pinName, pinInfo] : compInfo.allPinsInComp) {
+            cout << "PIN " << pinName << ", " << pinInfo.direct << ", Layer ";
+            for (const auto& layer : pinInfo.vLayer) {
+                cout << layer << "  ";
+            }
+            cout << endl;
+            for (const auto& rect : pinInfo.vRectsInUm_globCoor) {
+                cout << "    RECT " << rect[0] << "  " << rect[1] << "  " << rect[2] << "  " << rect[3] << endl;
+            }
+        }
     }
 }
 
@@ -682,6 +692,47 @@ vector<double> localLefCoorToGlobalDefCoor(
     double xg = (xmr - xll) - origin[0] + placementDef[0];
     double yg = (ymr - yll) - origin[1] + placementDef[1];
     return {xg, yg};
+}
+
+// Obtain global coordinates of all pins for each component. Converted from local rectangles in corresponding cell
+void localCellPinRect_to_globalCompPinRect(
+    const unordered_map<string, LefCellInfo>& allCellsLEF,
+    unordered_map<string, ComponentInfo>& allComponentsDEF) {
+    for (auto& [compName, compInfo] : allComponentsDEF) {
+        string cellName = compInfo.cellName;
+        const LefCellInfo& cellInfo = allCellsLEF.at(cellName);
+
+        // cur cell info: size of bounding box, origin, placement, and orient
+        double sizeBBInUm[2] = { cellInfo.sizeXInUm, cellInfo.sizeYInUm };
+        double originInUm[2] = { cellInfo.originXInUm, cellInfo.originYInUm };
+        double placementDefInUm[2] = { compInfo.xInUm, compInfo.yInUm };
+        string cellOrient = compInfo.orient;
+
+        // transform pin coordinates from local cell coordinate to global coordinate
+        for (const auto&[pinName, lefPinInfo] : cellInfo.allPinsInCell) {
+            CompPinInfo compPinInfo;
+            compPinInfo.direct = lefPinInfo.direct;
+            compPinInfo.vLayer = lefPinInfo.vLayer;
+            for (const vector<double>& rect : lefPinInfo.vRectsInUm) {
+                vector<double> rect_globCoor = {};
+                for (int iPt = 0; iPt < 2; iPt++) { // 2 corner points of the rect
+                    double localLefCoorInUm[2] = { rect[2 * iPt], rect[2 * iPt + 1] };
+                    vector<double> globalCoorInUm = localLefCoorToGlobalDefCoor(
+                        localLefCoorInUm,   // local LEF coordinate
+                        sizeBBInUm,         // size of bounding box of the cell
+                        originInUm,         // origin of the cell to align with a DEF COMPONENT placement point
+                        placementDefInUm,   // the DEF COMPONENT placement point
+                        cellOrient);        // orientation of the cell defined in DEF COMPONENTS
+                    rect_globCoor.push_back(globalCoorInUm[0]);
+                    rect_globCoor.push_back(globalCoorInUm[1]);
+                }
+                compPinInfo.vRectsInUm_globCoor.push_back(rect_globCoor);
+            }
+
+            // store all global pin coor in ComponentInfo.allPinsInComp
+            compInfo.allPinsInComp[pinName] = compPinInfo;
+        }
+    }
 }
 
 void AutoPorts::getPortCoordinate(
