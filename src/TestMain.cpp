@@ -559,7 +559,7 @@ int main(int argc, char** argv)
             AutoPorts autoPorts;
             autoPorts.readLayerMap_cbk(inSimFile);
             //autoPorts.print_layerMap_cbk();
-            autoPorts.getPortCoordinate(dbDef.allComponents, dbDef.allDefPins, dbDef.allNets, dbLef.allCells);
+            autoPorts.getPortCoordinate(dbDef.netName_to_vVias, dbDef.allComponents, dbDef.allDefPins, dbDef.allNets);
             //autoPorts.print_netName_to_vPortCoor();
 
             // Append information so far to fdtdMesh

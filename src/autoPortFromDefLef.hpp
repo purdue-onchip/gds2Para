@@ -208,10 +208,10 @@ public:
     void readLayerMap_cbk(string inFileName);
     void print_layerMap_cbk();
     void getPortCoordinate(
+        const unordered_map<string, vector<ViaInfo>> netName_to_vVias,
         const unordered_map<string, ComponentInfo>& allComponentsDEF,
         const unordered_map<string, DefPinInfo>& allDefPinsDEF,
-        const vector<NetInfo>& allNetsDEF,
-        const unordered_map<string, LefCellInfo>& allCellsLEF);
+        const vector<NetInfo>& allNetsDEF);
     void print_netName_to_vPortCoor();
 };
 
@@ -220,5 +220,6 @@ vector<double> localLefCoorToGlobalDefCoor(double localLefCoor[2],
 void localCellPinRect_to_globalCompPinRect(
     const unordered_map<string, LefCellInfo>& allCellsLEF,
     unordered_map<string, ComponentInfo>& allComponentsDEF);
+string allDigitsInString(const string& str);
 
 #endif

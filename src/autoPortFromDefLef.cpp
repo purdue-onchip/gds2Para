@@ -735,11 +735,21 @@ void localCellPinRect_to_globalCompPinRect(
     }
 }
 
+string allDigitsInString(const string& str) {
+    string digitStr = {};
+    for (char c : str) {
+        if (isdigit(c)) {
+            digitStr.push_back(c);
+        }
+    }
+    return digitStr;
+}
+
 void AutoPorts::getPortCoordinate(
+    const unordered_map<string, vector<ViaInfo>> netName_to_vVias,
     const unordered_map<string, ComponentInfo>& allComponentsDEF,
     const unordered_map<string, DefPinInfo>& allDefPinsDEF,
-    const vector<NetInfo>& allNetsDEF,
-    const unordered_map<string, LefCellInfo>& allCellsLEF)
+    const vector<NetInfo>& allNetsDEF)
 {
     for (const auto& net : allNetsDEF) {                        // loop over all nets
         const string& netName = net.netName;
@@ -750,40 +760,57 @@ void AutoPorts::getPortCoordinate(
 
             // Node type 1: defined as component
             if (nodeName != "PIN") {
-                // corresponding cell of cur component
-                const ComponentInfo& defComp = allComponentsDEF.at(nodeName);
-                string cellName = defComp.cellName;
-                const LefCellInfo& lefCell = allCellsLEF.at(cellName);
+                const ComponentInfo& defComp = allComponentsDEF.at(nodeName);   // cur component info
+                const CompPinInfo& compPin = defComp.allPinsInComp.at(pinName); // cur compPin info
+                string layerName = compPin.vLayer[0];           // use the first found layerName as the port layer
+                string digitsInLayerName = allDigitsInString(layerName);
 
-                // cur cell info: size of bounding box, origin, placement, and orient
-                double sizeBBInUm[2] = { lefCell.sizeXInUm, lefCell.sizeYInUm };
-                double originInUm[2] = { lefCell.originXInUm, lefCell.originYInUm };
-                double placementDefInUm[2] = { defComp.xInUm, defComp.yInUm };
-                string cellOrient = defComp.orient;
-
-                // pin of cur cell and its local coordinate within the cell
-                const LefPinInfo& lefPin = lefCell.allPinsInCell.at(pinName);
-                const vector<double>& rect = lefPin.vRectsInUm[0];      // use the first Rect of cur pin
-                double localCoor_xInUm = (rect[0] + rect[2]) / 2.0;     // use the center point of 1st rect as cur pin location
-                double localCoor_yInUm = (rect[1] + rect[3]) / 2.0;
-
-                // apply transformation from local cell coordinate to global port coordinate
-                double localLefCoorInUm[2] = { localCoor_xInUm, localCoor_yInUm };
-                vector<double> globalCoorInUm = localLefCoorToGlobalDefCoor(
-                    localLefCoorInUm,   // local LEF coordinate
-                    sizeBBInUm,         // size of bounding box of the cell
-                    originInUm,         // origin of the cell to align with a DEF COMPONENT placement point
-                    placementDefInUm,   // the DEF COMPONENT placement point
-                    cellOrient);        // orientation of the cell defined in DEF COMPONENTS
+                // loop over all vias in cur net to find a via inside the compPin rects
+                const vector<vector<double>>& vRect = compPin.vRectsInUm_globCoor;  // rect shapes of cur compPin
+                const vector<ViaInfo>& vVias = netName_to_vVias.at(netName);        // all vias in cur net
+                bool notFoundPortYet = true;
+                int indVia = 0;
+                vector<double> globalPortCoorInUm = {};
+                while (notFoundPortYet && indVia < vVias.size()) {
+                    const ViaInfo& via = vVias[indVia];
+                    indVia++;
+                    // check if cur via connects the pin's layer by checking the digits. e.g. "VIA12" connects layer "M1" & "M2"
+                    string digitsInViaName = allDigitsInString(via.viaName);
+                    if (digitsInViaName.find(digitsInLayerName) != string::npos) {
+                        for (const vector<double>& rect : vRect) {
+                            double xmin = rect[2] > rect[0] ? rect[0] : rect[2];
+                            double xmax = rect[2] > rect[0] ? rect[2] : rect[0];
+                            double ymin = rect[3] > rect[1] ? rect[1] : rect[3];
+                            double ymax = rect[3] > rect[1] ? rect[3] : rect[1];
+                            // found the port at cur via when cur via is inside cur compPin rect
+                            if (via.xInUm >= xmin && via.xInUm <= xmax &&
+                                via.yInUm >= ymin && via.yInUm <= ymax) {
+                                notFoundPortYet = false;
+                                globalPortCoorInUm = { via.xInUm, via.yInUm };
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (globalPortCoorInUm.size() == 0) {
+                    if (vRect.size() != 0) {    // if cur pin is not defined at via, choose the center of 1st rect as port location
+                        const vector<double>& rect = vRect[0];
+                        globalPortCoorInUm = { (rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0 };
+                    }
+                    else {
+                        cerr << "ERROR! Not found the port coordinate from DEF file for net "
+                            << netName << ", node " << nodeName << ". Reset port to (0, 0) \n";
+                        globalPortCoorInUm = { 0, 0 };
+                    }
+                }
 
                 // organize port coordinate together in struct NetPortCoor
                 NetPortCoor portCoor;
-                portCoor.direct = lefPin.direct;
-                portCoor.vLayer = lefPin.vLayer;
+                portCoor.direct = compPin.direct;
+                portCoor.vLayer = compPin.vLayer;
                 portCoor.portName = "port_" + netName + "_" + nodeName + "_" + pinName;
-                portCoor.xInUm = globalCoorInUm[0];
-                portCoor.yInUm = globalCoorInUm[1];
-                string layerName = lefPin.vLayer[0];                    // use the first found layerName as the port layer
+                portCoor.xInUm = globalPortCoorInUm[0];
+                portCoor.yInUm = globalPortCoorInUm[1];
                 portCoor.zInUm = this->layerMap[layerName].zminInUm;    // put port at layer bottom
                 portCoor.gdsiiNum = this->layerMap[layerName].layerNameInNum;
 
