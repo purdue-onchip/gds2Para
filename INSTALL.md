@@ -128,9 +128,12 @@ Please follow these instructions for a general deployment on Linux machines. The
     * The partial installation of Limbo components needed to run gds2Para is feasible only before CMake was introduced as the way to build the entirety of Limbo
     * Only the necessary parsers will be built from Limbo using these instructions, and users wanting to use other Limbo features should follow the installation instructions given in that repository
     * (Optional) It is believed that the necessary components and most other components of Limbo can be built using `make` in the top directory of Limbo following these instructions, but this has not been tested
-12. Enter the directory "limbo/parsers/gdsii/stream" from the previous location
-13. Run `make -j 2` in this directory to build certain Limbo libraries
-14. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
+12. Install third-party LEF & DEF readers by following the instructions in file /Limbo/limbo/thirdparty/lefdef/5.8/lefdefReadme.txt
+13. Compile Limbo's parsers 
+    * Limbo's GDSII parser: Enter the directory "/Limbo/limbo/parsers/gdsii/stream". Run `make -j 2` in this directory to build certain Limbo libraries
+    * Limbo's LEF parser: Enter the directory "/Limbo/limbo/parsers/lef/adapt". Run `make -j 2`.
+    * Limbo's DEF parser: Enter the directory "/Limbo/limbo/parsers/def/adapt". Run `make -j 2`.
+14. Ensure that new static libraries named **libgdsparser.a**, **liblefparseradapt.a**, and **libdefparseradapt.a** exist in directory "/Limbo/lib"
 15. Follow the instructions in [HYPRE Setup](#HYPRE-Setup) to prepare multigrid methods from HYPRE
     * It is necessary to make all changes to ".bashrc" and ".cshrc" in the home directory before following these instructions
     * Additional environment variables may need to be set depending on the setup of your Linux machine
