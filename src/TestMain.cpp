@@ -560,7 +560,7 @@ int main(int argc, char** argv)
             autoPorts.readLayerMap_cbk(inSimFile);
             //autoPorts.print_layerMap_cbk();
             autoPorts.getPortCoordinate(dbDef.netName_to_vVias, dbDef.allComponents, dbDef.allDefPins, dbDef.allNets);
-            //autoPorts.print_netName_to_vPortCoor();
+            //autoPorts.print_netName_to_vPortCoor(dbDef.allNets);
 
             // Append information so far to fdtdMesh
             unordered_set<double> portCoorx, portCoory;

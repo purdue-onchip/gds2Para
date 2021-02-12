@@ -838,11 +838,13 @@ void AutoPorts::getPortCoordinate(
 
 }
 
-void AutoPorts::print_netName_to_vPortCoor() {
-    cout << "Port Coordinate in um: (portName layerName, layerNameInNum, x, y, z) \n";
-    for (auto&[netName, vPortCoor] : this->netName_to_vPortCoor) {
+void AutoPorts::print_netName_to_vPortCoor(const vector<NetInfo>& allNetsDEF) {
+    cout << "\n\nPort Coordinate in um: (portName layerName, layerNameInNum, x, y, z) \n";
+    for (const auto& net : allNetsDEF) {                // loop over all nets
+        const string& netName = net.netName;
+        const vector<NetPortCoor>& vPortCoor = this->netName_to_vPortCoor.at(netName);
         cout << "\nNet \"" << netName << "\": \n"; 
-        for (auto & portCoor : vPortCoor) {
+        for (auto & portCoor : vPortCoor) {             // loop over all ports of current net
             cout << portCoor.portName << "  " << portCoor.vLayer[0] << "  " << portCoor.gdsiiNum << "  "
                 << portCoor.xInUm << "  " << portCoor.yInUm << "  " << portCoor.zInUm << endl;
         }

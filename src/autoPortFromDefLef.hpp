@@ -212,7 +212,7 @@ public:
         const unordered_map<string, ComponentInfo>& allComponentsDEF,
         const unordered_map<string, DefPinInfo>& allDefPinsDEF,
         const vector<NetInfo>& allNetsDEF);
-    void print_netName_to_vPortCoor();
+    void print_netName_to_vPortCoor(const vector<NetInfo>& allNetsDEF);
 };
 
 vector<double> localLefCoorToGlobalDefCoor(double localLefCoor[2], 
