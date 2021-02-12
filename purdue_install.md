@@ -63,30 +63,32 @@ Please direct all questions, bug reports, and issues relating to installing or r
         return
     fi
 
+    # Note: Commands for improving "gcc" and "OpenMPI" can be replaced by 
+    #       command "module load gcc" and "module load mpi" in new OS.
+    # Details in https://engineering.purdue.edu/ECN/Support/KB/Docs/LmodonLinuxHosts
+    module load gcc/8.3.0
+    module load mpi/mpich-3.2-x86_64
+
     # Improve Compilers
     alias cc="gcc"
-    export CC=/opt/gcc/7.1.0/bin/gcc
-    export CXX=/opt/gcc/7.1.0/bin/g++
-    export FC=/opt/gcc/7.1.0/bin/gfortran
-    export PATH=/opt/gcc/7.1.0/bin:$PATH
-    export LD_LIBRARY_PATH=/opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:$LD_LIBRARY_PATH
+    export CC=/package/gcc/8.3.0/bin/gcc
+    export CXX=/package/gcc/8.3.0/bin/g++
+    export FC=/package/gcc/8.3.0/bin/gfortran
+    export PATH=/package/gcc/8.3.0/bin:$PATH
+    export LD_LIBRARY_PATH=/package/gcc/8.3.0/lib64:/package/gcc/8.3.0/lib:$LD_LIBRARY_PATH
 
     # Improve OpenMPI Version
-    export PATH=/opt/mpich2-gcc/1.4.1p1/bin:${PATH}
-    export LD_LIBRARY_PATH=/opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
+    export PATH=/usr/lib64/mpich-3.2/bin:${PATH}
+    export LD_LIBRARY_PATH=/usr/lib64/mpich-3.2/lib:${LD_LIBRARY_PATH}
     export OMPI_CC=$CC
     export OMPI_CXX=$CXX
     export OMPI_FC=$FC
 
-    # Improve Intel MKL Version
-    export INTEL_MATH_LIB=/opt/intel/current/lib/intel64_lin
-    export MKL_DIR=/opt/intel/current/mkl
+    # Improve Intel MKL Version (module load intel)
+    module load intel/18.0.1
+    export MKL_DIR=/package/intel/18.0.1/mkl
     export MKLROOT=$MKL_DIR
-    export LD_LIBRARY_PATH=$INTEL_MATH_LIB:$MKL_DIR/lib/intel64_lin:$LD_LIBRARY_PATH
-
-    # Improve LAPACK / BLAS Version
-    export LAPACK_DIR=/opt/lapack/3.8.0
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LAPACK_DIR/lib64
+    export LD_LIBRARY_PATH=$MKL_DIR/lib/intel64:$LD_LIBRARY_PATH
 
     # Improve git Version
     export PATH=/opt/git/2.18.0/bin:$PATH
@@ -106,30 +108,32 @@ Please direct all questions, bug reports, and issues relating to installing or r
         exit 0
     endif
 
+    # Note: Commands for improving "gcc" and "OpenMPI" can be replaced by 
+    #       command "module load gcc" and "module load mpi" in new OS.
+    # Details in https://engineering.purdue.edu/ECN/Support/KB/Docs/LmodonLinuxHosts
+    module load gcc/8.3.0
+    module load mpi/mpich-3.2-x86_64
+
     # Improve gcc Version
     alias cc 'gcc'
-    setenv CC /opt/gcc/7.1.0/bin/gcc
-    setenv CXX /opt/gcc/7.1.0/bin/g++
-    setenv FC /opt/gcc/7.1.0/bin/gfortran
-    setenv PATH /opt/gcc/7.1.0/bin:${PATH}
-    setenv LD_LIBRARY_PATH /opt/gcc/7.1.0/lib64:/opt/gcc/7.1.0/lib:${LD_LIBRARY_PATH}
+    setenv CC /package/gcc/8.3.0/bin/gcc
+    setenv CXX /package/gcc/8.3.0/bin/g++
+    setenv FC /package/gcc/8.3.0/bin/gfortran
+    setenv PATH /package/gcc/8.3.0/bin:$PATH
+    setenv LD_LIBRARY_PATH /package/gcc/8.3.0/lib64:/package/gcc/8.3.0/lib:${LD_LIBRARY_PATH}
 
     # Improve OpenMPI Version
-    setenv PATH /opt/mpich2-gcc/1.4.1p1/bin:${PATH}
-    setenv LD_LIBRARY_PATH /opt/mpich2-gcc/1.4.1p1/lib64:${LD_LIBRARY_PATH}
+    setenv PATH /usr/lib64/mpich-3.2/bin:${PATH}
+    setenv LD_LIBRARY_PATH /usr/lib64/mpich-3.2/lib:${LD_LIBRARY_PATH}
     setenv OMPI_CC ${CC}
     setenv OMPI_CXX ${CXX}
     setenv OMPI_FC ${FC}
 
     # Improve Intel MKL Version
-    setenv INTEL_MATH_LIB /opt/intel/current/lib/intel64_lin
-    setenv MKL_DIR /opt/intel/current/mkl
+    module load intel/18.0.1
+    setenv MKL_DIR /package/intel/18.0.1/mkl
     setenv MKLROOT ${MKL_DIR}
-    setenv LD_LIBRARY_PATH ${INTEL_MATH_LIB}:${MKL_DIR}/lib/intel64_lin:${LD_LIBRARY_PATH}
-
-    # Improve LAPACK / BLAS Version
-    setenv LAPACK_DIR /opt/lapack/3.8.0
-    setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:${LAPACK_DIR}/lib64
+    setenv LD_LIBRARY_PATH ${MKL_DIR}/lib/intel64:${LD_LIBRARY_PATH}
 
     # Improve git Version
     setenv PATH /opt/git/2.18.0/bin:${PATH}
@@ -152,9 +156,12 @@ Please direct all questions, bug reports, and issues relating to installing or r
     * The partial installation of Limbo components needed to run gds2Para is feasible only before CMake was introduced as the way to build the entirety of Limbo
     * Only the necessary parsers will be built from Limbo using these instructions, and users wanting to use other Limbo features should follow the installation instructions given in that repository
     * (Optional) It is believed that the necessary components and most other components of Limbo can be built using `make` in the top directory of Limbo following these instructions, but this has not been tested
-12. Enter the directory "limbo/parsers/gdsii/stream" from the previous location
-13. Run `make -j 2` in this directory to build certain Limbo libraries
-14. Return to working directory and ensure that a new library file named **libgdsparser.a** exists by running `ls -lh Limbo/lib`
+12. Install third-party LEF & DEF readers by following the instructions in file /Limbo/limbo/thirdparty/lefdef/5.8/lefdefReadme.txt
+13. Compile Limbo's parsers 
+    * Limbo's GDSII parser: Enter the directory "/Limbo/limbo/parsers/gdsii/stream". Run `make -j 2` in this directory to build certain Limbo libraries
+    * Limbo's LEF parser: Enter the directory "/Limbo/limbo/parsers/lef/adapt". Run `make -j 2`.
+    * Limbo's DEF parser: Enter the directory "/Limbo/limbo/parsers/def/adapt". Run `make -j 2`.
+14. Ensure that new static libraries named **libgdsparser.a**, **liblefparseradapt.a**, and **libdefparseradapt.a** exist in directory "/Limbo/lib"
 15. Follow the instructions in [HYPRE Setup](#HYPRE-Setup) to prepare multigrid methods from HYPRE
     * It is necessary to make all changes to ".bashrc" and ".cshrc" in the home directory before following these instructions
     * Continue following the remaining steps once HYPRE is installed
