@@ -7,6 +7,7 @@ namespace CustomDefParser {
 
     // define as global to access retrieved data inside customized callback function
     DefDataBase* defDB = NULL;
+    int indexOfNet = 0; // 0-based index of regualr net in DEF-NETS
 
     int custom_netf(defrCallbackType_e c, defiNet* net, defiUserData ud) {
 #define IGNORE_DEBUG_PRINT_defiNet_
@@ -22,6 +23,8 @@ namespace CustomDefParser {
         // Via information from Regular Wiring Statement in DEF-NETS
         /*      refer to Limbo\limbo\thirdparty\lefdef\5.8\def\def\defiNet.hpp  */
         int x, y;       // current point
+        int xmin = INT_MAX, ymin = INT_MAX; // track the bounding box of this net
+        int xmax = INT_MIN, ymax = INT_MIN;
         ViaInfo curVia;
         for (int i = 0; i < net->numWires(); i++) {
             int newLayer = 0;
@@ -76,6 +79,11 @@ namespace CustomDefParser {
                         break;
                     case DEFIPATH_POINT:
                         p->getPoint(&x, &y);
+                        // get bounding box from min & max of all points in the wires
+                        xmin = min(xmin, x);
+                        ymin = min(ymin, y);
+                        xmax = max(xmax, x);
+                        ymax = max(ymax, y);
 #ifndef IGNORE_DEBUG_PRINT_defiNet_
                         fprintf(stdout, "( %d %d ) ", x, y);
 #endif
@@ -91,7 +99,26 @@ namespace CustomDefParser {
         }
 
         defDB->netName_to_vVias[netName] = vVias;
-        
+
+        auto& curNet = defDB->allNets[indexOfNet];
+        // bounding box should also be bounded by the die area of the DEF design
+        curNet.boundBoxInUm[0] = max(xmin * 1.0 / defDB->defUnit, defDB->dieAreaInUm[0]);
+        curNet.boundBoxInUm[1] = max(ymin * 1.0 / defDB->defUnit, defDB->dieAreaInUm[1]);
+        curNet.boundBoxInUm[2] = min(xmax * 1.0 / defDB->defUnit, defDB->dieAreaInUm[2]);
+        curNet.boundBoxInUm[3] = min(ymax * 1.0 / defDB->defUnit, defDB->dieAreaInUm[3]);
+        if (curNet.netName != netName || xmin == INT_MAX) {
+            if (curNet.netName != netName) {
+                cerr << "Warning: netName NOT matched! Bounding box is set to [0,0,0,0] for net \"" << curNet.netName << "\" \n";
+            }
+            else if (xmin == INT_MAX) {
+                cerr << "Warning: NO point found in net wiring statement! Bounding box is set to [0,0,0,0] for net \"" << curNet.netName << "\" \n";
+            }
+            for (int i = 0; i < 4; i++) {
+                curNet.boundBoxInUm[i] = 0;
+            }
+        }
+
+        indexOfNet++;
         return 0;
     }
 
@@ -138,6 +165,7 @@ namespace CustomDefParser {
 
     bool customDefRead(DefDataBase& dbDef, const string& defFile) {
         defDB = &dbDef;      // set dbDef as global defDB 
+        indexOfNet = 0;      // init index of net in DEF-NETS
 
         CustomDefDriver driver(dbDef);
         bool res = driver.custom_parse_file(defFile);
@@ -164,6 +192,8 @@ void DefDataBase::print_allNets() {
                 cout << "  " << via.viaName << "  ( " << via.xInUm << ", " << via.yInUm << " ) \n";
             }
         }
+        cout << "  Bounding box (xmin, ymin, xmax, ymax) in um: ( " << net.boundBoxInUm[0] << ", "
+            << net.boundBoxInUm[1] << ", " << net.boundBoxInUm[2] << ", " << net.boundBoxInUm[3] << " ) \n";
     }
 }
 

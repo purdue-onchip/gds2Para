@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <unordered_map>
 #include <fstream>
 #include <sstream>
@@ -68,6 +69,7 @@ struct NetInfo {        // same as DefParser::Net, redefine here for easier refe
     string netName = "";
     int netWeight = 1;  // net weight, used in automatic layout tools, not used in gds2Para.
     vector<std::pair<string, string> > vNodenamePin;    // array of (node, pin) pair. vNetPin[i].first = componentName.
+    double boundBoxInUm[4]; // bounding box {xmin, ymin, xmax, ymax} in um of this net
 };
 
 class DefDataBase : public DefParser::DefDataBase
