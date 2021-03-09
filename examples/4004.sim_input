@@ -12,11 +12,11 @@ freqScale = 1
 DIELECTRIC STACK
 numStack = 7
 0 z = 0.0000 h = 4.0e-5 e = 3.9 # Li added PEC
-1 z = 4.0e-5 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-3 z = 8.0e-5 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-4 z = 1.2e-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-5 z = 1.6e-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
-6 z = 2.0e-4 h = 4.0e-5 e = 3.9 # SiO2 at 4x 10-um technology node
+1 z = 4.0e-5 h = 4.0e-5 e = 3.9 TanD = 0.0 sigma = 5.8e+7  # SiO2 at 4x 10-um technology node
+3 z = 8.0e-5 h = 4.0e-5 e = 3.9 TanD = 0.0 sigma = 5.8e+7  # SiO2 at 4x 10-um technology node
+4 z = 1.2e-4 h = 4.0e-5 e = 3.9 TanD = 0.0 sigma = 5.8e+7  # SiO2 at 4x 10-um technology node
+5 z = 1.6e-4 h = 4.0e-5 e = 3.9 TanD = 0.0 sigma = 5.8e+7  # SiO2 at 4x 10-um technology node
+6 z = 2.0e-4 h = 4.0e-5 e = 3.9 TanD = 0.0 sigma = 5.8e+7  # SiO2 at 4x 10-um technology node
 7 z = 2.4e-4 h = 4.0e-5 e = 3.9 # Li added PEC
 
 PORT
