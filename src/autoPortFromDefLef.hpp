@@ -222,6 +222,7 @@ vector<double> localLefCoorToGlobalDefCoor(double localLefCoor[2],
 void localCellPinRect_to_globalCompPinRect(
     const unordered_map<string, LefCellInfo>& allCellsLEF,
     unordered_map<string, ComponentInfo>& allComponentsDEF);
+void enlargeNetBoundingBox_by_enclosingContactedLefPins(DefDataBase& dbDef);
 string allDigitsInString(const string& str);
 
 #endif

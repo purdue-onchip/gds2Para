@@ -539,6 +539,7 @@ int main(int argc, char** argv)
             bool defStatus = DefParser::read(dbDef, inDefFile);
             CustomDefParser::customDefRead(dbDef, inDefFile);
             localCellPinRect_to_globalCompPinRect(dbLef.allCells, dbDef.allComponents);
+            enlargeNetBoundingBox_by_enclosingContactedLefPins(dbDef);
             if (defStatus) {
                 cout << "Successfully read in DEF file " << inDefFile << endl;
             }

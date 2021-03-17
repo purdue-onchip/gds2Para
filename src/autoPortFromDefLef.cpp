@@ -765,6 +765,35 @@ void localCellPinRect_to_globalCompPinRect(
     }
 }
 
+// Enlarge the bounding box of each net by also including the contacted LEF pins
+void enlargeNetBoundingBox_by_enclosingContactedLefPins(DefDataBase& dbDef) {
+    for (NetInfo& net : dbDef.allNets) {
+        // find the bounding box of contacted LEF pins
+        for (const pair<string, string>& NodenamePin : net.vNodenamePin) {
+            const string& nodeName = NodenamePin.first;
+            const string& pinName = NodenamePin.second;
+
+            // only consider node type 1 (component)
+            if (nodeName != "PIN") {
+                CompPinInfo& contactedCompPin = dbDef.allComponents.at(nodeName).allPinsInComp.at(pinName);
+                for (const vector<double>& rect : contactedCompPin.vRectsInUm_globCoor) {
+                    // min & max of each rect of this contacted LEF pin
+                    double xmin = min(rect[0], rect[2]);
+                    double xmax = max(rect[0], rect[2]);
+                    double ymin = min(rect[1], rect[3]);
+                    double ymax = max(rect[1], rect[3]);
+
+                    // update the bounding box of the net
+                    net.boundBoxInUm[0] = min(net.boundBoxInUm[0], xmin);
+                    net.boundBoxInUm[2] = max(net.boundBoxInUm[2], xmax);
+                    net.boundBoxInUm[1] = min(net.boundBoxInUm[1], ymin);
+                    net.boundBoxInUm[3] = max(net.boundBoxInUm[3], ymax);
+                }
+            }
+        }
+    }
+}
+
 string allDigitsInString(const string& str) {
     string digitStr = {};
     for (char c : str) {
