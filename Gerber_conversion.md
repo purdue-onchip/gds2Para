@@ -1,4 +1,4 @@
-# How to Convert Cadence Allegro BRD to GDSII
+# How to Convert RS-274X Gerber Files to GDSII
 
 1. Download full printed circuit board design from source
 2. Unzip the design and navigate to the Gerber files in the electrical aspects
