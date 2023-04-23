@@ -14,7 +14,7 @@ Once a design is loaded, the information can be written to another GDSII file or
 ## Packages
 | Packages / Library               | Languages        | Headers                                | Description                                                       |
 | -------------------------------- | ---------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| C Standard Library               | C                | CCtype, Cerrno, Cmath, Cstdio, Cstlib, Cstring, Ctime     | Utilities for testing character categorization, C language error numbers, basic arithmetic operations, C language input/output, manipulating the char\* data type, and dates and timers |
+| C Standard Library               | C                | CCtype, Cerrno, Cmath, Cstdio, Cstdlib, Cstring, Ctime    | Utilities for testing character categorization, C language error numbers, basic arithmetic operations, C language input/output, manipulating the char\* data type, and dates and timers |
 | C++ Standard Library: Algorithms | C++              | Algorithm                              | Useful algorithms including sorting                               |
 | C++ Standard Library: Containers | C++              | Queue, Set, Stack, Unordered\_map, Unordered\_set, Vector | Utilities for handling queues and priority queues, sets and multisets, LIFO stacks, associative data types, dictionary collection types, and collection data types from existing C++ data types  |
 | C++ Standard Library: I/O        | C++              | FStream, IOStream                      | Plain text file input/output and command line input/output        |
@@ -62,12 +62,12 @@ Note that modern compilers that support the following language standards are nee
 
 ## Developers
 All software is under active development without any notices regarding the timing of nature of updates. Contributions are welcome through forking and [pull requests](https://github.com/purdue-onchip/gds2Para/pulls). Please direct all questions, bug reports, and issues relating to this repository to the primary maintainer:
-* [Michael Hayashi](mailto:mhayashi@purdue.edu?subject=Inquiry%20for%20gdsii-interface), Graduate Research Assistant, School of ECE, Purdue University
+* [Dan Jiao](mailto:djiao@purdue.edu?subject=Inquiry%20for%20gds2Para), Synopsys Professor of ECE, Elmore Family School of ECE, Purdue University
 
 Developers:
-* Michael Hayashi, Graduate Research Assistant, School of ECE, Purdue University
-* Li Xue, Graduate Research Assistant, School of ECE, Purdue University
-* Shuzhan Sun, Graduate Research Assistant, School of ECE, Purdue University
+* [Michael Hayashi](mailto:mhayashi@purdue.edu?subject=Inquiry%20for%20gdsii-interface), Former Graduate Research Assistant, Elmore Family School of ECE, Purdue University
+* Dr. Li Xue, Former Graduate Research Assistant, Elmore Family School of ECE, Purdue University
+* Dr. Shuzhan Sun, Former Graduate Research Assistant, Elmore Family School of ECE, Purdue University
 
 Many thanks are owed to the project sponsors for making the development of this software possible:
 
